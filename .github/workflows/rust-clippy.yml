@@ -39,7 +39,13 @@ jobs:
           override: true
 
       - name: Install required cargo
-        run: cargo install clippy-sarif sarif-fmt
+        run: |
+          if ! command -v clippy-sarif &> /dev/null; then
+            cargo install clippy-sarif
+          fi
+          if ! command -v sarif-fmt &> /dev/null; then
+            cargo install sarif-fmt
+          fi
 
       - name: Run rust-clippy
         run: cargo clippy --all-features --message-format=json | clippy-sarif | tee rust-clippy-results.sarif | sarif-fmt
