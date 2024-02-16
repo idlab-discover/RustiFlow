@@ -1,13 +1,10 @@
-use clap:: {
-    Parser,
-    Subcommand,
-};
+use clap::{Parser, Subcommand};
 
 #[derive(Debug, Parser)]
 #[clap(author, version, about)]
 pub struct Cli {
     #[clap(subcommand)]
-    command: Commands,
+    pub command: Commands,
 }
 
 #[derive(Debug, Subcommand)]
@@ -47,7 +44,7 @@ pub enum Dataset {
 
     /// UNSW-NB15 from UNSW Sydney
     UnswNb15,
-    
+
     /// UNSW-NB15 without contaminant features from Laurens D'Hooge
     UnswNb15Ld,
 }
