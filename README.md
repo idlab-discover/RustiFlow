@@ -47,6 +47,8 @@ To build the user space programs:
 cargo build
 ```
 
+### Running the project
+
 To run the program:
 
 ```bash
