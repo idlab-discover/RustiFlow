@@ -24,6 +24,9 @@ jobs:
         profile: minimal
         components: rust-src, llvm-tools-preview
         override: true
+    
+    - name: Install bpf-linker
+      run: cargo install bpf-linker
 
     - name: Build eBPF program
       run: cargo xtask build-ebpf
