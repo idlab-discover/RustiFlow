@@ -8,7 +8,6 @@ use aya_bpf::{
     programs::XdpContext,
     maps::PerfEventArray
 };
-use aya_log_ebpf::info;
 
 use ingress_common::PacketLog;
 
@@ -86,8 +85,6 @@ fn try_xdp_flow_track(ctx: XdpContext) -> Result<u32, ()>{
         port_destination: destination_port,
         port_source: source_port,
     };
-
-    info!(&ctx, "Packet received");
 
     // the zero value is a flag
     EVENTS.output(&ctx, &flow, 0);
