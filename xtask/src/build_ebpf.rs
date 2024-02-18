@@ -39,8 +39,8 @@ pub struct Options {
     pub release: bool,
 }
 
-pub fn build_ebpf(opts: Options) -> Result<(), anyhow::Error> {
-    let dir = PathBuf::from("ingress-ebpf");
+pub fn build_ebpf(opts: Options, target: String) -> Result<(), anyhow::Error> {
+    let dir = PathBuf::from(target);
     let target = format!("--target={}", opts.target);
     let mut args = vec!["build", target.as_str(), "-Z", "build-std=core"];
     if opts.release {
@@ -58,5 +58,6 @@ pub fn build_ebpf(opts: Options) -> Result<(), anyhow::Error> {
         .status()
         .expect("failed to build bpf program");
     assert!(status.success());
+
     Ok(())
 }

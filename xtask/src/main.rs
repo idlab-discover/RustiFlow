@@ -13,7 +13,10 @@ pub struct Options {
 
 #[derive(Debug, Parser)]
 enum Command {
-    BuildEbpf(build_ebpf::Options),
+    #[clap(name = "ingress-ebpf")]
+    BuildIngressEbpf(build_ebpf::Options),
+    #[clap(name = "egress-ebpf")]
+    BuildEgressEbpf(build_ebpf::Options),
     Run(run::Options),
 }
 
@@ -22,7 +25,8 @@ fn main() {
 
     use Command::*;
     let ret = match opts.command {
-        BuildEbpf(opts) => build_ebpf::build_ebpf(opts),
+        BuildIngressEbpf(opts) => build_ebpf::build_ebpf(opts, "ingress-ebpf".to_string()),
+        BuildEgressEbpf(opts) => build_ebpf::build_ebpf(opts, "egress-ebpf".to_string()),
         Run(opts) => run::run(opts),
     };
 

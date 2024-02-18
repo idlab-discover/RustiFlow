@@ -38,11 +38,24 @@ fn build(opts: &Options) -> Result<(), anyhow::Error> {
 /// Build and run the project
 pub fn run(opts: Options) -> Result<(), anyhow::Error> {
     // build our ebpf program followed by our application
-    build_ebpf(BuildOptions {
-        target: opts.bpf_target,
-        release: opts.release,
-    })
-    .context("Error while building eBPF program")?;
+    build_ebpf(
+        BuildOptions {
+            target: opts.bpf_target,
+            release: opts.release,
+        },
+        "ingress-ebpf".to_string(),
+    )
+    .context("Error while building the ingress-eBPF program")?;
+    build(&opts).context("Error while building userspace application")?;
+
+    build_ebpf(
+        BuildOptions {
+            target: opts.bpf_target,
+            release: opts.release,
+        },
+        "egress-ebpf".to_string(),
+    )
+    .context("Error while building the egress-eBPF program")?;
     build(&opts).context("Error while building userspace application")?;
 
     // profile we are building (release or debug)
