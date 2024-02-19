@@ -28,8 +28,11 @@ jobs:
     - name: Install bpf-linker
       run: cargo install bpf-linker
 
-    - name: Build eBPF program
-      run: cargo xtask build-ebpf
+    - name: Build ingress eBPF program
+      run: cargo xtask ingress-ebpf
+
+    - name: Build egress eBPF program
+      run: cargo xtask egress-ebpf
 
     - name: Build userspace program
       run: cargo build --verbose
