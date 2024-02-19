@@ -20,9 +20,16 @@ rustup toolchain install nightly --component rust-src
 ```
 
 Installing the bpf linker
+This is highly dependent on your operating system, just follow the error messages and install the requirements. For llvm you need version 18, make sure that Polly is installed with it.
 
 ```bash
 sudo apt install llvm
+sudo apt install llvm-dev
+sudo apt install libzstd-dev
+```
+
+Make sure you are in the project root directory
+```bash
 cargo install --no-default-features bpf-linker
 ```
 
@@ -38,7 +45,8 @@ export PATH=/usr/lib/linux-tools/5.8.0-63-generic:$PATH
 To build the eBPF programs:
 
 ```bash
-cargo xtask build-ebpf
+cargo xtask ingress-ebpf
+cargo xtask egress-ebpf
 ```
 
 To build the user space programs:

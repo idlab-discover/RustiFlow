@@ -1,2 +1,2 @@
 [workspace]
-members = ["feature-extraction-tool", "ingress-common", "xtask"]
+members = ["feature-extraction-tool", "common", "xtask"]

@@ -1,5 +1,5 @@
 [package]
-name = "ingress-ebpf"
+name = "egress-ebpf"
 version = "0.1.0"
 edition = "2021"
 
@@ -7,10 +7,11 @@ edition = "2021"
 aya-bpf = { git = "https://github.com/aya-rs/aya" }
 aya-log-ebpf = { git = "https://github.com/aya-rs/aya" }
 common = { path = "../common" }
+memoffset = "0.8"
 network-types = "0.0.4"
 
 [[bin]]
-name = "feature-extraction-tool-ingress"
+name = "feature-extraction-tool-egress"
 path = "src/main.rs"
 
 [profile.dev]

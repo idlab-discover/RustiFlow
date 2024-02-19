@@ -9,7 +9,7 @@ use aya_bpf::{
     maps::PerfEventArray
 };
 
-use ingress_common::PacketLog;
+use common::PacketLog;
 
 use core::mem;
 use network_types::{
@@ -25,7 +25,7 @@ fn panic(_info: &core::panic::PanicInfo) -> ! {
 }
 
 #[map]
-static EVENTS: PerfEventArray<PacketLog> =
+static EVENTS_INGRESS: PerfEventArray<PacketLog> =
     PerfEventArray::with_max_entries(1024, 0);
 
 #[xdp]
@@ -87,7 +87,7 @@ fn try_xdp_flow_track(ctx: XdpContext) -> Result<u32, ()>{
     };
 
     // the zero value is a flag
-    EVENTS.output(&ctx, &flow, 0);
+    EVENTS_INGRESS.output(&ctx, &flow, 0);
 
     Ok(xdp_action::XDP_PASS)
 }
