@@ -10,7 +10,10 @@ pub struct Cli {
 #[derive(Debug, Subcommand)]
 pub enum Commands {
     /// Real-time feature extraction
-    Realtime,
+    Realtime {
+        /// The network interface to capture packets from
+        interface: String,
+    },
 
     /// Feature extraction from a dataset
     Dataset {
