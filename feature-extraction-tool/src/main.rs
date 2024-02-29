@@ -1,4 +1,5 @@
 mod args;
+mod flows;
 mod parsers;
 mod records;
 
@@ -19,10 +20,10 @@ use aya::{
 use aya_log::BpfLogger;
 use bytes::BytesMut;
 use clap::Parser;
-use common::PacketLog;
+use common::BasicFeatures;
 use core::panic;
 use log::{info, warn};
-use std::net::Ipv4Addr;
+use std::{net::Ipv4Addr, time::Instant};
 use tokio::{signal, task};
 
 #[tokio::main]
@@ -116,18 +117,10 @@ async fn handle_realtime(interface: String) -> Result<(), anyhow::Error> {
             loop {
                 let events = buf_egress.read_events(&mut buffers).await.unwrap();
                 for buf in buffers.iter_mut().take(events.read) {
-                    let ptr = buf.as_ptr() as *const PacketLog;
+                    let ptr = buf.as_ptr() as *const BasicFeatures;
                     let data = unsafe { ptr.read_unaligned() };
 
-                    let src_addr = Ipv4Addr::from(data.ipv4_source);
-                    let dst_addr = Ipv4Addr::from(data.ipv4_destination);
-                    let src_port = data.port_source;
-                    let dst_port = data.port_destination;
-
-                    info!(
-                        "LOG: SRC {}:{}, DST {}:{}",
-                        src_addr, src_port, dst_addr, dst_port
-                    );
+                    process_packet(data);
                 }
             }
         });
@@ -141,18 +134,10 @@ async fn handle_realtime(interface: String) -> Result<(), anyhow::Error> {
             loop {
                 let events = buf_ingress.read_events(&mut buffers).await.unwrap();
                 for buf in buffers.iter_mut().take(events.read) {
-                    let ptr = buf.as_ptr() as *const PacketLog;
+                    let ptr = buf.as_ptr() as *const BasicFeatures;
                     let data = unsafe { ptr.read_unaligned() };
 
-                    let src_addr = Ipv4Addr::from(data.ipv4_source);
-                    let dst_addr = Ipv4Addr::from(data.ipv4_destination);
-                    let src_port = data.port_source;
-                    let dst_port = data.port_destination;
-
-                    info!(
-                        "LOG: SRC {}:{}, DST {}:{}",
-                        src_addr, src_port, dst_addr, dst_port
-                    );
+                    process_packet(data);
                 }
             }
         });
@@ -163,6 +148,33 @@ async fn handle_realtime(interface: String) -> Result<(), anyhow::Error> {
     info!("Exiting...");
 
     Ok(())
+}
+
+fn process_packet(data: BasicFeatures) {
+    let timestamp = Instant::now();
+    let src_addr = Ipv4Addr::from(data.ipv4_source);
+    let dst_addr = Ipv4Addr::from(data.ipv4_destination);
+    let src_port = data.port_source;
+    let dst_port = data.port_destination;
+
+    let protocol = data.protocol;
+
+    let length = data.length;
+    let header_length = data.header_length;
+
+    let fin_flag = data.fin_flag;
+    let syn_flag = data.syn_flag;
+    let rst_flag = data.rst_flag;
+    let psh_flag = data.psh_flag;
+    let ack_flag = data.ack_flag;
+    let urg_flag = data.urg_flag;
+    let cwe_flag = data.cwe_flag;
+    let ece_flag = data.ece_flag;
+
+    info!(
+        "LOG: SRC {}:{}, DST {}:{}, PROT: {}, LENGTH: {}, HEADER LENGTH: {}, FIN: {}, SYN: {}, RST: {}, PSH: {}, ACK: {}, URG: {}, CWE: {}, ECE: {}",
+        src_addr, src_port, dst_addr, dst_port, protocol, length, header_length, fin_flag, syn_flag, rst_flag, psh_flag, ack_flag, urg_flag, cwe_flag, ece_flag
+    );
 }
 
 fn handle_dataset(dataset: Dataset, path: &str) {
