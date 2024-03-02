@@ -58,6 +58,7 @@ pub struct CicFlow {
 
 impl CicFlow {
     pub fn new(
+        flow_id: String,
         ipv4_source: u32,
         port_source: u16,
         ipv4_destination: u32,
@@ -66,6 +67,7 @@ impl CicFlow {
     ) -> Self {
         CicFlow {
             basic_flow: BasicFlow::new(
+                flow_id,
                 ipv4_source,
                 port_source,
                 ipv4_destination,
@@ -519,8 +521,9 @@ impl CicFlow {
 }
 
 impl Flow for CicFlow {
-    fn update_flow(&mut self, packet: BasicFeatures, timestamp: Instant, fwd: bool) {
+    fn update_flow(&mut self, packet: BasicFeatures, timestamp: Instant, fwd: bool) -> bool {
         self.basic_flow.update_flow(packet, fwd);
+
         if fwd {
             self.update_fwd_pkt_len_stats(packet.data_length);
             self.update_fwd_iat_stats(
@@ -542,6 +545,16 @@ impl Flow for CicFlow {
             self.increase_bwd_header_length(packet.header_length);
             self.bwd_last_timestamp = Some(timestamp);
         }
+
+        if self.basic_flow.flow_end_of_flow_ack > 0
+            || self.basic_flow.fwd_rst_flag_count > 0
+            || self.basic_flow.bwd_rst_flag_count > 0
+        {
+            self.dump();
+            return true;
+        }
+
+        false
     }
 
     fn update_flow_first(&mut self, packet: BasicFeatures, timestamp: Instant, fwd: bool) {
@@ -558,6 +571,83 @@ impl Flow for CicFlow {
             self.bwd_last_timestamp = Some(timestamp);
         }
     }
+
+    fn dump(&self) {
+        println!(
+            "{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},
+        {},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},
+        {},{},{},{},{},{},{},{},{},{},{},{:?},{},{:?},{},{},{},{},{},
+        {},{},{},{},{},{},{},{},{},{},{},{:?},{},{:?}",
+            self.basic_flow.flow_id,
+            self.basic_flow.ipv4_source,
+            self.basic_flow.port_source,
+            self.basic_flow.ipv4_destination,
+            self.basic_flow.port_destination,
+            self.basic_flow.protocol,
+            self.basic_flow.first_timestamp,
+            self.basic_flow.last_timestamp,
+            self.basic_flow.fwd_fin_flag_count,
+            self.basic_flow.fwd_syn_flag_count,
+            self.basic_flow.fwd_rst_flag_count,
+            self.basic_flow.fwd_psh_flag_count,
+            self.basic_flow.fwd_ack_flag_count,
+            self.basic_flow.fwd_urg_flag_count,
+            self.basic_flow.fwd_cwe_flag_count,
+            self.basic_flow.fwd_ece_flag_count,
+            self.basic_flow.fwd_packet_count,
+            self.basic_flow.bwd_fin_flag_count,
+            self.basic_flow.bwd_syn_flag_count,
+            self.basic_flow.bwd_rst_flag_count,
+            self.basic_flow.bwd_psh_flag_count,
+            self.basic_flow.bwd_ack_flag_count,
+            self.basic_flow.bwd_urg_flag_count,
+            self.basic_flow.bwd_cwe_flag_count,
+            self.basic_flow.bwd_ece_flag_count,
+            self.basic_flow.bwd_packet_count,
+            self.iat_mean,
+            self.iat_std,
+            self.iat_max,
+            self.iat_min,
+            self.fwd_pkt_len_tot,
+            self.fwd_pkt_len_max,
+            self.fwd_pkt_len_min,
+            self.fwd_pkt_len_mean,
+            self.fwd_pkt_len_std,
+            self.fwd_iat_total,
+            self.fwd_iat_mean,
+            self.fwd_iat_std,
+            self.fwd_iat_max,
+            self.fwd_iat_min,
+            self.fwd_header_length,
+            self.fwd_bulk_duration,
+            self.fwd_bulk_packet_count,
+            self.fwd_bulk_size_total,
+            self.fwd_bulk_state_count,
+            self.fwd_bulk_packet_count_help,
+            self.fwd_bulk_start_help.unwrap(),
+            self.fwd_bulk_size_help,
+            self.fwd_last_bulk_timestamp.unwrap(),
+            self.bwd_pkt_len_tot,
+            self.bwd_pkt_len_max,
+            self.bwd_pkt_len_min,
+            self.bwd_pkt_len_mean,
+            self.bwd_pkt_len_std,
+            self.bwd_iat_total,
+            self.bwd_iat_mean,
+            self.bwd_iat_std,
+            self.bwd_iat_max,
+            self.bwd_iat_min,
+            self.bwd_header_length,
+            self.bwd_bulk_duration,
+            self.bwd_bulk_packet_count,
+            self.bwd_bulk_size_total,
+            self.bwd_bulk_state_count,
+            self.bwd_bulk_packet_count_help,
+            self.bwd_bulk_start_help.unwrap(),
+            self.bwd_bulk_size_help,
+            self.bwd_last_bulk_timestamp.unwrap(),
+        )
+    }
 }
 
 #[cfg(test)]
@@ -567,7 +657,7 @@ mod tests {
     use std::time::Instant;
 
     fn setup_cic_flow() -> CicFlow {
-        CicFlow::new(1, 80, 2, 8080, 6)
+        CicFlow::new("".to_string(), 1, 80, 2, 8080, 6)
     }
 
     #[test]
@@ -1121,7 +1211,7 @@ mod tests {
 
     #[test]
     fn test_update_flow_first_with_fwd_packet() {
-        let mut cic_flow = CicFlow::new(1, 80, 2, 8080, 6);
+        let mut cic_flow = CicFlow::new("".to_string(), 1, 80, 2, 8080, 6);
         let packet = BasicFeatures {
             ipv4_destination: 2,
             ipv4_source: 1,
@@ -1190,7 +1280,7 @@ mod tests {
 
     #[test]
     fn test_update_flow_first_with_bwd_packet() {
-        let mut cic_flow = CicFlow::new(1, 80, 2, 8080, 6);
+        let mut cic_flow = CicFlow::new("".to_string(), 1, 80, 2, 8080, 6);
         let packet = BasicFeatures {
             ipv4_destination: 2,
             ipv4_source: 1,
@@ -1259,7 +1349,7 @@ mod tests {
 
     #[test]
     fn test_update_flow_with_fwd_packet() {
-        let mut cic_flow = CicFlow::new(1, 80, 2, 8080, 6);
+        let mut cic_flow = CicFlow::new("".to_string(), 1, 80, 2, 8080, 6);
         let packet_1 = BasicFeatures {
             ipv4_destination: 2,
             ipv4_source: 1,
@@ -1364,7 +1454,7 @@ mod tests {
 
     #[test]
     fn test_update_flow_with_bwd_packet() {
-        let mut cic_flow = CicFlow::new(1, 80, 2, 8080, 6);
+        let mut cic_flow = CicFlow::new("".to_string(), 1, 80, 2, 8080, 6);
         let packet_1 = BasicFeatures {
             ipv4_destination: 2,
             ipv4_source: 1,

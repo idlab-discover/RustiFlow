@@ -10,6 +10,7 @@ pub struct BasicFlow {
     pub protocol: u8,
     pub first_timestamp: DateTime<Utc>,
     pub last_timestamp: DateTime<Utc>,
+    pub flow_end_of_flow_ack: u8,
     // Forward
     pub fwd_fin_flag_count: u32,
     pub fwd_syn_flag_count: u32,
@@ -32,21 +33,9 @@ pub struct BasicFlow {
     pub bwd_packet_count: u32,
 }
 
-fn create_flow_id(
-    ipv4_source: u32,
-    port_source: u16,
-    ipv4_destination: u32,
-    port_destination: u16,
-    protocol: u8,
-) -> String {
-    format!(
-        "{}:{}-{}:{}-{}",
-        ipv4_source, port_source, ipv4_destination, port_destination, protocol
-    )
-}
-
 impl BasicFlow {
     pub fn new(
+        flow_id: String,
         ipv4_source: u32,
         port_source: u16,
         ipv4_destination: u32,
@@ -54,13 +43,7 @@ impl BasicFlow {
         protocol: u8,
     ) -> Self {
         BasicFlow {
-            flow_id: create_flow_id(
-                ipv4_source,
-                port_source,
-                ipv4_destination,
-                port_destination,
-                protocol,
-            ),
+            flow_id,
             ipv4_destination,
             ipv4_source,
             port_destination,
@@ -68,6 +51,7 @@ impl BasicFlow {
             protocol,
             first_timestamp: Utc::now(),
             last_timestamp: Utc::now(),
+            flow_end_of_flow_ack: 0,
             fwd_fin_flag_count: 0,
             fwd_syn_flag_count: 0,
             fwd_rst_flag_count: 0,
@@ -93,6 +77,12 @@ impl BasicFlow {
 impl BasicFlow {
     pub fn update_flow(&mut self, packet: BasicFeatures, fwd: bool) {
         self.last_timestamp = Utc::now();
+
+        // when both FIN flags are set, the flow can be finished when the last ACK is received
+        if self.fwd_fin_flag_count > 0 && self.bwd_fin_flag_count > 0 {
+            self.flow_end_of_flow_ack = packet.ack_flag;
+        }
+
         if fwd {
             self.fwd_packet_count += 1;
             self.fwd_fin_flag_count += u32::from(packet.fin_flag);

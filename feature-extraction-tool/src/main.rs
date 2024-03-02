@@ -2,10 +2,13 @@ mod args;
 mod flows;
 mod parsers;
 mod records;
+mod utils;
 
 use crate::{
+    flows::cic_flow::CicFlow,
     parsers::csv_parser::CsvParser,
     records::{cic_record::CicRecord, print::Print},
+    utils::utils::create_flow_id,
 };
 
 use anyhow::Context;
@@ -22,8 +25,10 @@ use bytes::BytesMut;
 use clap::Parser;
 use common::BasicFeatures;
 use core::panic;
+use dashmap::DashMap;
+use flows::flow::Flow;
 use log::{info, warn};
-use std::{net::Ipv4Addr, time::Instant};
+use std::{net::Ipv4Addr, sync::Arc, time::Instant};
 use tokio::{signal, task};
 
 #[tokio::main]
@@ -105,10 +110,12 @@ async fn handle_realtime(interface: String) -> Result<(), anyhow::Error> {
     let mut flows_ingress =
         AsyncPerfEventArray::try_from(bpf_ingress.take_map("EVENTS_INGRESS").unwrap())?;
 
+    let flow_map: Arc<DashMap<String, CicFlow>> = Arc::new(DashMap::new());
+
     // Use all online CPUs to process the events in the user space
     for cpu_id in online_cpus()? {
         let mut buf_egress = flows_egress.open(cpu_id, None)?;
-
+        let flow_map_clone_egress = flow_map.clone();
         task::spawn(async move {
             let mut buffers = (0..10)
                 .map(|_| BytesMut::with_capacity(1024))
@@ -120,12 +127,13 @@ async fn handle_realtime(interface: String) -> Result<(), anyhow::Error> {
                     let ptr = buf.as_ptr() as *const BasicFeatures;
                     let data = unsafe { ptr.read_unaligned() };
 
-                    process_packet(data);
+                    process_packet(data, flow_map_clone_egress.clone(), false);
                 }
             }
         });
 
         let mut buf_ingress = flows_ingress.open(cpu_id, None)?;
+        let flow_map_clone_ingress = flow_map.clone();
         task::spawn(async move {
             let mut buffers = (0..10)
                 .map(|_| BytesMut::with_capacity(1024))
@@ -137,7 +145,7 @@ async fn handle_realtime(interface: String) -> Result<(), anyhow::Error> {
                     let ptr = buf.as_ptr() as *const BasicFeatures;
                     let data = unsafe { ptr.read_unaligned() };
 
-                    process_packet(data);
+                    process_packet(data, flow_map_clone_ingress.clone(), true);
                 }
             }
         });
@@ -150,31 +158,48 @@ async fn handle_realtime(interface: String) -> Result<(), anyhow::Error> {
     Ok(())
 }
 
-fn process_packet(data: BasicFeatures) {
+fn process_packet(data: BasicFeatures, flow_map: Arc<DashMap<String, CicFlow>>, fwd: bool) {
     let timestamp = Instant::now();
-    let src_addr = Ipv4Addr::from(data.ipv4_source);
-    let dst_addr = Ipv4Addr::from(data.ipv4_destination);
-    let src_port = data.port_source;
-    let dst_port = data.port_destination;
+    let flow_id = if fwd {
+        create_flow_id(
+            data.ipv4_source,
+            data.port_source,
+            data.ipv4_destination,
+            data.port_destination,
+            data.protocol,
+        )
+    } else {
+        create_flow_id(
+            data.ipv4_destination,
+            data.port_destination,
+            data.ipv4_source,
+            data.port_source,
+            data.protocol,
+        )
+    };
 
-    let protocol = data.protocol;
-
-    let length = data.length;
-    let header_length = data.header_length;
-
-    let fin_flag = data.fin_flag;
-    let syn_flag = data.syn_flag;
-    let rst_flag = data.rst_flag;
-    let psh_flag = data.psh_flag;
-    let ack_flag = data.ack_flag;
-    let urg_flag = data.urg_flag;
-    let cwe_flag = data.cwe_flag;
-    let ece_flag = data.ece_flag;
-
-    info!(
-        "LOG: SRC {}:{}, DST {}:{}, PROT: {}, LENGTH: {}, HEADER LENGTH: {}, FIN: {}, SYN: {}, RST: {}, PSH: {}, ACK: {}, URG: {}, CWE: {}, ECE: {}",
-        src_addr, src_port, dst_addr, dst_port, protocol, length, header_length, fin_flag, syn_flag, rst_flag, psh_flag, ack_flag, urg_flag, cwe_flag, ece_flag
-    );
+    match flow_map.entry(flow_id.clone()) {
+        dashmap::mapref::entry::Entry::Vacant(entry) => {
+            // flow doesn't exist
+            let mut new_flow = CicFlow::new(
+                flow_id,
+                data.ipv4_source,
+                data.port_source,
+                data.ipv4_destination,
+                data.port_destination,
+                data.protocol,
+            );
+            new_flow.update_flow_first(data, timestamp, fwd);
+            entry.insert(new_flow);
+        }
+        dashmap::mapref::entry::Entry::Occupied(mut entry) => {
+            // flow already exists
+            let end = entry.get_mut().update_flow(data, timestamp, fwd);
+            if end {
+                entry.remove();
+            }
+        }
+    }
 }
 
 fn handle_dataset(dataset: Dataset, path: &str) {

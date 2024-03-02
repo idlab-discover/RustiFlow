@@ -76,21 +76,25 @@ fn try_tc_flow_track(ctx: TcContext) -> Result<i32, ()> {
 
     let header_length: u32;
     let data_length: usize = ctx.data_end() - ctx.data();
-    let length = ctx.len();
+    let length: u32;
 
     match unsafe { *ipv4hdr }.proto {
         IpProto::Tcp => {
-            let tcphdr: *const TcpHdr =
-                unsafe { ptr_at(&ctx, EthHdr::LEN + Ipv4Hdr::LEN) }?;
+            let tcphdr: *const TcpHdr = unsafe { ptr_at(&ctx, EthHdr::LEN + Ipv4Hdr::LEN) }?;
 
             // Cast the `TcpHdr` pointer to a `*const u8` to read individual bytes
-            let tcphdr_u8 = tcphdr as *const u8;    
+            let tcphdr_u8 = tcphdr as *const u8;
             // Read the 12th byte (offset 12 from the TCP header start)
             let data_offset_byte = unsafe { *tcphdr_u8.add(12) } as u8;
             // Extract the high-order 4 bits and shift right by 4 to get the 'data offset' value
             let data_offset = (data_offset_byte >> 4) as u32;
             // Calculate the TCP header size in bytes
             header_length = data_offset * 4;
+
+            length = data_length as u32
+                + header_length as u32
+                + Ipv4Hdr::LEN as u32
+                + EthHdr::LEN as u32;
 
             source_port = u16::from_be(unsafe { *tcphdr }.source);
             destination_port = u16::from_be(unsafe { *tcphdr }.dest);
@@ -107,12 +111,15 @@ fn try_tc_flow_track(ctx: TcContext) -> Result<i32, ()> {
             protocol = IpProto::Tcp as u8;
         }
         IpProto::Udp => {
-            let udphdr: *const UdpHdr =
-                unsafe { ptr_at(&ctx, EthHdr::LEN + Ipv4Hdr::LEN) }?;
+            let udphdr: *const UdpHdr = unsafe { ptr_at(&ctx, EthHdr::LEN + Ipv4Hdr::LEN) }?;
             source_port = u16::from_be(unsafe { *udphdr }.source);
             destination_port = u16::from_be(unsafe { *udphdr }.dest);
 
             header_length = UdpHdr::LEN as u32;
+            length = data_length as u32
+                + header_length as u32
+                + Ipv4Hdr::LEN as u32
+                + EthHdr::LEN as u32;
             protocol = IpProto::Udp as u8;
         }
         _ => return Ok(TC_ACT_PIPE),
@@ -132,7 +139,7 @@ fn try_tc_flow_track(ctx: TcContext) -> Result<i32, ()> {
         urg_flag: urg_flag_count,
         cwe_flag: cwe_flag_count,
         ece_flag: ece_flag_count,
-        data_length: data_length,
+        data_length: data_length as u32,
         header_length: header_length,
         length: length,
     };
