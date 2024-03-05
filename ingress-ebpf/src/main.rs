@@ -78,6 +78,7 @@ fn try_xdp_flow_track(ctx: XdpContext) -> Result<u32, ()>{
     let header_length: u32;
     let data_length: usize = ctx.data_end() - ctx.data();
     let length: u32;
+    let mut window_size: u16 = 0;
 
     match unsafe { *ipv4hdr }.proto {
         IpProto::Tcp => {
@@ -108,6 +109,7 @@ fn try_xdp_flow_track(ctx: XdpContext) -> Result<u32, ()>{
             ece_flag_count = (unsafe { *tcphdr }.ece() != 0) as u8;
 
             protocol = IpProto::Tcp as u8;
+            window_size = u16::from_be(unsafe { *tcphdr }.window);
         }
         IpProto::Udp => {
             let udphdr: *const UdpHdr =
@@ -139,6 +141,7 @@ fn try_xdp_flow_track(ctx: XdpContext) -> Result<u32, ()>{
         data_length: data_length as u32,
         header_length: header_length,
         length: length,
+        window_size: window_size,
     };
 
     // the zero value is a flag

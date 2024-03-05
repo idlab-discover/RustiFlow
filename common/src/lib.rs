@@ -19,6 +19,7 @@ pub struct BasicFeatures {
     pub data_length: u32,
     pub header_length: u32,
     pub length: u32,
+    pub window_size: u16,
 }
 
 #[cfg(feature = "user")]
