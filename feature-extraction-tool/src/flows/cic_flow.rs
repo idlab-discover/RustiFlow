@@ -287,7 +287,7 @@ impl CicFlow {
 
         // update mean and std
         let new_fwd_pkt_len_mean = (((self.basic_flow.fwd_packet_count - 1) as f32 * self.fwd_pkt_len_mean) + len as f32) / self.basic_flow.fwd_packet_count as f32;
-        self.fwd_pkt_len_std = (((((self.basic_flow.fwd_packet_count - 1) as f32 * self.fwd_pkt_len_std.powf(2.0)) + ((len as f32 - self.fwd_pkt_len_mean) * (len as f32 - new_fwd_pkt_len_mean))) / self.basic_flow.fwd_packet_count as f32)).sqrt();
+        self.fwd_pkt_len_std = ((((self.basic_flow.fwd_packet_count - 1) as f32 * self.fwd_pkt_len_std.powf(2.0)) + ((len as f32 - self.fwd_pkt_len_mean) * (len as f32 - new_fwd_pkt_len_mean))) / self.basic_flow.fwd_packet_count as f32).sqrt();
         self.fwd_pkt_len_mean = new_fwd_pkt_len_mean;
     }
 
@@ -313,7 +313,7 @@ impl CicFlow {
 
         // update mean and std
         let new_bwd_pkt_len_mean = (((self.basic_flow.bwd_packet_count - 1) as f32 * self.bwd_pkt_len_mean) + len as f32) / self.basic_flow.bwd_packet_count as f32;
-        self.bwd_pkt_len_std = (((((self.basic_flow.bwd_packet_count - 1) as f32 * self.bwd_pkt_len_std.powf(2.0)) + ((len as f32 - self.bwd_pkt_len_mean) * (len as f32 - new_bwd_pkt_len_mean))) / self.basic_flow.bwd_packet_count as f32)).sqrt();
+        self.bwd_pkt_len_std = ((((self.basic_flow.bwd_packet_count - 1) as f32 * self.bwd_pkt_len_std.powf(2.0)) + ((len as f32 - self.bwd_pkt_len_mean) * (len as f32 - new_bwd_pkt_len_mean))) / self.basic_flow.bwd_packet_count as f32).sqrt();
         self.bwd_pkt_len_mean = new_bwd_pkt_len_mean;
     }
 
@@ -338,7 +338,7 @@ impl CicFlow {
 
         // update mean and std
         let new_fwd_iat_mean = ((self.basic_flow.fwd_packet_count - 2) as f64 * self.fwd_iat_mean + iat) / (self.basic_flow.fwd_packet_count - 1) as f64;
-        self.fwd_iat_std = (((((self.basic_flow.fwd_packet_count - 2) as f64 * self.fwd_iat_std.powf(2.0)) + ((iat - self.fwd_iat_mean) * (iat - new_fwd_iat_mean))) / (self.basic_flow.fwd_packet_count - 1) as f64)).sqrt();
+        self.fwd_iat_std = ((((self.basic_flow.fwd_packet_count - 2) as f64 * self.fwd_iat_std.powf(2.0)) + ((iat - self.fwd_iat_mean) * (iat - new_fwd_iat_mean))) / (self.basic_flow.fwd_packet_count - 1) as f64).sqrt();
         self.fwd_iat_mean = new_fwd_iat_mean;
     }
 
@@ -363,7 +363,7 @@ impl CicFlow {
 
         // update mean and std
         let new_bwd_iat_mean = ((self.basic_flow.bwd_packet_count - 2) as f64 * self.bwd_iat_mean + iat) / (self.basic_flow.bwd_packet_count - 1) as f64;
-        self.bwd_iat_std = (((((self.basic_flow.bwd_packet_count - 2) as f64 * self.bwd_iat_std.powf(2.0)) + ((iat - self.bwd_iat_mean) * (iat - new_bwd_iat_mean))) / (self.basic_flow.bwd_packet_count - 1) as f64)).sqrt();
+        self.bwd_iat_std = ((((self.basic_flow.bwd_packet_count - 2) as f64 * self.bwd_iat_std.powf(2.0)) + ((iat - self.bwd_iat_mean) * (iat - new_bwd_iat_mean))) / (self.basic_flow.bwd_packet_count - 1) as f64).sqrt();
         self.bwd_iat_mean = new_bwd_iat_mean;
     }
 
@@ -388,7 +388,7 @@ impl CicFlow {
 
         // update mean and std
         let new_active_mean = (((self.active_count - 1) as f64 * self.active_mean) + duration) / self.active_count as f64;
-        self.active_std = (((((self.active_count - 1) as f64 * self.active_std.powf(2.0)) + ((duration - self.active_mean) * (duration - new_active_mean))) / self.active_count as f64)).sqrt();
+        self.active_std = ((((self.active_count - 1) as f64 * self.active_std.powf(2.0)) + ((duration - self.active_mean) * (duration - new_active_mean))) / self.active_count as f64).sqrt();
         self.active_mean = new_active_mean;
     }
 
@@ -413,7 +413,7 @@ impl CicFlow {
 
         // update mean and std
         let new_idle_mean = (((self.idle_count - 1) as f64 * self.idle_mean) + duration) / self.idle_count as f64;
-        self.idle_std = (((((self.idle_count - 1) as f64 * self.idle_std.powf(2.0)) + ((duration - self.idle_mean) * (duration - new_idle_mean))) / self.idle_count as f64)).sqrt();
+        self.idle_std = ((((self.idle_count - 1) as f64 * self.idle_std.powf(2.0)) + ((duration - self.idle_mean) * (duration - new_idle_mean))) / self.idle_count as f64).sqrt();
         self.idle_mean = new_idle_mean;
     }
 
@@ -641,10 +641,9 @@ impl CicFlow {
     /// Maximum inter-arrival time observed in the flow.
     fn get_flow_iat_max(&self) -> f64 {
         if self.fwd_iat_max > self.bwd_iat_max {
-            self.fwd_iat_max
-        } else {
-            self.bwd_iat_max
+            return self.fwd_iat_max;
         }
+        self.bwd_iat_max
     }
 
     /// Retrieves the minimum inter-arrival time (IAT) observed in the flow.
@@ -657,16 +656,14 @@ impl CicFlow {
     fn get_flow_iat_min(&self) -> f64 {
         if self.fwd_iat_min < self.bwd_iat_min {
             if self.fwd_iat_min == f64::MAX {
-                0.0
-            } else {
-                self.fwd_iat_min
+                return 0.0;
             }
+            self.fwd_iat_min
         } else {
             if self.bwd_iat_min == f64::MAX {
-                0.0
-            } else {
-                self.bwd_iat_min
+                return 0.0;
             }
+            self.bwd_iat_min
         }
     }
 
@@ -679,10 +676,9 @@ impl CicFlow {
     /// The minimum IAT observed in the forward flow or 0 if not set.
     fn get_fwd_iat_min(&self) -> f64 {
         if self.fwd_iat_min == f64::MAX {
-            0.0
-        } else {
-            self.fwd_iat_min
+            return 0.0;
         }
+        self.fwd_iat_min
     }
 
     /// Retrieves the minimum IAT of packets in the backward flow.
@@ -694,10 +690,9 @@ impl CicFlow {
     /// The minimum IAT observed in the backward flow or 0 if not set.
     fn get_bwd_iat_min(&self) -> f64 {
         if self.bwd_iat_min == f64::MAX {
-            0.0
-        } else {
-            self.bwd_iat_min
+            return 0.0;
         }
+        self.bwd_iat_min
     }
 
     /// Retrieves the minimum packet length in the flow, considering both forward and backward directions.
@@ -711,16 +706,14 @@ impl CicFlow {
     fn get_flow_packet_length_min(&self) -> u32 {
         if self.fwd_pkt_len_min < self.bwd_pkt_len_min {
             if self.fwd_pkt_len_min == u32::MAX {
-                0
-            } else {
-                self.fwd_pkt_len_min
+                return 0;
             }
+            self.fwd_pkt_len_min
         } else {
             if self.bwd_pkt_len_min == u32::MAX {
-                0
-            } else {
-                self.bwd_pkt_len_min
+                return 0;
             }
+            self.bwd_pkt_len_min
         }
     }
 
@@ -733,10 +726,9 @@ impl CicFlow {
     /// Maximum packet length in the flow.
     fn get_flow_packet_length_max(&self) -> u32 {
         if self.fwd_pkt_len_max > self.bwd_pkt_len_max {
-            self.fwd_pkt_len_max
-        } else {
-            self.bwd_pkt_len_max
+            return self.fwd_pkt_len_max;
         }
+        self.bwd_pkt_len_max
     }
 
     /// Retrieves the minimum packet length for forward packets.
@@ -749,10 +741,9 @@ impl CicFlow {
     /// Minimum forward packet length, or 0 if not set.
     fn get_fwd_packet_length_min(&self) -> u32 {
         if self.fwd_pkt_len_min == u32::MAX {
-            0
-        } else {
-            self.fwd_pkt_len_min
+            return 0;
         }
+        self.fwd_pkt_len_min
     }
 
     /// Retrieves the minimum packet length for backward packets.
@@ -765,10 +756,9 @@ impl CicFlow {
     /// Minimum backward packet length, or 0 if not set.
     fn get_bwd_packet_length_min(&self) -> u32 {
         if self.bwd_pkt_len_min == u32::MAX {
-            0
-        } else {
-            self.bwd_pkt_len_min
+            return 0;
         }
+        self.bwd_pkt_len_min
     }
 
     /// Calculates the mean packet length of the flow, averaging both forward and backward packet lengths.
