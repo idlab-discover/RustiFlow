@@ -39,3 +39,6 @@ jobs:
       
     - name: Run tests
       run: cargo test --verbose
+      
+    - name: Generate documenation
+      run: cargo doc --no-deps
