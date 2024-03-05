@@ -19,7 +19,6 @@ use aya::{
     util::online_cpus,
     Bpf,
 };
-use aya_log::BpfLogger;
 use bytes::BytesMut;
 use chrono::Utc;
 use clap::Parser;
@@ -27,7 +26,7 @@ use common::BasicFeatures;
 use core::panic;
 use dashmap:: DashMap;
 use flows::flow::Flow;
-use log::{info, warn};
+use log::info;
 use std::{sync::Arc, time::Instant};
 use tokio::{signal, task};
 use tokio::time::{self, Duration};
