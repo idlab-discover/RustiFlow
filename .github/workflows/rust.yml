@@ -40,5 +40,14 @@ jobs:
     - name: Run tests
       run: cargo test --verbose
       
-    - name: Generate documenation
+    - name: Generate documentation
+      if: github.event_name == 'push' && github.ref == 'refs/heads/main'
       run: cargo doc --no-deps
+    
+    - name: Push docs to gh-pages
+      if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+      uses: peaceiris/actions-gh-pages@v3
+      with:
+        github_token: ${{ secrets.GITHUB_TOKEN }}
+        publish_dir: ./target/doc
+        publish_branch: gh-pages
