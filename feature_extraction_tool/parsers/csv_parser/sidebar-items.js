@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"fn":["filter_record","preprocess_headers"],"struct":["CsvParser"]};
