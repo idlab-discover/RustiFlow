@@ -1,3 +1,5 @@
+> Not really usefull as this just tests the speed in wich rust processes the packets, the packets are already received. It does not give the duration between arrival time and end of processing.
+
 # Real-Time Adaptive Feature Extraction for ML-Based Network Intrusion Detection
 
 This is a feature extraction tool build in Rust using eBPF for network intrusion detection
