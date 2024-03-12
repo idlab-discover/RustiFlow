@@ -60,21 +60,36 @@ fn try_xdp_flow_track(ctx: XdpContext) -> Result<u32, ()>{
     let ipv4hdr: *const Ipv4Hdr = unsafe { ptr_at(&ctx, EthHdr::LEN)? };
     let ipv4_source = u32::from_be(unsafe { (*ipv4hdr).src_addr });
     let ipv4_destination = u32::from_be(unsafe { (*ipv4hdr).dst_addr });
+    let length: usize = ctx.data_end() - ctx.data();
 
     let source_port;
     let destination_port;
+    let protocol: u8;
+
+    let mut fin_flag_count = 0 as u8;
+    let mut rst_flag_count = 0 as u8;
+    let mut ack_flag_count = 0 as u8;
+
     match unsafe { *ipv4hdr }.proto {
         IpProto::Tcp => {
             let tcphdr: *const TcpHdr =
                 unsafe { ptr_at(&ctx, EthHdr::LEN + Ipv4Hdr::LEN) }?;
             source_port = u16::from_be(unsafe { *tcphdr }.source);
             destination_port = u16::from_be(unsafe { *tcphdr }.dest);
+
+            fin_flag_count = (unsafe { *tcphdr }.fin() != 0) as u8;
+            rst_flag_count = (unsafe { *tcphdr }.rst() != 0) as u8;
+            ack_flag_count = (unsafe { *tcphdr }.ack() != 0) as u8;
+
+            protocol = IpProto::Tcp as u8;
         }
         IpProto::Udp => {
             let udphdr: *const UdpHdr =
                 unsafe { ptr_at(&ctx, EthHdr::LEN + Ipv4Hdr::LEN) }?;
             source_port = u16::from_be(unsafe { *udphdr }.source);
             destination_port = u16::from_be(unsafe { *udphdr }.dest);
+
+            protocol = IpProto::Udp as u8;
         }
         _ => return Ok(xdp_action::XDP_ABORTED),
     };
@@ -84,6 +99,11 @@ fn try_xdp_flow_track(ctx: XdpContext) -> Result<u32, ()>{
         ipv4_source: ipv4_source,
         port_destination: destination_port,
         port_source: source_port,
+        length: length as u32,
+        fin_flag: fin_flag_count,
+        rst_flag: rst_flag_count,
+        ack_flag: ack_flag_count,
+        protocol: protocol,
     };
 
     // the zero value is a flag
