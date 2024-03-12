@@ -20,10 +20,25 @@ use aya_log::BpfLogger;
 use bytes::BytesMut;
 use clap::Parser;
 use common::PacketLog;
+use dashmap::DashMap;
 use core::panic;
 use log::{info, warn};
-use std::net::Ipv4Addr;
-use tokio::{signal, task};
+use std::{net::Ipv4Addr, sync::{atomic::{AtomicUsize, Ordering}, Arc, Mutex}, time::{Duration, Instant}};
+use tokio::task;
+use std::convert::TryInto;
+
+#[derive(Debug, Hash, Eq, PartialEq)]
+struct FlowKey {
+    src_ip: Ipv4Addr,
+    dst_ip: Ipv4Addr,
+    src_port: u16,
+    dst_port: u16,
+}
+
+struct FlowStats {
+    packets: usize,
+    bytes: usize,
+}
 
 #[tokio::main]
 async fn main() {
@@ -104,9 +119,18 @@ async fn handle_realtime(interface: String) -> Result<(), anyhow::Error> {
     let mut flows_ingress =
         AsyncPerfEventArray::try_from(bpf_ingress.take_map("EVENTS_INGRESS").unwrap())?;
 
+    let flow_map: Arc<DashMap<FlowKey, FlowStats>> = Arc::new(DashMap::new());
+
+    let processing_times: Arc<Mutex<Vec<Duration>>> = Arc::new(Mutex::new(Vec::new()));
+
+    let packet_count = Arc::new(AtomicUsize::new(0));
+
     // Use all online CPUs to process the events in the user space
     for cpu_id in online_cpus()? {
         let mut buf_egress = flows_egress.open(cpu_id, None)?;
+        let flow_map_egress = flow_map.clone();
+        let processing_times_egress = processing_times.clone();
+        let packet_count_egress = packet_count.clone();
 
         task::spawn(async move {
             let mut buffers = (0..10)
@@ -119,20 +143,16 @@ async fn handle_realtime(interface: String) -> Result<(), anyhow::Error> {
                     let ptr = buf.as_ptr() as *const PacketLog;
                     let data = unsafe { ptr.read_unaligned() };
 
-                    let src_addr = Ipv4Addr::from(data.ipv4_source);
-                    let dst_addr = Ipv4Addr::from(data.ipv4_destination);
-                    let src_port = data.port_source;
-                    let dst_port = data.port_destination;
-
-                    info!(
-                        "LOG: SRC {}:{}, DST {}:{}",
-                        src_addr, src_port, dst_addr, dst_port
-                    );
+                    process(&data, &flow_map_egress, &processing_times_egress, &packet_count_egress);
                 }
             }
         });
 
         let mut buf_ingress = flows_ingress.open(cpu_id, None)?;
+        let flow_map_ingress = flow_map.clone();
+        let processing_times_ingress = processing_times.clone();
+        let packet_count_ingress = packet_count.clone();
+
         task::spawn(async move {
             let mut buffers = (0..10)
                 .map(|_| BytesMut::with_capacity(1024))
@@ -144,25 +164,53 @@ async fn handle_realtime(interface: String) -> Result<(), anyhow::Error> {
                     let ptr = buf.as_ptr() as *const PacketLog;
                     let data = unsafe { ptr.read_unaligned() };
 
-                    let src_addr = Ipv4Addr::from(data.ipv4_source);
-                    let dst_addr = Ipv4Addr::from(data.ipv4_destination);
-                    let src_port = data.port_source;
-                    let dst_port = data.port_destination;
-
-                    info!(
-                        "LOG: SRC {}:{}, DST {}:{}",
-                        src_addr, src_port, dst_addr, dst_port
-                    );
+                    process(&data, &flow_map_ingress, &processing_times_ingress, &packet_count_ingress);
                 }
             }
         });
     }
 
-    info!("Waiting for Ctrl-C...");
-    signal::ctrl_c().await?;
-    info!("Exiting...");
+    loop {
+        tokio::time::sleep(Duration::from_secs(2)).await;
+        if packet_count.load(Ordering::SeqCst) >= 10_000 {
+            info!("Packet count exceeded 10000. writing results to file...");
 
-    Ok(())
+            let csv_file = "processing_times_rust_ebpf.csv";
+            let mut wtr = csv::Writer::from_path(csv_file).unwrap();
+            wtr.write_record(&["Packet Number", "Processing Time (seconds)"]).unwrap();
+
+            let processing_times = processing_times.lock().unwrap();
+
+            for (idx, time_val) in processing_times.iter().enumerate() {
+                wtr.write_record(&[idx.to_string(), time_val.as_secs_f64().to_string()]).unwrap();
+            }
+            wtr.flush().unwrap();
+            return Ok(());
+        }
+    }
+}
+
+fn process(data: &PacketLog, flow_map: &Arc<DashMap<FlowKey, FlowStats>>, processing_times: &Arc<Mutex<Vec<Duration>>>, packet_count: &Arc<AtomicUsize>) {
+    if packet_count.fetch_add(1, Ordering::SeqCst) >= 10_000 {
+        return;
+    }
+    let start_time = Instant::now();
+
+    let flow_key = FlowKey {
+        src_ip: Ipv4Addr::from(data.ipv4_source),
+        dst_ip: Ipv4Addr::from(data.ipv4_destination),
+        src_port: data.port_source,
+        dst_port: data.port_destination,
+    };
+
+    let mut stats = flow_map.entry(flow_key).or_insert_with(|| FlowStats { packets: 0, bytes: 0 });
+    stats.packets += 1;
+    stats.bytes += data.data_length as usize;
+
+    let elapsed_time = start_time.elapsed();
+
+    let mut processing_times = processing_times.lock().unwrap();
+    processing_times.push(elapsed_time);
 }
 
 fn handle_dataset(dataset: Dataset, path: &str) {

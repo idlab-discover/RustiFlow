@@ -6,7 +6,8 @@ use aya_bpf::{
     bindings::xdp_action,
     macros::{map, xdp},
     programs::XdpContext,
-    maps::PerfEventArray
+    maps::PerfEventArray,
+    helpers::bpf_ktime_get_ns,
 };
 
 use common::PacketLog;
@@ -51,6 +52,7 @@ unsafe fn ptr_at<T>(ctx: &XdpContext, offset: usize) -> Result<*const T, ()> {
 }
 
 fn try_xdp_flow_track(ctx: XdpContext) -> Result<u32, ()>{
+
     let ethhdr: *const EthHdr = unsafe { ptr_at(&ctx, 0)? };
     match unsafe { (*ethhdr).ether_type } {
         EtherType::Ipv4 => {}
@@ -63,6 +65,9 @@ fn try_xdp_flow_track(ctx: XdpContext) -> Result<u32, ()>{
 
     let source_port;
     let destination_port;
+
+    let data_length: usize = ctx.data_end() - ctx.data();
+
     match unsafe { *ipv4hdr }.proto {
         IpProto::Tcp => {
             let tcphdr: *const TcpHdr =
@@ -84,6 +89,7 @@ fn try_xdp_flow_track(ctx: XdpContext) -> Result<u32, ()>{
         ipv4_source: ipv4_source,
         port_destination: destination_port,
         port_source: source_port,
+        data_length: data_length as u32,
     };
 
     // the zero value is a flag

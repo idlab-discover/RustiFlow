@@ -7,6 +7,7 @@ use aya_bpf::{
     macros::{classifier, map},
     maps::PerfEventArray,
     programs::TcContext,
+    helpers::bpf_ktime_get_ns,
 };
 
 use common::PacketLog;
@@ -35,6 +36,7 @@ pub fn tc_flow_track(ctx: TcContext) -> i32 {
 }
 
 fn try_tc_flow_track(ctx: TcContext) -> Result<i32, ()> {
+
     let ethhdr: EthHdr = ctx.load(0).map_err(|_| ())?;
     match ethhdr.ether_type {
         EtherType::Ipv4 => {}
@@ -47,6 +49,9 @@ fn try_tc_flow_track(ctx: TcContext) -> Result<i32, ()> {
 
     let source_port;
     let destination_port;
+
+    let data_length: usize = ctx.data_end() - ctx.data();
+
     match ipv4hdr.proto {
         IpProto::Tcp => {
             let tcphdr: TcpHdr = ctx.load(EthHdr::LEN + Ipv4Hdr::LEN).map_err(|_| ())?;
@@ -66,6 +71,7 @@ fn try_tc_flow_track(ctx: TcContext) -> Result<i32, ()> {
         ipv4_source: ipv4_source,
         port_destination: destination_port,
         port_source: source_port,
+        data_length: data_length as u32,
     };
 
     // the zero value is a flag
