@@ -225,7 +225,6 @@ fn process_packet(data: BasicFeatures, flow_map: Arc<DashMap<String, CicFlow>>, 
     let end = entry.update_flow(data, &timestamp, fwd);
     if end.is_some() {
         println!("{}", end.unwrap());
-        entry.dump();
         drop(entry);
         flow_map.remove(&flow_id_remove);
     }
