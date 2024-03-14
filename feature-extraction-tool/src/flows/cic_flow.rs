@@ -605,7 +605,7 @@ impl CicFlow {
     ///
     /// Pooled standard deviation of the flow's IATs.
     fn get_flow_iat_std(&self) -> f64 {
-        if self.basic_flow.bwd_packet_count < 2 {
+        if self.basic_flow.fwd_packet_count < 1 || self.basic_flow.bwd_packet_count < 1 || self.basic_flow.fwd_packet_count + self.basic_flow.bwd_packet_count < 3{
             return 0.0;
         }
 
