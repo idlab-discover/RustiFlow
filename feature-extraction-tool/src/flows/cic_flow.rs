@@ -1121,7 +1121,7 @@ impl CicFlow {
 impl Flow for CicFlow {
     fn update_flow(
         &mut self,
-        packet: BasicFeatures,
+        packet: &BasicFeatures,
         timestamp: &Instant,
         fwd: bool,
     ) -> Option<String> {
@@ -2094,7 +2094,7 @@ mod tests {
         };
         let timestamp = Instant::now();
 
-        cic_flow.update_flow(packet, &timestamp, true);
+        cic_flow.update_flow(&packet, &timestamp, true);
 
         assert_eq!(cic_flow.basic_flow.fwd_packet_count, 1);
         assert_eq!(cic_flow.basic_flow.bwd_packet_count, 0);
@@ -2166,7 +2166,7 @@ mod tests {
         };
         let timestamp = Instant::now();
 
-        cic_flow.update_flow(packet, &timestamp, false);
+        cic_flow.update_flow(&packet, &timestamp, false);
 
         assert_eq!(cic_flow.basic_flow.fwd_packet_count, 0);
         assert_eq!(cic_flow.basic_flow.bwd_packet_count, 1);
@@ -2238,7 +2238,7 @@ mod tests {
         };
         let timestamp_1 = Instant::now();
 
-        cic_flow.update_flow(packet_1, &timestamp_1, true);
+        cic_flow.update_flow(&packet_1, &timestamp_1, true);
 
         std::thread::sleep(std::time::Duration::from_secs(1));
 
@@ -2263,7 +2263,7 @@ mod tests {
         };
         let timestamp_2 = Instant::now();
 
-        cic_flow.update_flow(packet_2, &timestamp_2, true);
+        cic_flow.update_flow(&packet_2, &timestamp_2, true);
 
         assert_eq!(cic_flow.basic_flow.fwd_packet_count, 2);
         assert_eq!(cic_flow.basic_flow.bwd_packet_count, 0);
@@ -2347,7 +2347,7 @@ mod tests {
         };
         let timestamp_1 = Instant::now();
 
-        cic_flow.update_flow(packet_1, &timestamp_1, false);
+        cic_flow.update_flow(&packet_1, &timestamp_1, false);
 
         std::thread::sleep(std::time::Duration::from_secs(1));
 
@@ -2372,7 +2372,7 @@ mod tests {
         };
         let timestamp_2 = Instant::now();
 
-        cic_flow.update_flow(packet_2, &timestamp_2, false);
+        cic_flow.update_flow(&packet_2, &timestamp_2, false);
 
         assert_eq!(cic_flow.basic_flow.fwd_packet_count, 0);
         assert_eq!(cic_flow.basic_flow.bwd_packet_count, 2);

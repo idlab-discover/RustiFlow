@@ -118,7 +118,7 @@ async fn handle_realtime(interface: String, interval: Option<u64>, lifespan: u64
                     let ptr = buf.as_ptr() as *const BasicFeatures;
                     let data = unsafe { ptr.read_unaligned() };
 
-                    process_packet(data, flow_map_clone_egress.clone(), false);
+                    process_packet(&data, &flow_map_clone_egress, false);
                 }
             }
         });
@@ -136,7 +136,7 @@ async fn handle_realtime(interface: String, interval: Option<u64>, lifespan: u64
                     let ptr = buf.as_ptr() as *const BasicFeatures;
                     let data = unsafe { ptr.read_unaligned() };
 
-                    process_packet(data, flow_map_clone_ingress.clone(), true);
+                    process_packet(&data, &flow_map_clone_ingress, true);
                 }
             }
         });
@@ -189,7 +189,7 @@ async fn handle_realtime(interface: String, interval: Option<u64>, lifespan: u64
     Ok(())
 }
 
-fn process_packet(data: BasicFeatures, flow_map: Arc<DashMap<String, CicFlow>>, fwd: bool) {
+fn process_packet(data: &BasicFeatures, flow_map: &Arc<DashMap<String, CicFlow>>, fwd: bool) {
     let timestamp = Instant::now();
     let flow_id = if fwd {
         create_flow_id(
@@ -222,7 +222,7 @@ fn process_packet(data: BasicFeatures, flow_map: Arc<DashMap<String, CicFlow>>, 
         )
     });
 
-    let end = entry.update_flow(data, &timestamp, fwd);
+    let end = entry.update_flow(&data, &timestamp, fwd);
     if end.is_some() {
         println!("{}", end.unwrap());
         drop(entry);
@@ -300,7 +300,7 @@ mod tests {
             length: 140,
             window_size: 1000,
         };
-        process_packet(data_1, flow_map.clone(), true);
+        process_packet(&data_1, &flow_map, true);
 
         let data_2 = BasicFeatures {
             ipv4_source: 2,
@@ -321,7 +321,7 @@ mod tests {
             length: 140,
             window_size: 1000,
         };
-        process_packet(data_2, flow_map.clone(), false);
+        process_packet(&data_2, &flow_map, false);
 
         assert_eq!(flow_map.len(), 1);
         // 17 is for udp, here we just use it to create a new flow
@@ -344,7 +344,7 @@ mod tests {
             length: 140,
             window_size: 1000,
         };
-        process_packet(data_3, flow_map.clone(), true);
+        process_packet(&data_3, &flow_map, true);
 
         assert_eq!(flow_map.len(), 2);
 
@@ -367,7 +367,7 @@ mod tests {
             length: 140,
             window_size: 1000,
         };
-        process_packet(data_4, flow_map.clone(), true);
+        process_packet(&data_4, &flow_map, true);
 
         assert_eq!(flow_map.len(), 2);
 
@@ -390,7 +390,7 @@ mod tests {
             length: 140,
             window_size: 1000,
         };
-        process_packet(data_5, flow_map.clone(), false);
+        process_packet(&data_5, &flow_map, false);
 
         assert_eq!(flow_map.len(), 2);
 
@@ -413,7 +413,7 @@ mod tests {
             length: 140,
             window_size: 1000,
         };
-        process_packet(data_6, flow_map.clone(), true);
+        process_packet(&data_6, &flow_map, true);
 
         assert_eq!(flow_map.len(), 1);
 
@@ -436,7 +436,7 @@ mod tests {
             length: 140,
             window_size: 1000,
         };
-        process_packet(data_7, flow_map.clone(), false);
+        process_packet(&data_7, &flow_map, false);
 
         assert_eq!(flow_map.len(), 0);
 
@@ -459,7 +459,7 @@ mod tests {
             length: 140,
             window_size: 1000,
         };
-        process_packet(data_8, flow_map.clone(), true);
+        process_packet(&data_8, &flow_map, true);
 
         assert_eq!(flow_map.len(), 1);
 
@@ -482,7 +482,7 @@ mod tests {
             length: 140,
             window_size: 1000,
         };
-        process_packet(data_9, flow_map.clone(), true);
+        process_packet(&data_9, &flow_map, true);
 
         assert_eq!(flow_map.len(), 1);
 
@@ -506,7 +506,7 @@ mod tests {
             window_size: 1000,
         };
 
-        process_packet(data_10, flow_map.clone(), true);
+        process_packet(&data_10, &flow_map, true);
 
         assert_eq!(flow_map.len(), 1);
 
@@ -529,7 +529,7 @@ mod tests {
             length: 140,
             window_size: 1000,
         };
-        process_packet(data_11, flow_map.clone(), false);
+        process_packet(&data_11, &flow_map, false);
 
         assert_eq!(flow_map.len(), 1);
 
@@ -552,7 +552,7 @@ mod tests {
             length: 140,
             window_size: 1000,
         };
-        process_packet(data_12, flow_map.clone(), false);
+        process_packet(&data_12, &flow_map, false);
 
         assert_eq!(flow_map.len(), 0);
     }

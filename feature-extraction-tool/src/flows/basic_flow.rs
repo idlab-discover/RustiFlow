@@ -105,7 +105,7 @@ impl BasicFlow {
 }
 
 impl Flow for BasicFlow {
-    fn update_flow(&mut self, packet: BasicFeatures, _timestamp: &Instant, fwd: bool) -> Option<String>{
+    fn update_flow(&mut self, packet: &BasicFeatures, _timestamp: &Instant, fwd: bool) -> Option<String>{
         self.last_timestamp = Utc::now();
 
         // when both FIN flags are set, the flow can be finished when the last ACK is received

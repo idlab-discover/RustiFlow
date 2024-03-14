@@ -24,7 +24,7 @@ pub trait Flow {
     /// If the flow is terminated, you will get a dump of all features of the flow.
     fn update_flow(
         &mut self,
-        packet: BasicFeatures,
+        packet: &BasicFeatures,
         timestamp: &Instant,
         fwd: bool,
     ) -> Option<String>;
