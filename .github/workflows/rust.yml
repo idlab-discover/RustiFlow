@@ -37,11 +37,14 @@ jobs:
     - name: Build userspace program
       run: cargo build --verbose
 
+    - name: Fetch gh-pages branch
+      if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+      run: git fetch origin gh-pages:gh-pages
+
     - name: Backup custom index.html
       if: github.event_name == 'push' && github.ref == 'refs/heads/main'
       run: |
-        git fetch origin gh-pages
-        git checkout gh-pages -- index.html
+        git checkout gh-pages
         mv index.html index.html.backup
         git checkout -
       
