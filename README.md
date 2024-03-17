@@ -1,46 +1,51 @@
 # Real-Time Adaptive Feature Extraction for ML-Based Network Intrusion Detection
 
-This is a feature extraction tool build in Rust using eBPF for network intrusion detection
+This is a feature extraction tool that is capable of exporting multiple kinds of feature and feature sets. The project is written in rust and uses eBPF code to collect the basic network traffic data from the incomming and outgoing packets. The project was made with following goals, it needed to be fast, adaptable and reliable.
 
-## Install:
+![GitHub Actions Workflow Status](https://img.shields.io/github/actions/workflow/status/matissecallewaert/nids-feature-extraction-tool/rust.yml) ![Website](https://img.shields.io/website?url=https%3A%2F%2Fmatissecallewaert.github.io%2Fnids-feature-extraction-tool&label=Documentation)
 
-### Prerequisites
-
-Make sure you have Rust installed:
+## How to install:
+### Installing rust
 
 ```bash
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 ```
 
-Installing nightly:
+### Installing nightly
 
 ```bash
 rustup install stable
 rustup toolchain install nightly --component rust-src
 ```
 
-Installing the bpf linker
-This is highly dependent on your operating system, just follow the error messages and install the requirements. For llvm you need version 18, make sure that Polly is installed with it.
+### Installing bpf linker
+
+If you are running a linux x86_64 system the install is simple:
 
 ```bash
-sudo apt install llvm
-sudo apt install llvm-dev
-sudo apt install libzstd-dev
+cargo install bpf-linker
 ```
 
-Make sure you are in the project root directory
+If you are running macos or linux on any other architecture, you need to install the newest stable version of LLVM first:
+
+```bash
+brew install llvm
+```
+
+Then install the linker with:
+
 ```bash
 cargo install --no-default-features bpf-linker
 ```
 
-When you are running Ubuntu 20.04 LTS you need to run this command to avoid bugs:
+When you are running Ubuntu 20.04 LTS you need to run this command to avoid bugs, because there is a bug in the default kernel of the distribution:
 
 ```bash
 sudo apt install linux-tools-5.8.0-63-generic
 export PATH=/usr/lib/linux-tools/5.8.0-63-generic:$PATH
 ```
 
-## Building the project
+## Building the project:
 
 To build the eBPF programs:
 
@@ -55,15 +60,15 @@ To build the user space programs:
 cargo build
 ```
 
-## Running the project
+## Running (and building) the project
 
-To run the program:
+To run (and build) the program, the dump interval argument is optional:
 
 ```bash
-RUST_LOG=info cargo xtask run -- realtime <interface>
+RUST_LOG=info cargo xtask run -- realtime <interface> <flow_lifetime_sec> <dump_interval>
 ```
 
-To now the other possibilities, run this command:
+To know the other possibilities, run this command:
 
 ```bash
 RUST_LOG=info cargo xtask run -- help
