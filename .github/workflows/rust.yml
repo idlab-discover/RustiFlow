@@ -36,6 +36,14 @@ jobs:
 
     - name: Build userspace program
       run: cargo build --verbose
+
+    - name: Backup custom index.html
+      if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+      run: |
+        git fetch origin gh-pages
+        git checkout gh-pages -- index.html
+        mv index.html index.html.backup
+        git checkout -
       
     - name: Run tests
       run: cargo test --verbose
@@ -43,7 +51,11 @@ jobs:
     - name: Generate documentation
       if: github.event_name == 'push' && github.ref == 'refs/heads/main'
       run: cargo doc --no-deps
-    
+
+    - name: Restore custom index.html
+      if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+      run: mv index.html.backup target/doc/index.html
+
     - name: Push docs to gh-pages
       if: github.event_name == 'push' && github.ref == 'refs/heads/main'
       uses: peaceiris/actions-gh-pages@v3
