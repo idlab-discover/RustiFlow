@@ -17,26 +17,30 @@ use aya::{
     maps::AsyncPerfEventArray,
     programs::{tc, SchedClassifier, TcAttachType, Xdp, XdpFlags},
     util::online_cpus,
-    Bpf,
+    Ebpf,
 };
 use bytes::BytesMut;
 use chrono::Utc;
 use clap::Parser;
 use common::BasicFeatures;
 use core::panic;
-use dashmap:: DashMap;
+use dashmap::DashMap;
 use flows::flow::Flow;
 use log::info;
 use std::{sync::Arc, time::Instant};
-use tokio::{signal, task};
 use tokio::time::{self, Duration};
+use tokio::{signal, task};
 
 #[tokio::main]
 async fn main() {
     let cli = Cli::parse();
 
     match cli.command {
-        Commands::Realtime { interface, interval, lifespan} => {
+        Commands::Realtime {
+            interface,
+            interval,
+            lifespan,
+        } => {
             if let Some(interval) = interval {
                 if interval >= lifespan {
                     panic!("The interval needs to be smaller than the lifespan!");
@@ -53,26 +57,30 @@ async fn main() {
     }
 }
 
-async fn handle_realtime(interface: String, interval: Option<u64>, lifespan: u64) -> Result<(), anyhow::Error> {
+async fn handle_realtime(
+    interface: String,
+    interval: Option<u64>,
+    lifespan: u64,
+) -> Result<(), anyhow::Error> {
     env_logger::init();
 
     // Loading the eBPF program for egress, the macros make sure the correct file is loaded
     #[cfg(debug_assertions)]
-    let mut bpf_egress = Bpf::load(include_bytes_aligned!(
+    let mut bpf_egress = Ebpf::load(include_bytes_aligned!(
         "../../target/bpfel-unknown-none/debug/feature-extraction-tool-egress"
     ))?;
     #[cfg(not(debug_assertions))]
-    let mut bpf_egress = Bpf::load(include_bytes_aligned!(
+    let mut bpf_egress = Ebpf::load(include_bytes_aligned!(
         "../../target/bpfel-unknown-none/release/feature-extraction-tool-egress"
     ))?;
 
     // Loading the eBPF program for ingress, the macros make sure the correct file is loaded
     #[cfg(debug_assertions)]
-    let mut bpf_ingress = Bpf::load(include_bytes_aligned!(
+    let mut bpf_ingress = Ebpf::load(include_bytes_aligned!(
         "../../target/bpfel-unknown-none/debug/feature-extraction-tool-ingress"
     ))?;
     #[cfg(not(debug_assertions))]
-    let mut bpf_ingress = Bpf::load(include_bytes_aligned!(
+    let mut bpf_ingress = Ebpf::load(include_bytes_aligned!(
         "../../target/bpfel-unknown-none/release/feature-extraction-tool-ingress"
     ))?;
 
@@ -155,7 +163,7 @@ async fn handle_realtime(interface: String, interval: Option<u64>, lifespan: u64
             }
         });
     }
-    
+
     let flow_map_end = flow_map.clone();
     task::spawn(async move {
         let mut interval = time::interval(Duration::from_secs(2));
@@ -167,7 +175,8 @@ async fn handle_realtime(interface: String, interval: Option<u64>, lifespan: u64
             let mut keys_to_remove = Vec::new();
             for entry in flow_map_end.iter() {
                 let flow = entry.value();
-                let end = flow.get_duration(flow.basic_flow.first_timestamp, timestamp) / 1_000_000.0;
+                let end =
+                    flow.get_duration(flow.basic_flow.first_timestamp, timestamp) / 1_000_000.0;
 
                 if end >= lifespan as f64 {
                     println!("{}", flow.dump());

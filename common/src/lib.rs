@@ -1,5 +1,5 @@
 #![no_std]
-// BasicFeatures is 264 bits in size
+/// BasicFeatures is a struct collection all traffic data and is 280 bits in size.
 #[repr(C)]
 #[derive(Clone, Copy)]
 pub struct BasicFeatures {
