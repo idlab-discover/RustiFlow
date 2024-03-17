@@ -559,6 +559,15 @@
 <a href="#557" id="557">557</a>
 <a href="#558" id="558">558</a>
 <a href="#559" id="559">559</a>
+<a href="#560" id="560">560</a>
+<a href="#561" id="561">561</a>
+<a href="#562" id="562">562</a>
+<a href="#563" id="563">563</a>
+<a href="#564" id="564">564</a>
+<a href="#565" id="565">565</a>
+<a href="#566" id="566">566</a>
+<a href="#567" id="567">567</a>
+<a href="#568" id="568">568</a>
 </pre></div><pre class="rust"><code><span class="kw">mod </span>args;
 <span class="kw">mod </span>flows;
 <span class="kw">mod </span>parsers;
@@ -578,26 +587,30 @@
     maps::AsyncPerfEventArray,
     programs::{tc, SchedClassifier, TcAttachType, Xdp, XdpFlags},
     util::online_cpus,
-    Bpf,
+    Ebpf,
 };
 <span class="kw">use </span>bytes::BytesMut;
 <span class="kw">use </span>chrono::Utc;
 <span class="kw">use </span>clap::Parser;
 <span class="kw">use </span>common::BasicFeatures;
 <span class="kw">use </span>core::panic;
-<span class="kw">use </span>dashmap:: DashMap;
+<span class="kw">use </span>dashmap::DashMap;
 <span class="kw">use </span>flows::flow::Flow;
 <span class="kw">use </span>log::info;
 <span class="kw">use </span>std::{sync::Arc, time::Instant};
-<span class="kw">use </span>tokio::{signal, task};
 <span class="kw">use </span>tokio::time::{<span class="self">self</span>, Duration};
+<span class="kw">use </span>tokio::{signal, task};
 
 <span class="attr">#[tokio::main]
 </span><span class="kw">async fn </span>main() {
     <span class="kw">let </span>cli = Cli::parse();
 
     <span class="kw">match </span>cli.command {
-        Commands::Realtime { interface, interval, lifespan} =&gt; {
+        Commands::Realtime {
+            interface,
+            interval,
+            lifespan,
+        } =&gt; {
             <span class="kw">if let </span><span class="prelude-val">Some</span>(interval) = interval {
                 <span class="kw">if </span>interval &gt;= lifespan {
                     <span class="macro">panic!</span>(<span class="string">"The interval needs to be smaller than the lifespan!"</span>);
@@ -614,26 +627,30 @@
     }
 }
 
-<span class="kw">async fn </span>handle_realtime(interface: String, interval: <span class="prelude-ty">Option</span>&lt;u64&gt;, lifespan: u64) -&gt; <span class="prelude-ty">Result</span>&lt;(), anyhow::Error&gt; {
+<span class="kw">async fn </span>handle_realtime(
+    interface: String,
+    interval: <span class="prelude-ty">Option</span>&lt;u64&gt;,
+    lifespan: u64,
+) -&gt; <span class="prelude-ty">Result</span>&lt;(), anyhow::Error&gt; {
     env_logger::init();
 
     <span class="comment">// Loading the eBPF program for egress, the macros make sure the correct file is loaded
     </span><span class="attr">#[cfg(debug_assertions)]
-    </span><span class="kw">let </span><span class="kw-2">mut </span>bpf_egress = Bpf::load(<span class="macro">include_bytes_aligned!</span>(
+    </span><span class="kw">let </span><span class="kw-2">mut </span>bpf_egress = Ebpf::load(<span class="macro">include_bytes_aligned!</span>(
         <span class="string">"../../target/bpfel-unknown-none/debug/feature-extraction-tool-egress"
     </span>))<span class="question-mark">?</span>;
     <span class="attr">#[cfg(not(debug_assertions))]
-    </span><span class="kw">let </span><span class="kw-2">mut </span>bpf_egress = Bpf::load(<span class="macro">include_bytes_aligned!</span>(
+    </span><span class="kw">let </span><span class="kw-2">mut </span>bpf_egress = Ebpf::load(<span class="macro">include_bytes_aligned!</span>(
         <span class="string">"../../target/bpfel-unknown-none/release/feature-extraction-tool-egress"
     </span>))<span class="question-mark">?</span>;
 
     <span class="comment">// Loading the eBPF program for ingress, the macros make sure the correct file is loaded
     </span><span class="attr">#[cfg(debug_assertions)]
-    </span><span class="kw">let </span><span class="kw-2">mut </span>bpf_ingress = Bpf::load(<span class="macro">include_bytes_aligned!</span>(
+    </span><span class="kw">let </span><span class="kw-2">mut </span>bpf_ingress = Ebpf::load(<span class="macro">include_bytes_aligned!</span>(
         <span class="string">"../../target/bpfel-unknown-none/debug/feature-extraction-tool-ingress"
     </span>))<span class="question-mark">?</span>;
     <span class="attr">#[cfg(not(debug_assertions))]
-    </span><span class="kw">let </span><span class="kw-2">mut </span>bpf_ingress = Bpf::load(<span class="macro">include_bytes_aligned!</span>(
+    </span><span class="kw">let </span><span class="kw-2">mut </span>bpf_ingress = Ebpf::load(<span class="macro">include_bytes_aligned!</span>(
         <span class="string">"../../target/bpfel-unknown-none/release/feature-extraction-tool-ingress"
     </span>))<span class="question-mark">?</span>;
 
@@ -716,7 +733,7 @@
             }
         });
     }
-    
+
     <span class="kw">let </span>flow_map_end = flow_map.clone();
     task::spawn(<span class="kw">async move </span>{
         <span class="kw">let </span><span class="kw-2">mut </span>interval = time::interval(Duration::from_secs(<span class="number">2</span>));
@@ -728,7 +745,8 @@
             </span><span class="kw">let </span><span class="kw-2">mut </span>keys_to_remove = Vec::new();
             <span class="kw">for </span>entry <span class="kw">in </span>flow_map_end.iter() {
                 <span class="kw">let </span>flow = entry.value();
-                <span class="kw">let </span>end = flow.get_duration(flow.basic_flow.first_timestamp, timestamp) / <span class="number">1_000_000.0</span>;
+                <span class="kw">let </span>end =
+                    flow.get_duration(flow.basic_flow.first_timestamp, timestamp) / <span class="number">1_000_000.0</span>;
 
                 <span class="kw">if </span>end &gt;= lifespan <span class="kw">as </span>f64 {
                     <span class="macro">println!</span>(<span class="string">"{}"</span>, flow.dump());
