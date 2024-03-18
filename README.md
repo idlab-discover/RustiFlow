@@ -4,6 +4,8 @@ This is a feature extraction tool that is capable of exporting multiple kinds of
 
 ![GitHub Actions Workflow Status](https://img.shields.io/github/actions/workflow/status/matissecallewaert/nids-feature-extraction-tool/rust.yml) ![Website](https://img.shields.io/website?url=https%3A%2F%2Fmatissecallewaert.github.io%2Fnids-feature-extraction-tool&label=Documentation)
 
+![flows](flows.gif)
+
 ## How to install:
 ### Installing rust
 
