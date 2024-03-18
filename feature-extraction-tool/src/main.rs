@@ -50,17 +50,23 @@ async fn main() {
 
             match flow_type {
                 FlowType::BasicFlow => {
-                    if let Err(err) = handle_realtime::<BasicFlow>(interface, interval, lifespan).await {
+                    if let Err(err) =
+                        handle_realtime::<BasicFlow>(interface, interval, lifespan).await
+                    {
                         eprintln!("Error: {:?}", err);
                     }
                 }
                 FlowType::CicFlow => {
-                    if let Err(err) = handle_realtime::<CicFlow>(interface, interval, lifespan).await {
+                    if let Err(err) =
+                        handle_realtime::<CicFlow>(interface, interval, lifespan).await
+                    {
                         eprintln!("Error: {:?}", err);
                     }
                 }
                 FlowType::CiddsFlow => {
-                    if let Err(err) = handle_realtime::<CiddsFlow>(interface, interval, lifespan).await {
+                    if let Err(err) =
+                        handle_realtime::<CiddsFlow>(interface, interval, lifespan).await
+                    {
                         eprintln!("Error: {:?}", err);
                     }
                 }
@@ -76,10 +82,10 @@ async fn handle_realtime<T>(
     interface: String,
     interval: Option<u64>,
     lifespan: u64,
-) -> Result<(), anyhow::Error> 
+) -> Result<(), anyhow::Error>
 where
-        T: Flow + Send + Sync + 'static,
-        {
+    T: Flow + Send + Sync + 'static,
+{
     env_logger::init();
 
     // Loading the eBPF program for egress, the macros make sure the correct file is loaded
@@ -193,8 +199,7 @@ where
             let mut keys_to_remove = Vec::new();
             for entry in flow_map_end.iter() {
                 let flow = entry.value();
-                let end =
-                    get_duration(flow.get_first_timestamp(), timestamp) / 1_000_000.0;
+                let end = get_duration(flow.get_first_timestamp(), timestamp) / 1_000_000.0;
 
                 if end >= lifespan as f64 {
                     println!("{}", flow.dump());
@@ -216,8 +221,9 @@ where
     Ok(())
 }
 
-fn process_packet<T>(data: &BasicFeatures, flow_map: &Arc<DashMap<String, T>>, fwd: bool) 
-where T: Flow,
+fn process_packet<T>(data: &BasicFeatures, flow_map: &Arc<DashMap<String, T>>, fwd: bool)
+where
+    T: Flow,
 {
     let timestamp = Instant::now();
     let flow_id = if fwd {

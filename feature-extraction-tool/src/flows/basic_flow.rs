@@ -103,7 +103,12 @@ impl Flow for BasicFlow {
         }
     }
 
-    fn update_flow(&mut self, packet: &BasicFeatures, _timestamp: &Instant, fwd: bool) -> Option<String>{
+    fn update_flow(
+        &mut self,
+        packet: &BasicFeatures,
+        _timestamp: &Instant,
+        fwd: bool,
+    ) -> Option<String> {
         self.last_timestamp = Utc::now();
 
         // when both FIN flags are set, the flow can be finished when the last ACK is received
@@ -136,35 +141,37 @@ impl Flow for BasicFlow {
     }
 
     fn dump(&self) -> String {
-        format!("{},{},{},{},{},{},{},{},{},{},{},{},{},\
-        {},{},{},{},{},{},{},{},{},{},{},{},{},{}", 
-        self.flow_id, 
-        self.ipv4_source, 
-        self.port_source, 
-        self.ipv4_destination, 
-        self.port_destination, 
-        self.protocol, 
-        self.first_timestamp, 
-        self.last_timestamp, 
-        self.flow_end_of_flow_ack, 
-        self.fwd_fin_flag_count, 
-        self.fwd_syn_flag_count, 
-        self.fwd_rst_flag_count, 
-        self.fwd_psh_flag_count, 
-        self.fwd_ack_flag_count, 
-        self.fwd_urg_flag_count, 
-        self.fwd_cwe_flag_count, 
-        self.fwd_ece_flag_count, 
-        self.fwd_packet_count, 
-        self.bwd_fin_flag_count, 
-        self.bwd_syn_flag_count, 
-        self.bwd_rst_flag_count, 
-        self.bwd_psh_flag_count, 
-        self.bwd_ack_flag_count, 
-        self.bwd_urg_flag_count, 
-        self.bwd_cwe_flag_count, 
-        self.bwd_ece_flag_count, 
-        self.bwd_packet_count)
+        format!(
+            "{},{},{},{},{},{},{},{},{},{},{},{},{},\
+        {},{},{},{},{},{},{},{},{},{},{},{},{},{}",
+            self.flow_id,
+            self.ipv4_source,
+            self.port_source,
+            self.ipv4_destination,
+            self.port_destination,
+            self.protocol,
+            self.first_timestamp,
+            self.last_timestamp,
+            self.flow_end_of_flow_ack,
+            self.fwd_fin_flag_count,
+            self.fwd_syn_flag_count,
+            self.fwd_rst_flag_count,
+            self.fwd_psh_flag_count,
+            self.fwd_ack_flag_count,
+            self.fwd_urg_flag_count,
+            self.fwd_cwe_flag_count,
+            self.fwd_ece_flag_count,
+            self.fwd_packet_count,
+            self.bwd_fin_flag_count,
+            self.bwd_syn_flag_count,
+            self.bwd_rst_flag_count,
+            self.bwd_psh_flag_count,
+            self.bwd_ack_flag_count,
+            self.bwd_urg_flag_count,
+            self.bwd_cwe_flag_count,
+            self.bwd_ece_flag_count,
+            self.bwd_packet_count
+        )
     }
 
     fn get_first_timestamp(&self) -> DateTime<Utc> {

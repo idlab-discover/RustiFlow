@@ -1,6 +1,6 @@
-use std::{net::Ipv4Addr, time::Instant};
 use chrono::{DateTime, Utc};
 use common::BasicFeatures;
+use std::{net::Ipv4Addr, time::Instant};
 
 use super::{basic_flow::BasicFlow, flow::Flow};
 
@@ -15,7 +15,6 @@ pub struct CiddsFlow {
 }
 
 impl CiddsFlow {
-    
     /// Retrieves the flags feature string of the flow.
     ///
     /// Returns the flags feature string of the flow. If no flags were used
@@ -27,12 +26,36 @@ impl CiddsFlow {
     fn get_flags_string(&self) -> String {
         let mut flags = String::new();
 
-        if self.basic_flow.fwd_urg_flag_count + self.basic_flow.bwd_urg_flag_count != 0 { flags.push('U'); } else { flags.push('.'); }
-        if self.basic_flow.fwd_ack_flag_count + self.basic_flow.bwd_ack_flag_count != 0 { flags.push('A'); } else { flags.push('.'); }
-        if self.basic_flow.fwd_psh_flag_count + self.basic_flow.bwd_psh_flag_count != 0 { flags.push('P'); } else { flags.push('.'); }
-        if self.basic_flow.fwd_rst_flag_count + self.basic_flow.bwd_rst_flag_count != 0 { flags.push('R'); } else { flags.push('.'); }
-        if self.basic_flow.fwd_syn_flag_count + self.basic_flow.bwd_syn_flag_count != 0 { flags.push('S'); } else { flags.push('.'); }
-        if self.basic_flow.fwd_fin_flag_count + self.basic_flow.bwd_fin_flag_count != 0 { flags.push('F'); } else { flags.push('.'); }
+        if self.basic_flow.fwd_urg_flag_count + self.basic_flow.bwd_urg_flag_count != 0 {
+            flags.push('U');
+        } else {
+            flags.push('.');
+        }
+        if self.basic_flow.fwd_ack_flag_count + self.basic_flow.bwd_ack_flag_count != 0 {
+            flags.push('A');
+        } else {
+            flags.push('.');
+        }
+        if self.basic_flow.fwd_psh_flag_count + self.basic_flow.bwd_psh_flag_count != 0 {
+            flags.push('P');
+        } else {
+            flags.push('.');
+        }
+        if self.basic_flow.fwd_rst_flag_count + self.basic_flow.bwd_rst_flag_count != 0 {
+            flags.push('R');
+        } else {
+            flags.push('.');
+        }
+        if self.basic_flow.fwd_syn_flag_count + self.basic_flow.bwd_syn_flag_count != 0 {
+            flags.push('S');
+        } else {
+            flags.push('.');
+        }
+        if self.basic_flow.fwd_fin_flag_count + self.basic_flow.bwd_fin_flag_count != 0 {
+            flags.push('F');
+        } else {
+            flags.push('.');
+        }
 
         flags
     }
@@ -84,8 +107,19 @@ impl Flow for CiddsFlow {
         format!(
             "{},{},{},{},{},{},{},{},{},{}",
             self.basic_flow.first_timestamp,
-            self.basic_flow.last_timestamp.signed_duration_since(self.basic_flow.first_timestamp).num_milliseconds(),
-            if self.basic_flow.protocol == 6 { "TCP" } else if self.basic_flow.protocol == 17 { "UDP" } else if self.basic_flow.protocol == 1 { "ICMP" } else { "OTHER" },
+            self.basic_flow
+                .last_timestamp
+                .signed_duration_since(self.basic_flow.first_timestamp)
+                .num_milliseconds(),
+            if self.basic_flow.protocol == 6 {
+                "TCP"
+            } else if self.basic_flow.protocol == 17 {
+                "UDP"
+            } else if self.basic_flow.protocol == 1 {
+                "ICMP"
+            } else {
+                "OTHER"
+            },
             Ipv4Addr::from(self.basic_flow.ipv4_source),
             self.basic_flow.port_source,
             Ipv4Addr::from(self.basic_flow.ipv4_destination),

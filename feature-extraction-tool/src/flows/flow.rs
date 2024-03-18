@@ -1,6 +1,6 @@
-use std::time::Instant;
 use chrono::{DateTime, Utc};
 use common::BasicFeatures;
+use std::time::Instant;
 
 /// `Flow` defines the behavior of a network flow.
 ///

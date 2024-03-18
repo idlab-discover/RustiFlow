@@ -28,7 +28,11 @@ pub fn create_flow_id(
 ) -> String {
     format!(
         "{}:{}-{}:{}-{}",
-        Ipv4Addr::from(ipv4_source), port_source, Ipv4Addr::from(ipv4_destination), port_destination, protocol
+        Ipv4Addr::from(ipv4_source),
+        port_source,
+        Ipv4Addr::from(ipv4_destination),
+        port_destination,
+        protocol
     )
 }
 
