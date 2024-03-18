@@ -8,10 +8,10 @@ use crate::{
     flows::cic_flow::CicFlow,
     parsers::csv_parser::CsvParser,
     records::{cic_record::CicRecord, print::Print},
-    utils::utils::create_flow_id,
+    utils::utils::{create_flow_id, get_duration},
 };
 use anyhow::Context;
-use args::{Cli, Commands, Dataset};
+use args::{Cli, Commands, Dataset, FlowType};
 use aya::{
     include_bytes_aligned,
     maps::AsyncPerfEventArray,
@@ -25,7 +25,7 @@ use clap::Parser;
 use common::BasicFeatures;
 use core::panic;
 use dashmap::DashMap;
-use flows::flow::Flow;
+use flows::{basic_flow::BasicFlow, cidds_flow::CiddsFlow, flow::Flow};
 use log::info;
 use std::{sync::Arc, time::Instant};
 use tokio::time::{self, Duration};
@@ -38,8 +38,9 @@ async fn main() {
     match cli.command {
         Commands::Realtime {
             interface,
-            interval,
+            flow_type,
             lifespan,
+            interval,
         } => {
             if let Some(interval) = interval {
                 if interval >= lifespan {
@@ -47,8 +48,22 @@ async fn main() {
                 }
             }
 
-            if let Err(err) = handle_realtime(interface, interval, lifespan).await {
-                eprintln!("Error: {:?}", err);
+            match flow_type {
+                FlowType::BasicFlow => {
+                    if let Err(err) = handle_realtime::<BasicFlow>(interface, interval, lifespan).await {
+                        eprintln!("Error: {:?}", err);
+                    }
+                }
+                FlowType::CicFlow => {
+                    if let Err(err) = handle_realtime::<CicFlow>(interface, interval, lifespan).await {
+                        eprintln!("Error: {:?}", err);
+                    }
+                }
+                FlowType::CiddsFlow => {
+                    if let Err(err) = handle_realtime::<CiddsFlow>(interface, interval, lifespan).await {
+                        eprintln!("Error: {:?}", err);
+                    }
+                }
             }
         }
         Commands::Dataset { dataset, path } => {
@@ -57,11 +72,14 @@ async fn main() {
     }
 }
 
-async fn handle_realtime(
+async fn handle_realtime<T>(
     interface: String,
     interval: Option<u64>,
     lifespan: u64,
-) -> Result<(), anyhow::Error> {
+) -> Result<(), anyhow::Error> 
+where
+        T: Flow + Send + Sync + 'static,
+        {
     env_logger::init();
 
     // Loading the eBPF program for egress, the macros make sure the correct file is loaded
@@ -109,7 +127,7 @@ async fn handle_realtime(
     let mut flows_ingress =
         AsyncPerfEventArray::try_from(bpf_ingress.take_map("EVENTS_INGRESS").unwrap())?;
 
-    let flow_map: Arc<DashMap<String, CicFlow>> = Arc::new(DashMap::new());
+    let flow_map: Arc<DashMap<String, T>> = Arc::new(DashMap::new());
 
     // Use all online CPUs to process the events in the user space
     for cpu_id in online_cpus()? {
@@ -176,7 +194,7 @@ async fn handle_realtime(
             for entry in flow_map_end.iter() {
                 let flow = entry.value();
                 let end =
-                    flow.get_duration(flow.basic_flow.first_timestamp, timestamp) / 1_000_000.0;
+                    get_duration(flow.get_first_timestamp(), timestamp) / 1_000_000.0;
 
                 if end >= lifespan as f64 {
                     println!("{}", flow.dump());
@@ -198,7 +216,9 @@ async fn handle_realtime(
     Ok(())
 }
 
-fn process_packet(data: &BasicFeatures, flow_map: &Arc<DashMap<String, CicFlow>>, fwd: bool) {
+fn process_packet<T>(data: &BasicFeatures, flow_map: &Arc<DashMap<String, T>>, fwd: bool) 
+where T: Flow,
+{
     let timestamp = Instant::now();
     let flow_id = if fwd {
         create_flow_id(
@@ -221,7 +241,7 @@ fn process_packet(data: &BasicFeatures, flow_map: &Arc<DashMap<String, CicFlow>>
     let flow_id_clone = flow_id.clone();
     let flow_id_remove = flow_id.clone();
     let mut entry = flow_map.entry(flow_id).or_insert_with(|| {
-        CicFlow::new(
+        T::new(
             flow_id_clone,
             data.ipv4_source,
             data.port_source,
@@ -309,7 +329,7 @@ mod tests {
             length: 140,
             window_size: 1000,
         };
-        process_packet(&data_1, &flow_map, true);
+        process_packet::<CicFlow>(&data_1, &flow_map, true);
 
         let data_2 = BasicFeatures {
             ipv4_source: 2,

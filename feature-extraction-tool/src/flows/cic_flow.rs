@@ -2,6 +2,8 @@ use chrono::{DateTime, Utc};
 use common::BasicFeatures;
 use std::{net::Ipv4Addr, time::Instant};
 
+use crate::utils::utils::get_duration;
+
 use super::{basic_flow::BasicFlow, flow::Flow};
 
 /// Represents a CIC Flow, encapsulating various metrics and states of a network flow.
@@ -130,101 +132,7 @@ pub struct CicFlow {
 }
 
 impl CicFlow {
-    /// Constructs a new `CicFlow`.
-    ///
-    /// Initializes a `CicFlow` instance with the provided parameters, setting up
-    /// the basic flow and initializing all other metrics to their default values.
-    ///
-    /// # Arguments
-    ///
-    /// * `flow_id` - A unique identifier for the flow.
-    /// * `ipv4_source` - The source IPv4 address.
-    /// * `port_source` - The source port.
-    /// * `ipv4_destination` - The destination IPv4 address.
-    /// * `port_destination` - The destination port.
-    /// * `protocol` - The protocol number.
-    ///
-    /// # Returns
-    ///
-    /// Returns a new instance of `CicFlow`.
-    pub fn new(
-        flow_id: String,
-        ipv4_source: u32,
-        port_source: u16,
-        ipv4_destination: u32,
-        port_destination: u16,
-        protocol: u8,
-    ) -> Self {
-        CicFlow {
-            basic_flow: BasicFlow::new(
-                flow_id,
-                ipv4_source,
-                port_source,
-                ipv4_destination,
-                port_destination,
-                protocol,
-            ),
-            sf_last_packet_timestamp: None,
-            sf_count: 0,
-            start_active: Instant::now(),
-            end_active: Instant::now(),
-            active_count: 0,
-            active_mean: 0.0,
-            active_std: 0.0,
-            active_max: 0.0,
-            active_min: f64::MAX,
-            idle_count: 0,
-            idle_mean: 0.0,
-            idle_std: 0.0,
-            idle_max: 0.0,
-            idle_min: f64::MAX,
-            fwd_act_data_pkt: 0,
-            fwd_init_win_bytes: 0,
-            fwd_header_len_min: u32::MAX,
-            fwd_last_timestamp: None,
-            fwd_pkt_len_tot: 0,
-            fwd_pkt_len_max: 0,
-            fwd_pkt_len_min: u32::MAX,
-            fwd_pkt_len_mean: 0.0,
-            fwd_pkt_len_std: 0.0,
-            fwd_iat_total: 0.0,
-            fwd_iat_mean: 0.0,
-            fwd_iat_std: 0.0,
-            fwd_iat_max: 0.0,
-            fwd_iat_min: f64::MAX,
-            fwd_header_length: 0,
-            fwd_bulk_duration: 0.0,
-            fwd_bulk_packet_count: 0,
-            fwd_bulk_size_total: 0,
-            fwd_bulk_state_count: 0,
-            fwd_bulk_packet_count_help: 0,
-            fwd_bulk_start_help: None,
-            fwd_bulk_size_help: 0,
-            fwd_last_bulk_timestamp: None,
-            bwd_init_win_bytes: 0,
-            bwd_last_timestamp: None,
-            bwd_pkt_len_tot: 0,
-            bwd_pkt_len_max: 0,
-            bwd_pkt_len_min: u32::MAX,
-            bwd_pkt_len_mean: 0.0,
-            bwd_pkt_len_std: 0.0,
-            bwd_iat_total: 0.0,
-            bwd_iat_mean: 0.0,
-            bwd_iat_std: 0.0,
-            bwd_iat_max: 0.0,
-            bwd_iat_min: f64::MAX,
-            bwd_header_length: 0,
-            bwd_bulk_duration: 0.0,
-            bwd_bulk_packet_count: 0,
-            bwd_bulk_size_total: 0,
-            bwd_bulk_state_count: 0,
-            bwd_bulk_packet_count_help: 0,
-            bwd_bulk_start_help: None,
-            bwd_bulk_size_help: 0,
-            bwd_last_bulk_timestamp: None,
-        }
-    }
-
+    
     /// Increases the length of the forward header.
     ///
     /// This method adds the specified length to the current forward header length.
@@ -853,21 +761,6 @@ impl CicFlow {
         self.bwd_pkt_len_tot / self.basic_flow.bwd_packet_count
     }
 
-    /// Calculates the duration between two timestamps in microseconds.
-    ///
-    /// # Arguments
-    ///
-    /// * `start` - The starting timestamp.
-    /// * `end` - The ending timestamp.
-    ///
-    /// # Returns
-    ///
-    /// Duration between `start` and `end` in microseconds.
-    pub fn get_duration(&self, start: DateTime<Utc>, end: DateTime<Utc>) -> f64 {
-        let duration = end.signed_duration_since(start);
-        duration.num_microseconds().unwrap() as f64
-    }
-
     /// Calculates the bytes per second rate of the flow.
     ///
     /// Computes the total number of bytes (forward and backward) transferred in the flow
@@ -878,7 +771,7 @@ impl CicFlow {
     /// Bytes per second rate of the flow.
     fn get_flow_bytes_s(&self) -> f64 {
         (self.fwd_pkt_len_tot + self.bwd_pkt_len_tot) as f64
-            / (self.get_duration(
+            / (get_duration(
                 self.basic_flow.first_timestamp,
                 self.basic_flow.last_timestamp,
             ) / 1_000_000.0)
@@ -894,7 +787,7 @@ impl CicFlow {
     /// Packets per second rate of the flow.
     fn get_flow_packets_s(&self) -> f64 {
         (self.basic_flow.fwd_packet_count + self.basic_flow.bwd_packet_count) as f64
-            / (self.get_duration(
+            / (get_duration(
                 self.basic_flow.first_timestamp,
                 self.basic_flow.last_timestamp,
             ) / 1_000_000.0)
@@ -910,7 +803,7 @@ impl CicFlow {
     /// Forward packets per second rate of the flow.
     fn get_fwd_packets_s(&self) -> f64 {
         self.basic_flow.fwd_packet_count as f64
-            / (self.get_duration(
+            / (get_duration(
                 self.basic_flow.first_timestamp,
                 self.basic_flow.last_timestamp,
             ) / 1_000_000.0)
@@ -926,7 +819,7 @@ impl CicFlow {
     /// Backward packets per second rate of the flow.
     fn get_bwd_packets_s(&self) -> f64 {
         self.basic_flow.bwd_packet_count as f64
-            / (self.get_duration(
+            / (get_duration(
                 self.basic_flow.first_timestamp,
                 self.basic_flow.last_timestamp,
             ) / 1_000_000.0)
@@ -1119,6 +1012,84 @@ impl CicFlow {
 }
 
 impl Flow for CicFlow {
+    fn new(
+        flow_id: String,
+        ipv4_source: u32,
+        port_source: u16,
+        ipv4_destination: u32,
+        port_destination: u16,
+        protocol: u8,
+    ) -> Self {
+        CicFlow {
+            basic_flow: BasicFlow::new(
+                flow_id,
+                ipv4_source,
+                port_source,
+                ipv4_destination,
+                port_destination,
+                protocol,
+            ),
+            sf_last_packet_timestamp: None,
+            sf_count: 0,
+            start_active: Instant::now(),
+            end_active: Instant::now(),
+            active_count: 0,
+            active_mean: 0.0,
+            active_std: 0.0,
+            active_max: 0.0,
+            active_min: f64::MAX,
+            idle_count: 0,
+            idle_mean: 0.0,
+            idle_std: 0.0,
+            idle_max: 0.0,
+            idle_min: f64::MAX,
+            fwd_act_data_pkt: 0,
+            fwd_init_win_bytes: 0,
+            fwd_header_len_min: u32::MAX,
+            fwd_last_timestamp: None,
+            fwd_pkt_len_tot: 0,
+            fwd_pkt_len_max: 0,
+            fwd_pkt_len_min: u32::MAX,
+            fwd_pkt_len_mean: 0.0,
+            fwd_pkt_len_std: 0.0,
+            fwd_iat_total: 0.0,
+            fwd_iat_mean: 0.0,
+            fwd_iat_std: 0.0,
+            fwd_iat_max: 0.0,
+            fwd_iat_min: f64::MAX,
+            fwd_header_length: 0,
+            fwd_bulk_duration: 0.0,
+            fwd_bulk_packet_count: 0,
+            fwd_bulk_size_total: 0,
+            fwd_bulk_state_count: 0,
+            fwd_bulk_packet_count_help: 0,
+            fwd_bulk_start_help: None,
+            fwd_bulk_size_help: 0,
+            fwd_last_bulk_timestamp: None,
+            bwd_init_win_bytes: 0,
+            bwd_last_timestamp: None,
+            bwd_pkt_len_tot: 0,
+            bwd_pkt_len_max: 0,
+            bwd_pkt_len_min: u32::MAX,
+            bwd_pkt_len_mean: 0.0,
+            bwd_pkt_len_std: 0.0,
+            bwd_iat_total: 0.0,
+            bwd_iat_mean: 0.0,
+            bwd_iat_std: 0.0,
+            bwd_iat_max: 0.0,
+            bwd_iat_min: f64::MAX,
+            bwd_header_length: 0,
+            bwd_bulk_duration: 0.0,
+            bwd_bulk_packet_count: 0,
+            bwd_bulk_size_total: 0,
+            bwd_bulk_state_count: 0,
+            bwd_bulk_packet_count_help: 0,
+            bwd_bulk_start_help: None,
+            bwd_bulk_size_help: 0,
+            bwd_last_bulk_timestamp: None,
+        }
+    }
+
     fn update_flow(
         &mut self,
         packet: &BasicFeatures,
@@ -1196,7 +1167,7 @@ impl Flow for CicFlow {
             self.basic_flow.port_destination,
             self.basic_flow.protocol,
             self.basic_flow.first_timestamp,
-            self.get_duration(self.basic_flow.first_timestamp, self.basic_flow.last_timestamp),
+            get_duration(self.basic_flow.first_timestamp, self.basic_flow.last_timestamp),
             self.basic_flow.fwd_packet_count,
             self.basic_flow.bwd_packet_count,
             self.fwd_pkt_len_tot,
@@ -1275,11 +1246,15 @@ impl Flow for CicFlow {
             self.get_idle_min(),
         )
     }
+
+    fn get_first_timestamp(&self) -> DateTime<Utc> {
+        self.basic_flow.get_first_timestamp()
+    }
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::flows::{cic_flow::CicFlow, flow::Flow};
+    use crate::{flows::{cic_flow::CicFlow, flow::Flow}, utils::utils::get_duration};
     use common::BasicFeatures;
     use std::time::{Duration, Instant};
 
@@ -1940,12 +1915,10 @@ mod tests {
 
     #[test]
     fn test_get_duration() {
-        let cic_flow = setup_cic_flow();
-
         let start = chrono::Utc::now();
         let end = chrono::Utc::now() + chrono::Duration::seconds(5);
 
-        assert_eq!(cic_flow.get_duration(start, end), 5_000_000.0);
+        assert_eq!(get_duration(start, end), 5_000_000.0);
     }
 
     #[test]

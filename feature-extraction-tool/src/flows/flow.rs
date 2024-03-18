@@ -1,4 +1,5 @@
 use std::time::Instant;
+use chrono::{DateTime, Utc};
 use common::BasicFeatures;
 
 /// `Flow` defines the behavior of a network flow.
@@ -7,6 +8,32 @@ use common::BasicFeatures;
 /// a network flow, providing mechanisms to update the flow state
 /// and to dump its current state into a string format.
 pub trait Flow {
+    /// Constructs a new `Flow`.
+    ///
+    /// Initializes a `Flow` instance with the provided parameters, setting up
+    /// the basic flow and initializing all other metrics to their default values.
+    ///
+    /// # Arguments
+    ///
+    /// * `flow_id` - A unique identifier for the flow.
+    /// * `ipv4_source` - The source IPv4 address.
+    /// * `port_source` - The source port.
+    /// * `ipv4_destination` - The destination IPv4 address.
+    /// * `port_destination` - The destination port.
+    /// * `protocol` - The protocol number.
+    ///
+    /// # Returns
+    ///
+    /// Returns a new instance of `Flow`.
+    fn new(
+        flow_id: String,
+        ipv4_source: u32,
+        port_source: u16,
+        ipv4_destination: u32,
+        port_destination: u16,
+        protocol: u8,
+    ) -> Self;
+
     /// Updates the flow with a new packet.
     ///
     /// This method processes a packet and updates the internal state of the flow
@@ -37,4 +64,13 @@ pub trait Flow {
     ///
     /// Returns a `String` that represents the current state of the flow.
     fn dump(&self) -> String;
+
+    /// Returns the first timestamp of the flow.
+    ///
+    /// This method returns the first timestamp of the flow.
+    ///
+    /// # Returns
+    ///
+    /// Returns a `DateTime<Utc>` representing the first timestamp of the flow.
+    fn get_first_timestamp(&self) -> DateTime<Utc>;
 }

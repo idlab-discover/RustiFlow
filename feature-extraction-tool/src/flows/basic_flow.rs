@@ -63,8 +63,8 @@ pub struct BasicFlow {
     pub bwd_packet_count: u32,
 }
 
-impl BasicFlow {
-    pub fn new(
+impl Flow for BasicFlow {
+    fn new(
         flow_id: String,
         ipv4_source: u32,
         port_source: u16,
@@ -102,9 +102,7 @@ impl BasicFlow {
             bwd_packet_count: 0,
         }
     }
-}
 
-impl Flow for BasicFlow {
     fn update_flow(&mut self, packet: &BasicFeatures, _timestamp: &Instant, fwd: bool) -> Option<String>{
         self.last_timestamp = Utc::now();
 
@@ -167,5 +165,9 @@ impl Flow for BasicFlow {
         self.bwd_cwe_flag_count, 
         self.bwd_ece_flag_count, 
         self.bwd_packet_count)
+    }
+
+    fn get_first_timestamp(&self) -> DateTime<Utc> {
+        self.first_timestamp
     }
 }

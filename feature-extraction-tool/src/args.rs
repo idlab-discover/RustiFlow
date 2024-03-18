@@ -14,6 +14,9 @@ pub enum Commands {
         /// The network interface to capture packets from
         interface: String,
 
+        #[clap(value_enum)]
+        flow_type: FlowType,
+
         /// The maximum lifespan of a flow in seconds
         lifespan: u64,
 
@@ -30,6 +33,16 @@ pub enum Commands {
         /// The relative path to the dataset
         path: String,
     },
+}
+
+#[derive(clap::ValueEnum, Clone, Debug)]
+pub enum FlowType {
+    /// A basic flow that stores the basic features of a flow.
+    BasicFlow,
+    /// Represents the CIC Flow, giving 83 features.
+    CicFlow,
+    /// Represents the CIDDS Flow, giving 10 features.
+    CiddsFlow,
 }
 
 #[derive(clap::ValueEnum, Clone, Debug)]
