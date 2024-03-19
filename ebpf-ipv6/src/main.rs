@@ -9,12 +9,12 @@ use aya_ebpf::{
     programs::TcContext,
 };
 
-use common::BasicFeaturesIpv4;
+use common::BasicFeaturesIpv6;
 
 use core::mem;
 use network_types::{
     eth::{EthHdr, EtherType},
-    ip::{IpProto, Ipv4Hdr},
+    ip::{IpProto, Ipv6Hdr},
     tcp::TcpHdr,
     udp::UdpHdr,
 };
@@ -25,7 +25,7 @@ fn panic(_info: &core::panic::PanicInfo) -> ! {
 }
 
 #[map]
-static EVENTS_INGRESS_IPV4: PerfEventArray<BasicFeaturesIpv4> = PerfEventArray::with_max_entries(1024, 0);
+static EVENTS_IPV6: PerfEventArray<BasicFeaturesIpv6> = PerfEventArray::with_max_entries(1024, 0);
 
 #[classifier]
 pub fn tc_flow_track(ctx: TcContext) -> i32 {
@@ -52,13 +52,13 @@ unsafe fn ptr_at<T>(ctx: &TcContext, offset: usize) -> Result<*const T, ()> {
 fn try_tc_flow_track(ctx: TcContext) -> Result<i32, ()> {
     let ethhdr: *const EthHdr = unsafe { ptr_at(&ctx, 0)? };
     match unsafe { (*ethhdr).ether_type } {
-        EtherType::Ipv4 => {}
+        EtherType::Ipv6 => {}
         _ => return Ok(TC_ACT_PIPE),
     }
 
-    let ipv4hdr: *const Ipv4Hdr = unsafe { ptr_at(&ctx, EthHdr::LEN)? };
-    let ipv4_source = u32::from_be(unsafe { (*ipv4hdr).src_addr });
-    let ipv4_destination = u32::from_be(unsafe { (*ipv4hdr).dst_addr });
+    let ipv6hdr: *const Ipv6Hdr = unsafe { ptr_at(&ctx, EthHdr::LEN)? };
+    let ipv6_source = unsafe { (*ipv6hdr).src_addr };
+    let ipv6_destination = unsafe { (*ipv6hdr).dst_addr };
 
     let source_port: u16;
     let destination_port: u16;
@@ -79,9 +79,9 @@ fn try_tc_flow_track(ctx: TcContext) -> Result<i32, ()> {
     let length: u32;
     let mut window_size: u16 = 0;
 
-    match unsafe { *ipv4hdr }.proto {
+    match unsafe { *ipv6hdr }.next_hdr {
         IpProto::Tcp => {
-            let tcphdr: *const TcpHdr = unsafe { ptr_at(&ctx, EthHdr::LEN + Ipv4Hdr::LEN) }?;
+            let tcphdr: *const TcpHdr = unsafe { ptr_at(&ctx, EthHdr::LEN + Ipv6Hdr::LEN) }?;
 
             // Cast the `TcpHdr` pointer to a `*const u8` to read individual bytes
             let tcphdr_u8 = tcphdr as *const u8;
@@ -94,7 +94,7 @@ fn try_tc_flow_track(ctx: TcContext) -> Result<i32, ()> {
 
             length = data_length as u32
                 + header_length as u32
-                + Ipv4Hdr::LEN as u32
+                + Ipv6Hdr::LEN as u32
                 + EthHdr::LEN as u32;
 
             source_port = u16::from_be(unsafe { *tcphdr }.source);
@@ -113,23 +113,23 @@ fn try_tc_flow_track(ctx: TcContext) -> Result<i32, ()> {
             window_size = u16::from_be(unsafe { *tcphdr }.window);
         }
         IpProto::Udp => {
-            let udphdr: *const UdpHdr = unsafe { ptr_at(&ctx, EthHdr::LEN + Ipv4Hdr::LEN) }?;
+            let udphdr: *const UdpHdr = unsafe { ptr_at(&ctx, EthHdr::LEN + Ipv6Hdr::LEN) }?;
             source_port = u16::from_be(unsafe { *udphdr }.source);
             destination_port = u16::from_be(unsafe { *udphdr }.dest);
 
             header_length = UdpHdr::LEN as u32;
             length = data_length as u32
                 + header_length as u32
-                + Ipv4Hdr::LEN as u32
+                + Ipv6Hdr::LEN as u32
                 + EthHdr::LEN as u32;
             protocol = IpProto::Udp as u8;
         }
         _ => return Ok(TC_ACT_PIPE),
     };
 
-    let flow = BasicFeaturesIpv4 {
-        ipv4_destination: ipv4_destination,
-        ipv4_source: ipv4_source,
+    let flow = BasicFeaturesIpv6 {
+        ipv6_destination: ipv6_destination,
+        ipv6_source: ipv6_source,
         port_destination: destination_port,
         port_source: source_port,
         protocol: protocol,
@@ -148,7 +148,7 @@ fn try_tc_flow_track(ctx: TcContext) -> Result<i32, ()> {
     };
 
     // the zero value is a flag
-    EVENTS_INGRESS_IPV4.output(&ctx, &flow, 0);
+    EVENTS_IPV6.output(&ctx, &flow, 0);
 
     Ok(TC_ACT_PIPE)
 }

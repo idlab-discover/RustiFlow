@@ -1,5 +1,5 @@
 [package]
-name = "egress-ebpf-ipv6"
+name = "ebpf-ipv6"
 version = "0.1.0"
 edition = "2021"
 
@@ -10,7 +10,7 @@ common = { path = "../common" }
 network-types = "0.0.5"
 
 [[bin]]
-name = "feature-extraction-tool-egress-ipv6"
+name = "feature-extraction-tool-ipv6"
 path = "src/main.rs"
 
 [profile.dev]
