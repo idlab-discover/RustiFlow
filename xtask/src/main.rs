@@ -13,14 +13,10 @@ pub struct Options {
 
 #[derive(Debug, Parser)]
 enum Command {
-    #[clap(name = "ingress-ebpf-ipv4")]
-    BuildIngressEbpfIpv4(build_ebpf::Options),
-    #[clap(name = "ingress-ebpf-ipv6")]
-    BuildIngressEbpfIpv6(build_ebpf::Options),
-    #[clap(name = "egress-ebpf-ipv4")]
-    BuildEgressEbpfIpv4(build_ebpf::Options),
-    #[clap(name = "egress-ebpf-ipv6")]
-    BuildEgressEbpfIpv6(build_ebpf::Options),
+    #[clap(name = "ebpf-ipv4")]
+    BuildEbpfIpv4(build_ebpf::Options),
+    #[clap(name = "ebpf-ipv6")]
+    BuildEbpfIpv6(build_ebpf::Options),
     Run(run::Options),
 }
 
@@ -29,10 +25,8 @@ fn main() {
 
     use Command::*;
     let ret = match opts.command {
-        BuildIngressEbpfIpv4(opts) => build_ebpf::build_ebpf(opts, "ingress-ebpf-ipv4".to_string()),
-        BuildEgressEbpfIpv4(opts) => build_ebpf::build_ebpf(opts, "egress-ebpf-ipv4".to_string()),
-        BuildIngressEbpfIpv6(opts) => build_ebpf::build_ebpf(opts, "ingress-ebpf-ipv6".to_string()),
-        BuildEgressEbpfIpv6(opts) => build_ebpf::build_ebpf(opts, "egress-ebpf-ipv6".to_string()),
+        BuildEbpfIpv4(opts) => build_ebpf::build_ebpf(opts, "ebpf-ipv4".to_string()),
+        BuildEbpfIpv6(opts) => build_ebpf::build_ebpf(opts, "ebpf-ipv6".to_string()),
         Run(opts) => run::run(opts),
     };
 

@@ -25,7 +25,7 @@ fn panic(_info: &core::panic::PanicInfo) -> ! {
 }
 
 #[map]
-static EVENTS_EGRESS_IPV4: PerfEventArray<BasicFeaturesIpv4> = PerfEventArray::with_max_entries(1024, 0);
+static EVENTS_IPV4: PerfEventArray<BasicFeaturesIpv4> = PerfEventArray::with_max_entries(1024, 0);
 
 #[classifier]
 pub fn tc_flow_track(ctx: TcContext) -> i32 {
@@ -148,7 +148,7 @@ fn try_tc_flow_track(ctx: TcContext) -> Result<i32, ()> {
     };
 
     // the zero value is a flag
-    EVENTS_EGRESS_IPV4.output(&ctx, &flow, 0);
+    EVENTS_IPV4.output(&ctx, &flow, 0);
 
     Ok(TC_ACT_PIPE)
 }
