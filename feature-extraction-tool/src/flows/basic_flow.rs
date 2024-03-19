@@ -11,9 +11,9 @@ pub struct BasicFlow {
     /// The unique identifier of the flow.
     pub flow_id: String,
     /// The destination IP address of the flow.
-    pub ipv4_destination: IpAddr,
+    pub ip_destination: IpAddr,
     /// The source IP address of the flow.
-    pub ipv4_source: IpAddr,
+    pub ip_source: IpAddr,
     /// The destination port of the flow.
     pub port_destination: u16,
     /// The source port of the flow.
@@ -67,16 +67,16 @@ pub struct BasicFlow {
 impl Flow for BasicFlow {
     fn new(
         flow_id: String,
-        ipv4_source: IpAddr,
+        ip_source: IpAddr,
         port_source: u16,
-        ipv4_destination: IpAddr,
+        ip_destination: IpAddr,
         port_destination: u16,
         protocol: u8,
     ) -> Self {
         BasicFlow {
             flow_id,
-            ipv4_destination,
-            ipv4_source,
+            ip_destination,
+            ip_source,
             port_destination,
             port_source,
             protocol,
@@ -146,9 +146,9 @@ impl Flow for BasicFlow {
             "{},{},{},{},{},{},{},{},{},{},{},{},{},\
         {},{},{},{},{},{},{},{},{},{},{},{},{},{}",
             self.flow_id,
-            self.ipv4_source,
+            self.ip_source,
             self.port_source,
-            self.ipv4_destination,
+            self.ip_destination,
             self.port_destination,
             self.protocol,
             self.first_timestamp,
