@@ -1,4 +1,4 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `feature-extraction-tool/src/flows/basic_flow.rs`."><title>basic_flow.rs - source</title><script> if (window.location.protocol !== "file:") document.write(`<link rel="preload" as="font" type="font/woff2" crossorigin href="../../../static.files/SourceSerif4-Regular-46f98efaafac5295.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../static.files/FiraSans-Regular-018c141bf0843ffd.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../static.files/FiraSans-Medium-8f9a781e4970d388.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../static.files/SourceCodePro-Regular-562dcc5011b6de7d.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../static.files/SourceCodePro-Semibold-d899c5a5c4aeb14a.ttf.woff2">`)</script><link rel="stylesheet" href="../../../static.files/normalize-76eba96aa4d2e634.css"><link rel="stylesheet" href="../../../static.files/rustdoc-e935ef01ae1c1829.css"><meta name="rustdoc-vars" data-root-path="../../../" data-static-root-path="../../../static.files/" data-current-crate="feature_extraction_tool" data-themes="" data-resource-suffix="" data-rustdoc-version="1.79.0-nightly (eb45c8444 2024-03-17)" data-channel="nightly" data-search-js="search-42d8da7a6b9792c2.js" data-settings-js="settings-4313503d2e1961c2.js" ><script src="../../../static.files/storage-4c98445ec4002617.js"></script><script defer src="../../../static.files/src-script-e66d777a5a92e9b2.js"></script><script defer src="../../../src-files.js"></script><script defer src="../../../static.files/main-12cf3b4f4f9dc36d.js"></script><noscript><link rel="stylesheet" href="../../../static.files/noscript-04d5337699b92874.css"></noscript><link rel="alternate icon" type="image/png" href="../../../static.files/favicon-16x16-8b506e7a72182f1c.png"><link rel="alternate icon" type="image/png" href="../../../static.files/favicon-32x32-422f7d1d52889060.png"><link rel="icon" type="image/svg+xml" href="../../../static.files/favicon-2c020d218678b618.svg"></head><body class="rustdoc src"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="src-sidebar-title">
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `feature-extraction-tool/src/flows/basic_flow.rs`."><title>basic_flow.rs - source</title><script> if (window.location.protocol !== "file:") document.write(`<link rel="preload" as="font" type="font/woff2" crossorigin href="../../../static.files/SourceSerif4-Regular-46f98efaafac5295.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../static.files/FiraSans-Regular-018c141bf0843ffd.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../static.files/FiraSans-Medium-8f9a781e4970d388.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../static.files/SourceCodePro-Regular-562dcc5011b6de7d.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../static.files/SourceCodePro-Semibold-d899c5a5c4aeb14a.ttf.woff2">`)</script><link rel="stylesheet" href="../../../static.files/normalize-76eba96aa4d2e634.css"><link rel="stylesheet" href="../../../static.files/rustdoc-e935ef01ae1c1829.css"><meta name="rustdoc-vars" data-root-path="../../../" data-static-root-path="../../../static.files/" data-current-crate="feature_extraction_tool" data-themes="" data-resource-suffix="" data-rustdoc-version="1.79.0-nightly (3c85e5624 2024-03-18)" data-channel="nightly" data-search-js="search-42d8da7a6b9792c2.js" data-settings-js="settings-4313503d2e1961c2.js" ><script src="../../../static.files/storage-4c98445ec4002617.js"></script><script defer src="../../../static.files/src-script-e66d777a5a92e9b2.js"></script><script defer src="../../../src-files.js"></script><script defer src="../../../static.files/main-12cf3b4f4f9dc36d.js"></script><noscript><link rel="stylesheet" href="../../../static.files/noscript-04d5337699b92874.css"></noscript><link rel="alternate icon" type="image/png" href="../../../static.files/favicon-16x16-8b506e7a72182f1c.png"><link rel="alternate icon" type="image/png" href="../../../static.files/favicon-32x32-422f7d1d52889060.png"><link rel="icon" type="image/svg+xml" href="../../../static.files/favicon-2c020d218678b618.svg"></head><body class="rustdoc src"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="src-sidebar-title">
             <h2>Files</h2></div></nav><div class="sidebar-resizer"></div>
     <main><nav class="sub"><form class="search-form"><span></span><div id="sidebar-button" tabindex="-1"><a href="../../../feature_extraction_tool/all.html" title="show sidebar"></a></div><input class="search-input" name="search" aria-label="Run search in the documentation" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" tabindex="-1"><a href="../../../help.html" title="help">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../../static.files/wheel-7b819b6101059cd0.svg"></a></div></form></nav><section id="main-content" class="content"><div class="example-wrap"><div data-nosnippet><pre class="src-line-numbers"><a href="#1" id="1">1</a>
 <a href="#2" id="2">2</a>
@@ -171,10 +171,21 @@
 <a href="#169" id="169">169</a>
 <a href="#170" id="170">170</a>
 <a href="#171" id="171">171</a>
-</pre></div><pre class="rust"><code><span class="kw">use </span>std::time::Instant;
+<a href="#172" id="172">172</a>
+<a href="#173" id="173">173</a>
+<a href="#174" id="174">174</a>
+<a href="#175" id="175">175</a>
+<a href="#176" id="176">176</a>
+<a href="#177" id="177">177</a>
+<a href="#178" id="178">178</a>
+<a href="#179" id="179">179</a>
+<a href="#180" id="180">180</a>
+<a href="#181" id="181">181</a>
+</pre></div><pre class="rust"><code><span class="kw">use </span>std::{net::IpAddr, time::Instant};
 
 <span class="kw">use </span>chrono::{DateTime, Utc};
-<span class="kw">use </span>common::BasicFeatures;
+
+<span class="kw">use </span><span class="kw">crate</span>::utils::utils::BasicFeatures;
 
 <span class="kw">use </span><span class="kw">super</span>::flow::Flow;
 
@@ -183,9 +194,9 @@
     <span class="doccomment">/// The unique identifier of the flow.
     </span><span class="kw">pub </span>flow_id: String,
     <span class="doccomment">/// The destination IP address of the flow.
-    </span><span class="kw">pub </span>ipv4_destination: u32,
+    </span><span class="kw">pub </span>ipv4_destination: IpAddr,
     <span class="doccomment">/// The source IP address of the flow.
-    </span><span class="kw">pub </span>ipv4_source: u32,
+    </span><span class="kw">pub </span>ipv4_source: IpAddr,
     <span class="doccomment">/// The destination port of the flow.
     </span><span class="kw">pub </span>port_destination: u16,
     <span class="doccomment">/// The source port of the flow.
@@ -236,12 +247,12 @@
     </span><span class="kw">pub </span>bwd_packet_count: u32,
 }
 
-<span class="kw">impl </span>BasicFlow {
-    <span class="kw">pub fn </span>new(
+<span class="kw">impl </span>Flow <span class="kw">for </span>BasicFlow {
+    <span class="kw">fn </span>new(
         flow_id: String,
-        ipv4_source: u32,
+        ipv4_source: IpAddr,
         port_source: u16,
-        ipv4_destination: u32,
+        ipv4_destination: IpAddr,
         port_destination: u16,
         protocol: u8,
     ) -&gt; <span class="self">Self </span>{
@@ -275,10 +286,13 @@
             bwd_packet_count: <span class="number">0</span>,
         }
     }
-}
 
-<span class="kw">impl </span>Flow <span class="kw">for </span>BasicFlow {
-    <span class="kw">fn </span>update_flow(<span class="kw-2">&amp;mut </span><span class="self">self</span>, packet: <span class="kw-2">&amp;</span>BasicFeatures, _timestamp: <span class="kw-2">&amp;</span>Instant, fwd: bool) -&gt; <span class="prelude-ty">Option</span>&lt;String&gt;{
+    <span class="kw">fn </span>update_flow(
+        <span class="kw-2">&amp;mut </span><span class="self">self</span>,
+        packet: <span class="kw-2">&amp;</span>BasicFeatures,
+        _timestamp: <span class="kw-2">&amp;</span>Instant,
+        fwd: bool,
+    ) -&gt; <span class="prelude-ty">Option</span>&lt;String&gt; {
         <span class="self">self</span>.last_timestamp = Utc::now();
 
         <span class="comment">// when both FIN flags are set, the flow can be finished when the last ACK is received
@@ -311,35 +325,41 @@
     </span>}
 
     <span class="kw">fn </span>dump(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; String {
-        <span class="macro">format!</span>(<span class="string">"{},{},{},{},{},{},{},{},{},{},{},{},{},\
-        {},{},{},{},{},{},{},{},{},{},{},{},{},{}"</span>, 
-        <span class="self">self</span>.flow_id, 
-        <span class="self">self</span>.ipv4_source, 
-        <span class="self">self</span>.port_source, 
-        <span class="self">self</span>.ipv4_destination, 
-        <span class="self">self</span>.port_destination, 
-        <span class="self">self</span>.protocol, 
-        <span class="self">self</span>.first_timestamp, 
-        <span class="self">self</span>.last_timestamp, 
-        <span class="self">self</span>.flow_end_of_flow_ack, 
-        <span class="self">self</span>.fwd_fin_flag_count, 
-        <span class="self">self</span>.fwd_syn_flag_count, 
-        <span class="self">self</span>.fwd_rst_flag_count, 
-        <span class="self">self</span>.fwd_psh_flag_count, 
-        <span class="self">self</span>.fwd_ack_flag_count, 
-        <span class="self">self</span>.fwd_urg_flag_count, 
-        <span class="self">self</span>.fwd_cwe_flag_count, 
-        <span class="self">self</span>.fwd_ece_flag_count, 
-        <span class="self">self</span>.fwd_packet_count, 
-        <span class="self">self</span>.bwd_fin_flag_count, 
-        <span class="self">self</span>.bwd_syn_flag_count, 
-        <span class="self">self</span>.bwd_rst_flag_count, 
-        <span class="self">self</span>.bwd_psh_flag_count, 
-        <span class="self">self</span>.bwd_ack_flag_count, 
-        <span class="self">self</span>.bwd_urg_flag_count, 
-        <span class="self">self</span>.bwd_cwe_flag_count, 
-        <span class="self">self</span>.bwd_ece_flag_count, 
-        <span class="self">self</span>.bwd_packet_count)
+        <span class="macro">format!</span>(
+            <span class="string">"{},{},{},{},{},{},{},{},{},{},{},{},{},\
+        {},{},{},{},{},{},{},{},{},{},{},{},{},{}"</span>,
+            <span class="self">self</span>.flow_id,
+            <span class="self">self</span>.ipv4_source,
+            <span class="self">self</span>.port_source,
+            <span class="self">self</span>.ipv4_destination,
+            <span class="self">self</span>.port_destination,
+            <span class="self">self</span>.protocol,
+            <span class="self">self</span>.first_timestamp,
+            <span class="self">self</span>.last_timestamp,
+            <span class="self">self</span>.flow_end_of_flow_ack,
+            <span class="self">self</span>.fwd_fin_flag_count,
+            <span class="self">self</span>.fwd_syn_flag_count,
+            <span class="self">self</span>.fwd_rst_flag_count,
+            <span class="self">self</span>.fwd_psh_flag_count,
+            <span class="self">self</span>.fwd_ack_flag_count,
+            <span class="self">self</span>.fwd_urg_flag_count,
+            <span class="self">self</span>.fwd_cwe_flag_count,
+            <span class="self">self</span>.fwd_ece_flag_count,
+            <span class="self">self</span>.fwd_packet_count,
+            <span class="self">self</span>.bwd_fin_flag_count,
+            <span class="self">self</span>.bwd_syn_flag_count,
+            <span class="self">self</span>.bwd_rst_flag_count,
+            <span class="self">self</span>.bwd_psh_flag_count,
+            <span class="self">self</span>.bwd_ack_flag_count,
+            <span class="self">self</span>.bwd_urg_flag_count,
+            <span class="self">self</span>.bwd_cwe_flag_count,
+            <span class="self">self</span>.bwd_ece_flag_count,
+            <span class="self">self</span>.bwd_packet_count
+        )
+    }
+
+    <span class="kw">fn </span>get_first_timestamp(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; DateTime&lt;Utc&gt; {
+        <span class="self">self</span>.first_timestamp
     }
 }
 </code></pre></div></section></main></body></html>

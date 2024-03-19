@@ -1,4 +1,4 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `feature-extraction-tool/src/flows/cic_flow.rs`."><title>cic_flow.rs - source</title><script> if (window.location.protocol !== "file:") document.write(`<link rel="preload" as="font" type="font/woff2" crossorigin href="../../../static.files/SourceSerif4-Regular-46f98efaafac5295.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../static.files/FiraSans-Regular-018c141bf0843ffd.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../static.files/FiraSans-Medium-8f9a781e4970d388.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../static.files/SourceCodePro-Regular-562dcc5011b6de7d.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../static.files/SourceCodePro-Semibold-d899c5a5c4aeb14a.ttf.woff2">`)</script><link rel="stylesheet" href="../../../static.files/normalize-76eba96aa4d2e634.css"><link rel="stylesheet" href="../../../static.files/rustdoc-e935ef01ae1c1829.css"><meta name="rustdoc-vars" data-root-path="../../../" data-static-root-path="../../../static.files/" data-current-crate="feature_extraction_tool" data-themes="" data-resource-suffix="" data-rustdoc-version="1.79.0-nightly (eb45c8444 2024-03-17)" data-channel="nightly" data-search-js="search-42d8da7a6b9792c2.js" data-settings-js="settings-4313503d2e1961c2.js" ><script src="../../../static.files/storage-4c98445ec4002617.js"></script><script defer src="../../../static.files/src-script-e66d777a5a92e9b2.js"></script><script defer src="../../../src-files.js"></script><script defer src="../../../static.files/main-12cf3b4f4f9dc36d.js"></script><noscript><link rel="stylesheet" href="../../../static.files/noscript-04d5337699b92874.css"></noscript><link rel="alternate icon" type="image/png" href="../../../static.files/favicon-16x16-8b506e7a72182f1c.png"><link rel="alternate icon" type="image/png" href="../../../static.files/favicon-32x32-422f7d1d52889060.png"><link rel="icon" type="image/svg+xml" href="../../../static.files/favicon-2c020d218678b618.svg"></head><body class="rustdoc src"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="src-sidebar-title">
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `feature-extraction-tool/src/flows/cic_flow.rs`."><title>cic_flow.rs - source</title><script> if (window.location.protocol !== "file:") document.write(`<link rel="preload" as="font" type="font/woff2" crossorigin href="../../../static.files/SourceSerif4-Regular-46f98efaafac5295.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../static.files/FiraSans-Regular-018c141bf0843ffd.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../static.files/FiraSans-Medium-8f9a781e4970d388.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../static.files/SourceCodePro-Regular-562dcc5011b6de7d.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../static.files/SourceCodePro-Semibold-d899c5a5c4aeb14a.ttf.woff2">`)</script><link rel="stylesheet" href="../../../static.files/normalize-76eba96aa4d2e634.css"><link rel="stylesheet" href="../../../static.files/rustdoc-e935ef01ae1c1829.css"><meta name="rustdoc-vars" data-root-path="../../../" data-static-root-path="../../../static.files/" data-current-crate="feature_extraction_tool" data-themes="" data-resource-suffix="" data-rustdoc-version="1.79.0-nightly (3c85e5624 2024-03-18)" data-channel="nightly" data-search-js="search-42d8da7a6b9792c2.js" data-settings-js="settings-4313503d2e1961c2.js" ><script src="../../../static.files/storage-4c98445ec4002617.js"></script><script defer src="../../../static.files/src-script-e66d777a5a92e9b2.js"></script><script defer src="../../../src-files.js"></script><script defer src="../../../static.files/main-12cf3b4f4f9dc36d.js"></script><noscript><link rel="stylesheet" href="../../../static.files/noscript-04d5337699b92874.css"></noscript><link rel="alternate icon" type="image/png" href="../../../static.files/favicon-16x16-8b506e7a72182f1c.png"><link rel="alternate icon" type="image/png" href="../../../static.files/favicon-32x32-422f7d1d52889060.png"><link rel="icon" type="image/svg+xml" href="../../../static.files/favicon-2c020d218678b618.svg"></head><body class="rustdoc src"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="src-sidebar-title">
             <h2>Files</h2></div></nav><div class="sidebar-resizer"></div>
     <main><nav class="sub"><form class="search-form"><span></span><div id="sidebar-button" tabindex="-1"><a href="../../../feature_extraction_tool/all.html" title="show sidebar"></a></div><input class="search-input" name="search" aria-label="Run search in the documentation" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" tabindex="-1"><a href="../../../help.html" title="help">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../../static.files/wheel-7b819b6101059cd0.svg"></a></div></form></nav><section id="main-content" class="content"><div class="example-wrap"><div data-nosnippet><pre class="src-line-numbers"><a href="#1" id="1">1</a>
 <a href="#2" id="2">2</a>
@@ -2434,9 +2434,32 @@
 <a href="#2432" id="2432">2432</a>
 <a href="#2433" id="2433">2433</a>
 <a href="#2434" id="2434">2434</a>
+<a href="#2435" id="2435">2435</a>
+<a href="#2436" id="2436">2436</a>
+<a href="#2437" id="2437">2437</a>
+<a href="#2438" id="2438">2438</a>
+<a href="#2439" id="2439">2439</a>
+<a href="#2440" id="2440">2440</a>
+<a href="#2441" id="2441">2441</a>
+<a href="#2442" id="2442">2442</a>
+<a href="#2443" id="2443">2443</a>
+<a href="#2444" id="2444">2444</a>
+<a href="#2445" id="2445">2445</a>
+<a href="#2446" id="2446">2446</a>
+<a href="#2447" id="2447">2447</a>
+<a href="#2448" id="2448">2448</a>
+<a href="#2449" id="2449">2449</a>
+<a href="#2450" id="2450">2450</a>
+<a href="#2451" id="2451">2451</a>
+<a href="#2452" id="2452">2452</a>
+<a href="#2453" id="2453">2453</a>
+<a href="#2454" id="2454">2454</a>
+<a href="#2455" id="2455">2455</a>
+<a href="#2456" id="2456">2456</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span>chrono::{DateTime, Utc};
-<span class="kw">use </span>common::BasicFeatures;
-<span class="kw">use </span>std::{net::Ipv4Addr, time::Instant};
+<span class="kw">use </span>std::{net::IpAddr, time::Instant};
+
+<span class="kw">use </span><span class="kw">crate</span>::utils::utils::{get_duration, BasicFeatures};
 
 <span class="kw">use super</span>::{basic_flow::BasicFlow, flow::Flow};
 
@@ -2566,101 +2589,6 @@
 }
 
 <span class="kw">impl </span>CicFlow {
-    <span class="doccomment">/// Constructs a new `CicFlow`.
-    ///
-    /// Initializes a `CicFlow` instance with the provided parameters, setting up
-    /// the basic flow and initializing all other metrics to their default values.
-    ///
-    /// # Arguments
-    ///
-    /// * `flow_id` - A unique identifier for the flow.
-    /// * `ipv4_source` - The source IPv4 address.
-    /// * `port_source` - The source port.
-    /// * `ipv4_destination` - The destination IPv4 address.
-    /// * `port_destination` - The destination port.
-    /// * `protocol` - The protocol number.
-    ///
-    /// # Returns
-    ///
-    /// Returns a new instance of `CicFlow`.
-    </span><span class="kw">pub fn </span>new(
-        flow_id: String,
-        ipv4_source: u32,
-        port_source: u16,
-        ipv4_destination: u32,
-        port_destination: u16,
-        protocol: u8,
-    ) -&gt; <span class="self">Self </span>{
-        CicFlow {
-            basic_flow: BasicFlow::new(
-                flow_id,
-                ipv4_source,
-                port_source,
-                ipv4_destination,
-                port_destination,
-                protocol,
-            ),
-            sf_last_packet_timestamp: <span class="prelude-val">None</span>,
-            sf_count: <span class="number">0</span>,
-            start_active: Instant::now(),
-            end_active: Instant::now(),
-            active_count: <span class="number">0</span>,
-            active_mean: <span class="number">0.0</span>,
-            active_std: <span class="number">0.0</span>,
-            active_max: <span class="number">0.0</span>,
-            active_min: f64::MAX,
-            idle_count: <span class="number">0</span>,
-            idle_mean: <span class="number">0.0</span>,
-            idle_std: <span class="number">0.0</span>,
-            idle_max: <span class="number">0.0</span>,
-            idle_min: f64::MAX,
-            fwd_act_data_pkt: <span class="number">0</span>,
-            fwd_init_win_bytes: <span class="number">0</span>,
-            fwd_header_len_min: u32::MAX,
-            fwd_last_timestamp: <span class="prelude-val">None</span>,
-            fwd_pkt_len_tot: <span class="number">0</span>,
-            fwd_pkt_len_max: <span class="number">0</span>,
-            fwd_pkt_len_min: u32::MAX,
-            fwd_pkt_len_mean: <span class="number">0.0</span>,
-            fwd_pkt_len_std: <span class="number">0.0</span>,
-            fwd_iat_total: <span class="number">0.0</span>,
-            fwd_iat_mean: <span class="number">0.0</span>,
-            fwd_iat_std: <span class="number">0.0</span>,
-            fwd_iat_max: <span class="number">0.0</span>,
-            fwd_iat_min: f64::MAX,
-            fwd_header_length: <span class="number">0</span>,
-            fwd_bulk_duration: <span class="number">0.0</span>,
-            fwd_bulk_packet_count: <span class="number">0</span>,
-            fwd_bulk_size_total: <span class="number">0</span>,
-            fwd_bulk_state_count: <span class="number">0</span>,
-            fwd_bulk_packet_count_help: <span class="number">0</span>,
-            fwd_bulk_start_help: <span class="prelude-val">None</span>,
-            fwd_bulk_size_help: <span class="number">0</span>,
-            fwd_last_bulk_timestamp: <span class="prelude-val">None</span>,
-            bwd_init_win_bytes: <span class="number">0</span>,
-            bwd_last_timestamp: <span class="prelude-val">None</span>,
-            bwd_pkt_len_tot: <span class="number">0</span>,
-            bwd_pkt_len_max: <span class="number">0</span>,
-            bwd_pkt_len_min: u32::MAX,
-            bwd_pkt_len_mean: <span class="number">0.0</span>,
-            bwd_pkt_len_std: <span class="number">0.0</span>,
-            bwd_iat_total: <span class="number">0.0</span>,
-            bwd_iat_mean: <span class="number">0.0</span>,
-            bwd_iat_std: <span class="number">0.0</span>,
-            bwd_iat_max: <span class="number">0.0</span>,
-            bwd_iat_min: f64::MAX,
-            bwd_header_length: <span class="number">0</span>,
-            bwd_bulk_duration: <span class="number">0.0</span>,
-            bwd_bulk_packet_count: <span class="number">0</span>,
-            bwd_bulk_size_total: <span class="number">0</span>,
-            bwd_bulk_state_count: <span class="number">0</span>,
-            bwd_bulk_packet_count_help: <span class="number">0</span>,
-            bwd_bulk_start_help: <span class="prelude-val">None</span>,
-            bwd_bulk_size_help: <span class="number">0</span>,
-            bwd_last_bulk_timestamp: <span class="prelude-val">None</span>,
-        }
-    }
-
     <span class="doccomment">/// Increases the length of the forward header.
     ///
     /// This method adds the specified length to the current forward header length.
@@ -2722,8 +2650,14 @@
         </span><span class="self">self</span>.fwd_pkt_len_tot += len;
 
         <span class="comment">// update mean and std
-        </span><span class="kw">let </span>new_fwd_pkt_len_mean = (((<span class="self">self</span>.basic_flow.fwd_packet_count - <span class="number">1</span>) <span class="kw">as </span>f32 * <span class="self">self</span>.fwd_pkt_len_mean) + len <span class="kw">as </span>f32) / <span class="self">self</span>.basic_flow.fwd_packet_count <span class="kw">as </span>f32;
-        <span class="self">self</span>.fwd_pkt_len_std = ((((<span class="self">self</span>.basic_flow.fwd_packet_count - <span class="number">1</span>) <span class="kw">as </span>f32 * <span class="self">self</span>.fwd_pkt_len_std.powf(<span class="number">2.0</span>)) + ((len <span class="kw">as </span>f32 - <span class="self">self</span>.fwd_pkt_len_mean) * (len <span class="kw">as </span>f32 - new_fwd_pkt_len_mean))) / <span class="self">self</span>.basic_flow.fwd_packet_count <span class="kw">as </span>f32).sqrt();
+        </span><span class="kw">let </span>new_fwd_pkt_len_mean =
+            (((<span class="self">self</span>.basic_flow.fwd_packet_count - <span class="number">1</span>) <span class="kw">as </span>f32 * <span class="self">self</span>.fwd_pkt_len_mean) + len <span class="kw">as </span>f32)
+                / <span class="self">self</span>.basic_flow.fwd_packet_count <span class="kw">as </span>f32;
+        <span class="self">self</span>.fwd_pkt_len_std = ((((<span class="self">self</span>.basic_flow.fwd_packet_count - <span class="number">1</span>) <span class="kw">as </span>f32
+            * <span class="self">self</span>.fwd_pkt_len_std.powf(<span class="number">2.0</span>))
+            + ((len <span class="kw">as </span>f32 - <span class="self">self</span>.fwd_pkt_len_mean) * (len <span class="kw">as </span>f32 - new_fwd_pkt_len_mean)))
+            / <span class="self">self</span>.basic_flow.fwd_packet_count <span class="kw">as </span>f32)
+            .sqrt();
         <span class="self">self</span>.fwd_pkt_len_mean = new_fwd_pkt_len_mean;
     }
 
@@ -2748,8 +2682,14 @@
         </span><span class="self">self</span>.bwd_pkt_len_tot += len;
 
         <span class="comment">// update mean and std
-        </span><span class="kw">let </span>new_bwd_pkt_len_mean = (((<span class="self">self</span>.basic_flow.bwd_packet_count - <span class="number">1</span>) <span class="kw">as </span>f32 * <span class="self">self</span>.bwd_pkt_len_mean) + len <span class="kw">as </span>f32) / <span class="self">self</span>.basic_flow.bwd_packet_count <span class="kw">as </span>f32;
-        <span class="self">self</span>.bwd_pkt_len_std = ((((<span class="self">self</span>.basic_flow.bwd_packet_count - <span class="number">1</span>) <span class="kw">as </span>f32 * <span class="self">self</span>.bwd_pkt_len_std.powf(<span class="number">2.0</span>)) + ((len <span class="kw">as </span>f32 - <span class="self">self</span>.bwd_pkt_len_mean) * (len <span class="kw">as </span>f32 - new_bwd_pkt_len_mean))) / <span class="self">self</span>.basic_flow.bwd_packet_count <span class="kw">as </span>f32).sqrt();
+        </span><span class="kw">let </span>new_bwd_pkt_len_mean =
+            (((<span class="self">self</span>.basic_flow.bwd_packet_count - <span class="number">1</span>) <span class="kw">as </span>f32 * <span class="self">self</span>.bwd_pkt_len_mean) + len <span class="kw">as </span>f32)
+                / <span class="self">self</span>.basic_flow.bwd_packet_count <span class="kw">as </span>f32;
+        <span class="self">self</span>.bwd_pkt_len_std = ((((<span class="self">self</span>.basic_flow.bwd_packet_count - <span class="number">1</span>) <span class="kw">as </span>f32
+            * <span class="self">self</span>.bwd_pkt_len_std.powf(<span class="number">2.0</span>))
+            + ((len <span class="kw">as </span>f32 - <span class="self">self</span>.bwd_pkt_len_mean) * (len <span class="kw">as </span>f32 - new_bwd_pkt_len_mean)))
+            / <span class="self">self</span>.basic_flow.bwd_packet_count <span class="kw">as </span>f32)
+            .sqrt();
         <span class="self">self</span>.bwd_pkt_len_mean = new_bwd_pkt_len_mean;
     }
 
@@ -2773,8 +2713,14 @@
         </span><span class="self">self</span>.fwd_iat_total += iat;
 
         <span class="comment">// update mean and std
-        </span><span class="kw">let </span>new_fwd_iat_mean = ((<span class="self">self</span>.basic_flow.fwd_packet_count - <span class="number">2</span>) <span class="kw">as </span>f64 * <span class="self">self</span>.fwd_iat_mean + iat) / (<span class="self">self</span>.basic_flow.fwd_packet_count - <span class="number">1</span>) <span class="kw">as </span>f64;
-        <span class="self">self</span>.fwd_iat_std = ((((<span class="self">self</span>.basic_flow.fwd_packet_count - <span class="number">2</span>) <span class="kw">as </span>f64 * <span class="self">self</span>.fwd_iat_std.powf(<span class="number">2.0</span>)) + ((iat - <span class="self">self</span>.fwd_iat_mean) * (iat - new_fwd_iat_mean))) / (<span class="self">self</span>.basic_flow.fwd_packet_count - <span class="number">1</span>) <span class="kw">as </span>f64).sqrt();
+        </span><span class="kw">let </span>new_fwd_iat_mean = ((<span class="self">self</span>.basic_flow.fwd_packet_count - <span class="number">2</span>) <span class="kw">as </span>f64 * <span class="self">self</span>.fwd_iat_mean
+            + iat)
+            / (<span class="self">self</span>.basic_flow.fwd_packet_count - <span class="number">1</span>) <span class="kw">as </span>f64;
+        <span class="self">self</span>.fwd_iat_std = ((((<span class="self">self</span>.basic_flow.fwd_packet_count - <span class="number">2</span>) <span class="kw">as </span>f64
+            * <span class="self">self</span>.fwd_iat_std.powf(<span class="number">2.0</span>))
+            + ((iat - <span class="self">self</span>.fwd_iat_mean) * (iat - new_fwd_iat_mean)))
+            / (<span class="self">self</span>.basic_flow.fwd_packet_count - <span class="number">1</span>) <span class="kw">as </span>f64)
+            .sqrt();
         <span class="self">self</span>.fwd_iat_mean = new_fwd_iat_mean;
     }
 
@@ -2798,8 +2744,14 @@
         </span><span class="self">self</span>.bwd_iat_total += iat;
 
         <span class="comment">// update mean and std
-        </span><span class="kw">let </span>new_bwd_iat_mean = ((<span class="self">self</span>.basic_flow.bwd_packet_count - <span class="number">2</span>) <span class="kw">as </span>f64 * <span class="self">self</span>.bwd_iat_mean + iat) / (<span class="self">self</span>.basic_flow.bwd_packet_count - <span class="number">1</span>) <span class="kw">as </span>f64;
-        <span class="self">self</span>.bwd_iat_std = ((((<span class="self">self</span>.basic_flow.bwd_packet_count - <span class="number">2</span>) <span class="kw">as </span>f64 * <span class="self">self</span>.bwd_iat_std.powf(<span class="number">2.0</span>)) + ((iat - <span class="self">self</span>.bwd_iat_mean) * (iat - new_bwd_iat_mean))) / (<span class="self">self</span>.basic_flow.bwd_packet_count - <span class="number">1</span>) <span class="kw">as </span>f64).sqrt();
+        </span><span class="kw">let </span>new_bwd_iat_mean = ((<span class="self">self</span>.basic_flow.bwd_packet_count - <span class="number">2</span>) <span class="kw">as </span>f64 * <span class="self">self</span>.bwd_iat_mean
+            + iat)
+            / (<span class="self">self</span>.basic_flow.bwd_packet_count - <span class="number">1</span>) <span class="kw">as </span>f64;
+        <span class="self">self</span>.bwd_iat_std = ((((<span class="self">self</span>.basic_flow.bwd_packet_count - <span class="number">2</span>) <span class="kw">as </span>f64
+            * <span class="self">self</span>.bwd_iat_std.powf(<span class="number">2.0</span>))
+            + ((iat - <span class="self">self</span>.bwd_iat_mean) * (iat - new_bwd_iat_mean)))
+            / (<span class="self">self</span>.basic_flow.bwd_packet_count - <span class="number">1</span>) <span class="kw">as </span>f64)
+            .sqrt();
         <span class="self">self</span>.bwd_iat_mean = new_bwd_iat_mean;
     }
 
@@ -2823,8 +2775,12 @@
         }
 
         <span class="comment">// update mean and std
-        </span><span class="kw">let </span>new_active_mean = (((<span class="self">self</span>.active_count - <span class="number">1</span>) <span class="kw">as </span>f64 * <span class="self">self</span>.active_mean) + duration) / <span class="self">self</span>.active_count <span class="kw">as </span>f64;
-        <span class="self">self</span>.active_std = ((((<span class="self">self</span>.active_count - <span class="number">1</span>) <span class="kw">as </span>f64 * <span class="self">self</span>.active_std.powf(<span class="number">2.0</span>)) + ((duration - <span class="self">self</span>.active_mean) * (duration - new_active_mean))) / <span class="self">self</span>.active_count <span class="kw">as </span>f64).sqrt();
+        </span><span class="kw">let </span>new_active_mean = (((<span class="self">self</span>.active_count - <span class="number">1</span>) <span class="kw">as </span>f64 * <span class="self">self</span>.active_mean) + duration)
+            / <span class="self">self</span>.active_count <span class="kw">as </span>f64;
+        <span class="self">self</span>.active_std = ((((<span class="self">self</span>.active_count - <span class="number">1</span>) <span class="kw">as </span>f64 * <span class="self">self</span>.active_std.powf(<span class="number">2.0</span>))
+            + ((duration - <span class="self">self</span>.active_mean) * (duration - new_active_mean)))
+            / <span class="self">self</span>.active_count <span class="kw">as </span>f64)
+            .sqrt();
         <span class="self">self</span>.active_mean = new_active_mean;
     }
 
@@ -2848,8 +2804,12 @@
         }
 
         <span class="comment">// update mean and std
-        </span><span class="kw">let </span>new_idle_mean = (((<span class="self">self</span>.idle_count - <span class="number">1</span>) <span class="kw">as </span>f64 * <span class="self">self</span>.idle_mean) + duration) / <span class="self">self</span>.idle_count <span class="kw">as </span>f64;
-        <span class="self">self</span>.idle_std = ((((<span class="self">self</span>.idle_count - <span class="number">1</span>) <span class="kw">as </span>f64 * <span class="self">self</span>.idle_std.powf(<span class="number">2.0</span>)) + ((duration - <span class="self">self</span>.idle_mean) * (duration - new_idle_mean))) / <span class="self">self</span>.idle_count <span class="kw">as </span>f64).sqrt();
+        </span><span class="kw">let </span>new_idle_mean =
+            (((<span class="self">self</span>.idle_count - <span class="number">1</span>) <span class="kw">as </span>f64 * <span class="self">self</span>.idle_mean) + duration) / <span class="self">self</span>.idle_count <span class="kw">as </span>f64;
+        <span class="self">self</span>.idle_std = ((((<span class="self">self</span>.idle_count - <span class="number">1</span>) <span class="kw">as </span>f64 * <span class="self">self</span>.idle_std.powf(<span class="number">2.0</span>))
+            + ((duration - <span class="self">self</span>.idle_mean) * (duration - new_idle_mean)))
+            / <span class="self">self</span>.idle_count <span class="kw">as </span>f64)
+            .sqrt();
         <span class="self">self</span>.idle_mean = new_idle_mean;
     }
 
@@ -2983,7 +2943,11 @@
             <span class="self">self</span>.sf_last_packet_timestamp = <span class="prelude-val">Some</span>(<span class="kw-2">*</span>timestamp);
         }
 
-        <span class="kw">if </span>timestamp.duration_since(<span class="self">self</span>.sf_last_packet_timestamp.unwrap()).as_secs_f64() &gt; <span class="number">1.0 </span>{
+        <span class="kw">if </span>timestamp
+            .duration_since(<span class="self">self</span>.sf_last_packet_timestamp.unwrap())
+            .as_secs_f64()
+            &gt; <span class="number">1.0
+        </span>{
             <span class="self">self</span>.sf_count += <span class="number">1</span>;
             <span class="self">self</span>.update_active_idle_time(timestamp, <span class="number">5_000_000.0</span>);
         }
@@ -3004,9 +2968,7 @@
         <span class="kw">if </span>timestamp.duration_since(<span class="self">self</span>.end_active).as_micros() <span class="kw">as </span>f64 &gt; threshold {
             <span class="kw">let </span>duration = <span class="self">self</span>.end_active.duration_since(<span class="self">self</span>.start_active);
             <span class="kw">if </span>duration.as_secs_f64() &gt; <span class="number">0.0 </span>{
-                <span class="self">self</span>.update_active_flow(
-                    duration.as_micros() <span class="kw">as </span>f64,
-                );
+                <span class="self">self</span>.update_active_flow(duration.as_micros() <span class="kw">as </span>f64);
             }
             <span class="self">self</span>.update_idle_flow(timestamp.duration_since(<span class="self">self</span>.end_active).as_micros() <span class="kw">as </span>f64);
             <span class="self">self</span>.start_active = <span class="kw-2">*</span>timestamp;
@@ -3041,7 +3003,10 @@
     ///
     /// Pooled standard deviation of the flow's IATs.
     </span><span class="kw">fn </span>get_flow_iat_std(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; f64 {
-        <span class="kw">if </span><span class="self">self</span>.basic_flow.fwd_packet_count &lt; <span class="number">1 </span>|| <span class="self">self</span>.basic_flow.bwd_packet_count &lt; <span class="number">1 </span>|| <span class="self">self</span>.basic_flow.fwd_packet_count + <span class="self">self</span>.basic_flow.bwd_packet_count &lt; <span class="number">3</span>{
+        <span class="kw">if </span><span class="self">self</span>.basic_flow.fwd_packet_count &lt; <span class="number">1
+            </span>|| <span class="self">self</span>.basic_flow.bwd_packet_count &lt; <span class="number">1
+            </span>|| <span class="self">self</span>.basic_flow.fwd_packet_count + <span class="self">self</span>.basic_flow.bwd_packet_count &lt; <span class="number">3
+        </span>{
             <span class="kw">return </span><span class="number">0.0</span>;
         }
 
@@ -3104,11 +3069,11 @@
     }
 
     <span class="doccomment">/// Retrieves the minimum IAT of packets in the forward flow.
-    /// 
+    ///
     /// Compares the minimum IAT to the max of the f64 type and returns the IAT if it is not the same as the max value.
-    /// 
+    ///
     /// # Returns
-    /// 
+    ///
     /// The minimum IAT observed in the forward flow or 0 if not set.
     </span><span class="kw">fn </span>get_fwd_iat_min(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; f64 {
         <span class="kw">if </span><span class="self">self</span>.fwd_iat_min == f64::MAX {
@@ -3118,11 +3083,11 @@
     }
 
     <span class="doccomment">/// Retrieves the minimum IAT of packets in the backward flow.
-    /// 
+    ///
     /// Compares the minimum IAT to the max of the f64 type and returns the IAT if it is not the same as the max value.
-    /// 
+    ///
     /// # Returns
-    /// 
+    ///
     /// The minimum IAT observed in the backward flow or 0 if not set.
     </span><span class="kw">fn </span>get_bwd_iat_min(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; f64 {
         <span class="kw">if </span><span class="self">self</span>.bwd_iat_min == f64::MAX {
@@ -3219,7 +3184,10 @@
     ///
     /// Variance of the flow's packet lengths, or 0 if not enough data.
     </span><span class="kw">fn </span>get_flow_packet_length_variance(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; f64 {
-        <span class="kw">if </span><span class="self">self</span>.basic_flow.fwd_packet_count &lt; <span class="number">1 </span>|| <span class="self">self</span>.basic_flow.bwd_packet_count &lt; <span class="number">1 </span>|| <span class="self">self</span>.basic_flow.fwd_packet_count + <span class="self">self</span>.basic_flow.bwd_packet_count &lt; <span class="number">3</span>{
+        <span class="kw">if </span><span class="self">self</span>.basic_flow.fwd_packet_count &lt; <span class="number">1
+            </span>|| <span class="self">self</span>.basic_flow.bwd_packet_count &lt; <span class="number">1
+            </span>|| <span class="self">self</span>.basic_flow.fwd_packet_count + <span class="self">self</span>.basic_flow.bwd_packet_count &lt; <span class="number">3
+        </span>{
             <span class="kw">return </span><span class="number">0.0</span>;
         }
 
@@ -3289,21 +3257,6 @@
         <span class="self">self</span>.bwd_pkt_len_tot / <span class="self">self</span>.basic_flow.bwd_packet_count
     }
 
-    <span class="doccomment">/// Calculates the duration between two timestamps in microseconds.
-    ///
-    /// # Arguments
-    ///
-    /// * `start` - The starting timestamp.
-    /// * `end` - The ending timestamp.
-    ///
-    /// # Returns
-    ///
-    /// Duration between `start` and `end` in microseconds.
-    </span><span class="kw">pub fn </span>get_duration(<span class="kw-2">&amp;</span><span class="self">self</span>, start: DateTime&lt;Utc&gt;, end: DateTime&lt;Utc&gt;) -&gt; f64 {
-        <span class="kw">let </span>duration = end.signed_duration_since(start);
-        duration.num_microseconds().unwrap() <span class="kw">as </span>f64
-    }
-
     <span class="doccomment">/// Calculates the bytes per second rate of the flow.
     ///
     /// Computes the total number of bytes (forward and backward) transferred in the flow
@@ -3314,7 +3267,7 @@
     /// Bytes per second rate of the flow.
     </span><span class="kw">fn </span>get_flow_bytes_s(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; f64 {
         (<span class="self">self</span>.fwd_pkt_len_tot + <span class="self">self</span>.bwd_pkt_len_tot) <span class="kw">as </span>f64
-            / (<span class="self">self</span>.get_duration(
+            / (get_duration(
                 <span class="self">self</span>.basic_flow.first_timestamp,
                 <span class="self">self</span>.basic_flow.last_timestamp,
             ) / <span class="number">1_000_000.0</span>)
@@ -3330,7 +3283,7 @@
     /// Packets per second rate of the flow.
     </span><span class="kw">fn </span>get_flow_packets_s(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; f64 {
         (<span class="self">self</span>.basic_flow.fwd_packet_count + <span class="self">self</span>.basic_flow.bwd_packet_count) <span class="kw">as </span>f64
-            / (<span class="self">self</span>.get_duration(
+            / (get_duration(
                 <span class="self">self</span>.basic_flow.first_timestamp,
                 <span class="self">self</span>.basic_flow.last_timestamp,
             ) / <span class="number">1_000_000.0</span>)
@@ -3346,7 +3299,7 @@
     /// Forward packets per second rate of the flow.
     </span><span class="kw">fn </span>get_fwd_packets_s(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; f64 {
         <span class="self">self</span>.basic_flow.fwd_packet_count <span class="kw">as </span>f64
-            / (<span class="self">self</span>.get_duration(
+            / (get_duration(
                 <span class="self">self</span>.basic_flow.first_timestamp,
                 <span class="self">self</span>.basic_flow.last_timestamp,
             ) / <span class="number">1_000_000.0</span>)
@@ -3362,7 +3315,7 @@
     /// Backward packets per second rate of the flow.
     </span><span class="kw">fn </span>get_bwd_packets_s(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; f64 {
         <span class="self">self</span>.basic_flow.bwd_packet_count <span class="kw">as </span>f64
-            / (<span class="self">self</span>.get_duration(
+            / (get_duration(
                 <span class="self">self</span>.basic_flow.first_timestamp,
                 <span class="self">self</span>.basic_flow.last_timestamp,
             ) / <span class="number">1_000_000.0</span>)
@@ -3508,7 +3461,7 @@
 
     <span class="doccomment">/// Calculates the average number of backward bytes per subflow.
     ///
-    /// Determines the mean number of bytes in the backward direction across subflows. 
+    /// Determines the mean number of bytes in the backward direction across subflows.
     /// It's useful for understanding the data transfer characteristics in each identified subflow.
     ///
     /// # Returns
@@ -3523,7 +3476,7 @@
 
     <span class="doccomment">/// Retrieves the minimum active time observed in the flow.
     ///
-    /// This function returns the shortest period of time in which the flow was active. 
+    /// This function returns the shortest period of time in which the flow was active.
     /// If the minimum active time has never been updated (indicated by `f64::MAX`), it returns 0.0.
     ///
     /// # Returns
@@ -3555,6 +3508,84 @@
 }
 
 <span class="kw">impl </span>Flow <span class="kw">for </span>CicFlow {
+    <span class="kw">fn </span>new(
+        flow_id: String,
+        ipv4_source: IpAddr,
+        port_source: u16,
+        ipv4_destination: IpAddr,
+        port_destination: u16,
+        protocol: u8,
+    ) -&gt; <span class="self">Self </span>{
+        CicFlow {
+            basic_flow: BasicFlow::new(
+                flow_id,
+                ipv4_source,
+                port_source,
+                ipv4_destination,
+                port_destination,
+                protocol,
+            ),
+            sf_last_packet_timestamp: <span class="prelude-val">None</span>,
+            sf_count: <span class="number">0</span>,
+            start_active: Instant::now(),
+            end_active: Instant::now(),
+            active_count: <span class="number">0</span>,
+            active_mean: <span class="number">0.0</span>,
+            active_std: <span class="number">0.0</span>,
+            active_max: <span class="number">0.0</span>,
+            active_min: f64::MAX,
+            idle_count: <span class="number">0</span>,
+            idle_mean: <span class="number">0.0</span>,
+            idle_std: <span class="number">0.0</span>,
+            idle_max: <span class="number">0.0</span>,
+            idle_min: f64::MAX,
+            fwd_act_data_pkt: <span class="number">0</span>,
+            fwd_init_win_bytes: <span class="number">0</span>,
+            fwd_header_len_min: u32::MAX,
+            fwd_last_timestamp: <span class="prelude-val">None</span>,
+            fwd_pkt_len_tot: <span class="number">0</span>,
+            fwd_pkt_len_max: <span class="number">0</span>,
+            fwd_pkt_len_min: u32::MAX,
+            fwd_pkt_len_mean: <span class="number">0.0</span>,
+            fwd_pkt_len_std: <span class="number">0.0</span>,
+            fwd_iat_total: <span class="number">0.0</span>,
+            fwd_iat_mean: <span class="number">0.0</span>,
+            fwd_iat_std: <span class="number">0.0</span>,
+            fwd_iat_max: <span class="number">0.0</span>,
+            fwd_iat_min: f64::MAX,
+            fwd_header_length: <span class="number">0</span>,
+            fwd_bulk_duration: <span class="number">0.0</span>,
+            fwd_bulk_packet_count: <span class="number">0</span>,
+            fwd_bulk_size_total: <span class="number">0</span>,
+            fwd_bulk_state_count: <span class="number">0</span>,
+            fwd_bulk_packet_count_help: <span class="number">0</span>,
+            fwd_bulk_start_help: <span class="prelude-val">None</span>,
+            fwd_bulk_size_help: <span class="number">0</span>,
+            fwd_last_bulk_timestamp: <span class="prelude-val">None</span>,
+            bwd_init_win_bytes: <span class="number">0</span>,
+            bwd_last_timestamp: <span class="prelude-val">None</span>,
+            bwd_pkt_len_tot: <span class="number">0</span>,
+            bwd_pkt_len_max: <span class="number">0</span>,
+            bwd_pkt_len_min: u32::MAX,
+            bwd_pkt_len_mean: <span class="number">0.0</span>,
+            bwd_pkt_len_std: <span class="number">0.0</span>,
+            bwd_iat_total: <span class="number">0.0</span>,
+            bwd_iat_mean: <span class="number">0.0</span>,
+            bwd_iat_std: <span class="number">0.0</span>,
+            bwd_iat_max: <span class="number">0.0</span>,
+            bwd_iat_min: f64::MAX,
+            bwd_header_length: <span class="number">0</span>,
+            bwd_bulk_duration: <span class="number">0.0</span>,
+            bwd_bulk_packet_count: <span class="number">0</span>,
+            bwd_bulk_size_total: <span class="number">0</span>,
+            bwd_bulk_state_count: <span class="number">0</span>,
+            bwd_bulk_packet_count_help: <span class="number">0</span>,
+            bwd_bulk_start_help: <span class="prelude-val">None</span>,
+            bwd_bulk_size_help: <span class="number">0</span>,
+            bwd_last_bulk_timestamp: <span class="prelude-val">None</span>,
+        }
+    }
+
     <span class="kw">fn </span>update_flow(
         <span class="kw-2">&amp;mut </span><span class="self">self</span>,
         packet: <span class="kw-2">&amp;</span>BasicFeatures,
@@ -3587,7 +3618,6 @@
             <span class="self">self</span>.update_fwd_bulk_stats(timestamp, packet.data_length);
             <span class="self">self</span>.increase_fwd_header_length(packet.header_length);
             <span class="self">self</span>.fwd_last_timestamp = <span class="prelude-val">Some</span>(<span class="kw-2">*</span>timestamp);
-
         } <span class="kw">else </span>{
             <span class="self">self</span>.update_bwd_pkt_len_stats(packet.data_length);
 
@@ -3626,13 +3656,16 @@
             {},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},\
             {},{},{},{}"</span>,
             <span class="self">self</span>.basic_flow.flow_id,
-            Ipv4Addr::from(<span class="self">self</span>.basic_flow.ipv4_source),
+            <span class="self">self</span>.basic_flow.ipv4_source,
             <span class="self">self</span>.basic_flow.port_source,
-            Ipv4Addr::from(<span class="self">self</span>.basic_flow.ipv4_destination),
+            <span class="self">self</span>.basic_flow.ipv4_destination,
             <span class="self">self</span>.basic_flow.port_destination,
             <span class="self">self</span>.basic_flow.protocol,
             <span class="self">self</span>.basic_flow.first_timestamp,
-            <span class="self">self</span>.get_duration(<span class="self">self</span>.basic_flow.first_timestamp, <span class="self">self</span>.basic_flow.last_timestamp),
+            get_duration(
+                <span class="self">self</span>.basic_flow.first_timestamp,
+                <span class="self">self</span>.basic_flow.last_timestamp
+            ),
             <span class="self">self</span>.basic_flow.fwd_packet_count,
             <span class="self">self</span>.basic_flow.bwd_packet_count,
             <span class="self">self</span>.fwd_pkt_len_tot,
@@ -3711,16 +3744,32 @@
             <span class="self">self</span>.get_idle_min(),
         )
     }
+
+    <span class="kw">fn </span>get_first_timestamp(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; DateTime&lt;Utc&gt; {
+        <span class="self">self</span>.basic_flow.get_first_timestamp()
+    }
 }
 
 <span class="attr">#[cfg(test)]
 </span><span class="kw">mod </span>tests {
-    <span class="kw">use </span><span class="kw">crate</span>::flows::{cic_flow::CicFlow, flow::Flow};
-    <span class="kw">use </span>common::BasicFeatures;
-    <span class="kw">use </span>std::time::{Duration, Instant};
+    <span class="kw">use crate</span>::{
+        flows::{cic_flow::CicFlow, flow::Flow},
+        utils::utils::{get_duration, BasicFeatures},
+    };
+    <span class="kw">use </span>std::{
+        net::{IpAddr, Ipv4Addr},
+        time::{Duration, Instant},
+    };
 
     <span class="kw">fn </span>setup_cic_flow() -&gt; CicFlow {
-        CicFlow::new(<span class="string">""</span>.to_string(), <span class="number">1</span>, <span class="number">80</span>, <span class="number">2</span>, <span class="number">8080</span>, <span class="number">6</span>)
+        CicFlow::new(
+            <span class="string">""</span>.to_string(),
+            IpAddr::V4(Ipv4Addr::from(<span class="number">1</span>)),
+            <span class="number">80</span>,
+            IpAddr::V4(Ipv4Addr::from(<span class="number">2</span>)),
+            <span class="number">8080</span>,
+            <span class="number">6</span>,
+        )
     }
 
     <span class="attr">#[test]
@@ -4112,13 +4161,13 @@
     <span class="attr">#[test]
     </span><span class="kw">fn </span>test_update_active_idle_time() {
         <span class="kw">let </span><span class="kw-2">mut </span>cic_flow = setup_cic_flow();
-    
+
         <span class="kw">let </span>threshold = <span class="number">60_000_000.0</span>;
-    
+
         <span class="kw">let </span>timestamp = Instant::now();
         <span class="kw">let </span>timestamp_2 = timestamp + Duration::new(<span class="number">30</span>, <span class="number">0</span>); <span class="comment">// 30 seconds later
         </span><span class="kw">let </span>timestamp_3 = timestamp + Duration::new(<span class="number">91</span>, <span class="number">0</span>); <span class="comment">// 90 seconds later
-    
+
         </span>cic_flow.update_active_idle_time(<span class="kw-2">&amp;</span>timestamp, threshold);
 
         <span class="macro">assert_eq!</span>(cic_flow.end_active, timestamp);
@@ -4133,9 +4182,9 @@
         <span class="macro">assert_eq!</span>(cic_flow.idle_min, f64::MAX);
         <span class="macro">assert_eq!</span>(cic_flow.idle_mean, <span class="number">0.0</span>);
         <span class="macro">assert_eq!</span>(cic_flow.idle_std, <span class="number">0.0</span>);
-    
+
         cic_flow.update_active_idle_time(<span class="kw-2">&amp;</span>timestamp_2, threshold);
-        
+
         <span class="macro">assert_eq!</span>(cic_flow.end_active, timestamp_2);
         <span class="macro">assert_ne!</span>(cic_flow.start_active, timestamp_2);
         <span class="macro">assert_eq!</span>(cic_flow.active_count, <span class="number">0</span>);
@@ -4148,7 +4197,7 @@
         <span class="macro">assert_eq!</span>(cic_flow.idle_min, f64::MAX);
         <span class="macro">assert_eq!</span>(cic_flow.idle_mean, <span class="number">0.0</span>);
         <span class="macro">assert_eq!</span>(cic_flow.idle_std, <span class="number">0.0</span>);
-    
+
         cic_flow.update_active_idle_time(<span class="kw-2">&amp;</span>timestamp_3, threshold);
         <span class="macro">assert_eq!</span>(cic_flow.end_active, timestamp_3);
         <span class="macro">assert_eq!</span>(cic_flow.start_active, timestamp_3);
@@ -4162,7 +4211,6 @@
         <span class="macro">assert_ne!</span>(cic_flow.idle_min, f64::MAX);
         <span class="macro">assert_ne!</span>(cic_flow.idle_mean, <span class="number">0.0</span>);
         <span class="macro">assert_eq!</span>(cic_flow.idle_std, <span class="number">0.0</span>);
-    
     }
 
     <span class="attr">#[test]
@@ -4376,12 +4424,10 @@
 
     <span class="attr">#[test]
     </span><span class="kw">fn </span>test_get_duration() {
-        <span class="kw">let </span>cic_flow = setup_cic_flow();
-
         <span class="kw">let </span>start = chrono::Utc::now();
         <span class="kw">let </span>end = chrono::Utc::now() + chrono::Duration::seconds(<span class="number">5</span>);
 
-        <span class="macro">assert_eq!</span>(cic_flow.get_duration(start, end), <span class="number">5_000_000.0</span>);
+        <span class="macro">assert_eq!</span>(get_duration(start, end), <span class="number">5_000_000.0</span>);
     }
 
     <span class="attr">#[test]
@@ -4508,13 +4554,15 @@
 
     <span class="attr">#[test]
     </span><span class="kw">fn </span>test_update_flow_first_with_fwd_packet() {
-        <span class="kw">let </span><span class="kw-2">mut </span>cic_flow = CicFlow::new(<span class="string">""</span>.to_string(), <span class="number">1</span>, <span class="number">80</span>, <span class="number">2</span>, <span class="number">8080</span>, <span class="number">6</span>);
+        <span class="kw">let </span><span class="kw-2">mut </span>cic_flow = CicFlow::new(
+            <span class="string">""</span>.to_string(),
+            IpAddr::V4(Ipv4Addr::from(<span class="number">1</span>)),
+            <span class="number">80</span>,
+            IpAddr::V4(Ipv4Addr::from(<span class="number">2</span>)),
+            <span class="number">8080</span>,
+            <span class="number">6</span>,
+        );
         <span class="kw">let </span>packet = BasicFeatures {
-            ipv4_destination: <span class="number">2</span>,
-            ipv4_source: <span class="number">1</span>,
-            port_destination: <span class="number">8080</span>,
-            port_source: <span class="number">80</span>,
-            protocol: <span class="number">6</span>,
             fin_flag: <span class="number">1</span>,
             syn_flag: <span class="number">0</span>,
             rst_flag: <span class="number">0</span>,
@@ -4580,13 +4628,15 @@
 
     <span class="attr">#[test]
     </span><span class="kw">fn </span>test_update_flow_first_with_bwd_packet() {
-        <span class="kw">let </span><span class="kw-2">mut </span>cic_flow = CicFlow::new(<span class="string">""</span>.to_string(), <span class="number">1</span>, <span class="number">80</span>, <span class="number">2</span>, <span class="number">8080</span>, <span class="number">6</span>);
+        <span class="kw">let </span><span class="kw-2">mut </span>cic_flow = CicFlow::new(
+            <span class="string">""</span>.to_string(),
+            IpAddr::V4(Ipv4Addr::from(<span class="number">1</span>)),
+            <span class="number">80</span>,
+            IpAddr::V4(Ipv4Addr::from(<span class="number">2</span>)),
+            <span class="number">8080</span>,
+            <span class="number">6</span>,
+        );
         <span class="kw">let </span>packet = BasicFeatures {
-            ipv4_destination: <span class="number">2</span>,
-            ipv4_source: <span class="number">1</span>,
-            port_destination: <span class="number">8080</span>,
-            port_source: <span class="number">80</span>,
-            protocol: <span class="number">6</span>,
             fin_flag: <span class="number">1</span>,
             syn_flag: <span class="number">0</span>,
             rst_flag: <span class="number">0</span>,
@@ -4652,13 +4702,15 @@
 
     <span class="attr">#[test]
     </span><span class="kw">fn </span>test_update_flow_with_fwd_packet() {
-        <span class="kw">let </span><span class="kw-2">mut </span>cic_flow = CicFlow::new(<span class="string">""</span>.to_string(), <span class="number">1</span>, <span class="number">80</span>, <span class="number">2</span>, <span class="number">8080</span>, <span class="number">6</span>);
+        <span class="kw">let </span><span class="kw-2">mut </span>cic_flow = CicFlow::new(
+            <span class="string">""</span>.to_string(),
+            IpAddr::V4(Ipv4Addr::from(<span class="number">1</span>)),
+            <span class="number">80</span>,
+            IpAddr::V4(Ipv4Addr::from(<span class="number">2</span>)),
+            <span class="number">8080</span>,
+            <span class="number">6</span>,
+        );
         <span class="kw">let </span>packet_1 = BasicFeatures {
-            ipv4_destination: <span class="number">2</span>,
-            ipv4_source: <span class="number">1</span>,
-            port_destination: <span class="number">8080</span>,
-            port_source: <span class="number">80</span>,
-            protocol: <span class="number">6</span>,
             fin_flag: <span class="number">1</span>,
             syn_flag: <span class="number">0</span>,
             rst_flag: <span class="number">0</span>,
@@ -4679,11 +4731,6 @@
         std::thread::sleep(std::time::Duration::from_secs(<span class="number">1</span>));
 
         <span class="kw">let </span>packet_2 = BasicFeatures {
-            ipv4_destination: <span class="number">2</span>,
-            ipv4_source: <span class="number">1</span>,
-            port_destination: <span class="number">8080</span>,
-            port_source: <span class="number">80</span>,
-            protocol: <span class="number">6</span>,
             fin_flag: <span class="number">1</span>,
             syn_flag: <span class="number">0</span>,
             rst_flag: <span class="number">0</span>,
@@ -4761,13 +4808,15 @@
 
     <span class="attr">#[test]
     </span><span class="kw">fn </span>test_update_flow_with_bwd_packet() {
-        <span class="kw">let </span><span class="kw-2">mut </span>cic_flow = CicFlow::new(<span class="string">""</span>.to_string(), <span class="number">1</span>, <span class="number">80</span>, <span class="number">2</span>, <span class="number">8080</span>, <span class="number">6</span>);
+        <span class="kw">let </span><span class="kw-2">mut </span>cic_flow = CicFlow::new(
+            <span class="string">""</span>.to_string(),
+            IpAddr::V4(Ipv4Addr::from(<span class="number">1</span>)),
+            <span class="number">80</span>,
+            IpAddr::V4(Ipv4Addr::from(<span class="number">2</span>)),
+            <span class="number">8080</span>,
+            <span class="number">6</span>,
+        );
         <span class="kw">let </span>packet_1 = BasicFeatures {
-            ipv4_destination: <span class="number">2</span>,
-            ipv4_source: <span class="number">1</span>,
-            port_destination: <span class="number">8080</span>,
-            port_source: <span class="number">80</span>,
-            protocol: <span class="number">6</span>,
             fin_flag: <span class="number">1</span>,
             syn_flag: <span class="number">0</span>,
             rst_flag: <span class="number">0</span>,
@@ -4788,11 +4837,6 @@
         std::thread::sleep(std::time::Duration::from_secs(<span class="number">1</span>));
 
         <span class="kw">let </span>packet_2 = BasicFeatures {
-            ipv4_destination: <span class="number">2</span>,
-            ipv4_source: <span class="number">1</span>,
-            port_destination: <span class="number">8080</span>,
-            port_source: <span class="number">80</span>,
-            protocol: <span class="number">6</span>,
             fin_flag: <span class="number">1</span>,
             syn_flag: <span class="number">0</span>,
             rst_flag: <span class="number">0</span>,

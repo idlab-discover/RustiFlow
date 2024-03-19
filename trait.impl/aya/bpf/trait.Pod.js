@@ -1,3 +1,3 @@
 (function() {var implementors = {
-"common":[["impl Pod for <a class=\"struct\" href=\"common/struct.BasicFeatures.html\" title=\"struct common::BasicFeatures\">BasicFeatures</a>"]]
+"common":[["impl Pod for <a class=\"struct\" href=\"common/struct.BasicFeaturesIpv4.html\" title=\"struct common::BasicFeaturesIpv4\">BasicFeaturesIpv4</a>"],["impl Pod for <a class=\"struct\" href=\"common/struct.BasicFeaturesIpv6.html\" title=\"struct common::BasicFeaturesIpv6\">BasicFeaturesIpv6</a>"]]
 };if (window.register_implementors) {window.register_implementors(implementors);} else {window.pending_implementors = implementors;}})()

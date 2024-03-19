@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"struct":["BasicFeatures"]};
+window.SIDEBAR_ITEMS = {"struct":["BasicFeaturesIpv4","BasicFeaturesIpv6"]};
