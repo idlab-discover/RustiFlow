@@ -1,8 +1,7 @@
 use chrono::{DateTime, Utc};
-use common::BasicFeatures;
-use std::{net::Ipv4Addr, time::Instant};
+use std::{net::IpAddr, time::Instant};
 
-use crate::utils::utils::get_duration;
+use crate::utils::utils::{get_duration, BasicFeatures};
 
 use super::{basic_flow::BasicFlow, flow::Flow};
 
@@ -132,7 +131,6 @@ pub struct CicFlow {
 }
 
 impl CicFlow {
-    
     /// Increases the length of the forward header.
     ///
     /// This method adds the specified length to the current forward header length.
@@ -194,8 +192,14 @@ impl CicFlow {
         self.fwd_pkt_len_tot += len;
 
         // update mean and std
-        let new_fwd_pkt_len_mean = (((self.basic_flow.fwd_packet_count - 1) as f32 * self.fwd_pkt_len_mean) + len as f32) / self.basic_flow.fwd_packet_count as f32;
-        self.fwd_pkt_len_std = ((((self.basic_flow.fwd_packet_count - 1) as f32 * self.fwd_pkt_len_std.powf(2.0)) + ((len as f32 - self.fwd_pkt_len_mean) * (len as f32 - new_fwd_pkt_len_mean))) / self.basic_flow.fwd_packet_count as f32).sqrt();
+        let new_fwd_pkt_len_mean =
+            (((self.basic_flow.fwd_packet_count - 1) as f32 * self.fwd_pkt_len_mean) + len as f32)
+                / self.basic_flow.fwd_packet_count as f32;
+        self.fwd_pkt_len_std = ((((self.basic_flow.fwd_packet_count - 1) as f32
+            * self.fwd_pkt_len_std.powf(2.0))
+            + ((len as f32 - self.fwd_pkt_len_mean) * (len as f32 - new_fwd_pkt_len_mean)))
+            / self.basic_flow.fwd_packet_count as f32)
+            .sqrt();
         self.fwd_pkt_len_mean = new_fwd_pkt_len_mean;
     }
 
@@ -220,8 +224,14 @@ impl CicFlow {
         self.bwd_pkt_len_tot += len;
 
         // update mean and std
-        let new_bwd_pkt_len_mean = (((self.basic_flow.bwd_packet_count - 1) as f32 * self.bwd_pkt_len_mean) + len as f32) / self.basic_flow.bwd_packet_count as f32;
-        self.bwd_pkt_len_std = ((((self.basic_flow.bwd_packet_count - 1) as f32 * self.bwd_pkt_len_std.powf(2.0)) + ((len as f32 - self.bwd_pkt_len_mean) * (len as f32 - new_bwd_pkt_len_mean))) / self.basic_flow.bwd_packet_count as f32).sqrt();
+        let new_bwd_pkt_len_mean =
+            (((self.basic_flow.bwd_packet_count - 1) as f32 * self.bwd_pkt_len_mean) + len as f32)
+                / self.basic_flow.bwd_packet_count as f32;
+        self.bwd_pkt_len_std = ((((self.basic_flow.bwd_packet_count - 1) as f32
+            * self.bwd_pkt_len_std.powf(2.0))
+            + ((len as f32 - self.bwd_pkt_len_mean) * (len as f32 - new_bwd_pkt_len_mean)))
+            / self.basic_flow.bwd_packet_count as f32)
+            .sqrt();
         self.bwd_pkt_len_mean = new_bwd_pkt_len_mean;
     }
 
@@ -245,8 +255,14 @@ impl CicFlow {
         self.fwd_iat_total += iat;
 
         // update mean and std
-        let new_fwd_iat_mean = ((self.basic_flow.fwd_packet_count - 2) as f64 * self.fwd_iat_mean + iat) / (self.basic_flow.fwd_packet_count - 1) as f64;
-        self.fwd_iat_std = ((((self.basic_flow.fwd_packet_count - 2) as f64 * self.fwd_iat_std.powf(2.0)) + ((iat - self.fwd_iat_mean) * (iat - new_fwd_iat_mean))) / (self.basic_flow.fwd_packet_count - 1) as f64).sqrt();
+        let new_fwd_iat_mean = ((self.basic_flow.fwd_packet_count - 2) as f64 * self.fwd_iat_mean
+            + iat)
+            / (self.basic_flow.fwd_packet_count - 1) as f64;
+        self.fwd_iat_std = ((((self.basic_flow.fwd_packet_count - 2) as f64
+            * self.fwd_iat_std.powf(2.0))
+            + ((iat - self.fwd_iat_mean) * (iat - new_fwd_iat_mean)))
+            / (self.basic_flow.fwd_packet_count - 1) as f64)
+            .sqrt();
         self.fwd_iat_mean = new_fwd_iat_mean;
     }
 
@@ -270,8 +286,14 @@ impl CicFlow {
         self.bwd_iat_total += iat;
 
         // update mean and std
-        let new_bwd_iat_mean = ((self.basic_flow.bwd_packet_count - 2) as f64 * self.bwd_iat_mean + iat) / (self.basic_flow.bwd_packet_count - 1) as f64;
-        self.bwd_iat_std = ((((self.basic_flow.bwd_packet_count - 2) as f64 * self.bwd_iat_std.powf(2.0)) + ((iat - self.bwd_iat_mean) * (iat - new_bwd_iat_mean))) / (self.basic_flow.bwd_packet_count - 1) as f64).sqrt();
+        let new_bwd_iat_mean = ((self.basic_flow.bwd_packet_count - 2) as f64 * self.bwd_iat_mean
+            + iat)
+            / (self.basic_flow.bwd_packet_count - 1) as f64;
+        self.bwd_iat_std = ((((self.basic_flow.bwd_packet_count - 2) as f64
+            * self.bwd_iat_std.powf(2.0))
+            + ((iat - self.bwd_iat_mean) * (iat - new_bwd_iat_mean)))
+            / (self.basic_flow.bwd_packet_count - 1) as f64)
+            .sqrt();
         self.bwd_iat_mean = new_bwd_iat_mean;
     }
 
@@ -295,8 +317,12 @@ impl CicFlow {
         }
 
         // update mean and std
-        let new_active_mean = (((self.active_count - 1) as f64 * self.active_mean) + duration) / self.active_count as f64;
-        self.active_std = ((((self.active_count - 1) as f64 * self.active_std.powf(2.0)) + ((duration - self.active_mean) * (duration - new_active_mean))) / self.active_count as f64).sqrt();
+        let new_active_mean = (((self.active_count - 1) as f64 * self.active_mean) + duration)
+            / self.active_count as f64;
+        self.active_std = ((((self.active_count - 1) as f64 * self.active_std.powf(2.0))
+            + ((duration - self.active_mean) * (duration - new_active_mean)))
+            / self.active_count as f64)
+            .sqrt();
         self.active_mean = new_active_mean;
     }
 
@@ -320,8 +346,12 @@ impl CicFlow {
         }
 
         // update mean and std
-        let new_idle_mean = (((self.idle_count - 1) as f64 * self.idle_mean) + duration) / self.idle_count as f64;
-        self.idle_std = ((((self.idle_count - 1) as f64 * self.idle_std.powf(2.0)) + ((duration - self.idle_mean) * (duration - new_idle_mean))) / self.idle_count as f64).sqrt();
+        let new_idle_mean =
+            (((self.idle_count - 1) as f64 * self.idle_mean) + duration) / self.idle_count as f64;
+        self.idle_std = ((((self.idle_count - 1) as f64 * self.idle_std.powf(2.0))
+            + ((duration - self.idle_mean) * (duration - new_idle_mean)))
+            / self.idle_count as f64)
+            .sqrt();
         self.idle_mean = new_idle_mean;
     }
 
@@ -455,7 +485,11 @@ impl CicFlow {
             self.sf_last_packet_timestamp = Some(*timestamp);
         }
 
-        if timestamp.duration_since(self.sf_last_packet_timestamp.unwrap()).as_secs_f64() > 1.0 {
+        if timestamp
+            .duration_since(self.sf_last_packet_timestamp.unwrap())
+            .as_secs_f64()
+            > 1.0
+        {
             self.sf_count += 1;
             self.update_active_idle_time(timestamp, 5_000_000.0);
         }
@@ -476,9 +510,7 @@ impl CicFlow {
         if timestamp.duration_since(self.end_active).as_micros() as f64 > threshold {
             let duration = self.end_active.duration_since(self.start_active);
             if duration.as_secs_f64() > 0.0 {
-                self.update_active_flow(
-                    duration.as_micros() as f64,
-                );
+                self.update_active_flow(duration.as_micros() as f64);
             }
             self.update_idle_flow(timestamp.duration_since(self.end_active).as_micros() as f64);
             self.start_active = *timestamp;
@@ -513,7 +545,10 @@ impl CicFlow {
     ///
     /// Pooled standard deviation of the flow's IATs.
     fn get_flow_iat_std(&self) -> f64 {
-        if self.basic_flow.fwd_packet_count < 1 || self.basic_flow.bwd_packet_count < 1 || self.basic_flow.fwd_packet_count + self.basic_flow.bwd_packet_count < 3{
+        if self.basic_flow.fwd_packet_count < 1
+            || self.basic_flow.bwd_packet_count < 1
+            || self.basic_flow.fwd_packet_count + self.basic_flow.bwd_packet_count < 3
+        {
             return 0.0;
         }
 
@@ -576,11 +611,11 @@ impl CicFlow {
     }
 
     /// Retrieves the minimum IAT of packets in the forward flow.
-    /// 
+    ///
     /// Compares the minimum IAT to the max of the f64 type and returns the IAT if it is not the same as the max value.
-    /// 
+    ///
     /// # Returns
-    /// 
+    ///
     /// The minimum IAT observed in the forward flow or 0 if not set.
     fn get_fwd_iat_min(&self) -> f64 {
         if self.fwd_iat_min == f64::MAX {
@@ -590,11 +625,11 @@ impl CicFlow {
     }
 
     /// Retrieves the minimum IAT of packets in the backward flow.
-    /// 
+    ///
     /// Compares the minimum IAT to the max of the f64 type and returns the IAT if it is not the same as the max value.
-    /// 
+    ///
     /// # Returns
-    /// 
+    ///
     /// The minimum IAT observed in the backward flow or 0 if not set.
     fn get_bwd_iat_min(&self) -> f64 {
         if self.bwd_iat_min == f64::MAX {
@@ -691,7 +726,10 @@ impl CicFlow {
     ///
     /// Variance of the flow's packet lengths, or 0 if not enough data.
     fn get_flow_packet_length_variance(&self) -> f64 {
-        if self.basic_flow.fwd_packet_count < 1 || self.basic_flow.bwd_packet_count < 1 || self.basic_flow.fwd_packet_count + self.basic_flow.bwd_packet_count < 3{
+        if self.basic_flow.fwd_packet_count < 1
+            || self.basic_flow.bwd_packet_count < 1
+            || self.basic_flow.fwd_packet_count + self.basic_flow.bwd_packet_count < 3
+        {
             return 0.0;
         }
 
@@ -965,7 +1003,7 @@ impl CicFlow {
 
     /// Calculates the average number of backward bytes per subflow.
     ///
-    /// Determines the mean number of bytes in the backward direction across subflows. 
+    /// Determines the mean number of bytes in the backward direction across subflows.
     /// It's useful for understanding the data transfer characteristics in each identified subflow.
     ///
     /// # Returns
@@ -980,7 +1018,7 @@ impl CicFlow {
 
     /// Retrieves the minimum active time observed in the flow.
     ///
-    /// This function returns the shortest period of time in which the flow was active. 
+    /// This function returns the shortest period of time in which the flow was active.
     /// If the minimum active time has never been updated (indicated by `f64::MAX`), it returns 0.0.
     ///
     /// # Returns
@@ -1014,9 +1052,9 @@ impl CicFlow {
 impl Flow for CicFlow {
     fn new(
         flow_id: String,
-        ipv4_source: u32,
+        ipv4_source: IpAddr,
         port_source: u16,
-        ipv4_destination: u32,
+        ipv4_destination: IpAddr,
         port_destination: u16,
         protocol: u8,
     ) -> Self {
@@ -1122,7 +1160,6 @@ impl Flow for CicFlow {
             self.update_fwd_bulk_stats(timestamp, packet.data_length);
             self.increase_fwd_header_length(packet.header_length);
             self.fwd_last_timestamp = Some(*timestamp);
-
         } else {
             self.update_bwd_pkt_len_stats(packet.data_length);
 
@@ -1161,13 +1198,16 @@ impl Flow for CicFlow {
             {},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},\
             {},{},{},{}",
             self.basic_flow.flow_id,
-            Ipv4Addr::from(self.basic_flow.ipv4_source),
+            self.basic_flow.ipv4_source,
             self.basic_flow.port_source,
-            Ipv4Addr::from(self.basic_flow.ipv4_destination),
+            self.basic_flow.ipv4_destination,
             self.basic_flow.port_destination,
             self.basic_flow.protocol,
             self.basic_flow.first_timestamp,
-            get_duration(self.basic_flow.first_timestamp, self.basic_flow.last_timestamp),
+            get_duration(
+                self.basic_flow.first_timestamp,
+                self.basic_flow.last_timestamp
+            ),
             self.basic_flow.fwd_packet_count,
             self.basic_flow.bwd_packet_count,
             self.fwd_pkt_len_tot,
@@ -1254,12 +1294,24 @@ impl Flow for CicFlow {
 
 #[cfg(test)]
 mod tests {
-    use crate::{flows::{cic_flow::CicFlow, flow::Flow}, utils::utils::get_duration};
-    use common::BasicFeatures;
-    use std::time::{Duration, Instant};
+    use crate::{
+        flows::{cic_flow::CicFlow, flow::Flow},
+        utils::utils::{get_duration, BasicFeatures},
+    };
+    use std::{
+        net::{IpAddr, Ipv4Addr},
+        time::{Duration, Instant},
+    };
 
     fn setup_cic_flow() -> CicFlow {
-        CicFlow::new("".to_string(), 1, 80, 2, 8080, 6)
+        CicFlow::new(
+            "".to_string(),
+            IpAddr::V4(Ipv4Addr::from(1)),
+            80,
+            IpAddr::V4(Ipv4Addr::from(2)),
+            8080,
+            6,
+        )
     }
 
     #[test]
@@ -1651,13 +1703,13 @@ mod tests {
     #[test]
     fn test_update_active_idle_time() {
         let mut cic_flow = setup_cic_flow();
-    
+
         let threshold = 60_000_000.0;
-    
+
         let timestamp = Instant::now();
         let timestamp_2 = timestamp + Duration::new(30, 0); // 30 seconds later
         let timestamp_3 = timestamp + Duration::new(91, 0); // 90 seconds later
-    
+
         cic_flow.update_active_idle_time(&timestamp, threshold);
 
         assert_eq!(cic_flow.end_active, timestamp);
@@ -1672,9 +1724,9 @@ mod tests {
         assert_eq!(cic_flow.idle_min, f64::MAX);
         assert_eq!(cic_flow.idle_mean, 0.0);
         assert_eq!(cic_flow.idle_std, 0.0);
-    
+
         cic_flow.update_active_idle_time(&timestamp_2, threshold);
-        
+
         assert_eq!(cic_flow.end_active, timestamp_2);
         assert_ne!(cic_flow.start_active, timestamp_2);
         assert_eq!(cic_flow.active_count, 0);
@@ -1687,7 +1739,7 @@ mod tests {
         assert_eq!(cic_flow.idle_min, f64::MAX);
         assert_eq!(cic_flow.idle_mean, 0.0);
         assert_eq!(cic_flow.idle_std, 0.0);
-    
+
         cic_flow.update_active_idle_time(&timestamp_3, threshold);
         assert_eq!(cic_flow.end_active, timestamp_3);
         assert_eq!(cic_flow.start_active, timestamp_3);
@@ -1701,7 +1753,6 @@ mod tests {
         assert_ne!(cic_flow.idle_min, f64::MAX);
         assert_ne!(cic_flow.idle_mean, 0.0);
         assert_eq!(cic_flow.idle_std, 0.0);
-    
     }
 
     #[test]
@@ -2045,13 +2096,15 @@ mod tests {
 
     #[test]
     fn test_update_flow_first_with_fwd_packet() {
-        let mut cic_flow = CicFlow::new("".to_string(), 1, 80, 2, 8080, 6);
+        let mut cic_flow = CicFlow::new(
+            "".to_string(),
+            IpAddr::V4(Ipv4Addr::from(1)),
+            80,
+            IpAddr::V4(Ipv4Addr::from(2)),
+            8080,
+            6,
+        );
         let packet = BasicFeatures {
-            ipv4_destination: 2,
-            ipv4_source: 1,
-            port_destination: 8080,
-            port_source: 80,
-            protocol: 6,
             fin_flag: 1,
             syn_flag: 0,
             rst_flag: 0,
@@ -2117,13 +2170,15 @@ mod tests {
 
     #[test]
     fn test_update_flow_first_with_bwd_packet() {
-        let mut cic_flow = CicFlow::new("".to_string(), 1, 80, 2, 8080, 6);
+        let mut cic_flow = CicFlow::new(
+            "".to_string(),
+            IpAddr::V4(Ipv4Addr::from(1)),
+            80,
+            IpAddr::V4(Ipv4Addr::from(2)),
+            8080,
+            6,
+        );
         let packet = BasicFeatures {
-            ipv4_destination: 2,
-            ipv4_source: 1,
-            port_destination: 8080,
-            port_source: 80,
-            protocol: 6,
             fin_flag: 1,
             syn_flag: 0,
             rst_flag: 0,
@@ -2189,13 +2244,15 @@ mod tests {
 
     #[test]
     fn test_update_flow_with_fwd_packet() {
-        let mut cic_flow = CicFlow::new("".to_string(), 1, 80, 2, 8080, 6);
+        let mut cic_flow = CicFlow::new(
+            "".to_string(),
+            IpAddr::V4(Ipv4Addr::from(1)),
+            80,
+            IpAddr::V4(Ipv4Addr::from(2)),
+            8080,
+            6,
+        );
         let packet_1 = BasicFeatures {
-            ipv4_destination: 2,
-            ipv4_source: 1,
-            port_destination: 8080,
-            port_source: 80,
-            protocol: 6,
             fin_flag: 1,
             syn_flag: 0,
             rst_flag: 0,
@@ -2216,11 +2273,6 @@ mod tests {
         std::thread::sleep(std::time::Duration::from_secs(1));
 
         let packet_2 = BasicFeatures {
-            ipv4_destination: 2,
-            ipv4_source: 1,
-            port_destination: 8080,
-            port_source: 80,
-            protocol: 6,
             fin_flag: 1,
             syn_flag: 0,
             rst_flag: 0,
@@ -2298,13 +2350,15 @@ mod tests {
 
     #[test]
     fn test_update_flow_with_bwd_packet() {
-        let mut cic_flow = CicFlow::new("".to_string(), 1, 80, 2, 8080, 6);
+        let mut cic_flow = CicFlow::new(
+            "".to_string(),
+            IpAddr::V4(Ipv4Addr::from(1)),
+            80,
+            IpAddr::V4(Ipv4Addr::from(2)),
+            8080,
+            6,
+        );
         let packet_1 = BasicFeatures {
-            ipv4_destination: 2,
-            ipv4_source: 1,
-            port_destination: 8080,
-            port_source: 80,
-            protocol: 6,
             fin_flag: 1,
             syn_flag: 0,
             rst_flag: 0,
@@ -2325,11 +2379,6 @@ mod tests {
         std::thread::sleep(std::time::Duration::from_secs(1));
 
         let packet_2 = BasicFeatures {
-            ipv4_destination: 2,
-            ipv4_source: 1,
-            port_destination: 8080,
-            port_source: 80,
-            protocol: 6,
             fin_flag: 1,
             syn_flag: 0,
             rst_flag: 0,

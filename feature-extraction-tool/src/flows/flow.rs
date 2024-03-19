@@ -1,6 +1,7 @@
-use std::time::Instant;
 use chrono::{DateTime, Utc};
-use common::BasicFeatures;
+use std::{net::IpAddr, time::Instant};
+
+use crate::utils::utils::BasicFeatures;
 
 /// `Flow` defines the behavior of a network flow.
 ///
@@ -27,9 +28,9 @@ pub trait Flow {
     /// Returns a new instance of `Flow`.
     fn new(
         flow_id: String,
-        ipv4_source: u32,
+        ipv4_source: IpAddr,
         port_source: u16,
-        ipv4_destination: u32,
+        ipv4_destination: IpAddr,
         port_destination: u16,
         protocol: u8,
     ) -> Self;

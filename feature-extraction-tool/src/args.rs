@@ -22,7 +22,6 @@ pub enum Commands {
 
         /// The print interval for open flows in seconds, needs to be smaller than the flow maximum lifespan
         interval: Option<u64>,
-        
     },
 
     /// Feature extraction from a dataset

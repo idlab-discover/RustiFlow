@@ -1,7 +1,8 @@
-use std::time::Instant;
+use std::{net::IpAddr, time::Instant};
 
 use chrono::{DateTime, Utc};
-use common::BasicFeatures;
+
+use crate::utils::utils::BasicFeatures;
 
 use super::flow::Flow;
 
@@ -10,9 +11,9 @@ pub struct BasicFlow {
     /// The unique identifier of the flow.
     pub flow_id: String,
     /// The destination IP address of the flow.
-    pub ipv4_destination: u32,
+    pub ipv4_destination: IpAddr,
     /// The source IP address of the flow.
-    pub ipv4_source: u32,
+    pub ipv4_source: IpAddr,
     /// The destination port of the flow.
     pub port_destination: u16,
     /// The source port of the flow.
@@ -66,9 +67,9 @@ pub struct BasicFlow {
 impl Flow for BasicFlow {
     fn new(
         flow_id: String,
-        ipv4_source: u32,
+        ipv4_source: IpAddr,
         port_source: u16,
-        ipv4_destination: u32,
+        ipv4_destination: IpAddr,
         port_destination: u16,
         protocol: u8,
     ) -> Self {
@@ -103,7 +104,12 @@ impl Flow for BasicFlow {
         }
     }
 
-    fn update_flow(&mut self, packet: &BasicFeatures, _timestamp: &Instant, fwd: bool) -> Option<String>{
+    fn update_flow(
+        &mut self,
+        packet: &BasicFeatures,
+        _timestamp: &Instant,
+        fwd: bool,
+    ) -> Option<String> {
         self.last_timestamp = Utc::now();
 
         // when both FIN flags are set, the flow can be finished when the last ACK is received
@@ -136,35 +142,37 @@ impl Flow for BasicFlow {
     }
 
     fn dump(&self) -> String {
-        format!("{},{},{},{},{},{},{},{},{},{},{},{},{},\
-        {},{},{},{},{},{},{},{},{},{},{},{},{},{}", 
-        self.flow_id, 
-        self.ipv4_source, 
-        self.port_source, 
-        self.ipv4_destination, 
-        self.port_destination, 
-        self.protocol, 
-        self.first_timestamp, 
-        self.last_timestamp, 
-        self.flow_end_of_flow_ack, 
-        self.fwd_fin_flag_count, 
-        self.fwd_syn_flag_count, 
-        self.fwd_rst_flag_count, 
-        self.fwd_psh_flag_count, 
-        self.fwd_ack_flag_count, 
-        self.fwd_urg_flag_count, 
-        self.fwd_cwe_flag_count, 
-        self.fwd_ece_flag_count, 
-        self.fwd_packet_count, 
-        self.bwd_fin_flag_count, 
-        self.bwd_syn_flag_count, 
-        self.bwd_rst_flag_count, 
-        self.bwd_psh_flag_count, 
-        self.bwd_ack_flag_count, 
-        self.bwd_urg_flag_count, 
-        self.bwd_cwe_flag_count, 
-        self.bwd_ece_flag_count, 
-        self.bwd_packet_count)
+        format!(
+            "{},{},{},{},{},{},{},{},{},{},{},{},{},\
+        {},{},{},{},{},{},{},{},{},{},{},{},{},{}",
+            self.flow_id,
+            self.ipv4_source,
+            self.port_source,
+            self.ipv4_destination,
+            self.port_destination,
+            self.protocol,
+            self.first_timestamp,
+            self.last_timestamp,
+            self.flow_end_of_flow_ack,
+            self.fwd_fin_flag_count,
+            self.fwd_syn_flag_count,
+            self.fwd_rst_flag_count,
+            self.fwd_psh_flag_count,
+            self.fwd_ack_flag_count,
+            self.fwd_urg_flag_count,
+            self.fwd_cwe_flag_count,
+            self.fwd_ece_flag_count,
+            self.fwd_packet_count,
+            self.bwd_fin_flag_count,
+            self.bwd_syn_flag_count,
+            self.bwd_rst_flag_count,
+            self.bwd_psh_flag_count,
+            self.bwd_ack_flag_count,
+            self.bwd_urg_flag_count,
+            self.bwd_cwe_flag_count,
+            self.bwd_ece_flag_count,
+            self.bwd_packet_count
+        )
     }
 
     fn get_first_timestamp(&self) -> DateTime<Utc> {
