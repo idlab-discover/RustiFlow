@@ -38,10 +38,15 @@ pub enum Commands {
 pub enum FlowType {
     /// A basic flow that stores the basic features of a flow.
     BasicFlow,
+
     /// Represents the CIC Flow, giving 83 features.
     CicFlow,
+
     /// Represents the CIDDS Flow, giving 10 features.
     CiddsFlow,
+
+    /// Represents a nfstream inspired flow, giving 69 features.
+    NfFlow,
 }
 
 #[derive(clap::ValueEnum, Clone, Debug)]

@@ -24,7 +24,7 @@ use clap::Parser;
 use common::{BasicFeaturesIpv4, BasicFeaturesIpv6};
 use core::panic;
 use dashmap::DashMap;
-use flows::{basic_flow::BasicFlow, cidds_flow::CiddsFlow, flow::Flow};
+use flows::{basic_flow::BasicFlow, cidds_flow::CiddsFlow, flow::Flow, nf_flow::NfFlow};
 use log::info;
 use std::{
     net::{Ipv4Addr, Ipv6Addr},
@@ -70,6 +70,12 @@ async fn main() {
                 FlowType::CiddsFlow => {
                     if let Err(err) =
                         handle_realtime::<CiddsFlow>(interface, interval, lifespan).await
+                    {
+                        eprintln!("Error: {:?}", err);
+                    }
+                }
+                FlowType::NfFlow => {
+                    if let Err(err) = handle_realtime::<NfFlow>(interface, interval, lifespan).await
                     {
                         eprintln!("Error: {:?}", err);
                     }
