@@ -7,6 +7,9 @@ use crate::utils::utils::BasicFeatures;
 
 use super::{cic_flow::CicFlow, flow::Flow};
 
+/// Represents a Nfstream inspired Flow, encapsulating various metrics and states of a network flow.
+///
+/// This struct includes detailed information about both forward and backward
 pub struct NfFlow {
     pub cic_flow: CicFlow,
     pub first_timestamp: SystemTime,
