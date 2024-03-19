@@ -2471,63 +2471,63 @@
     <span class="doccomment">/// The basic flow information.
     </span><span class="kw">pub </span>basic_flow: BasicFlow,
     <span class="doccomment">/// The timestamp of the last packet in the subflow.
-    </span>sf_last_packet_timestamp: <span class="prelude-ty">Option</span>&lt;Instant&gt;,
+    </span><span class="kw">pub </span>sf_last_packet_timestamp: <span class="prelude-ty">Option</span>&lt;Instant&gt;,
     <span class="doccomment">/// The number of subflows.
-    </span>sf_count: u32,
+    </span><span class="kw">pub </span>sf_count: u32,
     <span class="doccomment">/// The timestamp of the start of an active period.
-    </span>start_active: Instant,
+    </span><span class="kw">pub </span>start_active: Instant,
     <span class="doccomment">/// The timestamp of the end of an active period.
-    </span>end_active: Instant,
+    </span><span class="kw">pub </span>end_active: Instant,
     <span class="doccomment">/// The number of active periods.
-    </span>active_count: u32,
+    </span><span class="kw">pub </span>active_count: u32,
     <span class="doccomment">/// The mean of active periods.
-    </span>active_mean: f64,
+    </span><span class="kw">pub </span>active_mean: f64,
     <span class="doccomment">/// The standard deviation of active periods.
-    </span>active_std: f64,
+    </span><span class="kw">pub </span>active_std: f64,
     <span class="doccomment">/// The maximum active period.
-    </span>active_max: f64,
+    </span><span class="kw">pub </span>active_max: f64,
     <span class="doccomment">/// The minimum active period.
     </span>active_min: f64,
     <span class="doccomment">/// The number of idle periods.
-    </span>idle_count: u32,
+    </span><span class="kw">pub </span>idle_count: u32,
     <span class="doccomment">/// The mean of idle periods.
-    </span>idle_mean: f64,
+    </span><span class="kw">pub </span>idle_mean: f64,
     <span class="doccomment">/// The standard deviation of idle periods.
-    </span>idle_std: f64,
+    </span><span class="kw">pub </span>idle_std: f64,
     <span class="doccomment">/// The maximum idle period.
-    </span>idle_max: f64,
+    </span><span class="kw">pub </span>idle_max: f64,
     <span class="doccomment">/// The minimum idle period.
     </span>idle_min: f64,
     <span class="doccomment">/// The initial window size of the forward flow.
-    </span>fwd_init_win_bytes: u16,
+    </span><span class="kw">pub </span>fwd_init_win_bytes: u16,
     <span class="doccomment">/// The number of data packets in the forward flow with more than one byte of data.
-    </span>fwd_act_data_pkt: u32,
+    </span><span class="kw">pub </span>fwd_act_data_pkt: u32,
     <span class="doccomment">/// The minimum header length of the forward flow.
     </span>fwd_header_len_min: u32,
     <span class="doccomment">/// The timestamp of the last packet in the forward flow.
-    </span>fwd_last_timestamp: <span class="prelude-ty">Option</span>&lt;Instant&gt;,
+    </span><span class="kw">pub </span>fwd_last_timestamp: <span class="prelude-ty">Option</span>&lt;Instant&gt;,
     <span class="doccomment">/// The total length of packets in the forward flow.
-    </span>fwd_pkt_len_tot: u32,
+    </span><span class="kw">pub </span>fwd_pkt_len_tot: u32,
     <span class="doccomment">/// The maximum length of packets in the forward flow.
-    </span>fwd_pkt_len_max: u32,
+    </span><span class="kw">pub </span>fwd_pkt_len_max: u32,
     <span class="doccomment">/// The minimum length of packets in the forward flow.
     </span>fwd_pkt_len_min: u32,
     <span class="doccomment">/// The mean length of packets in the forward flow.
-    </span>fwd_pkt_len_mean: f32,
+    </span><span class="kw">pub </span>fwd_pkt_len_mean: f32,
     <span class="doccomment">/// The standard deviation of the length of packets in the forward flow.
-    </span>fwd_pkt_len_std: f32,
+    </span><span class="kw">pub </span>fwd_pkt_len_std: f32,
     <span class="doccomment">/// The total inter-arrival time of packets in the forward flow.
-    </span>fwd_iat_total: f64,
+    </span><span class="kw">pub </span>fwd_iat_total: f64,
     <span class="doccomment">/// The mean inter-arrival time of packets in the forward flow.
-    </span>fwd_iat_mean: f64,
+    </span><span class="kw">pub </span>fwd_iat_mean: f64,
     <span class="doccomment">/// The standard deviation of the inter-arrival time of packets in the forward flow.
-    </span>fwd_iat_std: f64,
+    </span><span class="kw">pub </span>fwd_iat_std: f64,
     <span class="doccomment">/// The maximum inter-arrival time of packets in the forward flow.
-    </span>fwd_iat_max: f64,
+    </span><span class="kw">pub </span>fwd_iat_max: f64,
     <span class="doccomment">/// The minimum inter-arrival time of packets in the forward flow.
     </span>fwd_iat_min: f64,
     <span class="doccomment">/// The total header length of the forward flow.
-    </span>fwd_header_length: u32,
+    </span><span class="kw">pub </span>fwd_header_length: u32,
     <span class="doccomment">/// The total duration of bulk packets in the forward flow.
     </span>fwd_bulk_duration: f64,
     <span class="doccomment">/// The number of bulk packets in the forward flow.
@@ -2543,33 +2543,33 @@
     <span class="doccomment">/// Helper variable for bulk size.
     </span>fwd_bulk_size_help: u32,
     <span class="doccomment">/// The timestamp of the last bulk packet in the forward flow.
-    </span>fwd_last_bulk_timestamp: <span class="prelude-ty">Option</span>&lt;Instant&gt;,
+    </span><span class="kw">pub </span>fwd_last_bulk_timestamp: <span class="prelude-ty">Option</span>&lt;Instant&gt;,
     <span class="doccomment">/// The initial window size of the backward flow.
-    </span>bwd_init_win_bytes: u16,
+    </span><span class="kw">pub </span>bwd_init_win_bytes: u16,
     <span class="doccomment">/// The timestamp of the last packet in the backward flow.
-    </span>bwd_last_timestamp: <span class="prelude-ty">Option</span>&lt;Instant&gt;,
+    </span><span class="kw">pub </span>bwd_last_timestamp: <span class="prelude-ty">Option</span>&lt;Instant&gt;,
     <span class="doccomment">/// The total length of packets in the backward flow.
-    </span>bwd_pkt_len_tot: u32,
+    </span><span class="kw">pub </span>bwd_pkt_len_tot: u32,
     <span class="doccomment">/// The maximum length of packets in the backward flow.
-    </span>bwd_pkt_len_max: u32,
+    </span><span class="kw">pub </span>bwd_pkt_len_max: u32,
     <span class="doccomment">/// The minimum length of packets in the backward flow.
     </span>bwd_pkt_len_min: u32,
     <span class="doccomment">/// The mean length of packets in the backward flow.
-    </span>bwd_pkt_len_mean: f32,
+    </span><span class="kw">pub </span>bwd_pkt_len_mean: f32,
     <span class="doccomment">/// The standard deviation of the length of packets in the backward flow.
-    </span>bwd_pkt_len_std: f32,
+    </span><span class="kw">pub </span>bwd_pkt_len_std: f32,
     <span class="doccomment">/// The total inter-arrival time of packets in the backward flow.
-    </span>bwd_iat_total: f64,
+    </span><span class="kw">pub </span>bwd_iat_total: f64,
     <span class="doccomment">/// The mean inter-arrival time of packets in the backward flow.
-    </span>bwd_iat_mean: f64,
+    </span><span class="kw">pub </span>bwd_iat_mean: f64,
     <span class="doccomment">/// The standard deviation of the inter-arrival time of packets in the backward flow.
-    </span>bwd_iat_std: f64,
+    </span><span class="kw">pub </span>bwd_iat_std: f64,
     <span class="doccomment">/// The maximum inter-arrival time of packets in the backward flow.
-    </span>bwd_iat_max: f64,
+    </span><span class="kw">pub </span>bwd_iat_max: f64,
     <span class="doccomment">/// The minimum inter-arrival time of packets in the backward flow.
     </span>bwd_iat_min: f64,
     <span class="doccomment">/// The total header length of the backward flow.
-    </span>bwd_header_length: u32,
+    </span><span class="kw">pub </span>bwd_header_length: u32,
     <span class="doccomment">/// The total duration of bulk packets in the backward flow.
     </span>bwd_bulk_duration: f64,
     <span class="doccomment">/// The number of bulk packets in the backward flow.
@@ -3002,7 +3002,7 @@
     /// # Returns
     ///
     /// Pooled standard deviation of the flow's IATs.
-    </span><span class="kw">fn </span>get_flow_iat_std(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; f64 {
+    </span><span class="kw">pub fn </span>get_flow_iat_std(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; f64 {
         <span class="kw">if </span><span class="self">self</span>.basic_flow.fwd_packet_count &lt; <span class="number">1
             </span>|| <span class="self">self</span>.basic_flow.bwd_packet_count &lt; <span class="number">1
             </span>|| <span class="self">self</span>.basic_flow.fwd_packet_count + <span class="self">self</span>.basic_flow.bwd_packet_count &lt; <span class="number">3
@@ -3027,7 +3027,7 @@
     /// # Returns
     ///
     /// Mean inter-arrival time of the flow.
-    </span><span class="kw">fn </span>get_flow_iat_mean(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; f64 {
+    </span><span class="kw">pub fn </span>get_flow_iat_mean(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; f64 {
         (<span class="self">self</span>.fwd_iat_mean * <span class="self">self</span>.basic_flow.fwd_packet_count <span class="kw">as </span>f64
             + <span class="self">self</span>.bwd_iat_mean * <span class="self">self</span>.basic_flow.bwd_packet_count <span class="kw">as </span>f64)
             / (<span class="self">self</span>.basic_flow.fwd_packet_count + <span class="self">self</span>.basic_flow.bwd_packet_count) <span class="kw">as </span>f64
@@ -3040,7 +3040,7 @@
     /// # Returns
     ///
     /// Maximum inter-arrival time observed in the flow.
-    </span><span class="kw">fn </span>get_flow_iat_max(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; f64 {
+    </span><span class="kw">pub fn </span>get_flow_iat_max(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; f64 {
         <span class="kw">if </span><span class="self">self</span>.fwd_iat_max &gt; <span class="self">self</span>.bwd_iat_max {
             <span class="kw">return </span><span class="self">self</span>.fwd_iat_max;
         }
@@ -3054,7 +3054,7 @@
     /// # Returns
     ///
     /// Minimum inter-arrival time observed in the flow or 0 if not set.
-    </span><span class="kw">fn </span>get_flow_iat_min(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; f64 {
+    </span><span class="kw">pub fn </span>get_flow_iat_min(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; f64 {
         <span class="kw">if </span><span class="self">self</span>.fwd_iat_min &lt; <span class="self">self</span>.bwd_iat_min {
             <span class="kw">if </span><span class="self">self</span>.fwd_iat_min == f64::MAX {
                 <span class="kw">return </span><span class="number">0.0</span>;
@@ -3075,7 +3075,7 @@
     /// # Returns
     ///
     /// The minimum IAT observed in the forward flow or 0 if not set.
-    </span><span class="kw">fn </span>get_fwd_iat_min(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; f64 {
+    </span><span class="kw">pub fn </span>get_fwd_iat_min(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; f64 {
         <span class="kw">if </span><span class="self">self</span>.fwd_iat_min == f64::MAX {
             <span class="kw">return </span><span class="number">0.0</span>;
         }
@@ -3089,7 +3089,7 @@
     /// # Returns
     ///
     /// The minimum IAT observed in the backward flow or 0 if not set.
-    </span><span class="kw">fn </span>get_bwd_iat_min(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; f64 {
+    </span><span class="kw">pub fn </span>get_bwd_iat_min(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; f64 {
         <span class="kw">if </span><span class="self">self</span>.bwd_iat_min == f64::MAX {
             <span class="kw">return </span><span class="number">0.0</span>;
         }
@@ -3104,7 +3104,7 @@
     /// # Returns
     ///
     /// Minimum packet length in the flow, or 0 if not set.
-    </span><span class="kw">fn </span>get_flow_packet_length_min(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; u32 {
+    </span><span class="kw">pub fn </span>get_flow_packet_length_min(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; u32 {
         <span class="kw">if </span><span class="self">self</span>.fwd_pkt_len_min &lt; <span class="self">self</span>.bwd_pkt_len_min {
             <span class="kw">if </span><span class="self">self</span>.fwd_pkt_len_min == u32::MAX {
                 <span class="kw">return </span><span class="number">0</span>;
@@ -3125,7 +3125,7 @@
     /// # Returns
     ///
     /// Maximum packet length in the flow.
-    </span><span class="kw">fn </span>get_flow_packet_length_max(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; u32 {
+    </span><span class="kw">pub fn </span>get_flow_packet_length_max(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; u32 {
         <span class="kw">if </span><span class="self">self</span>.fwd_pkt_len_max &gt; <span class="self">self</span>.bwd_pkt_len_max {
             <span class="kw">return </span><span class="self">self</span>.fwd_pkt_len_max;
         }
@@ -3140,7 +3140,7 @@
     /// # Returns
     ///
     /// Minimum forward packet length, or 0 if not set.
-    </span><span class="kw">fn </span>get_fwd_packet_length_min(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; u32 {
+    </span><span class="kw">pub fn </span>get_fwd_packet_length_min(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; u32 {
         <span class="kw">if </span><span class="self">self</span>.fwd_pkt_len_min == u32::MAX {
             <span class="kw">return </span><span class="number">0</span>;
         }
@@ -3155,7 +3155,7 @@
     /// # Returns
     ///
     /// Minimum backward packet length, or 0 if not set.
-    </span><span class="kw">fn </span>get_bwd_packet_length_min(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; u32 {
+    </span><span class="kw">pub fn </span>get_bwd_packet_length_min(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; u32 {
         <span class="kw">if </span><span class="self">self</span>.bwd_pkt_len_min == u32::MAX {
             <span class="kw">return </span><span class="number">0</span>;
         }
@@ -3169,7 +3169,7 @@
     /// # Returns
     ///
     /// Mean packet length of the flow.
-    </span><span class="kw">fn </span>get_flow_packet_length_mean(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; f32 {
+    </span><span class="kw">pub fn </span>get_flow_packet_length_mean(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; f32 {
         (<span class="self">self</span>.fwd_pkt_len_mean * <span class="self">self</span>.basic_flow.fwd_packet_count <span class="kw">as </span>f32
             + <span class="self">self</span>.bwd_pkt_len_mean * <span class="self">self</span>.basic_flow.bwd_packet_count <span class="kw">as </span>f32) <span class="kw">as </span>f32
             / (<span class="self">self</span>.basic_flow.fwd_packet_count + <span class="self">self</span>.basic_flow.bwd_packet_count) <span class="kw">as </span>f32
@@ -3206,7 +3206,7 @@
     /// # Returns
     ///
     /// Standard deviation of the flow's packet lengths.
-    </span><span class="kw">fn </span>get_flow_packet_length_std(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; f64 {
+    </span><span class="kw">pub fn </span>get_flow_packet_length_std(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; f64 {
         <span class="self">self</span>.get_flow_packet_length_variance().sqrt()
     }
 
@@ -3656,9 +3656,9 @@
             {},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},\
             {},{},{},{}"</span>,
             <span class="self">self</span>.basic_flow.flow_id,
-            <span class="self">self</span>.basic_flow.ipv4_source,
+            <span class="self">self</span>.basic_flow.ip_source,
             <span class="self">self</span>.basic_flow.port_source,
-            <span class="self">self</span>.basic_flow.ipv4_destination,
+            <span class="self">self</span>.basic_flow.ip_destination,
             <span class="self">self</span>.basic_flow.port_destination,
             <span class="self">self</span>.basic_flow.protocol,
             <span class="self">self</span>.basic_flow.first_timestamp,

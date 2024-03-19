@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"mod":["basic_flow","cic_flow","cidds_flow","flow"]};
+window.SIDEBAR_ITEMS = {"mod":["basic_flow","cic_flow","cidds_flow","flow","nf_flow"]};

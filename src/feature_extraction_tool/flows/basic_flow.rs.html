@@ -194,9 +194,9 @@
     <span class="doccomment">/// The unique identifier of the flow.
     </span><span class="kw">pub </span>flow_id: String,
     <span class="doccomment">/// The destination IP address of the flow.
-    </span><span class="kw">pub </span>ipv4_destination: IpAddr,
+    </span><span class="kw">pub </span>ip_destination: IpAddr,
     <span class="doccomment">/// The source IP address of the flow.
-    </span><span class="kw">pub </span>ipv4_source: IpAddr,
+    </span><span class="kw">pub </span>ip_source: IpAddr,
     <span class="doccomment">/// The destination port of the flow.
     </span><span class="kw">pub </span>port_destination: u16,
     <span class="doccomment">/// The source port of the flow.
@@ -250,16 +250,16 @@
 <span class="kw">impl </span>Flow <span class="kw">for </span>BasicFlow {
     <span class="kw">fn </span>new(
         flow_id: String,
-        ipv4_source: IpAddr,
+        ip_source: IpAddr,
         port_source: u16,
-        ipv4_destination: IpAddr,
+        ip_destination: IpAddr,
         port_destination: u16,
         protocol: u8,
     ) -&gt; <span class="self">Self </span>{
         BasicFlow {
             flow_id,
-            ipv4_destination,
-            ipv4_source,
+            ip_destination,
+            ip_source,
             port_destination,
             port_source,
             protocol,
@@ -329,9 +329,9 @@
             <span class="string">"{},{},{},{},{},{},{},{},{},{},{},{},{},\
         {},{},{},{},{},{},{},{},{},{},{},{},{},{}"</span>,
             <span class="self">self</span>.flow_id,
-            <span class="self">self</span>.ipv4_source,
+            <span class="self">self</span>.ip_source,
             <span class="self">self</span>.port_source,
-            <span class="self">self</span>.ipv4_destination,
+            <span class="self">self</span>.ip_destination,
             <span class="self">self</span>.port_destination,
             <span class="self">self</span>.protocol,
             <span class="self">self</span>.first_timestamp,

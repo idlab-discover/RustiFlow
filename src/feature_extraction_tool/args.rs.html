@@ -72,6 +72,11 @@
 <a href="#70" id="70">70</a>
 <a href="#71" id="71">71</a>
 <a href="#72" id="72">72</a>
+<a href="#73" id="73">73</a>
+<a href="#74" id="74">74</a>
+<a href="#75" id="75">75</a>
+<a href="#76" id="76">76</a>
+<a href="#77" id="77">77</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span>clap::{Parser, Subcommand};
 
 <span class="attr">#[derive(Debug, Parser)]
@@ -112,10 +117,15 @@
 </span><span class="kw">pub enum </span>FlowType {
     <span class="doccomment">/// A basic flow that stores the basic features of a flow.
     </span>BasicFlow,
+
     <span class="doccomment">/// Represents the CIC Flow, giving 83 features.
     </span>CicFlow,
+
     <span class="doccomment">/// Represents the CIDDS Flow, giving 10 features.
     </span>CiddsFlow,
+
+    <span class="doccomment">/// Represents a nfstream inspired flow, giving 69 features.
+    </span>NfFlow,
 }
 
 <span class="attr">#[derive(clap::ValueEnum, Clone, Debug)]
