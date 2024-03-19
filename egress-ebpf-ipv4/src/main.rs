@@ -9,7 +9,7 @@ use aya_ebpf::{
     programs::TcContext,
 };
 
-use common::BasicFeatures;
+use common::BasicFeaturesIpv4;
 
 use core::mem;
 use network_types::{
@@ -25,7 +25,7 @@ fn panic(_info: &core::panic::PanicInfo) -> ! {
 }
 
 #[map]
-static EVENTS_EGRESS: PerfEventArray<BasicFeatures> = PerfEventArray::with_max_entries(1024, 0);
+static EVENTS_EGRESS_IPV4: PerfEventArray<BasicFeaturesIpv4> = PerfEventArray::with_max_entries(1024, 0);
 
 #[classifier]
 pub fn tc_flow_track(ctx: TcContext) -> i32 {
@@ -127,7 +127,7 @@ fn try_tc_flow_track(ctx: TcContext) -> Result<i32, ()> {
         _ => return Ok(TC_ACT_PIPE),
     };
 
-    let flow = BasicFeatures {
+    let flow = BasicFeaturesIpv4 {
         ipv4_destination: ipv4_destination,
         ipv4_source: ipv4_source,
         port_destination: destination_port,
@@ -148,7 +148,7 @@ fn try_tc_flow_track(ctx: TcContext) -> Result<i32, ()> {
     };
 
     // the zero value is a flag
-    EVENTS_EGRESS.output(&ctx, &flow, 0);
+    EVENTS_EGRESS_IPV4.output(&ctx, &flow, 0);
 
     Ok(TC_ACT_PIPE)
 }

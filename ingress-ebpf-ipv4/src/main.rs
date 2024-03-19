@@ -3,18 +3,18 @@
 #![allow(nonstandard_style, dead_code)]
 
 use aya_ebpf::{
-    bindings::xdp_action,
-    macros::{map, xdp},
-    programs::XdpContext,
-    maps::PerfEventArray
+    bindings::TC_ACT_PIPE,
+    macros::{classifier, map},
+    maps::PerfEventArray,
+    programs::TcContext,
 };
 
-use common::BasicFeatures;
+use common::BasicFeaturesIpv4;
 
 use core::mem;
 use network_types::{
     eth::{EthHdr, EtherType},
-    ip::{Ipv4Hdr, IpProto},
+    ip::{IpProto, Ipv4Hdr},
     tcp::TcpHdr,
     udp::UdpHdr,
 };
@@ -25,19 +25,18 @@ fn panic(_info: &core::panic::PanicInfo) -> ! {
 }
 
 #[map]
-static EVENTS_INGRESS: PerfEventArray<BasicFeatures> =
-    PerfEventArray::with_max_entries(1024, 0);
+static EVENTS_INGRESS_IPV4: PerfEventArray<BasicFeaturesIpv4> = PerfEventArray::with_max_entries(1024, 0);
 
-#[xdp]
-pub fn xdp_flow_track(ctx: XdpContext) -> u32{
-    match try_xdp_flow_track(ctx) {
+#[classifier]
+pub fn tc_flow_track(ctx: TcContext) -> i32 {
+    match try_tc_flow_track(ctx) {
         Ok(ret) => ret,
-        Err(_) => xdp_action::XDP_ABORTED,
+        Err(_) => TC_ACT_PIPE,
     }
 }
 
 #[inline(always)]
-unsafe fn ptr_at<T>(ctx: &XdpContext, offset: usize) -> Result<*const T, ()> {
+unsafe fn ptr_at<T>(ctx: &TcContext, offset: usize) -> Result<*const T, ()> {
     let start = ctx.data();
     let end = ctx.data_end();
     let len = mem::size_of::<T>();
@@ -50,11 +49,11 @@ unsafe fn ptr_at<T>(ctx: &XdpContext, offset: usize) -> Result<*const T, ()> {
     Ok(&*ptr)
 }
 
-fn try_xdp_flow_track(ctx: XdpContext) -> Result<u32, ()>{
+fn try_tc_flow_track(ctx: TcContext) -> Result<i32, ()> {
     let ethhdr: *const EthHdr = unsafe { ptr_at(&ctx, 0)? };
     match unsafe { (*ethhdr).ether_type } {
         EtherType::Ipv4 => {}
-        _ => return Ok(xdp_action::XDP_PASS),
+        _ => return Ok(TC_ACT_PIPE),
     }
 
     let ipv4hdr: *const Ipv4Hdr = unsafe { ptr_at(&ctx, EthHdr::LEN)? };
@@ -82,11 +81,10 @@ fn try_xdp_flow_track(ctx: XdpContext) -> Result<u32, ()>{
 
     match unsafe { *ipv4hdr }.proto {
         IpProto::Tcp => {
-            let tcphdr: *const TcpHdr =
-                unsafe { ptr_at(&ctx, EthHdr::LEN + Ipv4Hdr::LEN) }?;
+            let tcphdr: *const TcpHdr = unsafe { ptr_at(&ctx, EthHdr::LEN + Ipv4Hdr::LEN) }?;
 
             // Cast the `TcpHdr` pointer to a `*const u8` to read individual bytes
-            let tcphdr_u8 = tcphdr as *const u8;    
+            let tcphdr_u8 = tcphdr as *const u8;
             // Read the 12th byte (offset 12 from the TCP header start)
             let data_offset_byte = unsafe { *tcphdr_u8.add(12) } as u8;
             // Extract the high-order 4 bits and shift right by 4 to get the 'data offset' value
@@ -94,7 +92,10 @@ fn try_xdp_flow_track(ctx: XdpContext) -> Result<u32, ()>{
             // Calculate the TCP header size in bytes
             header_length = data_offset * 4;
 
-            length = data_length as u32 + header_length + Ipv4Hdr::LEN as u32 + EthHdr::LEN as u32;
+            length = data_length as u32
+                + header_length as u32
+                + Ipv4Hdr::LEN as u32
+                + EthHdr::LEN as u32;
 
             source_port = u16::from_be(unsafe { *tcphdr }.source);
             destination_port = u16::from_be(unsafe { *tcphdr }.dest);
@@ -112,19 +113,21 @@ fn try_xdp_flow_track(ctx: XdpContext) -> Result<u32, ()>{
             window_size = u16::from_be(unsafe { *tcphdr }.window);
         }
         IpProto::Udp => {
-            let udphdr: *const UdpHdr =
-                unsafe { ptr_at(&ctx, EthHdr::LEN + Ipv4Hdr::LEN) }?;
+            let udphdr: *const UdpHdr = unsafe { ptr_at(&ctx, EthHdr::LEN + Ipv4Hdr::LEN) }?;
             source_port = u16::from_be(unsafe { *udphdr }.source);
             destination_port = u16::from_be(unsafe { *udphdr }.dest);
 
             header_length = UdpHdr::LEN as u32;
-            length = data_length as u32 + header_length + Ipv4Hdr::LEN as u32 + EthHdr::LEN as u32;
+            length = data_length as u32
+                + header_length as u32
+                + Ipv4Hdr::LEN as u32
+                + EthHdr::LEN as u32;
             protocol = IpProto::Udp as u8;
         }
-        _ => return Ok(xdp_action::XDP_ABORTED),
+        _ => return Ok(TC_ACT_PIPE),
     };
 
-    let flow = BasicFeatures {
+    let flow = BasicFeaturesIpv4 {
         ipv4_destination: ipv4_destination,
         ipv4_source: ipv4_source,
         port_destination: destination_port,
@@ -145,7 +148,7 @@ fn try_xdp_flow_track(ctx: XdpContext) -> Result<u32, ()>{
     };
 
     // the zero value is a flag
-    EVENTS_INGRESS.output(&ctx, &flow, 0);
+    EVENTS_INGRESS_IPV4.output(&ctx, &flow, 0);
 
-    Ok(xdp_action::XDP_PASS)
+    Ok(TC_ACT_PIPE)
 }

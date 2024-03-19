@@ -1,4 +1,6 @@
-use std::net::Ipv4Addr;
+use std::net::IpAddr;
+
+use chrono::{DateTime, Utc};
 
 /// Creates a unique identifier for a network flow.
 ///
@@ -8,9 +10,9 @@ use std::net::Ipv4Addr;
 ///
 /// # Arguments
 ///
-/// * `ipv4_source` - The source IP address, represented as a u32.
+/// * `ipv4_source` - The source IP address, represented as IpAddr.
 /// * `port_source` - The source port number.
-/// * `ipv4_destination` - The destination IP address, represented as a u32.
+/// * `ipv4_destination` - The destination IP address, represented as IpAddr.
 /// * `port_destination` - The destination port number.
 /// * `protocol` - The protocol used, represented as a u8.
 ///
@@ -18,14 +20,44 @@ use std::net::Ipv4Addr;
 ///
 /// A string representing the unique identifier of the network flow.
 pub fn create_flow_id(
-    ipv4_source: u32,
+    ip_source: IpAddr,
     port_source: u16,
-    ipv4_destination: u32,
+    ip_destination: IpAddr,
     port_destination: u16,
     protocol: u8,
 ) -> String {
     format!(
         "{}:{}-{}:{}-{}",
-        Ipv4Addr::from(ipv4_source), port_source, Ipv4Addr::from(ipv4_destination), port_destination, protocol
+        ip_source, port_source, ip_destination, port_destination, protocol
     )
+}
+
+/// Calculates the duration between two timestamps in microseconds.
+///
+/// # Arguments
+///
+/// * `start` - The starting timestamp.
+/// * `end` - The ending timestamp.
+///
+/// # Returns
+///
+/// Duration between `start` and `end` in microseconds.
+pub fn get_duration(start: DateTime<Utc>, end: DateTime<Utc>) -> f64 {
+    let duration = end.signed_duration_since(start);
+    duration.num_microseconds().unwrap() as f64
+}
+
+pub struct BasicFeatures {
+    pub fin_flag: u8,
+    pub syn_flag: u8,
+    pub rst_flag: u8,
+    pub psh_flag: u8,
+    pub ack_flag: u8,
+    pub urg_flag: u8,
+    pub cwe_flag: u8,
+    pub ece_flag: u8,
+    pub data_length: u32,
+    pub header_length: u32,
+    pub length: u32,
+    pub window_size: u16,
 }
