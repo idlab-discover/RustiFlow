@@ -1,7 +1,8 @@
-use std::time::Instant;
+use std::{net::IpAddr, time::Instant};
 
 use chrono::{DateTime, Utc};
-use common::BasicFeatures;
+
+use crate::utils::utils::BasicFeatures;
 
 use super::flow::Flow;
 
@@ -10,9 +11,9 @@ pub struct BasicFlow {
     /// The unique identifier of the flow.
     pub flow_id: String,
     /// The destination IP address of the flow.
-    pub ipv4_destination: u32,
+    pub ipv4_destination: IpAddr,
     /// The source IP address of the flow.
-    pub ipv4_source: u32,
+    pub ipv4_source: IpAddr,
     /// The destination port of the flow.
     pub port_destination: u16,
     /// The source port of the flow.
@@ -66,9 +67,9 @@ pub struct BasicFlow {
 impl Flow for BasicFlow {
     fn new(
         flow_id: String,
-        ipv4_source: u32,
+        ipv4_source: IpAddr,
         port_source: u16,
-        ipv4_destination: u32,
+        ipv4_destination: IpAddr,
         port_destination: u16,
         protocol: u8,
     ) -> Self {

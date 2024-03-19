@@ -1,6 +1,7 @@
 use chrono::{DateTime, Utc};
-use common::BasicFeatures;
-use std::{net::Ipv4Addr, time::Instant};
+use std::{net::IpAddr, time::Instant};
+
+use crate::utils::utils::BasicFeatures;
 
 use super::{basic_flow::BasicFlow, flow::Flow};
 
@@ -64,9 +65,9 @@ impl CiddsFlow {
 impl Flow for CiddsFlow {
     fn new(
         flow_id: String,
-        ipv4_source: u32,
+        ipv4_source: IpAddr,
         port_source: u16,
-        ipv4_destination: u32,
+        ipv4_destination: IpAddr,
         port_destination: u16,
         protocol: u8,
     ) -> Self {
@@ -120,9 +121,9 @@ impl Flow for CiddsFlow {
             } else {
                 "OTHER"
             },
-            Ipv4Addr::from(self.basic_flow.ipv4_source),
+            self.basic_flow.ipv4_source,
             self.basic_flow.port_source,
-            Ipv4Addr::from(self.basic_flow.ipv4_destination),
+            self.basic_flow.ipv4_destination,
             self.basic_flow.port_destination,
             self.basic_flow.fwd_packet_count + self.basic_flow.bwd_packet_count,
             self.bytes,
@@ -137,12 +138,14 @@ impl Flow for CiddsFlow {
 
 #[cfg(test)]
 mod tests {
+    use std::net::{IpAddr, Ipv4Addr};
+
     use crate::flows::flow::Flow;
 
     use super::CiddsFlow;
 
     fn setup_ciddsflow() -> CiddsFlow {
-        CiddsFlow::new("".to_string(), 1, 80, 2, 8080, 6)
+        CiddsFlow::new("".to_string(), IpAddr::V4(Ipv4Addr::from(1)), 80, IpAddr::V4(Ipv4Addr::from(2)), 8080, 6)
     }
 
     #[test]
