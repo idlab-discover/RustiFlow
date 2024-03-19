@@ -45,7 +45,7 @@ pub struct CicFlow {
     /// The number of data packets in the forward flow with more than one byte of data.
     pub fwd_act_data_pkt: u32,
     /// The minimum header length of the forward flow.
-    pub fwd_header_len_min: u32,
+    fwd_header_len_min: u32,
     /// The timestamp of the last packet in the forward flow.
     pub fwd_last_timestamp: Option<Instant>,
     /// The total length of packets in the forward flow.
