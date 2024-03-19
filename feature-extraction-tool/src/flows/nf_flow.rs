@@ -50,7 +50,18 @@ impl Flow for NfFlow {
         timestamp: &Instant,
         fwd: bool,
     ) -> Option<String> {
-        self.cic_flow.update_flow(packet, timestamp, fwd)
+        if fwd {
+            self.fwd_last_timestamp = SystemTime::now();
+        } else {
+            self.bwd_last_timestamp = SystemTime::now();
+        }
+
+        let end = self.cic_flow.update_flow(packet, timestamp, fwd);
+        if end.is_some() {
+            return Some(self.dump());
+        }
+
+        None
     }
 
     fn dump(&self) -> String {
