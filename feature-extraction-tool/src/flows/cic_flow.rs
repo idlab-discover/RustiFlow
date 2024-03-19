@@ -1298,10 +1298,20 @@ mod tests {
         flows::{cic_flow::CicFlow, flow::Flow},
         utils::utils::{get_duration, BasicFeatures},
     };
-    use std::{net::{IpAddr, Ipv4Addr}, time::{Duration, Instant}};
+    use std::{
+        net::{IpAddr, Ipv4Addr},
+        time::{Duration, Instant},
+    };
 
     fn setup_cic_flow() -> CicFlow {
-        CicFlow::new("".to_string(), IpAddr::V4(Ipv4Addr::from(1)), 80, IpAddr::V4(Ipv4Addr::from(2)), 8080, 6)
+        CicFlow::new(
+            "".to_string(),
+            IpAddr::V4(Ipv4Addr::from(1)),
+            80,
+            IpAddr::V4(Ipv4Addr::from(2)),
+            8080,
+            6,
+        )
     }
 
     #[test]
@@ -2086,7 +2096,14 @@ mod tests {
 
     #[test]
     fn test_update_flow_first_with_fwd_packet() {
-        let mut cic_flow = CicFlow::new("".to_string(), IpAddr::V4(Ipv4Addr::from(1)), 80, IpAddr::V4(Ipv4Addr::from(2)), 8080, 6);
+        let mut cic_flow = CicFlow::new(
+            "".to_string(),
+            IpAddr::V4(Ipv4Addr::from(1)),
+            80,
+            IpAddr::V4(Ipv4Addr::from(2)),
+            8080,
+            6,
+        );
         let packet = BasicFeatures {
             fin_flag: 1,
             syn_flag: 0,
@@ -2153,7 +2170,14 @@ mod tests {
 
     #[test]
     fn test_update_flow_first_with_bwd_packet() {
-        let mut cic_flow = CicFlow::new("".to_string(), IpAddr::V4(Ipv4Addr::from(1)), 80, IpAddr::V4(Ipv4Addr::from(2)), 8080, 6);
+        let mut cic_flow = CicFlow::new(
+            "".to_string(),
+            IpAddr::V4(Ipv4Addr::from(1)),
+            80,
+            IpAddr::V4(Ipv4Addr::from(2)),
+            8080,
+            6,
+        );
         let packet = BasicFeatures {
             fin_flag: 1,
             syn_flag: 0,
@@ -2220,7 +2244,14 @@ mod tests {
 
     #[test]
     fn test_update_flow_with_fwd_packet() {
-        let mut cic_flow = CicFlow::new("".to_string(), IpAddr::V4(Ipv4Addr::from(1)), 80, IpAddr::V4(Ipv4Addr::from(2)), 8080, 6);
+        let mut cic_flow = CicFlow::new(
+            "".to_string(),
+            IpAddr::V4(Ipv4Addr::from(1)),
+            80,
+            IpAddr::V4(Ipv4Addr::from(2)),
+            8080,
+            6,
+        );
         let packet_1 = BasicFeatures {
             fin_flag: 1,
             syn_flag: 0,
@@ -2319,7 +2350,14 @@ mod tests {
 
     #[test]
     fn test_update_flow_with_bwd_packet() {
-        let mut cic_flow = CicFlow::new("".to_string(), IpAddr::V4(Ipv4Addr::from(1)), 80, IpAddr::V4(Ipv4Addr::from(2)), 8080, 6);
+        let mut cic_flow = CicFlow::new(
+            "".to_string(),
+            IpAddr::V4(Ipv4Addr::from(1)),
+            80,
+            IpAddr::V4(Ipv4Addr::from(2)),
+            8080,
+            6,
+        );
         let packet_1 = BasicFeatures {
             fin_flag: 1,
             syn_flag: 0,

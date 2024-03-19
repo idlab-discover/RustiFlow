@@ -22,14 +22,18 @@ use bytes::BytesMut;
 use chrono::Utc;
 use clap::Parser;
 use common::{BasicFeaturesIpv4, BasicFeaturesIpv6};
-use utils::utils::BasicFeatures;
 use core::panic;
 use dashmap::DashMap;
 use flows::{basic_flow::BasicFlow, cidds_flow::CiddsFlow, flow::Flow};
 use log::info;
-use std::{net::{Ipv4Addr, Ipv6Addr}, sync::Arc, time::Instant};
+use std::{
+    net::{Ipv4Addr, Ipv6Addr},
+    sync::Arc,
+    time::Instant,
+};
 use tokio::time::{self, Duration};
 use tokio::{signal, task};
+use utils::utils::BasicFeatures;
 
 #[tokio::main]
 async fn main() {
@@ -398,7 +402,9 @@ where
     T: Flow,
 {
     let timestamp = Instant::now();
-    let destination = std::net::IpAddr::V6(Ipv6Addr::from(unsafe { data.ipv6_destination.in6_u.u6_addr8 }));
+    let destination = std::net::IpAddr::V6(Ipv6Addr::from(unsafe {
+        data.ipv6_destination.in6_u.u6_addr8
+    }));
     let source = std::net::IpAddr::V6(Ipv6Addr::from(unsafe { data.ipv6_source.in6_u.u6_addr8 }));
     let features = BasicFeatures {
         fin_flag: data.fin_flag,

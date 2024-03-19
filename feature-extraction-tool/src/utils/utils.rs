@@ -28,11 +28,7 @@ pub fn create_flow_id(
 ) -> String {
     format!(
         "{}:{}-{}:{}-{}",
-        ip_source,
-        port_source,
-        ip_destination,
-        port_destination,
-        protocol
+        ip_source, port_source, ip_destination, port_destination, protocol
     )
 }
 

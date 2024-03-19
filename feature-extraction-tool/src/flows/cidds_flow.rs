@@ -145,7 +145,14 @@ mod tests {
     use super::CiddsFlow;
 
     fn setup_ciddsflow() -> CiddsFlow {
-        CiddsFlow::new("".to_string(), IpAddr::V4(Ipv4Addr::from(1)), 80, IpAddr::V4(Ipv4Addr::from(2)), 8080, 6)
+        CiddsFlow::new(
+            "".to_string(),
+            IpAddr::V4(Ipv4Addr::from(1)),
+            80,
+            IpAddr::V4(Ipv4Addr::from(2)),
+            8080,
+            6,
+        )
     }
 
     #[test]
