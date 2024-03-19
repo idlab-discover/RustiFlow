@@ -101,39 +101,39 @@ where
     // Loading the eBPF program for egress, the macros make sure the correct file is loaded
     #[cfg(debug_assertions)]
     let mut bpf_egress_ipv4 = Bpf::load(include_bytes_aligned!(
-        "../../target/bpfel-unknown-none/debug/feature-extraction-tool-egress-ipv4"
+        "../../target/bpfel-unknown-none/debug/feature-extraction-tool-ipv4"
     ))?;
     #[cfg(not(debug_assertions))]
     let mut bpf_egress_ipv4 = Bpf::load(include_bytes_aligned!(
-        "../../target/bpfel-unknown-none/release/feature-extraction-tool-egress-ipv4"
+        "../../target/bpfel-unknown-none/release/feature-extraction-tool-ipv4"
     ))?;
 
     #[cfg(debug_assertions)]
     let mut bpf_egress_ipv6 = Bpf::load(include_bytes_aligned!(
-        "../../target/bpfel-unknown-none/debug/feature-extraction-tool-egress-ipv6"
+        "../../target/bpfel-unknown-none/debug/feature-extraction-tool-ipv6"
     ))?;
     #[cfg(not(debug_assertions))]
     let mut bpf_egress_ipv6 = Bpf::load(include_bytes_aligned!(
-        "../../target/bpfel-unknown-none/release/feature-extraction-tool-egress-ipv6"
+        "../../target/bpfel-unknown-none/release/feature-extraction-tool-ipv6"
     ))?;
 
     // Loading the eBPF program for ingress, the macros make sure the correct file is loaded
     #[cfg(debug_assertions)]
     let mut bpf_ingress_ipv4 = Bpf::load(include_bytes_aligned!(
-        "../../target/bpfel-unknown-none/debug/feature-extraction-tool-ingress-ipv4"
+        "../../target/bpfel-unknown-none/debug/feature-extraction-tool-ipv4"
     ))?;
     #[cfg(not(debug_assertions))]
     let mut bpf_ingress_ipv4 = Bpf::load(include_bytes_aligned!(
-        "../../target/bpfel-unknown-none/release/feature-extraction-tool-ingress-ipv4"
+        "../../target/bpfel-unknown-none/release/feature-extraction-tool-ipv4"
     ))?;
 
     #[cfg(debug_assertions)]
     let mut bpf_ingress_ipv6 = Bpf::load(include_bytes_aligned!(
-        "../../target/bpfel-unknown-none/debug/feature-extraction-tool-ingress-ipv6"
+        "../../target/bpfel-unknown-none/debug/feature-extraction-tool-ipv6"
     ))?;
     #[cfg(not(debug_assertions))]
     let mut bpf_ingress_ipv6 = Bpf::load(include_bytes_aligned!(
-        "../../target/bpfel-unknown-none/release/feature-extraction-tool-ingress-ipv6"
+        "../../target/bpfel-unknown-none/release/feature-extraction-tool-ipv6"
     ))?;
 
     // Loading and attaching the eBPF program function for egress
@@ -172,16 +172,16 @@ where
 
     // Attach to the event arrays
     let mut flows_egress_ipv4 =
-        AsyncPerfEventArray::try_from(bpf_egress_ipv4.take_map("EVENTS_EGRESS_IPV4").unwrap())?;
+        AsyncPerfEventArray::try_from(bpf_egress_ipv4.take_map("EVENTS_IPV4").unwrap())?;
 
     let mut flows_egress_ipv6 =
-        AsyncPerfEventArray::try_from(bpf_egress_ipv6.take_map("EVENTS_EGRESS_IPV6").unwrap())?;
+        AsyncPerfEventArray::try_from(bpf_egress_ipv6.take_map("EVENTS_IPV6").unwrap())?;
 
     let mut flows_ingress_ipv4 =
-        AsyncPerfEventArray::try_from(bpf_ingress_ipv4.take_map("EVENTS_INGRESS_IPV4").unwrap())?;
+        AsyncPerfEventArray::try_from(bpf_ingress_ipv4.take_map("EVENTS_IPV4").unwrap())?;
 
     let mut flows_ingress_ipv6 =
-        AsyncPerfEventArray::try_from(bpf_ingress_ipv6.take_map("EVENTS_INGRESS_IPV6").unwrap())?;
+        AsyncPerfEventArray::try_from(bpf_ingress_ipv6.take_map("EVENTS_IPV6").unwrap())?;
 
     let flow_map_ipv4: Arc<DashMap<String, T>> = Arc::new(DashMap::new());
 
