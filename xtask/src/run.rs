@@ -43,9 +43,9 @@ pub fn run(opts: Options) -> Result<(), anyhow::Error> {
             target: opts.bpf_target,
             release: opts.release,
         },
-        "ingress-ebpf".to_string(),
+        "ingress-ebpf-ipv4".to_string(),
     )
-    .context("Error while building the ingress-eBPF program")?;
+    .context("Error while building the ingress-eBPF Ipv4 program")?;
     build(&opts).context("Error while building userspace application")?;
 
     build_ebpf(
@@ -53,11 +53,31 @@ pub fn run(opts: Options) -> Result<(), anyhow::Error> {
             target: opts.bpf_target,
             release: opts.release,
         },
-        "egress-ebpf".to_string(),
+        "egress-ebpf-ipv4".to_string(),
     )
-    .context("Error while building the egress-eBPF program")?;
+    .context("Error while building the egress-eBPF Ipv4 program")?;
     build(&opts).context("Error while building userspace application")?;
 
+    build_ebpf(
+        BuildOptions {
+            target: opts.bpf_target,
+            release: opts.release,
+        },
+        "ingress-ebpf-ipv6".to_string(),
+    )
+    .context("Error while building the ingress-eBPF Ipv6 program")?;
+    build(&opts).context("Error while building userspace application")?;
+
+    build_ebpf(
+        BuildOptions {
+            target: opts.bpf_target,
+            release: opts.release,
+        },
+        "egress-ebpf-ipv6".to_string(),
+    )
+    .context("Error while building the egress-eBPF Ipv6 program")?;
+    build(&opts).context("Error while building userspace application")?;
+    
     // profile we are building (release or debug)
     let profile = if opts.release { "release" } else { "debug" };
     let bin_path = format!("target/{profile}/feature-extraction-tool");
