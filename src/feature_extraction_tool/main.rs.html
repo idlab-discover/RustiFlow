@@ -909,39 +909,39 @@
     <span class="comment">// Loading the eBPF program for egress, the macros make sure the correct file is loaded
     </span><span class="attr">#[cfg(debug_assertions)]
     </span><span class="kw">let </span><span class="kw-2">mut </span>bpf_egress_ipv4 = Bpf::load(<span class="macro">include_bytes_aligned!</span>(
-        <span class="string">"../../target/bpfel-unknown-none/debug/feature-extraction-tool-egress-ipv4"
+        <span class="string">"../../target/bpfel-unknown-none/debug/feature-extraction-tool-ipv4"
     </span>))<span class="question-mark">?</span>;
     <span class="attr">#[cfg(not(debug_assertions))]
     </span><span class="kw">let </span><span class="kw-2">mut </span>bpf_egress_ipv4 = Bpf::load(<span class="macro">include_bytes_aligned!</span>(
-        <span class="string">"../../target/bpfel-unknown-none/release/feature-extraction-tool-egress-ipv4"
+        <span class="string">"../../target/bpfel-unknown-none/release/feature-extraction-tool-ipv4"
     </span>))<span class="question-mark">?</span>;
 
     <span class="attr">#[cfg(debug_assertions)]
     </span><span class="kw">let </span><span class="kw-2">mut </span>bpf_egress_ipv6 = Bpf::load(<span class="macro">include_bytes_aligned!</span>(
-        <span class="string">"../../target/bpfel-unknown-none/debug/feature-extraction-tool-egress-ipv6"
+        <span class="string">"../../target/bpfel-unknown-none/debug/feature-extraction-tool-ipv6"
     </span>))<span class="question-mark">?</span>;
     <span class="attr">#[cfg(not(debug_assertions))]
     </span><span class="kw">let </span><span class="kw-2">mut </span>bpf_egress_ipv6 = Bpf::load(<span class="macro">include_bytes_aligned!</span>(
-        <span class="string">"../../target/bpfel-unknown-none/release/feature-extraction-tool-egress-ipv6"
+        <span class="string">"../../target/bpfel-unknown-none/release/feature-extraction-tool-ipv6"
     </span>))<span class="question-mark">?</span>;
 
     <span class="comment">// Loading the eBPF program for ingress, the macros make sure the correct file is loaded
     </span><span class="attr">#[cfg(debug_assertions)]
     </span><span class="kw">let </span><span class="kw-2">mut </span>bpf_ingress_ipv4 = Bpf::load(<span class="macro">include_bytes_aligned!</span>(
-        <span class="string">"../../target/bpfel-unknown-none/debug/feature-extraction-tool-ingress-ipv4"
+        <span class="string">"../../target/bpfel-unknown-none/debug/feature-extraction-tool-ipv4"
     </span>))<span class="question-mark">?</span>;
     <span class="attr">#[cfg(not(debug_assertions))]
     </span><span class="kw">let </span><span class="kw-2">mut </span>bpf_ingress_ipv4 = Bpf::load(<span class="macro">include_bytes_aligned!</span>(
-        <span class="string">"../../target/bpfel-unknown-none/release/feature-extraction-tool-ingress-ipv4"
+        <span class="string">"../../target/bpfel-unknown-none/release/feature-extraction-tool-ipv4"
     </span>))<span class="question-mark">?</span>;
 
     <span class="attr">#[cfg(debug_assertions)]
     </span><span class="kw">let </span><span class="kw-2">mut </span>bpf_ingress_ipv6 = Bpf::load(<span class="macro">include_bytes_aligned!</span>(
-        <span class="string">"../../target/bpfel-unknown-none/debug/feature-extraction-tool-ingress-ipv6"
+        <span class="string">"../../target/bpfel-unknown-none/debug/feature-extraction-tool-ipv6"
     </span>))<span class="question-mark">?</span>;
     <span class="attr">#[cfg(not(debug_assertions))]
     </span><span class="kw">let </span><span class="kw-2">mut </span>bpf_ingress_ipv6 = Bpf::load(<span class="macro">include_bytes_aligned!</span>(
-        <span class="string">"../../target/bpfel-unknown-none/release/feature-extraction-tool-ingress-ipv6"
+        <span class="string">"../../target/bpfel-unknown-none/release/feature-extraction-tool-ipv6"
     </span>))<span class="question-mark">?</span>;
 
     <span class="comment">// Loading and attaching the eBPF program function for egress
@@ -980,16 +980,16 @@
 
     <span class="comment">// Attach to the event arrays
     </span><span class="kw">let </span><span class="kw-2">mut </span>flows_egress_ipv4 =
-        AsyncPerfEventArray::try_from(bpf_egress_ipv4.take_map(<span class="string">"EVENTS_EGRESS_IPV4"</span>).unwrap())<span class="question-mark">?</span>;
+        AsyncPerfEventArray::try_from(bpf_egress_ipv4.take_map(<span class="string">"EVENTS_IPV4"</span>).unwrap())<span class="question-mark">?</span>;
 
     <span class="kw">let </span><span class="kw-2">mut </span>flows_egress_ipv6 =
-        AsyncPerfEventArray::try_from(bpf_egress_ipv6.take_map(<span class="string">"EVENTS_EGRESS_IPV6"</span>).unwrap())<span class="question-mark">?</span>;
+        AsyncPerfEventArray::try_from(bpf_egress_ipv6.take_map(<span class="string">"EVENTS_IPV6"</span>).unwrap())<span class="question-mark">?</span>;
 
     <span class="kw">let </span><span class="kw-2">mut </span>flows_ingress_ipv4 =
-        AsyncPerfEventArray::try_from(bpf_ingress_ipv4.take_map(<span class="string">"EVENTS_INGRESS_IPV4"</span>).unwrap())<span class="question-mark">?</span>;
+        AsyncPerfEventArray::try_from(bpf_ingress_ipv4.take_map(<span class="string">"EVENTS_IPV4"</span>).unwrap())<span class="question-mark">?</span>;
 
     <span class="kw">let </span><span class="kw-2">mut </span>flows_ingress_ipv6 =
-        AsyncPerfEventArray::try_from(bpf_ingress_ipv6.take_map(<span class="string">"EVENTS_INGRESS_IPV6"</span>).unwrap())<span class="question-mark">?</span>;
+        AsyncPerfEventArray::try_from(bpf_ingress_ipv6.take_map(<span class="string">"EVENTS_IPV6"</span>).unwrap())<span class="question-mark">?</span>;
 
     <span class="kw">let </span>flow_map_ipv4: Arc&lt;DashMap&lt;String, T&gt;&gt; = Arc::new(DashMap::new());
 
