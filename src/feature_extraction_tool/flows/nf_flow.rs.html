@@ -144,6 +144,9 @@
 <a href="#142" id="142">142</a>
 <a href="#143" id="143">143</a>
 <a href="#144" id="144">144</a>
+<a href="#145" id="145">145</a>
+<a href="#146" id="146">146</a>
+<a href="#147" id="147">147</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span>std::{
     net::IpAddr,
     time::{Instant, SystemTime, UNIX_EPOCH},
@@ -153,7 +156,10 @@
 
 <span class="kw">use super</span>::{cic_flow::CicFlow, flow::Flow};
 
-<span class="kw">pub struct </span>NfFlow {
+<span class="doccomment">/// Represents a Nfstream inspired Flow, encapsulating various metrics and states of a network flow.
+///
+/// This struct includes detailed information about both forward and backward
+</span><span class="kw">pub struct </span>NfFlow {
     <span class="kw">pub </span>cic_flow: CicFlow,
     <span class="kw">pub </span>first_timestamp: SystemTime,
     <span class="kw">pub </span>last_timestamp: SystemTime,
