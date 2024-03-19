@@ -13,63 +13,63 @@ pub struct CicFlow {
     /// The basic flow information.
     pub basic_flow: BasicFlow,
     /// The timestamp of the last packet in the subflow.
-    sf_last_packet_timestamp: Option<Instant>,
+    pub sf_last_packet_timestamp: Option<Instant>,
     /// The number of subflows.
-    sf_count: u32,
+    pub sf_count: u32,
     /// The timestamp of the start of an active period.
-    start_active: Instant,
+    pub start_active: Instant,
     /// The timestamp of the end of an active period.
-    end_active: Instant,
+    pub end_active: Instant,
     /// The number of active periods.
-    active_count: u32,
+    pub active_count: u32,
     /// The mean of active periods.
-    active_mean: f64,
+    pub active_mean: f64,
     /// The standard deviation of active periods.
-    active_std: f64,
+    pub active_std: f64,
     /// The maximum active period.
-    active_max: f64,
+    pub active_max: f64,
     /// The minimum active period.
     active_min: f64,
     /// The number of idle periods.
-    idle_count: u32,
+    pub idle_count: u32,
     /// The mean of idle periods.
-    idle_mean: f64,
+    pub idle_mean: f64,
     /// The standard deviation of idle periods.
-    idle_std: f64,
+    pub idle_std: f64,
     /// The maximum idle period.
-    idle_max: f64,
+    pub idle_max: f64,
     /// The minimum idle period.
     idle_min: f64,
     /// The initial window size of the forward flow.
-    fwd_init_win_bytes: u16,
+    pub fwd_init_win_bytes: u16,
     /// The number of data packets in the forward flow with more than one byte of data.
-    fwd_act_data_pkt: u32,
+    pub fwd_act_data_pkt: u32,
     /// The minimum header length of the forward flow.
     fwd_header_len_min: u32,
     /// The timestamp of the last packet in the forward flow.
-    fwd_last_timestamp: Option<Instant>,
+    pub fwd_last_timestamp: Option<Instant>,
     /// The total length of packets in the forward flow.
-    fwd_pkt_len_tot: u32,
+    pub fwd_pkt_len_tot: u32,
     /// The maximum length of packets in the forward flow.
-    fwd_pkt_len_max: u32,
+    pub fwd_pkt_len_max: u32,
     /// The minimum length of packets in the forward flow.
     fwd_pkt_len_min: u32,
     /// The mean length of packets in the forward flow.
-    fwd_pkt_len_mean: f32,
+    pub fwd_pkt_len_mean: f32,
     /// The standard deviation of the length of packets in the forward flow.
-    fwd_pkt_len_std: f32,
+    pub fwd_pkt_len_std: f32,
     /// The total inter-arrival time of packets in the forward flow.
-    fwd_iat_total: f64,
+    pub fwd_iat_total: f64,
     /// The mean inter-arrival time of packets in the forward flow.
-    fwd_iat_mean: f64,
+    pub fwd_iat_mean: f64,
     /// The standard deviation of the inter-arrival time of packets in the forward flow.
-    fwd_iat_std: f64,
+    pub fwd_iat_std: f64,
     /// The maximum inter-arrival time of packets in the forward flow.
-    fwd_iat_max: f64,
+    pub fwd_iat_max: f64,
     /// The minimum inter-arrival time of packets in the forward flow.
     fwd_iat_min: f64,
     /// The total header length of the forward flow.
-    fwd_header_length: u32,
+    pub fwd_header_length: u32,
     /// The total duration of bulk packets in the forward flow.
     fwd_bulk_duration: f64,
     /// The number of bulk packets in the forward flow.
@@ -85,33 +85,33 @@ pub struct CicFlow {
     /// Helper variable for bulk size.
     fwd_bulk_size_help: u32,
     /// The timestamp of the last bulk packet in the forward flow.
-    fwd_last_bulk_timestamp: Option<Instant>,
+    pub fwd_last_bulk_timestamp: Option<Instant>,
     /// The initial window size of the backward flow.
-    bwd_init_win_bytes: u16,
+    pub bwd_init_win_bytes: u16,
     /// The timestamp of the last packet in the backward flow.
-    bwd_last_timestamp: Option<Instant>,
+    pub bwd_last_timestamp: Option<Instant>,
     /// The total length of packets in the backward flow.
-    bwd_pkt_len_tot: u32,
+    pub bwd_pkt_len_tot: u32,
     /// The maximum length of packets in the backward flow.
-    bwd_pkt_len_max: u32,
+    pub bwd_pkt_len_max: u32,
     /// The minimum length of packets in the backward flow.
     bwd_pkt_len_min: u32,
     /// The mean length of packets in the backward flow.
-    bwd_pkt_len_mean: f32,
+    pub bwd_pkt_len_mean: f32,
     /// The standard deviation of the length of packets in the backward flow.
-    bwd_pkt_len_std: f32,
+    pub bwd_pkt_len_std: f32,
     /// The total inter-arrival time of packets in the backward flow.
-    bwd_iat_total: f64,
+    pub bwd_iat_total: f64,
     /// The mean inter-arrival time of packets in the backward flow.
-    bwd_iat_mean: f64,
+    pub bwd_iat_mean: f64,
     /// The standard deviation of the inter-arrival time of packets in the backward flow.
-    bwd_iat_std: f64,
+    pub bwd_iat_std: f64,
     /// The maximum inter-arrival time of packets in the backward flow.
-    bwd_iat_max: f64,
+    pub bwd_iat_max: f64,
     /// The minimum inter-arrival time of packets in the backward flow.
     bwd_iat_min: f64,
     /// The total header length of the backward flow.
-    bwd_header_length: u32,
+    pub bwd_header_length: u32,
     /// The total duration of bulk packets in the backward flow.
     bwd_bulk_duration: f64,
     /// The number of bulk packets in the backward flow.
@@ -544,7 +544,7 @@ impl CicFlow {
     /// # Returns
     ///
     /// Pooled standard deviation of the flow's IATs.
-    fn get_flow_iat_std(&self) -> f64 {
+    pub fn get_flow_iat_std(&self) -> f64 {
         if self.basic_flow.fwd_packet_count < 1
             || self.basic_flow.bwd_packet_count < 1
             || self.basic_flow.fwd_packet_count + self.basic_flow.bwd_packet_count < 3
@@ -569,7 +569,7 @@ impl CicFlow {
     /// # Returns
     ///
     /// Mean inter-arrival time of the flow.
-    fn get_flow_iat_mean(&self) -> f64 {
+    pub fn get_flow_iat_mean(&self) -> f64 {
         (self.fwd_iat_mean * self.basic_flow.fwd_packet_count as f64
             + self.bwd_iat_mean * self.basic_flow.bwd_packet_count as f64)
             / (self.basic_flow.fwd_packet_count + self.basic_flow.bwd_packet_count) as f64
@@ -582,7 +582,7 @@ impl CicFlow {
     /// # Returns
     ///
     /// Maximum inter-arrival time observed in the flow.
-    fn get_flow_iat_max(&self) -> f64 {
+    pub fn get_flow_iat_max(&self) -> f64 {
         if self.fwd_iat_max > self.bwd_iat_max {
             return self.fwd_iat_max;
         }
@@ -596,7 +596,7 @@ impl CicFlow {
     /// # Returns
     ///
     /// Minimum inter-arrival time observed in the flow or 0 if not set.
-    fn get_flow_iat_min(&self) -> f64 {
+    pub fn get_flow_iat_min(&self) -> f64 {
         if self.fwd_iat_min < self.bwd_iat_min {
             if self.fwd_iat_min == f64::MAX {
                 return 0.0;
@@ -617,7 +617,7 @@ impl CicFlow {
     /// # Returns
     ///
     /// The minimum IAT observed in the forward flow or 0 if not set.
-    fn get_fwd_iat_min(&self) -> f64 {
+    pub fn get_fwd_iat_min(&self) -> f64 {
         if self.fwd_iat_min == f64::MAX {
             return 0.0;
         }
@@ -631,7 +631,7 @@ impl CicFlow {
     /// # Returns
     ///
     /// The minimum IAT observed in the backward flow or 0 if not set.
-    fn get_bwd_iat_min(&self) -> f64 {
+    pub fn get_bwd_iat_min(&self) -> f64 {
         if self.bwd_iat_min == f64::MAX {
             return 0.0;
         }
@@ -646,7 +646,7 @@ impl CicFlow {
     /// # Returns
     ///
     /// Minimum packet length in the flow, or 0 if not set.
-    fn get_flow_packet_length_min(&self) -> u32 {
+    pub fn get_flow_packet_length_min(&self) -> u32 {
         if self.fwd_pkt_len_min < self.bwd_pkt_len_min {
             if self.fwd_pkt_len_min == u32::MAX {
                 return 0;
@@ -667,7 +667,7 @@ impl CicFlow {
     /// # Returns
     ///
     /// Maximum packet length in the flow.
-    fn get_flow_packet_length_max(&self) -> u32 {
+    pub fn get_flow_packet_length_max(&self) -> u32 {
         if self.fwd_pkt_len_max > self.bwd_pkt_len_max {
             return self.fwd_pkt_len_max;
         }
@@ -682,7 +682,7 @@ impl CicFlow {
     /// # Returns
     ///
     /// Minimum forward packet length, or 0 if not set.
-    fn get_fwd_packet_length_min(&self) -> u32 {
+    pub fn get_fwd_packet_length_min(&self) -> u32 {
         if self.fwd_pkt_len_min == u32::MAX {
             return 0;
         }
@@ -697,7 +697,7 @@ impl CicFlow {
     /// # Returns
     ///
     /// Minimum backward packet length, or 0 if not set.
-    fn get_bwd_packet_length_min(&self) -> u32 {
+    pub fn get_bwd_packet_length_min(&self) -> u32 {
         if self.bwd_pkt_len_min == u32::MAX {
             return 0;
         }
@@ -711,7 +711,7 @@ impl CicFlow {
     /// # Returns
     ///
     /// Mean packet length of the flow.
-    fn get_flow_packet_length_mean(&self) -> f32 {
+    pub fn get_flow_packet_length_mean(&self) -> f32 {
         (self.fwd_pkt_len_mean * self.basic_flow.fwd_packet_count as f32
             + self.bwd_pkt_len_mean * self.basic_flow.bwd_packet_count as f32) as f32
             / (self.basic_flow.fwd_packet_count + self.basic_flow.bwd_packet_count) as f32
@@ -748,7 +748,7 @@ impl CicFlow {
     /// # Returns
     ///
     /// Standard deviation of the flow's packet lengths.
-    fn get_flow_packet_length_std(&self) -> f64 {
+    pub fn get_flow_packet_length_std(&self) -> f64 {
         self.get_flow_packet_length_variance().sqrt()
     }
 
@@ -1198,9 +1198,9 @@ impl Flow for CicFlow {
             {},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},\
             {},{},{},{}",
             self.basic_flow.flow_id,
-            self.basic_flow.ipv4_source,
+            self.basic_flow.ip_source,
             self.basic_flow.port_source,
-            self.basic_flow.ipv4_destination,
+            self.basic_flow.ip_destination,
             self.basic_flow.port_destination,
             self.basic_flow.protocol,
             self.basic_flow.first_timestamp,

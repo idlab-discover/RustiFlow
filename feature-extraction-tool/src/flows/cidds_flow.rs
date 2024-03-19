@@ -121,9 +121,9 @@ impl Flow for CiddsFlow {
             } else {
                 "OTHER"
             },
-            self.basic_flow.ipv4_source,
+            self.basic_flow.ip_source,
             self.basic_flow.port_source,
-            self.basic_flow.ipv4_destination,
+            self.basic_flow.ip_destination,
             self.basic_flow.port_destination,
             self.basic_flow.fwd_packet_count + self.basic_flow.bwd_packet_count,
             self.bytes,
