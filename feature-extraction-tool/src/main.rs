@@ -16,7 +16,7 @@ use aya::{
     maps::AsyncPerfEventArray,
     programs::{tc, SchedClassifier, TcAttachType},
     util::online_cpus,
-    Bpf,
+    Ebpf,
 };
 use bytes::BytesMut;
 use chrono::Utc;
@@ -100,39 +100,39 @@ where
 
     // Loading the eBPF program for egress, the macros make sure the correct file is loaded
     #[cfg(debug_assertions)]
-    let mut bpf_egress_ipv4 = Bpf::load(include_bytes_aligned!(
+    let mut bpf_egress_ipv4 = Ebpf::load(include_bytes_aligned!(
         "../../target/bpfel-unknown-none/debug/feature-extraction-tool-ipv4"
     ))?;
     #[cfg(not(debug_assertions))]
-    let mut bpf_egress_ipv4 = Bpf::load(include_bytes_aligned!(
+    let mut bpf_egress_ipv4 = Ebpf::load(include_bytes_aligned!(
         "../../target/bpfel-unknown-none/release/feature-extraction-tool-ipv4"
     ))?;
 
     #[cfg(debug_assertions)]
-    let mut bpf_egress_ipv6 = Bpf::load(include_bytes_aligned!(
+    let mut bpf_egress_ipv6 = Ebpf::load(include_bytes_aligned!(
         "../../target/bpfel-unknown-none/debug/feature-extraction-tool-ipv6"
     ))?;
     #[cfg(not(debug_assertions))]
-    let mut bpf_egress_ipv6 = Bpf::load(include_bytes_aligned!(
+    let mut bpf_egress_ipv6 = Ebpf::load(include_bytes_aligned!(
         "../../target/bpfel-unknown-none/release/feature-extraction-tool-ipv6"
     ))?;
 
     // Loading the eBPF program for ingress, the macros make sure the correct file is loaded
     #[cfg(debug_assertions)]
-    let mut bpf_ingress_ipv4 = Bpf::load(include_bytes_aligned!(
+    let mut bpf_ingress_ipv4 = Ebpf::load(include_bytes_aligned!(
         "../../target/bpfel-unknown-none/debug/feature-extraction-tool-ipv4"
     ))?;
     #[cfg(not(debug_assertions))]
-    let mut bpf_ingress_ipv4 = Bpf::load(include_bytes_aligned!(
+    let mut bpf_ingress_ipv4 = Ebpf::load(include_bytes_aligned!(
         "../../target/bpfel-unknown-none/release/feature-extraction-tool-ipv4"
     ))?;
 
     #[cfg(debug_assertions)]
-    let mut bpf_ingress_ipv6 = Bpf::load(include_bytes_aligned!(
+    let mut bpf_ingress_ipv6 = Ebpf::load(include_bytes_aligned!(
         "../../target/bpfel-unknown-none/debug/feature-extraction-tool-ipv6"
     ))?;
     #[cfg(not(debug_assertions))]
-    let mut bpf_ingress_ipv6 = Bpf::load(include_bytes_aligned!(
+    let mut bpf_ingress_ipv6 = Ebpf::load(include_bytes_aligned!(
         "../../target/bpfel-unknown-none/release/feature-extraction-tool-ipv6"
     ))?;
 
