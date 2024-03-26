@@ -1967,7 +1967,7 @@ mod tests {
     #[test]
     fn test_get_duration() {
         let start = chrono::Utc::now();
-        let end = chrono::Utc::now() + chrono::Duration::try_seconds(5).unwrap();
+        let end = start + chrono::Duration::try_seconds(5).unwrap();
 
         assert_eq!(get_duration(start, end), 5_000_000.0);
     }
