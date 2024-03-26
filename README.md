@@ -2,11 +2,21 @@
 
 This is a feature extraction tool that is capable of exporting multiple kinds of feature and feature sets. The project is written in rust and uses eBPF code to collect the basic network traffic data from the incomming and outgoing packets. The project was made with following goals, it needed to be fast, adaptable and reliable.
 
-![GitHub Actions Workflow Status](https://img.shields.io/github/actions/workflow/status/matissecallewaert/nids-feature-extraction-tool/rust.yml) ![Website](https://img.shields.io/website?url=https%3A%2F%2Fmatissecallewaert.github.io%2Fnids-feature-extraction-tool&label=Documentation)
+![GitHub Actions Workflow Status](https://img.shields.io/github/actions/workflow/status/matissecallewaert/nids-feature-extraction-tool/rust.yml?logo=github
+) ![Website](https://img.shields.io/website?url=https%3A%2F%2Fmatissecallewaert.github.io%2Fnids-feature-extraction-tool&label=Documentation)
 
 ![flows](flows.gif)
 
 ## How to install:
+### Installing libpcap-dev
+#### Debian
+```sh
+sudo apt install libpcap-dev
+```
+#### Fedora
+```sh
+sudo dnf install libpcap-devel
+```
 ### Installing rust
 
 ```bash
@@ -22,13 +32,13 @@ rustup toolchain install nightly --component rust-src
 
 ### Installing bpf linker
 
-If you are running a linux x86_64 system the install is simple:
+If you are running a Linux x86_64 system the installation is simple:
 
 ```bash
 cargo install bpf-linker
 ```
 
-If you are running macos or linux on any other architecture, you need to install the newest stable version of LLVM first:
+If you are running MacOs or Linux on any other architecture, you need to install the newest stable version of LLVM first:
 
 ```bash
 brew install llvm
