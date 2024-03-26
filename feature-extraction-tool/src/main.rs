@@ -1,16 +1,18 @@
 mod args;
 mod flows;
+mod output;
 mod parsers;
 mod records;
 mod utils;
 
 use crate::{
     flows::cic_flow::CicFlow,
+    output::Export,
     parsers::csv_parser::CsvParser,
     records::{cic_record::CicRecord, print::Print},
     utils::utils::{create_flow_id, get_duration},
 };
-use args::{Cli, Commands, Dataset, FlowType, GeneratedMachineType};
+use args::{Cli, Commands, Dataset, ExportMethodType, FlowType, GeneratedMachineType};
 use aya::{
     include_bytes_aligned,
     maps::AsyncPerfEventArray,
@@ -25,23 +27,35 @@ use common::{BasicFeaturesIpv4, BasicFeaturesIpv6};
 use core::panic;
 use dashmap::DashMap;
 use flows::{basic_flow::BasicFlow, cidds_flow::CiddsFlow, flow::Flow, nf_flow::NfFlow};
+use lazy_static::lazy_static;
 use log::info;
-use std::{
-    net::{Ipv4Addr, Ipv6Addr},
-    sync::Arc,
-    time::Instant,
-};
-use tokio::time::{self, Duration};
-use tokio::{signal, task};
-use utils::utils::BasicFeatures;
 use pnet::packet::{
-    ethernet::{EthernetPacket, EtherTypes},
+    ethernet::{EtherTypes, EthernetPacket},
     ip::IpNextHeaderProtocols,
     ipv4::Ipv4Packet,
     ipv6::Ipv6Packet,
     tcp::TcpPacket,
     Packet,
 };
+use std::{
+    fs::{File, OpenOptions},
+    io::BufWriter,
+    ops::{Deref, DerefMut},
+};
+use std::{
+    net::{Ipv4Addr, Ipv6Addr},
+    sync::{Arc, Mutex},
+    time::Instant,
+};
+use tokio::time::{self, Duration};
+use tokio::{signal, task};
+use utils::utils::BasicFeatures;
+
+lazy_static! {
+    static ref EXPORT_FUNCTION: Arc<Mutex<Option<Export>>> = Arc::new(Mutex::new(None));
+    static ref EXPORT_FILE: Arc<Mutex<Option<BufWriter<File>>>> = Arc::new(Mutex::new(None));
+    static ref FLUSH_COUNTER: Arc<Mutex<Option<u8>>> = Arc::new(Mutex::new(Some(0)));
+}
 
 #[tokio::main]
 async fn main() {
@@ -53,12 +67,38 @@ async fn main() {
         Commands::Realtime {
             interface,
             flow_type,
+            export_method,
             lifespan,
             interval,
         } => {
             if let Some(interval) = interval {
                 if interval >= lifespan {
                     panic!("The interval needs to be smaller than the lifespan!");
+                }
+            }
+
+            match export_method.method {
+                ExportMethodType::Print => {
+                    let func = output::print::print;
+                    let mut export_func = EXPORT_FUNCTION.lock().unwrap();
+                    *export_func = Some(func);
+                }
+                ExportMethodType::Csv => {
+                    let func = output::csv::export_to_csv;
+                    let mut export_func = EXPORT_FUNCTION.lock().unwrap();
+                    *export_func = Some(func);
+
+                    if let Some(path) = export_method.export_path {
+                        let file = OpenOptions::new()
+                            .create(true)
+                            .append(true)
+                            .open(path)
+                            .unwrap_or_else(|err| {
+                                panic!("Error opening file: {:?}", err);
+                            });
+                        let mut export_file = EXPORT_FILE.lock().unwrap();
+                        *export_file = Some(BufWriter::new(file));
+                    }
                 }
             }
 
@@ -95,16 +135,62 @@ async fn main() {
         Commands::Dataset { dataset, path } => {
             handle_dataset(dataset, &path);
         }
-        Commands::Pcap { path, machine_type, flow_type } => {
+        Commands::Pcap {
+            path,
+            machine_type,
+            flow_type,
+            export_method,
+        } => {
+            match export_method.method {
+                ExportMethodType::Print => {
+                    let func = output::print::print;
+                    let mut export_func = EXPORT_FUNCTION.lock().unwrap();
+                    *export_func = Some(func);
+                }
+                ExportMethodType::Csv => {
+                    let func = output::csv::export_to_csv;
+                    let mut export_func = EXPORT_FUNCTION.lock().unwrap();
+                    *export_func = Some(func);
+
+                    if let Some(path) = export_method.export_path {
+                        let file = OpenOptions::new()
+                            .create(true)
+                            .append(true)
+                            .open(path)
+                            .unwrap_or_else(|err| {
+                                panic!("Error opening file: {:?}", err);
+                            });
+                        let mut export_file = EXPORT_FILE.lock().unwrap();
+                        *export_file = Some(BufWriter::new(file));
+                    }
+                }
+            }
+
             match (machine_type, flow_type) {
-                (GeneratedMachineType::Windows, FlowType::BasicFlow) => read_pcap_file_ethernet::<BasicFlow>(&path),
-                (GeneratedMachineType::Windows, FlowType::CicFlow) => read_pcap_file_ethernet::<CicFlow>(&path),
-                (GeneratedMachineType::Windows, FlowType::CiddsFlow) => read_pcap_file_ethernet::<CiddsFlow>(&path),
-                (GeneratedMachineType::Windows, FlowType::NfFlow) => read_pcap_file_ethernet::<NfFlow>(&path),
-                (GeneratedMachineType::Linux, FlowType::BasicFlow) => read_pcap_file_linux_cooked::<BasicFlow>(&path),
-                (GeneratedMachineType::Linux, FlowType::CicFlow) => read_pcap_file_linux_cooked::<CicFlow>(&path),
-                (GeneratedMachineType::Linux, FlowType::CiddsFlow) => read_pcap_file_linux_cooked::<CiddsFlow>(&path),
-                (GeneratedMachineType::Linux, FlowType::NfFlow) => read_pcap_file_linux_cooked::<NfFlow>(&path),
+                (GeneratedMachineType::Windows, FlowType::BasicFlow) => {
+                    read_pcap_file_ethernet::<BasicFlow>(&path)
+                }
+                (GeneratedMachineType::Windows, FlowType::CicFlow) => {
+                    read_pcap_file_ethernet::<CicFlow>(&path)
+                }
+                (GeneratedMachineType::Windows, FlowType::CiddsFlow) => {
+                    read_pcap_file_ethernet::<CiddsFlow>(&path)
+                }
+                (GeneratedMachineType::Windows, FlowType::NfFlow) => {
+                    read_pcap_file_ethernet::<NfFlow>(&path)
+                }
+                (GeneratedMachineType::Linux, FlowType::BasicFlow) => {
+                    read_pcap_file_linux_cooked::<BasicFlow>(&path)
+                }
+                (GeneratedMachineType::Linux, FlowType::CicFlow) => {
+                    read_pcap_file_linux_cooked::<CicFlow>(&path)
+                }
+                (GeneratedMachineType::Linux, FlowType::CiddsFlow) => {
+                    read_pcap_file_linux_cooked::<CiddsFlow>(&path)
+                }
+                (GeneratedMachineType::Linux, FlowType::NfFlow) => {
+                    read_pcap_file_linux_cooked::<NfFlow>(&path)
+                }
             }
         }
     }
@@ -212,8 +298,9 @@ where
         let mut buf_egress_ipv4 = flows_egress_ipv4.open(cpu_id, None)?;
         let flow_map_clone_egress_ipv4 = flow_map_ipv4.clone();
         task::spawn(async move {
+            // 10 buffers with 10240 bytes each, meaning a capacity of 292 packets per buffer (280 bits per packet)
             let mut buffers = (0..10)
-                .map(|_| BytesMut::with_capacity(1024))
+                .map(|_| BytesMut::with_capacity(10_240))
                 .collect::<Vec<_>>();
 
             loop {
@@ -231,7 +318,7 @@ where
         let flow_map_clone_ingress_ipv4 = flow_map_ipv4.clone();
         task::spawn(async move {
             let mut buffers = (0..10)
-                .map(|_| BytesMut::with_capacity(1024))
+                .map(|_| BytesMut::with_capacity(10_240))
                 .collect::<Vec<_>>();
 
             loop {
@@ -248,8 +335,9 @@ where
         let mut buf_egress_ipv6 = flows_egress_ipv6.open(cpu_id, None)?;
         let flow_map_clone_egress_ipv6 = flow_map_ipv6.clone();
         task::spawn(async move {
+            // 10 buffers with 10240 bytes each, meaning a capacity of 173 packets per buffer (472 bits per packet)
             let mut buffers = (0..10)
-                .map(|_| BytesMut::with_capacity(1024))
+                .map(|_| BytesMut::with_capacity(10_240))
                 .collect::<Vec<_>>();
 
             loop {
@@ -267,7 +355,7 @@ where
         let flow_map_clone_ingress_ipv6 = flow_map_ipv6.clone();
         task::spawn(async move {
             let mut buffers = (0..10)
-                .map(|_| BytesMut::with_capacity(1024))
+                .map(|_| BytesMut::with_capacity(10_240))
                 .collect::<Vec<_>>();
 
             loop {
@@ -291,11 +379,11 @@ where
                 interval.tick().await;
                 for entry in flow_map_print_ipv4.iter() {
                     let flow = entry.value();
-                    println!("{}", flow.dump());
+                    export(&flow.dump());
                 }
                 for entry in flow_map_print_ipv6.iter() {
                     let flow = entry.value();
-                    println!("{}", flow.dump());
+                    export(&flow.dump());
                 }
             }
         });
@@ -316,7 +404,7 @@ where
                 let end = get_duration(flow.get_first_timestamp(), timestamp) / 1_000_000.0;
 
                 if end >= lifespan as f64 {
-                    println!("{}", flow.dump());
+                    export(&flow.dump());
                     keys_to_remove_ipv4.push(entry.key().clone());
                 }
             }
@@ -328,7 +416,7 @@ where
                 let end = get_duration(flow.get_first_timestamp(), timestamp) / 1_000_000.0;
 
                 if end >= lifespan as f64 {
-                    println!("{}", flow.dump());
+                    export(&flow.dump());
                     keys_to_remove_ipv6.push(entry.key().clone());
                 }
             }
@@ -350,12 +438,12 @@ where
 
     for entry in flow_map_ipv4.iter() {
         let flow = entry.value();
-        println!("{}", flow.dump());
+        export(&flow.dump());
     }
 
     for entry in flow_map_ipv6.iter() {
         let flow = entry.value();
-        println!("{}", flow.dump());
+        export(&flow.dump());
     }
 
     info!("Exiting...");
@@ -403,7 +491,7 @@ fn handle_dataset(dataset: Dataset, path: &str) {
     }
 }
 
-fn read_pcap_file_ethernet<T>(path: &str) 
+fn read_pcap_file_ethernet<T>(path: &str)
 where
     T: Flow,
 {
@@ -423,7 +511,7 @@ where
 
     while let Ok(packet) = cap.next_packet() {
         amount_of_packets += 1;
-        if let Some(ethernet) = EthernetPacket::new(packet.data){
+        if let Some(ethernet) = EthernetPacket::new(packet.data) {
             match ethernet.get_ethertype() {
                 EtherTypes::Ipv4 => {
                     if let Some(ipv4_packet) = Ipv4Packet::new(ethernet.payload()) {
@@ -431,14 +519,14 @@ where
                             redirect_packet_ipv4(&features_ipv4, &flow_map_ipv4);
                         }
                     }
-                },
+                }
                 EtherTypes::Ipv6 => {
                     if let Some(ipv6_packet) = Ipv6Packet::new(ethernet.payload()) {
                         if let Some(features_ipv6) = extract_ipv6_features(&ipv6_packet) {
                             redirect_packet_ipv6(&features_ipv6, &flow_map_ipv6);
                         }
                     }
-                },
+                }
                 _ => {
                     log::debug!("Unknown EtherType, consider using Linux cooked capture by setting the machine type to linux");
                 }
@@ -450,19 +538,23 @@ where
 
     for entry in flow_map_ipv4.iter() {
         let flow = entry.value();
-        println!("{}", flow.dump());
+        export(&flow.dump());
     }
 
     for entry in flow_map_ipv6.iter() {
         let flow = entry.value();
-        println!("{}", flow.dump());
+        export(&flow.dump());
     }
 
     let end = Instant::now();
-    println!("{} packets were processed in {:?} milliseconds",amount_of_packets, end.duration_since(start).as_millis());
+    println!(
+        "{} packets were processed in {:?} milliseconds",
+        amount_of_packets,
+        end.duration_since(start).as_millis()
+    );
 }
 
-fn read_pcap_file_linux_cooked<T>(path: &str) 
+fn read_pcap_file_linux_cooked<T>(path: &str)
 where
     T: Flow,
 {
@@ -495,14 +587,14 @@ where
                             redirect_packet_ipv4(&features_ipv4, &flow_map_ipv4);
                         }
                     }
-                },
+                }
                 SLL_IPV6 => {
                     if let Some(ipv6_packet) = Ipv6Packet::new(&packet.data[16..]) {
                         if let Some(features_ipv6) = extract_ipv6_features(&ipv6_packet) {
                             redirect_packet_ipv6(&features_ipv6, &flow_map_ipv6);
                         }
                     }
-                },
+                }
                 _ => {
                     log::debug!("Unknown SLL EtherType, consider using Ethernet capture by setting the machine type to windows");
                 }
@@ -514,22 +606,50 @@ where
 
     for entry in flow_map_ipv4.iter() {
         let flow = entry.value();
-        println!("{}", flow.dump());
+        export(&flow.dump());
     }
 
     for entry in flow_map_ipv6.iter() {
         let flow = entry.value();
-        println!("{}", flow.dump());
+        export(&flow.dump());
     }
 
     let end = Instant::now();
-    println!("{} packets were processed in {:?} milliseconds",amount_of_packets, end.duration_since(start).as_millis());
+    println!(
+        "{} packets were processed in {:?} milliseconds",
+        amount_of_packets,
+        end.duration_since(start).as_millis()
+    );
+}
+
+/// Export the flow to the set export function.
+/// 
+/// # Arguments
+/// 
+/// * `output` - The output to export.
+fn export(output: &String) {
+    let export_func = EXPORT_FUNCTION.lock().unwrap();
+
+    if let Some(function) = export_func.deref() {
+        let mut export_file_option = EXPORT_FILE.lock().unwrap();
+        let mut flush_counter_option = FLUSH_COUNTER.lock().unwrap();
+
+        if let Some(ref mut flush_counter) = 
+            flush_counter_option.deref_mut()
+        {
+            function(&output, export_file_option.deref_mut(), flush_counter);
+        } else {
+            log::error!("No export file set...")
+        }
+    } else {
+        log::error!("No export function set...")
+    }
 }
 
 /// Processes an ipv4 packet and updates the flow map.
 ///
 /// # Arguments
-/// 
+///
 /// * `data` - Basic features of the packet.
 /// * `flow_map` - Map of flows.
 /// * `fwd` - Direction of the packet.
@@ -598,16 +718,16 @@ where
 
     let end = entry.update_flow(&features, &timestamp, fwd);
     if end.is_some() {
-        println!("{}", end.unwrap());
+        export(&end.unwrap());
         drop(entry);
         flow_map.remove(&flow_id_remove);
     }
 }
 
 /// Processes an ipv6 packet and updates the flow map.
-/// 
+///
 /// # Arguments
-/// 
+///
 /// * `data` - Basic features of the packet.
 /// * `flow_map` - Map of flows.
 /// * `fwd` - Direction of the packet.
@@ -677,16 +797,16 @@ where
 
     let end = entry.update_flow(&features, &timestamp, fwd);
     if end.is_some() {
-        println!("{}", end.unwrap());
+        export(&end.unwrap());
         drop(entry);
         flow_map.remove(&flow_id_remove);
     }
 }
 
 /// Redirects an ipv4 packet to the correct flow.
-/// 
+///
 /// # Arguments
-/// 
+///
 /// * `features_ipv4` - Basic features of the packet.
 /// * `flow_map` - Map of flows.
 fn redirect_packet_ipv4<T>(features_ipv4: &BasicFeaturesIpv4, flow_map: &Arc<DashMap<String, T>>)
@@ -718,9 +838,9 @@ where
 }
 
 /// Redirects an ipv6 packet to the correct flow.
-/// 
+///
 /// # Arguments
-/// 
+///
 /// * `features_ipv6` - Basic features of the packet.
 /// * `flow_map` - Map of flows.
 fn redirect_packet_ipv6<T>(features_ipv6: &BasicFeaturesIpv6, flow_map: &Arc<DashMap<String, T>>)
@@ -752,19 +872,19 @@ where
 }
 
 /// Extracts the basic features of an ipv4 packet pnet struct.
-/// 
+///
 /// # Arguments
-/// 
+///
 /// * `ipv4_packet` - Ipv4 packet pnet struct.
-/// 
+///
 /// # Returns
-/// 
+///
 /// * `Option<BasicFeaturesIpv4>` - Basic features of the packet.
 fn extract_ipv4_features(ipv4_packet: &Ipv4Packet) -> Option<BasicFeaturesIpv4> {
     let source_ip = ipv4_packet.get_source();
     let destination_ip = ipv4_packet.get_destination();
     let protocol = ipv4_packet.get_next_level_protocol();
-    
+
     let source_port: u16;
     let destination_port: u16;
 
@@ -809,14 +929,13 @@ fn extract_ipv4_features(ipv4_packet: &Ipv4Packet) -> Option<BasicFeaturesIpv4> 
         if let Some(udp_packet) = pnet::packet::udp::UdpPacket::new(ipv4_packet.payload()) {
             source_port = udp_packet.get_source();
             destination_port = udp_packet.get_destination();
-    
+
             data_length = udp_packet.payload().len() as u32;
             header_length = 8;
             length = udp_packet.packet().len() as u32;
         } else {
             return None;
         }
-    
     } else {
         return None;
     }
@@ -840,17 +959,16 @@ fn extract_ipv4_features(ipv4_packet: &Ipv4Packet) -> Option<BasicFeaturesIpv4> 
         length,
         window_size,
     })
-    
 }
 
 /// Extracts the basic features of an ipv6 packet pnet struct.
-/// 
+///
 /// # Arguments
-/// 
+///
 /// * `ipv6_packet` - Ipv6 packet pnet struct.
-/// 
+///
 /// # Returns
-/// 
+///
 /// * `Option<BasicFeaturesIpv6>` - Basic features of the packet.
 fn extract_ipv6_features(ipv6_packet: &Ipv6Packet) -> Option<BasicFeaturesIpv6> {
     let source_ip = ipv6_packet.get_source();
@@ -901,14 +1019,13 @@ fn extract_ipv6_features(ipv6_packet: &Ipv6Packet) -> Option<BasicFeaturesIpv6> 
         if let Some(udp_packet) = pnet::packet::udp::UdpPacket::new(ipv6_packet.payload()) {
             source_port = udp_packet.get_source();
             destination_port = udp_packet.get_destination();
-    
+
             data_length = udp_packet.payload().len() as u32;
             header_length = 8;
             length = udp_packet.packet().len() as u32;
         } else {
             return None;
         }
-    
     } else {
         return None;
     }
