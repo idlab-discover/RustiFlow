@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"enum":["Commands","Dataset","FlowType"],"struct":["Cli"]};
+window.SIDEBAR_ITEMS = {"enum":["Commands","Dataset","ExportMethodType","FlowType","GeneratedMachineType"],"struct":["Cli","Output"]};

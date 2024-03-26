@@ -2456,6 +2456,10 @@
 <a href="#2454" id="2454">2454</a>
 <a href="#2455" id="2455">2455</a>
 <a href="#2456" id="2456">2456</a>
+<a href="#2457" id="2457">2457</a>
+<a href="#2458" id="2458">2458</a>
+<a href="#2459" id="2459">2459</a>
+<a href="#2460" id="2460">2460</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span>chrono::{DateTime, Utc};
 <span class="kw">use </span>std::{net::IpAddr, time::Instant};
 
@@ -4425,7 +4429,7 @@
     <span class="attr">#[test]
     </span><span class="kw">fn </span>test_get_duration() {
         <span class="kw">let </span>start = chrono::Utc::now();
-        <span class="kw">let </span>end = chrono::Utc::now() + chrono::Duration::try_seconds(<span class="number">5</span>).unwrap();
+        <span class="kw">let </span>end = start + chrono::Duration::try_seconds(<span class="number">5</span>).unwrap();
 
         <span class="macro">assert_eq!</span>(get_duration(start, end), <span class="number">5_000_000.0</span>);
     }
@@ -4435,7 +4439,8 @@
         <span class="kw">let </span><span class="kw-2">mut </span>cic_flow = setup_cic_flow();
 
         cic_flow.basic_flow.first_timestamp = chrono::Utc::now();
-        cic_flow.basic_flow.last_timestamp = chrono::Utc::now() + chrono::Duration::try_seconds(<span class="number">5</span>).unwrap();
+        cic_flow.basic_flow.last_timestamp =
+            chrono::Utc::now() + chrono::Duration::try_seconds(<span class="number">5</span>).unwrap();
 
         cic_flow.fwd_pkt_len_tot = <span class="number">100</span>;
         cic_flow.bwd_pkt_len_tot = <span class="number">100</span>;
@@ -4448,7 +4453,8 @@
         <span class="kw">let </span><span class="kw-2">mut </span>cic_flow = setup_cic_flow();
 
         cic_flow.basic_flow.first_timestamp = chrono::Utc::now();
-        cic_flow.basic_flow.last_timestamp = chrono::Utc::now() + chrono::Duration::try_seconds(<span class="number">5</span>).unwrap();
+        cic_flow.basic_flow.last_timestamp =
+            chrono::Utc::now() + chrono::Duration::try_seconds(<span class="number">5</span>).unwrap();
 
         cic_flow.basic_flow.fwd_packet_count = <span class="number">5</span>;
         cic_flow.basic_flow.bwd_packet_count = <span class="number">5</span>;
@@ -4461,7 +4467,8 @@
         <span class="kw">let </span><span class="kw-2">mut </span>cic_flow = setup_cic_flow();
 
         cic_flow.basic_flow.first_timestamp = chrono::Utc::now();
-        cic_flow.basic_flow.last_timestamp = chrono::Utc::now() + chrono::Duration::try_seconds(<span class="number">5</span>).unwrap();
+        cic_flow.basic_flow.last_timestamp =
+            chrono::Utc::now() + chrono::Duration::try_seconds(<span class="number">5</span>).unwrap();
 
         cic_flow.basic_flow.fwd_packet_count = <span class="number">5</span>;
 
@@ -4473,7 +4480,8 @@
         <span class="kw">let </span><span class="kw-2">mut </span>cic_flow = setup_cic_flow();
 
         cic_flow.basic_flow.first_timestamp = chrono::Utc::now();
-        cic_flow.basic_flow.last_timestamp = chrono::Utc::now() + chrono::Duration::try_seconds(<span class="number">5</span>).unwrap();
+        cic_flow.basic_flow.last_timestamp =
+            chrono::Utc::now() + chrono::Duration::try_seconds(<span class="number">5</span>).unwrap();
 
         cic_flow.basic_flow.bwd_packet_count = <span class="number">5</span>;
 

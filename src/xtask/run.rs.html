@@ -83,6 +83,7 @@
 <a href="#81" id="81">81</a>
 <a href="#82" id="82">82</a>
 <a href="#83" id="83">83</a>
+<a href="#84" id="84">84</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span>std::process::Command;
 
 <span class="kw">use </span>anyhow::Context <span class="kw">as _</span>;
@@ -147,15 +148,16 @@
     </span><span class="kw">let </span>profile = <span class="kw">if </span>opts.release { <span class="string">"release" </span>} <span class="kw">else </span>{ <span class="string">"debug" </span>};
     <span class="kw">let </span>bin_path = <span class="macro">format!</span>(<span class="string">"target/{profile}/feature-extraction-tool"</span>);
 
-    <span class="comment">// arguments to pass to the application
-    </span><span class="kw">let </span><span class="kw-2">mut </span>run_args: Vec&lt;<span class="kw">_</span>&gt; = opts.run_args.iter().map(String::as_str).collect();
+    <span class="comment">// Determine if 'realtime' is the first argument in run_args
+    </span><span class="kw">let </span>use_sudo = opts.run_args.first().map(|arg| arg == <span class="string">"realtime"</span>).unwrap_or(<span class="bool-val">false</span>);
 
     <span class="comment">// configure args
-    </span><span class="kw">let </span><span class="kw-2">mut </span>args: Vec&lt;<span class="kw">_</span>&gt; = opts.runner.trim().split_terminator(<span class="string">' '</span>).collect();
+    </span><span class="kw">let </span>runner = <span class="kw">if </span>use_sudo { opts.runner.trim().split_terminator(<span class="string">' '</span>).collect() } <span class="kw">else </span>{ Vec::new() };
+    <span class="kw">let </span><span class="kw-2">mut </span>args = runner;
     args.push(bin_path.as_str());
-    args.append(<span class="kw-2">&amp;mut </span>run_args);
+    args.extend(opts.run_args.iter().map(String::as_str)); <span class="comment">// directly extend with run_args
 
-    <span class="comment">// run the command
+    // run the command
     </span><span class="kw">let </span>status = Command::new(args.first().expect(<span class="string">"No first argument"</span>))
         .args(args.iter().skip(<span class="number">1</span>))
         .status()

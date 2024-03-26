@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"mod":["csv","print"],"type":["Export"]};
