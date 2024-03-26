@@ -63,7 +63,7 @@ pub fn run(opts: Options) -> Result<(), anyhow::Error> {
     let bin_path = format!("target/{profile}/feature-extraction-tool");
 
     // Determine if 'realtime' is the first argument in run_args
-    let use_sudo = opts.run_args.get(0).map(|arg| arg == "realtime").unwrap_or(false);
+    let use_sudo = opts.run_args.first().map(|arg| arg == "realtime").unwrap_or(false);
 
     // configure args
     let runner = if use_sudo { opts.runner.trim().split_terminator(' ').collect() } else { Vec::new() };
