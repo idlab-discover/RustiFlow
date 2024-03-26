@@ -1,5 +1,4 @@
 #![no_std]
-use network_types::ip::in6_addr;
 /// BasicFeaturesIpv4 is a struct collection all ipv4 traffic data and is 280 bits in size.
 #[repr(C)]
 #[derive(Clone, Copy)]
@@ -30,8 +29,8 @@ unsafe impl aya::Pod for BasicFeaturesIpv4 {}
 #[repr(C)]
 #[derive(Clone, Copy)]
 pub struct BasicFeaturesIpv6 {
-    pub ipv6_destination: in6_addr,
-    pub ipv6_source: in6_addr,
+    pub ipv6_destination: u128,
+    pub ipv6_source: u128,
     pub port_destination: u16,
     pub port_source: u16,
     pub protocol: u8,
