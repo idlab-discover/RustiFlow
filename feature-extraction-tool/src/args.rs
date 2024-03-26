@@ -32,6 +32,27 @@ pub enum Commands {
         /// The relative path to the dataset
         path: String,
     },
+
+    /// Feature extraction from a pcap file
+    Pcap {
+        #[clap(value_enum)]
+        machine_type: GeneratedMachineType,
+
+        #[clap(value_enum)]
+        flow_type: FlowType,
+
+        /// The relative path to the pcap file
+        path: String,
+    },
+}
+
+#[derive(clap::ValueEnum, Clone, Debug)]
+pub enum GeneratedMachineType {
+    /// The pcap file was generated on a Windows machine
+    Windows,
+
+    /// The pcap file was generated on a Linux machine
+    Linux,
 }
 
 #[derive(clap::ValueEnum, Clone, Debug)]
