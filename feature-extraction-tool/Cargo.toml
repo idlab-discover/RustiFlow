@@ -29,6 +29,7 @@ chrono = "0.4.34"
 dashmap = "5.5.3"
 pcap = "1.3.0"
 pnet = "0.34.0"
+lazy_static = "1.4.0"
 
 [[bin]]
 name = "feature-extraction-tool"
