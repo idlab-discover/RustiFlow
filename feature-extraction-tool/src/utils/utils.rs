@@ -8,7 +8,7 @@ use chrono::{DateTime, Utc};
 /// IP addresses, port numbers, and the protocol used. The identifier follows the format
 /// "source_ip:source_port-destination_ip:destination_port-protocol".
 ///
-/// # Arguments
+/// ### Arguments
 ///
 /// * `ipv4_source` - The source IP address, represented as IpAddr.
 /// * `port_source` - The source port number.
@@ -16,7 +16,7 @@ use chrono::{DateTime, Utc};
 /// * `port_destination` - The destination port number.
 /// * `protocol` - The protocol used, represented as a u8.
 ///
-/// # Returns
+/// ### Returns
 ///
 /// A string representing the unique identifier of the network flow.
 pub fn create_flow_id(
@@ -34,12 +34,12 @@ pub fn create_flow_id(
 
 /// Calculates the duration between two timestamps in microseconds.
 ///
-/// # Arguments
+/// ### Arguments
 ///
 /// * `start` - The starting timestamp.
 /// * `end` - The ending timestamp.
 ///
-/// # Returns
+/// ### Returns
 ///
 /// Duration between `start` and `end` in microseconds.
 pub fn get_duration(start: DateTime<Utc>, end: DateTime<Utc>) -> f64 {

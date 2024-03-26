@@ -14,7 +14,7 @@ pub trait Flow {
     /// Initializes a `Flow` instance with the provided parameters, setting up
     /// the basic flow and initializing all other metrics to their default values.
     ///
-    /// # Arguments
+    /// ### Arguments
     ///
     /// * `flow_id` - A unique identifier for the flow.
     /// * `ipv4_source` - The source IPv4 address.
@@ -23,7 +23,7 @@ pub trait Flow {
     /// * `port_destination` - The destination port.
     /// * `protocol` - The protocol number.
     ///
-    /// # Returns
+    /// ### Returns
     ///
     /// Returns a new instance of `Flow`.
     fn new(
@@ -40,13 +40,13 @@ pub trait Flow {
     /// This method processes a packet and updates the internal state of the flow
     /// based on the packet's features and the timestamp.
     ///
-    /// # Arguments
+    /// ### Arguments
     ///
     /// * `packet` - A `BasicFeatures` instance representing the packet to be processed.
     /// * `timestamp` - The timestamp at which the packet is received.
     /// * `fwd` - A boolean flag indicating the direction of the flow (forward or not).
     ///
-    /// # Returns
+    /// ### Returns
     ///
     /// Returns an `Option<String>` which might contain a result after processing the packet.
     /// If the flow is terminated, you will get a dump of all features of the flow.
@@ -61,16 +61,25 @@ pub trait Flow {
     ///
     /// This method returns a string representation of the current state of the flow.
     ///
-    /// # Returns
+    /// ### Returns
     ///
     /// Returns a `String` that represents the current state of the flow.
     fn dump(&self) -> String;
+
+    /// Dumps the current state of the flow without contaminant features.
+    ///
+    /// This method returns a string representation of the current state of the flow without contaminant features.
+    ///
+    /// ### Returns
+    ///
+    /// Returns a `String` that represents the current state of the flow without contaminant features.
+    fn dump_without_contamination(&self) -> String;
 
     /// Returns the first timestamp of the flow.
     ///
     /// This method returns the first timestamp of the flow.
     ///
-    /// # Returns
+    /// ### Returns
     ///
     /// Returns a `DateTime<Utc>` representing the first timestamp of the flow.
     fn get_first_timestamp(&self) -> DateTime<Utc>;
