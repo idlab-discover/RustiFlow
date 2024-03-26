@@ -64,6 +64,11 @@ impl Flow for CustomFlow {
         format!("")
     }
 
+    fn dump_without_contamination(&self) -> String {
+        // Add here the dump of the custom flow without contaminant features.
+        format!("")
+    }
+
     fn get_first_timestamp(&self) -> DateTime<Utc> {
         self.basic_flow.get_first_timestamp()
     }

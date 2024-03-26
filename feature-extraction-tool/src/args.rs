@@ -20,6 +20,10 @@ pub enum Commands {
         /// The maximum lifespan of a flow in seconds
         lifespan: u64,
 
+        /// Whether not to include contaminant features
+        #[clap(short, long, action = clap::ArgAction::SetTrue)]
+        no_contaminant_features: bool,
+
         /// Output method
         #[clap(flatten)]
         export_method: Output,
@@ -47,6 +51,10 @@ pub enum Commands {
 
         /// The relative path to the pcap file
         path: String,
+
+        /// Whether not to include contaminant features
+        #[clap(short, long, action = clap::ArgAction::SetTrue)]
+        no_contaminant_features: bool,
 
         /// Output method
         #[clap(flatten)]

@@ -1,7 +1,7 @@
 use chrono::{DateTime, Utc};
-use std::{net::IpAddr, time::Instant};
+use std::{net::IpAddr, ops::Deref, time::Instant};
 
-use crate::utils::utils::BasicFeatures;
+use crate::{utils::utils::BasicFeatures, NO_CONTAMINANT_FEATURES};
 
 use super::{basic_flow::BasicFlow, flow::Flow};
 
@@ -21,7 +21,7 @@ impl CiddsFlow {
     /// Returns the flags feature string of the flow. If no flags were used
     /// the function will return ......
     ///
-    /// # Returns
+    /// ### Returns
     ///
     /// Returns a `String` containing the flags feature string of the flow.
     fn get_flags_string(&self) -> String {
@@ -98,7 +98,11 @@ impl Flow for CiddsFlow {
             || self.basic_flow.fwd_rst_flag_count > 0
             || self.basic_flow.bwd_rst_flag_count > 0
         {
-            return Some(self.dump());
+            if *NO_CONTAMINANT_FEATURES.lock().unwrap().deref() {
+                return Some(self.dump_without_contamination());
+            } else {
+                return Some(self.dump());
+            }
         }
 
         None
@@ -125,6 +129,28 @@ impl Flow for CiddsFlow {
             self.basic_flow.port_source,
             self.basic_flow.ip_destination,
             self.basic_flow.port_destination,
+            self.basic_flow.fwd_packet_count + self.basic_flow.bwd_packet_count,
+            self.bytes,
+            self.get_flags_string(),
+        )
+    }
+
+    fn dump_without_contamination(&self) -> String {
+        format!(
+            "{},{},{},{},{}",
+            self.basic_flow
+                .last_timestamp
+                .signed_duration_since(self.basic_flow.first_timestamp)
+                .num_milliseconds(),
+            if self.basic_flow.protocol == 6 {
+                "TCP"
+            } else if self.basic_flow.protocol == 17 {
+                "UDP"
+            } else if self.basic_flow.protocol == 1 {
+                "ICMP"
+            } else {
+                "OTHER"
+            },
             self.basic_flow.fwd_packet_count + self.basic_flow.bwd_packet_count,
             self.bytes,
             self.get_flags_string(),

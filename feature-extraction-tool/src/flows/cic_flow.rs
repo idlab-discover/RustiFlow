@@ -1,7 +1,7 @@
 use chrono::{DateTime, Utc};
-use std::{net::IpAddr, time::Instant};
+use std::{net::IpAddr, ops::Deref, time::Instant};
 
-use crate::utils::utils::{get_duration, BasicFeatures};
+use crate::{utils::utils::{get_duration, BasicFeatures}, NO_CONTAMINANT_FEATURES};
 
 use super::{basic_flow::BasicFlow, flow::Flow};
 
@@ -136,7 +136,7 @@ impl CicFlow {
     /// This method adds the specified length to the current forward header length.
     /// It's used to accumulate the total size of the headers over multiple packets.
     ///
-    /// # Arguments
+    /// ### Arguments
     ///
     /// * `len` - The length to be added to the forward header length.
     fn increase_fwd_header_length(&mut self, len: u32) {
@@ -149,7 +149,7 @@ impl CicFlow {
     /// of backward headers. It's used in tracking the size of headers from the
     /// opposite direction of the flow.
     ///
-    /// # Arguments
+    /// ### Arguments
     ///
     /// * `len` - The length to be added to the backward header length.
     fn increase_bwd_header_length(&mut self, len: u32) {
@@ -161,7 +161,7 @@ impl CicFlow {
     /// This method updates the minimum forward header length if the provided length
     /// is smaller than the current minimum.
     ///
-    /// # Arguments
+    /// ### Arguments
     ///
     /// * `len` - The length to compare against the current minimum forward header length.
     fn update_fwd_header_len_min(&mut self, len: u32) {
@@ -176,7 +176,7 @@ impl CicFlow {
     /// for the lengths of forward packets. It's used for analyzing packet size
     /// distributions in the forward direction of the flow.
     ///
-    /// # Arguments
+    /// ### Arguments
     ///
     /// * `len` - The length of the new packet to be incorporated into the statistics.
     fn update_fwd_pkt_len_stats(&mut self, len: u32) {
@@ -208,7 +208,7 @@ impl CicFlow {
     /// Similar to `update_fwd_pkt_len_stats`, but for backward packets. It updates
     /// the statistical measures for packet sizes in the backward direction.
     ///
-    /// # Arguments
+    /// ### Arguments
     ///
     /// * `len` - The length of the new backward packet to be included in the stats.
     fn update_bwd_pkt_len_stats(&mut self, len: u32) {
@@ -240,7 +240,7 @@ impl CicFlow {
     /// This method updates the maximum, minimum, total, mean, and standard deviation
     /// of inter-arrival times between forward packets.
     ///
-    /// # Arguments
+    /// ### Arguments
     ///
     /// * `iat` - The inter-arrival time to be added to the statistics.
     fn update_fwd_iat_stats(&mut self, iat: f64) {
@@ -271,7 +271,7 @@ impl CicFlow {
     /// Similar to `update_fwd_iat_stats`, but focuses on the inter-arrival times
     /// of backward packets.
     ///
-    /// # Arguments
+    /// ### Arguments
     ///
     /// * `iat` - The backward inter-arrival time to be incorporated into the stats.
     fn update_bwd_iat_stats(&mut self, iat: f64) {
@@ -302,7 +302,7 @@ impl CicFlow {
     /// This method updates the count, mean, standard deviation, and max/min values
     /// for the durations of active flow periods.
     ///
-    /// # Arguments
+    /// ### Arguments
     ///
     /// * `duration` - The duration of the active period to be included in the stats.
     fn update_active_flow(&mut self, duration: f64) {
@@ -331,7 +331,7 @@ impl CicFlow {
     /// Similar to `update_active_flow`, but for idle periods. This method updates
     /// the statistical measures related to the duration of idle periods in the flow.
     ///
-    /// # Arguments
+    /// ### Arguments
     ///
     /// * `duration` - The duration of the idle period to be added to the stats.
     fn update_idle_flow(&mut self, duration: f64) {
@@ -361,7 +361,7 @@ impl CicFlow {
     /// determine whether it's part of an existing bulk transfer or the start of a new one.
     /// It updates various metrics related to bulk transfers in the forward direction.
     ///
-    /// # Arguments
+    /// ### Arguments
     ///
     /// * `timestamp` - The timestamp of the packet.
     /// * `len` - The length of the packet.
@@ -419,7 +419,7 @@ impl CicFlow {
     /// It analyzes incoming packets in the backward direction and updates
     /// metrics related to bulk transfers based on the packet's timestamp and length.
     ///
-    /// # Arguments
+    /// ### Arguments
     ///
     /// * `timestamp` - The timestamp of the packet.
     /// * `len` - The length of the packet.
@@ -477,7 +477,7 @@ impl CicFlow {
     /// This method increments the subflow count if the time since the last packet exceeds a threshold.
     /// It also updates the active and idle times of the flow based on the timestamp.
     ///
-    /// # Arguments
+    /// ### Arguments
     ///
     /// * `timestamp` - The timestamp of the packet.
     fn update_subflows(&mut self, timestamp: &Instant) {
@@ -502,7 +502,7 @@ impl CicFlow {
     /// Based on the timestamp and a specified threshold, this method determines whether the flow is active or idle,
     /// and updates the respective statistics. It is used for tracking how long the flow has been in each state.
     ///
-    /// # Arguments
+    /// ### Arguments
     ///
     /// * `timestamp` - The timestamp of the packet or event triggering the update.
     /// * `threshold` - The threshold in microseconds to determine state transitions between active and idle.
@@ -525,7 +525,7 @@ impl CicFlow {
     /// Returns the minimum length observed for forward headers. If no forward headers
     /// have been recorded, it returns 0.
     ///
-    /// # Returns
+    /// ### Returns
     ///
     /// The minimum length of the forward header or 0 if not set.
     fn get_fwd_header_len_min(&self) -> u32 {
@@ -541,7 +541,7 @@ impl CicFlow {
     /// This method considers both forward and backward packet inter-arrival times to compute
     /// a pooled variance, which is then square-rooted to get the standard deviation.
     ///
-    /// # Returns
+    /// ### Returns
     ///
     /// Pooled standard deviation of the flow's IATs.
     pub fn get_flow_iat_std(&self) -> f64 {
@@ -566,7 +566,7 @@ impl CicFlow {
     ///
     /// Averages the IATs of forward and backward packets to compute the overall mean IAT of the flow.
     ///
-    /// # Returns
+    /// ### Returns
     ///
     /// Mean inter-arrival time of the flow.
     pub fn get_flow_iat_mean(&self) -> f64 {
@@ -579,7 +579,7 @@ impl CicFlow {
     ///
     /// Compares the maximum IATs in both directions (forward and backward) and returns the larger one.
     ///
-    /// # Returns
+    /// ### Returns
     ///
     /// Maximum inter-arrival time observed in the flow.
     pub fn get_flow_iat_max(&self) -> f64 {
@@ -593,7 +593,7 @@ impl CicFlow {
     ///
     /// Compares the minimum IATs in both directions and returns the smaller one, or 0 if not set.
     ///
-    /// # Returns
+    /// ### Returns
     ///
     /// Minimum inter-arrival time observed in the flow or 0 if not set.
     pub fn get_flow_iat_min(&self) -> f64 {
@@ -614,7 +614,7 @@ impl CicFlow {
     ///
     /// Compares the minimum IAT to the max of the f64 type and returns the IAT if it is not the same as the max value.
     ///
-    /// # Returns
+    /// ### Returns
     ///
     /// The minimum IAT observed in the forward flow or 0 if not set.
     pub fn get_fwd_iat_min(&self) -> f64 {
@@ -628,7 +628,7 @@ impl CicFlow {
     ///
     /// Compares the minimum IAT to the max of the f64 type and returns the IAT if it is not the same as the max value.
     ///
-    /// # Returns
+    /// ### Returns
     ///
     /// The minimum IAT observed in the backward flow or 0 if not set.
     pub fn get_bwd_iat_min(&self) -> f64 {
@@ -643,7 +643,7 @@ impl CicFlow {
     /// Compares the minimum packet lengths of forward and backward flows and returns the smaller value.
     /// Returns 0 if the minimum length is not set (indicated by `u32::MAX`).
     ///
-    /// # Returns
+    /// ### Returns
     ///
     /// Minimum packet length in the flow, or 0 if not set.
     pub fn get_flow_packet_length_min(&self) -> u32 {
@@ -664,7 +664,7 @@ impl CicFlow {
     ///
     /// Compares the maximum packet lengths of forward and backward flows and returns the larger value.
     ///
-    /// # Returns
+    /// ### Returns
     ///
     /// Maximum packet length in the flow.
     pub fn get_flow_packet_length_max(&self) -> u32 {
@@ -679,7 +679,7 @@ impl CicFlow {
     /// Returns the minimum packet length observed in the forward direction.
     /// Returns 0 if the minimum length is not set (indicated by `u32::MAX`).
     ///
-    /// # Returns
+    /// ### Returns
     ///
     /// Minimum forward packet length, or 0 if not set.
     pub fn get_fwd_packet_length_min(&self) -> u32 {
@@ -694,7 +694,7 @@ impl CicFlow {
     /// Returns the minimum packet length observed in the backward direction.
     /// Returns 0 if the minimum length is not set (indicated by `u32::MAX`).
     ///
-    /// # Returns
+    /// ### Returns
     ///
     /// Minimum backward packet length, or 0 if not set.
     pub fn get_bwd_packet_length_min(&self) -> u32 {
@@ -708,7 +708,7 @@ impl CicFlow {
     ///
     /// The mean is computed by considering the lengths and counts of packets in both directions.
     ///
-    /// # Returns
+    /// ### Returns
     ///
     /// Mean packet length of the flow.
     pub fn get_flow_packet_length_mean(&self) -> f32 {
@@ -722,7 +722,7 @@ impl CicFlow {
     /// Computes the variance by considering the standard deviations of packet lengths
     /// in both forward and backward directions.
     ///
-    /// # Returns
+    /// ### Returns
     ///
     /// Variance of the flow's packet lengths, or 0 if not enough data.
     fn get_flow_packet_length_variance(&self) -> f64 {
@@ -745,7 +745,7 @@ impl CicFlow {
     ///
     /// Utilizes the calculated variance of packet lengths to compute the standard deviation.
     ///
-    /// # Returns
+    /// ### Returns
     ///
     /// Standard deviation of the flow's packet lengths.
     pub fn get_flow_packet_length_std(&self) -> f64 {
@@ -757,7 +757,7 @@ impl CicFlow {
     /// Computes the ratio of the number of forward packets to backward packets.
     /// Returns 0 if there are no backward packets, to avoid division by zero.
     ///
-    /// # Returns
+    /// ### Returns
     ///
     /// The down/up ratio of the flow, or 0 if there are no backward packets.
     fn get_down_up_ratio(&self) -> f64 {
@@ -774,7 +774,7 @@ impl CicFlow {
     /// Calculates the average length of forward packets by dividing the total length
     /// of forward packets by their count. Returns 0 if no forward packets are present.
     ///
-    /// # Returns
+    /// ### Returns
     ///
     /// Mean length of forward packets, or 0 if no forward packets are present.
     fn get_fwd_packet_length_mean(&self) -> u32 {
@@ -789,7 +789,7 @@ impl CicFlow {
     /// Similar to `get_fwd_packet_length_mean`, but calculates the average length
     /// for backward packets. Returns 0 if no backward packets are present.
     ///
-    /// # Returns
+    /// ### Returns
     ///
     /// Mean length of backward packets, or 0 if no backward packets are present.
     fn get_bwd_packet_length_mean(&self) -> u32 {
@@ -804,7 +804,7 @@ impl CicFlow {
     /// Computes the total number of bytes (forward and backward) transferred in the flow
     /// and divides it by the total duration of the flow in seconds.
     ///
-    /// # Returns
+    /// ### Returns
     ///
     /// Bytes per second rate of the flow.
     fn get_flow_bytes_s(&self) -> f64 {
@@ -820,7 +820,7 @@ impl CicFlow {
     /// Computes the total number of packets (forward and backward) in the flow
     /// and divides it by the total duration of the flow in seconds.
     ///
-    /// # Returns
+    /// ### Returns
     ///
     /// Packets per second rate of the flow.
     fn get_flow_packets_s(&self) -> f64 {
@@ -836,7 +836,7 @@ impl CicFlow {
     /// Computes the number of forward packets in the flow and divides it
     /// by the total duration of the flow in seconds.
     ///
-    /// # Returns
+    /// ### Returns
     ///
     /// Forward packets per second rate of the flow.
     fn get_fwd_packets_s(&self) -> f64 {
@@ -852,7 +852,7 @@ impl CicFlow {
     /// Computes the number of backward packets in the flow and divides it
     /// by the total duration of the flow in seconds.
     ///
-    /// # Returns
+    /// ### Returns
     ///
     /// Backward packets per second rate of the flow.
     fn get_bwd_packets_s(&self) -> f64 {
@@ -868,7 +868,7 @@ impl CicFlow {
     /// Calculates the mean size of bulk data transfers based on the total size
     /// and the number of bulk transfer states in the forward direction.
     ///
-    /// # Returns
+    /// ### Returns
     ///
     /// Average size of forward bulk transfers, or 0 if there are no bulk transfers.
     fn get_fwd_bytes_bulk(&self) -> f64 {
@@ -884,7 +884,7 @@ impl CicFlow {
     /// Calculates the mean number of packets in bulk transfers based on the total number
     /// and the count of bulk transfer states in the forward direction.
     ///
-    /// # Returns
+    /// ### Returns
     ///
     /// Average number of packets in forward bulk transfers, or 0 if there are no bulk transfers.
     fn get_fwd_packets_bulk(&self) -> f64 {
@@ -900,7 +900,7 @@ impl CicFlow {
     /// Computes the rate of bulk data transfer in the forward direction by dividing the total
     /// size of forward bulk transfers by the total duration of these transfers in seconds.
     ///
-    /// # Returns
+    /// ### Returns
     ///
     /// Forward bulk data transfer rate in bytes per second, or 0 if there are no forward bulk transfers.
     fn get_fwd_bulk_rate(&self) -> f64 {
@@ -916,7 +916,7 @@ impl CicFlow {
     /// Calculates the mean size of bulk data transfers based on the total size
     /// and the number of bulk transfer states in the backward direction.
     ///
-    /// # Returns
+    /// ### Returns
     ///
     /// Average size of backward bulk transfers, or 0 if there are no bulk transfers.
     fn get_bwd_bytes_bulk(&self) -> f64 {
@@ -932,7 +932,7 @@ impl CicFlow {
     /// Calculates the mean number of packets in bulk transfers based on the total number
     /// and the count of bulk transfer states in the backward direction.
     ///
-    /// # Returns
+    /// ### Returns
     ///
     /// Average number of packets in backward bulk transfers, or 0 if there are no bulk transfers.
     fn get_bwd_packets_bulk(&self) -> f64 {
@@ -948,7 +948,7 @@ impl CicFlow {
     /// Computes the rate of bulk data transfer in the backward direction by dividing the total
     /// size of backward bulk transfers by the total duration of these transfers in seconds.
     ///
-    /// # Returns
+    /// ### Returns
     ///
     /// Backward bulk data transfer rate in bytes per second, or 0 if there are no backward bulk transfers.
     fn get_bwd_bulk_rate(&self) -> f64 {
@@ -963,7 +963,7 @@ impl CicFlow {
     ///
     /// Determines the mean number of forward packets across subflows.
     ///
-    /// # Returns
+    /// ### Returns
     ///
     /// Average number of forward packets per subflow, or 0 if there are no subflows.
     fn get_sf_fwd_packets(&self) -> f64 {
@@ -977,7 +977,7 @@ impl CicFlow {
     ///
     /// Determines the mean number of bytes in the forward direction across subflows.
     ///
-    /// # Returns
+    /// ### Returns
     ///
     /// Average number of forward bytes per subflow, or 0 if there are no subflows.
     fn get_sf_fwd_bytes(&self) -> f64 {
@@ -991,7 +991,7 @@ impl CicFlow {
     ///
     /// Determines the mean number of backward packets across subflows.
     ///
-    /// # Returns
+    /// ### Returns
     ///
     /// Average number of backward packets per subflow, or 0 if there are no subflows.
     fn get_sf_bwd_packets(&self) -> f64 {
@@ -1006,7 +1006,7 @@ impl CicFlow {
     /// Determines the mean number of bytes in the backward direction across subflows.
     /// It's useful for understanding the data transfer characteristics in each identified subflow.
     ///
-    /// # Returns
+    /// ### Returns
     ///
     /// Average number of backward bytes per subflow, or 0 if there are no subflows.
     fn get_sf_bwd_bytes(&self) -> f64 {
@@ -1021,7 +1021,7 @@ impl CicFlow {
     /// This function returns the shortest period of time in which the flow was active.
     /// If the minimum active time has never been updated (indicated by `f64::MAX`), it returns 0.0.
     ///
-    /// # Returns
+    /// ### Returns
     ///
     /// Minimum active time in microseconds, or 0.0 if not set.
     fn get_active_min(&self) -> f64 {
@@ -1037,7 +1037,7 @@ impl CicFlow {
     /// Similar to `get_active_min`, this function returns the shortest idle period in the flow.
     /// If the minimum idle time has never been updated (indicated by `f64::MAX`), it returns 0.0.
     ///
-    /// # Returns
+    /// ### Returns
     ///
     /// Minimum idle time in microseconds, or 0.0 if not set.
     fn get_idle_min(&self) -> f64 {
@@ -1184,7 +1184,11 @@ impl Flow for CicFlow {
             || self.basic_flow.fwd_rst_flag_count > 0
             || self.basic_flow.bwd_rst_flag_count > 0
         {
-            return Some(self.dump());
+            if *NO_CONTAMINANT_FEATURES.lock().unwrap().deref() {
+                return Some(self.dump_without_contamination());
+            } else {
+                return Some(self.dump());
+            }
         }
 
         None
@@ -1262,6 +1266,94 @@ impl Flow for CicFlow {
             self.get_fwd_packet_length_mean(),
             self.get_bwd_packet_length_mean(),
             self.fwd_header_length, // this is a duplicate feature
+            self.get_fwd_bytes_bulk(),
+            self.get_fwd_packets_bulk(),
+            self.get_fwd_bulk_rate(),
+            self.get_bwd_bytes_bulk(),
+            self.get_bwd_packets_bulk(),
+            self.get_bwd_bulk_rate(),
+            self.get_sf_fwd_packets(),
+            self.get_sf_fwd_bytes(),
+            self.get_sf_bwd_packets(),
+            self.get_sf_bwd_bytes(),
+            self.fwd_init_win_bytes,
+            self.bwd_init_win_bytes,
+            self.fwd_act_data_pkt,
+            self.get_fwd_header_len_min(), // known as min_seg_size_forward but this is actually the min header length in the forward direction
+            self.active_mean,
+            self.active_std,
+            self.active_max,
+            self.get_active_min(),
+            self.idle_mean,
+            self.idle_std,
+            self.idle_max,
+            self.get_idle_min(),
+        )
+    }
+
+    fn dump_without_contamination(&self) -> String {
+        format!(
+            "{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},\
+            {},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},\
+            {},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},\
+            {},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{}",
+            self.basic_flow.protocol,
+            get_duration(
+                self.basic_flow.first_timestamp,
+                self.basic_flow.last_timestamp
+            ),
+            self.basic_flow.fwd_packet_count,
+            self.basic_flow.bwd_packet_count,
+            self.fwd_pkt_len_tot,
+            self.bwd_pkt_len_tot,
+            self.fwd_pkt_len_max,
+            self.get_fwd_packet_length_min(),
+            self.fwd_pkt_len_mean,
+            self.fwd_pkt_len_std,
+            self.bwd_pkt_len_max,
+            self.get_bwd_packet_length_min(),
+            self.bwd_pkt_len_mean,
+            self.bwd_pkt_len_std,
+            self.get_flow_bytes_s(),
+            self.get_flow_packets_s(),
+            self.get_flow_iat_mean(),
+            self.get_flow_iat_std(),
+            self.get_flow_iat_max(),
+            self.get_flow_iat_min(),
+            self.fwd_iat_total,
+            self.fwd_iat_mean,
+            self.fwd_iat_std,
+            self.fwd_iat_max,
+            self.get_fwd_iat_min(),
+            self.bwd_iat_total,
+            self.bwd_iat_mean,
+            self.bwd_iat_std,
+            self.bwd_iat_max,
+            self.get_bwd_iat_min(),
+            self.basic_flow.fwd_psh_flag_count,
+            self.basic_flow.bwd_psh_flag_count,
+            self.basic_flow.fwd_urg_flag_count,
+            self.basic_flow.bwd_urg_flag_count,
+            self.fwd_header_length,
+            self.bwd_header_length,
+            self.get_fwd_packets_s(),
+            self.get_bwd_packets_s(),
+            self.get_flow_packet_length_min(),
+            self.get_flow_packet_length_max(),
+            self.get_flow_packet_length_mean(),
+            self.get_flow_packet_length_std(),
+            self.get_flow_packet_length_variance(),
+            self.basic_flow.fwd_fin_flag_count + self.basic_flow.bwd_fin_flag_count,
+            self.basic_flow.fwd_syn_flag_count + self.basic_flow.bwd_syn_flag_count,
+            self.basic_flow.fwd_rst_flag_count + self.basic_flow.bwd_rst_flag_count,
+            self.basic_flow.fwd_psh_flag_count + self.basic_flow.bwd_psh_flag_count,
+            self.basic_flow.fwd_ack_flag_count + self.basic_flow.bwd_ack_flag_count,
+            self.basic_flow.fwd_urg_flag_count + self.basic_flow.bwd_urg_flag_count,
+            self.basic_flow.fwd_cwe_flag_count + self.basic_flow.bwd_cwe_flag_count,
+            self.basic_flow.fwd_ece_flag_count + self.basic_flow.bwd_ece_flag_count,
+            self.get_down_up_ratio(),
+            self.get_fwd_packet_length_mean(),
+            self.get_bwd_packet_length_mean(),
             self.get_fwd_bytes_bulk(),
             self.get_fwd_packets_bulk(),
             self.get_fwd_bulk_rate(),

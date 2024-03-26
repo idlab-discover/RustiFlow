@@ -1,8 +1,8 @@
-use std::{net::IpAddr, time::Instant};
+use std::{net::IpAddr, ops::Deref, time::Instant};
 
 use chrono::{DateTime, Utc};
 
-use crate::utils::utils::BasicFeatures;
+use crate::{utils::utils::{get_duration, BasicFeatures}, NO_CONTAMINANT_FEATURES};
 
 use super::flow::Flow;
 
@@ -138,13 +138,25 @@ impl Flow for BasicFlow {
             self.bwd_cwe_flag_count += u32::from(packet.cwe_flag);
             self.bwd_ece_flag_count += u32::from(packet.ece_flag);
         }
+
+        if self.flow_end_of_flow_ack > 0
+            || self.fwd_rst_flag_count > 0
+            || self.bwd_rst_flag_count > 0
+        {
+            if *NO_CONTAMINANT_FEATURES.lock().unwrap().deref() {
+                return Some(self.dump_without_contamination());
+            } else {
+                return Some(self.dump());
+            }
+        }
+
         None
     }
 
     fn dump(&self) -> String {
         format!(
             "{},{},{},{},{},{},{},{},{},{},{},{},{},\
-        {},{},{},{},{},{},{},{},{},{},{},{},{},{}",
+        {},{},{},{},{},{},{},{},{},{},{},{},{},{},{}",
             self.flow_id,
             self.ip_source,
             self.port_source,
@@ -153,6 +165,35 @@ impl Flow for BasicFlow {
             self.protocol,
             self.first_timestamp,
             self.last_timestamp,
+            get_duration(self.first_timestamp, self.last_timestamp),
+            self.flow_end_of_flow_ack,
+            self.fwd_fin_flag_count,
+            self.fwd_syn_flag_count,
+            self.fwd_rst_flag_count,
+            self.fwd_psh_flag_count,
+            self.fwd_ack_flag_count,
+            self.fwd_urg_flag_count,
+            self.fwd_cwe_flag_count,
+            self.fwd_ece_flag_count,
+            self.fwd_packet_count,
+            self.bwd_fin_flag_count,
+            self.bwd_syn_flag_count,
+            self.bwd_rst_flag_count,
+            self.bwd_psh_flag_count,
+            self.bwd_ack_flag_count,
+            self.bwd_urg_flag_count,
+            self.bwd_cwe_flag_count,
+            self.bwd_ece_flag_count,
+            self.bwd_packet_count
+        )
+    }
+
+    fn dump_without_contamination(&self) -> String {
+        format!(
+            "{},{},{},{},{},{},{},{},{},{},{},{},{},\
+            {},{},{},{},{},{},{},{}",
+            self.protocol,
+            get_duration(self.first_timestamp, self.last_timestamp),
             self.flow_end_of_flow_ack,
             self.fwd_fin_flag_count,
             self.fwd_syn_flag_count,

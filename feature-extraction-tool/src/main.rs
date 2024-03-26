@@ -55,6 +55,7 @@ lazy_static! {
     static ref EXPORT_FUNCTION: Arc<Mutex<Option<Export>>> = Arc::new(Mutex::new(None));
     static ref EXPORT_FILE: Arc<Mutex<Option<BufWriter<File>>>> = Arc::new(Mutex::new(None));
     static ref FLUSH_COUNTER: Arc<Mutex<Option<u8>>> = Arc::new(Mutex::new(Some(0)));
+    static ref NO_CONTAMINANT_FEATURES: Arc<Mutex<bool>> = Arc::new(Mutex::new(false));
 }
 
 #[tokio::main]
@@ -69,6 +70,7 @@ async fn main() {
             flow_type,
             export_method,
             lifespan,
+            no_contaminant_features,
             interval,
         } => {
             if let Some(interval) = interval {
@@ -76,6 +78,9 @@ async fn main() {
                     panic!("The interval needs to be smaller than the lifespan!");
                 }
             }
+
+            let mut ncf = NO_CONTAMINANT_FEATURES.lock().unwrap();
+            *ncf = no_contaminant_features;
 
             match export_method.method {
                 ExportMethodType::Print => {
@@ -139,8 +144,16 @@ async fn main() {
             path,
             machine_type,
             flow_type,
+            no_contaminant_features,
             export_method,
         } => {
+
+            let mut ncf = NO_CONTAMINANT_FEATURES.lock().unwrap();
+            *ncf = no_contaminant_features;
+
+            // needed to be dropped, because he stayed in scope.
+            drop(ncf);
+
             match export_method.method {
                 ExportMethodType::Print => {
                     let func = output::print::print;
@@ -379,11 +392,19 @@ where
                 interval.tick().await;
                 for entry in flow_map_print_ipv4.iter() {
                     let flow = entry.value();
-                    export(&flow.dump());
+                    if *NO_CONTAMINANT_FEATURES.lock().unwrap().deref() {
+                        export(&flow.dump_without_contamination());
+                    } else {
+                        export(&flow.dump());
+                    }
                 }
                 for entry in flow_map_print_ipv6.iter() {
                     let flow = entry.value();
-                    export(&flow.dump());
+                    if *NO_CONTAMINANT_FEATURES.lock().unwrap().deref() {
+                        export(&flow.dump_without_contamination());
+                    } else {
+                        export(&flow.dump());
+                    }
                 }
             }
         });
@@ -404,7 +425,11 @@ where
                 let end = get_duration(flow.get_first_timestamp(), timestamp) / 1_000_000.0;
 
                 if end >= lifespan as f64 {
-                    export(&flow.dump());
+                    if *NO_CONTAMINANT_FEATURES.lock().unwrap().deref() {
+                        export(&flow.dump_without_contamination());
+                    } else {
+                        export(&flow.dump());
+                    }
                     keys_to_remove_ipv4.push(entry.key().clone());
                 }
             }
@@ -416,7 +441,11 @@ where
                 let end = get_duration(flow.get_first_timestamp(), timestamp) / 1_000_000.0;
 
                 if end >= lifespan as f64 {
-                    export(&flow.dump());
+                    if *NO_CONTAMINANT_FEATURES.lock().unwrap().deref() {
+                        export(&flow.dump_without_contamination());
+                    } else {
+                        export(&flow.dump());
+                    }
                     keys_to_remove_ipv6.push(entry.key().clone());
                 }
             }
@@ -438,12 +467,20 @@ where
 
     for entry in flow_map_ipv4.iter() {
         let flow = entry.value();
-        export(&flow.dump());
+        if *NO_CONTAMINANT_FEATURES.lock().unwrap().deref() {
+            export(&flow.dump_without_contamination());
+        } else {
+            export(&flow.dump());
+        }
     }
 
     for entry in flow_map_ipv6.iter() {
         let flow = entry.value();
-        export(&flow.dump());
+        if *NO_CONTAMINANT_FEATURES.lock().unwrap().deref() {
+            export(&flow.dump_without_contamination());
+        } else {
+            export(&flow.dump());
+        }
     }
 
     info!("Exiting...");
@@ -538,12 +575,20 @@ where
 
     for entry in flow_map_ipv4.iter() {
         let flow = entry.value();
-        export(&flow.dump());
+        if *NO_CONTAMINANT_FEATURES.lock().unwrap().deref() {
+            export(&flow.dump_without_contamination());
+        } else {
+            export(&flow.dump());
+        }
     }
 
     for entry in flow_map_ipv6.iter() {
         let flow = entry.value();
-        export(&flow.dump());
+        if *NO_CONTAMINANT_FEATURES.lock().unwrap().deref() {
+            export(&flow.dump_without_contamination());
+        } else {
+            export(&flow.dump());
+        }
     }
 
     let end = Instant::now();
@@ -606,12 +651,20 @@ where
 
     for entry in flow_map_ipv4.iter() {
         let flow = entry.value();
-        export(&flow.dump());
+        if *NO_CONTAMINANT_FEATURES.lock().unwrap().deref() {
+            export(&flow.dump_without_contamination());
+        } else {
+            export(&flow.dump());
+        }
     }
 
     for entry in flow_map_ipv6.iter() {
         let flow = entry.value();
-        export(&flow.dump());
+        if *NO_CONTAMINANT_FEATURES.lock().unwrap().deref() {
+            export(&flow.dump_without_contamination());
+        } else {
+            export(&flow.dump());
+        }
     }
 
     let end = Instant::now();
@@ -624,7 +677,7 @@ where
 
 /// Export the flow to the set export function.
 /// 
-/// # Arguments
+/// ### Arguments
 /// 
 /// * `output` - The output to export.
 fn export(output: &String) {
@@ -648,7 +701,7 @@ fn export(output: &String) {
 
 /// Processes an ipv4 packet and updates the flow map.
 ///
-/// # Arguments
+/// ### Arguments
 ///
 /// * `data` - Basic features of the packet.
 /// * `flow_map` - Map of flows.
@@ -726,7 +779,7 @@ where
 
 /// Processes an ipv6 packet and updates the flow map.
 ///
-/// # Arguments
+/// ### Arguments
 ///
 /// * `data` - Basic features of the packet.
 /// * `flow_map` - Map of flows.
@@ -805,7 +858,7 @@ where
 
 /// Redirects an ipv4 packet to the correct flow.
 ///
-/// # Arguments
+/// ### Arguments
 ///
 /// * `features_ipv4` - Basic features of the packet.
 /// * `flow_map` - Map of flows.
@@ -839,7 +892,7 @@ where
 
 /// Redirects an ipv6 packet to the correct flow.
 ///
-/// # Arguments
+/// ### Arguments
 ///
 /// * `features_ipv6` - Basic features of the packet.
 /// * `flow_map` - Map of flows.
@@ -873,11 +926,11 @@ where
 
 /// Extracts the basic features of an ipv4 packet pnet struct.
 ///
-/// # Arguments
+/// ### Arguments
 ///
 /// * `ipv4_packet` - Ipv4 packet pnet struct.
 ///
-/// # Returns
+/// ### Returns
 ///
 /// * `Option<BasicFeaturesIpv4>` - Basic features of the packet.
 fn extract_ipv4_features(ipv4_packet: &Ipv4Packet) -> Option<BasicFeaturesIpv4> {
@@ -963,11 +1016,11 @@ fn extract_ipv4_features(ipv4_packet: &Ipv4Packet) -> Option<BasicFeaturesIpv4> 
 
 /// Extracts the basic features of an ipv6 packet pnet struct.
 ///
-/// # Arguments
+/// ### Arguments
 ///
 /// * `ipv6_packet` - Ipv6 packet pnet struct.
 ///
-/// # Returns
+/// ### Returns
 ///
 /// * `Option<BasicFeaturesIpv6>` - Basic features of the packet.
 fn extract_ipv6_features(ipv6_packet: &Ipv6Packet) -> Option<BasicFeaturesIpv6> {
