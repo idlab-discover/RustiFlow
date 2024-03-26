@@ -451,25 +451,6 @@ where
     Ok(())
 }
 
-fn export(output: &String) {
-    let export_func = EXPORT_FUNCTION.lock().unwrap();
-
-    if let Some(function) = export_func.deref() {
-        let mut export_file_option = EXPORT_FILE.lock().unwrap();
-        let mut flush_counter_option = FLUSH_COUNTER.lock().unwrap();
-
-        if let Some(ref mut flush_counter) = 
-            flush_counter_option.deref_mut()
-        {
-            function(&output, export_file_option.deref_mut(), flush_counter);
-        } else {
-            log::error!("No export file set...")
-        }
-    } else {
-        log::error!("No export function set...")
-    }
-}
-
 fn handle_dataset(dataset: Dataset, path: &str) {
     println!(
         "Dataset feature extraction for {:?} from path: {}",
@@ -639,6 +620,30 @@ where
         amount_of_packets,
         end.duration_since(start).as_millis()
     );
+}
+
+/// Export the flow to the set export function.
+/// 
+/// # Arguments
+/// 
+/// * `output` - The output to export.
+fn export(output: &String) {
+    let export_func = EXPORT_FUNCTION.lock().unwrap();
+
+    if let Some(function) = export_func.deref() {
+        let mut export_file_option = EXPORT_FILE.lock().unwrap();
+        let mut flush_counter_option = FLUSH_COUNTER.lock().unwrap();
+
+        if let Some(ref mut flush_counter) = 
+            flush_counter_option.deref_mut()
+        {
+            function(&output, export_file_option.deref_mut(), flush_counter);
+        } else {
+            log::error!("No export file set...")
+        }
+    } else {
+        log::error!("No export function set...")
+    }
 }
 
 /// Processes an ipv4 packet and updates the flow map.
