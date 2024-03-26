@@ -62,13 +62,14 @@ pub fn run(opts: Options) -> Result<(), anyhow::Error> {
     let profile = if opts.release { "release" } else { "debug" };
     let bin_path = format!("target/{profile}/feature-extraction-tool");
 
-    // arguments to pass to the application
-    let mut run_args: Vec<_> = opts.run_args.iter().map(String::as_str).collect();
+    // Determine if 'realtime' is the first argument in run_args
+    let use_sudo = opts.run_args.first().map(|arg| arg == "realtime").unwrap_or(false);
 
     // configure args
-    let mut args: Vec<_> = opts.runner.trim().split_terminator(' ').collect();
+    let runner = if use_sudo { opts.runner.trim().split_terminator(' ').collect() } else { Vec::new() };
+    let mut args = runner;
     args.push(bin_path.as_str());
-    args.append(&mut run_args);
+    args.extend(opts.run_args.iter().map(String::as_str)); // directly extend with run_args
 
     // run the command
     let status = Command::new(args.first().expect("No first argument"))

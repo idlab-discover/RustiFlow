@@ -1967,7 +1967,7 @@ mod tests {
     #[test]
     fn test_get_duration() {
         let start = chrono::Utc::now();
-        let end = chrono::Utc::now() + chrono::Duration::try_seconds(5).unwrap();
+        let end = start + chrono::Duration::try_seconds(5).unwrap();
 
         assert_eq!(get_duration(start, end), 5_000_000.0);
     }
@@ -1977,7 +1977,8 @@ mod tests {
         let mut cic_flow = setup_cic_flow();
 
         cic_flow.basic_flow.first_timestamp = chrono::Utc::now();
-        cic_flow.basic_flow.last_timestamp = chrono::Utc::now() + chrono::Duration::try_seconds(5).unwrap();
+        cic_flow.basic_flow.last_timestamp =
+            chrono::Utc::now() + chrono::Duration::try_seconds(5).unwrap();
 
         cic_flow.fwd_pkt_len_tot = 100;
         cic_flow.bwd_pkt_len_tot = 100;
@@ -1990,7 +1991,8 @@ mod tests {
         let mut cic_flow = setup_cic_flow();
 
         cic_flow.basic_flow.first_timestamp = chrono::Utc::now();
-        cic_flow.basic_flow.last_timestamp = chrono::Utc::now() + chrono::Duration::try_seconds(5).unwrap();
+        cic_flow.basic_flow.last_timestamp =
+            chrono::Utc::now() + chrono::Duration::try_seconds(5).unwrap();
 
         cic_flow.basic_flow.fwd_packet_count = 5;
         cic_flow.basic_flow.bwd_packet_count = 5;
@@ -2003,7 +2005,8 @@ mod tests {
         let mut cic_flow = setup_cic_flow();
 
         cic_flow.basic_flow.first_timestamp = chrono::Utc::now();
-        cic_flow.basic_flow.last_timestamp = chrono::Utc::now() + chrono::Duration::try_seconds(5).unwrap();
+        cic_flow.basic_flow.last_timestamp =
+            chrono::Utc::now() + chrono::Duration::try_seconds(5).unwrap();
 
         cic_flow.basic_flow.fwd_packet_count = 5;
 
@@ -2015,7 +2018,8 @@ mod tests {
         let mut cic_flow = setup_cic_flow();
 
         cic_flow.basic_flow.first_timestamp = chrono::Utc::now();
-        cic_flow.basic_flow.last_timestamp = chrono::Utc::now() + chrono::Duration::try_seconds(5).unwrap();
+        cic_flow.basic_flow.last_timestamp =
+            chrono::Utc::now() + chrono::Duration::try_seconds(5).unwrap();
 
         cic_flow.basic_flow.bwd_packet_count = 5;
 

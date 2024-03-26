@@ -1,4 +1,4 @@
-use clap::{Parser, Subcommand};
+use clap::{Args, Parser, Subcommand};
 
 #[derive(Debug, Parser)]
 #[clap(author, version, about)]
@@ -20,6 +20,10 @@ pub enum Commands {
         /// The maximum lifespan of a flow in seconds
         lifespan: u64,
 
+        /// Output method
+        #[clap(flatten)]
+        export_method: Output,
+
         /// The print interval for open flows in seconds, needs to be smaller than the flow maximum lifespan
         interval: Option<u64>,
     },
@@ -32,6 +36,51 @@ pub enum Commands {
         /// The relative path to the dataset
         path: String,
     },
+
+    /// Feature extraction from a pcap file
+    Pcap {
+        #[clap(value_enum)]
+        machine_type: GeneratedMachineType,
+
+        #[clap(value_enum)]
+        flow_type: FlowType,
+
+        /// The relative path to the pcap file
+        path: String,
+
+        /// Output method
+        #[clap(flatten)]
+        export_method: Output,
+    },
+}
+
+#[derive(Args, Debug, Clone)]
+pub struct Output {
+    /// Output method
+    #[clap(value_enum)]
+    pub method: ExportMethodType,
+
+    /// File path for output (used if method is File)
+    #[clap(required_if_eq("method", "Csv"))]
+    pub export_path: Option<String>,
+}
+
+#[derive(clap::ValueEnum, Clone, Debug)]
+pub enum ExportMethodType {
+    /// The output will be printed to the console
+    Print,
+
+    /// The output will be written to a CSV file
+    Csv,
+}
+
+#[derive(clap::ValueEnum, Clone, Debug)]
+pub enum GeneratedMachineType {
+    /// The pcap file was generated on a Windows machine
+    Windows,
+
+    /// The pcap file was generated on a Linux machine
+    Linux,
 }
 
 #[derive(clap::ValueEnum, Clone, Debug)]

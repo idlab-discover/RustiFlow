@@ -57,8 +57,11 @@ fn try_tc_flow_track(ctx: TcContext) -> Result<i32, ()> {
     }
 
     let ipv6hdr: *const Ipv6Hdr = unsafe { ptr_at(&ctx, EthHdr::LEN)? };
-    let ipv6_source = unsafe { (*ipv6hdr).src_addr };
-    let ipv6_destination = unsafe { (*ipv6hdr).dst_addr };
+    let bytes_ipv6_source = unsafe { (*ipv6hdr).src_addr.in6_u.u6_addr8 };
+    let bytes_ipv6_destination = unsafe { (*ipv6hdr).dst_addr.in6_u.u6_addr8 };
+
+    let ipv6_source = u128::from_be_bytes(bytes_ipv6_source);
+    let ipv6_destination = u128::from_be_bytes(bytes_ipv6_destination);
 
     let source_port: u16;
     let destination_port: u16;
