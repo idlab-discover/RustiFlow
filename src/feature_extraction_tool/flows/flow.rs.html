@@ -77,6 +77,15 @@
 <a href="#75" id="75">75</a>
 <a href="#76" id="76">76</a>
 <a href="#77" id="77">77</a>
+<a href="#78" id="78">78</a>
+<a href="#79" id="79">79</a>
+<a href="#80" id="80">80</a>
+<a href="#81" id="81">81</a>
+<a href="#82" id="82">82</a>
+<a href="#83" id="83">83</a>
+<a href="#84" id="84">84</a>
+<a href="#85" id="85">85</a>
+<a href="#86" id="86">86</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span>chrono::{DateTime, Utc};
 <span class="kw">use </span>std::{net::IpAddr, time::Instant};
 
@@ -93,7 +102,7 @@
     /// Initializes a `Flow` instance with the provided parameters, setting up
     /// the basic flow and initializing all other metrics to their default values.
     ///
-    /// # Arguments
+    /// ### Arguments
     ///
     /// * `flow_id` - A unique identifier for the flow.
     /// * `ipv4_source` - The source IPv4 address.
@@ -102,7 +111,7 @@
     /// * `port_destination` - The destination port.
     /// * `protocol` - The protocol number.
     ///
-    /// # Returns
+    /// ### Returns
     ///
     /// Returns a new instance of `Flow`.
     </span><span class="kw">fn </span>new(
@@ -119,13 +128,13 @@
     /// This method processes a packet and updates the internal state of the flow
     /// based on the packet's features and the timestamp.
     ///
-    /// # Arguments
+    /// ### Arguments
     ///
     /// * `packet` - A `BasicFeatures` instance representing the packet to be processed.
     /// * `timestamp` - The timestamp at which the packet is received.
     /// * `fwd` - A boolean flag indicating the direction of the flow (forward or not).
     ///
-    /// # Returns
+    /// ### Returns
     ///
     /// Returns an `Option&lt;String&gt;` which might contain a result after processing the packet.
     /// If the flow is terminated, you will get a dump of all features of the flow.
@@ -140,16 +149,25 @@
     ///
     /// This method returns a string representation of the current state of the flow.
     ///
-    /// # Returns
+    /// ### Returns
     ///
     /// Returns a `String` that represents the current state of the flow.
     </span><span class="kw">fn </span>dump(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; String;
+
+    <span class="doccomment">/// Dumps the current state of the flow without contaminant features.
+    ///
+    /// This method returns a string representation of the current state of the flow without contaminant features.
+    ///
+    /// ### Returns
+    ///
+    /// Returns a `String` that represents the current state of the flow without contaminant features.
+    </span><span class="kw">fn </span>dump_without_contamination(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; String;
 
     <span class="doccomment">/// Returns the first timestamp of the flow.
     ///
     /// This method returns the first timestamp of the flow.
     ///
-    /// # Returns
+    /// ### Returns
     ///
     /// Returns a `DateTime&lt;Utc&gt;` representing the first timestamp of the flow.
     </span><span class="kw">fn </span>get_first_timestamp(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; DateTime&lt;Utc&gt;;

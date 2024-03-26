@@ -73,7 +73,7 @@
 /// IP addresses, port numbers, and the protocol used. The identifier follows the format
 /// "source_ip:source_port-destination_ip:destination_port-protocol".
 ///
-/// # Arguments
+/// ### Arguments
 ///
 /// * `ipv4_source` - The source IP address, represented as IpAddr.
 /// * `port_source` - The source port number.
@@ -81,7 +81,7 @@
 /// * `port_destination` - The destination port number.
 /// * `protocol` - The protocol used, represented as a u8.
 ///
-/// # Returns
+/// ### Returns
 ///
 /// A string representing the unique identifier of the network flow.
 </span><span class="kw">pub fn </span>create_flow_id(
@@ -99,12 +99,12 @@
 
 <span class="doccomment">/// Calculates the duration between two timestamps in microseconds.
 ///
-/// # Arguments
+/// ### Arguments
 ///
 /// * `start` - The starting timestamp.
 /// * `end` - The ending timestamp.
 ///
-/// # Returns
+/// ### Returns
 ///
 /// Duration between `start` and `end` in microseconds.
 </span><span class="kw">pub fn </span>get_duration(start: DateTime&lt;Utc&gt;, end: DateTime&lt;Utc&gt;) -&gt; f64 {

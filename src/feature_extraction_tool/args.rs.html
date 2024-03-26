@@ -126,6 +126,14 @@
 <a href="#124" id="124">124</a>
 <a href="#125" id="125">125</a>
 <a href="#126" id="126">126</a>
+<a href="#127" id="127">127</a>
+<a href="#128" id="128">128</a>
+<a href="#129" id="129">129</a>
+<a href="#130" id="130">130</a>
+<a href="#131" id="131">131</a>
+<a href="#132" id="132">132</a>
+<a href="#133" id="133">133</a>
+<a href="#134" id="134">134</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span>clap::{Args, Parser, Subcommand};
 
 <span class="attr">#[derive(Debug, Parser)]
@@ -147,6 +155,10 @@
 
         <span class="doccomment">/// The maximum lifespan of a flow in seconds
         </span>lifespan: u64,
+
+        <span class="doccomment">/// Whether not to include contaminant features
+        </span><span class="attr">#[clap(short, long, action = clap::ArgAction::SetTrue)]
+        </span>no_contaminant_features: bool,
 
         <span class="doccomment">/// Output method
         </span><span class="attr">#[clap(flatten)]
@@ -175,6 +187,10 @@
 
         <span class="doccomment">/// The relative path to the pcap file
         </span>path: String,
+
+        <span class="doccomment">/// Whether not to include contaminant features
+        </span><span class="attr">#[clap(short, long, action = clap::ArgAction::SetTrue)]
+        </span>no_contaminant_features: bool,
 
         <span class="doccomment">/// Output method
         </span><span class="attr">#[clap(flatten)]

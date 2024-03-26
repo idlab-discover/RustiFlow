@@ -1337,6 +1337,59 @@
 <a href="#1335" id="1335">1335</a>
 <a href="#1336" id="1336">1336</a>
 <a href="#1337" id="1337">1337</a>
+<a href="#1338" id="1338">1338</a>
+<a href="#1339" id="1339">1339</a>
+<a href="#1340" id="1340">1340</a>
+<a href="#1341" id="1341">1341</a>
+<a href="#1342" id="1342">1342</a>
+<a href="#1343" id="1343">1343</a>
+<a href="#1344" id="1344">1344</a>
+<a href="#1345" id="1345">1345</a>
+<a href="#1346" id="1346">1346</a>
+<a href="#1347" id="1347">1347</a>
+<a href="#1348" id="1348">1348</a>
+<a href="#1349" id="1349">1349</a>
+<a href="#1350" id="1350">1350</a>
+<a href="#1351" id="1351">1351</a>
+<a href="#1352" id="1352">1352</a>
+<a href="#1353" id="1353">1353</a>
+<a href="#1354" id="1354">1354</a>
+<a href="#1355" id="1355">1355</a>
+<a href="#1356" id="1356">1356</a>
+<a href="#1357" id="1357">1357</a>
+<a href="#1358" id="1358">1358</a>
+<a href="#1359" id="1359">1359</a>
+<a href="#1360" id="1360">1360</a>
+<a href="#1361" id="1361">1361</a>
+<a href="#1362" id="1362">1362</a>
+<a href="#1363" id="1363">1363</a>
+<a href="#1364" id="1364">1364</a>
+<a href="#1365" id="1365">1365</a>
+<a href="#1366" id="1366">1366</a>
+<a href="#1367" id="1367">1367</a>
+<a href="#1368" id="1368">1368</a>
+<a href="#1369" id="1369">1369</a>
+<a href="#1370" id="1370">1370</a>
+<a href="#1371" id="1371">1371</a>
+<a href="#1372" id="1372">1372</a>
+<a href="#1373" id="1373">1373</a>
+<a href="#1374" id="1374">1374</a>
+<a href="#1375" id="1375">1375</a>
+<a href="#1376" id="1376">1376</a>
+<a href="#1377" id="1377">1377</a>
+<a href="#1378" id="1378">1378</a>
+<a href="#1379" id="1379">1379</a>
+<a href="#1380" id="1380">1380</a>
+<a href="#1381" id="1381">1381</a>
+<a href="#1382" id="1382">1382</a>
+<a href="#1383" id="1383">1383</a>
+<a href="#1384" id="1384">1384</a>
+<a href="#1385" id="1385">1385</a>
+<a href="#1386" id="1386">1386</a>
+<a href="#1387" id="1387">1387</a>
+<a href="#1388" id="1388">1388</a>
+<a href="#1389" id="1389">1389</a>
+<a href="#1390" id="1390">1390</a>
 </pre></div><pre class="rust"><code><span class="kw">mod </span>args;
 <span class="kw">mod </span>flows;
 <span class="kw">mod </span>output;
@@ -1394,6 +1447,7 @@
     <span class="kw">static </span><span class="kw-2">ref </span>EXPORT_FUNCTION: Arc&lt;Mutex&lt;<span class="prelude-ty">Option</span>&lt;Export&gt;&gt;&gt; = Arc::new(Mutex::new(<span class="prelude-val">None</span>));
     <span class="kw">static </span><span class="kw-2">ref </span>EXPORT_FILE: Arc&lt;Mutex&lt;<span class="prelude-ty">Option</span>&lt;BufWriter&lt;File&gt;&gt;&gt;&gt; = Arc::new(Mutex::new(<span class="prelude-val">None</span>));
     <span class="kw">static </span><span class="kw-2">ref </span>FLUSH_COUNTER: Arc&lt;Mutex&lt;<span class="prelude-ty">Option</span>&lt;u8&gt;&gt;&gt; = Arc::new(Mutex::new(<span class="prelude-val">Some</span>(<span class="number">0</span>)));
+    <span class="kw">static </span><span class="kw-2">ref </span>NO_CONTAMINANT_FEATURES: Arc&lt;Mutex&lt;bool&gt;&gt; = Arc::new(Mutex::new(<span class="bool-val">false</span>));
 }
 
 <span class="attr">#[tokio::main]
@@ -1408,6 +1462,7 @@
             flow_type,
             export_method,
             lifespan,
+            no_contaminant_features,
             interval,
         } =&gt; {
             <span class="kw">if let </span><span class="prelude-val">Some</span>(interval) = interval {
@@ -1415,6 +1470,9 @@
                     <span class="macro">panic!</span>(<span class="string">"The interval needs to be smaller than the lifespan!"</span>);
                 }
             }
+
+            <span class="kw">let </span><span class="kw-2">mut </span>ncf = NO_CONTAMINANT_FEATURES.lock().unwrap();
+            <span class="kw-2">*</span>ncf = no_contaminant_features;
 
             <span class="kw">match </span>export_method.method {
                 ExportMethodType::Print =&gt; {
@@ -1478,8 +1536,16 @@
             path,
             machine_type,
             flow_type,
+            no_contaminant_features,
             export_method,
         } =&gt; {
+
+            <span class="kw">let </span><span class="kw-2">mut </span>ncf = NO_CONTAMINANT_FEATURES.lock().unwrap();
+            <span class="kw-2">*</span>ncf = no_contaminant_features;
+
+            <span class="comment">// needed to be dropped, because he stayed in scope.
+            </span>drop(ncf);
+
             <span class="kw">match </span>export_method.method {
                 ExportMethodType::Print =&gt; {
                     <span class="kw">let </span>func = output::print::print;
@@ -1718,11 +1784,19 @@
                 interval.tick().<span class="kw">await</span>;
                 <span class="kw">for </span>entry <span class="kw">in </span>flow_map_print_ipv4.iter() {
                     <span class="kw">let </span>flow = entry.value();
-                    export(<span class="kw-2">&amp;</span>flow.dump());
+                    <span class="kw">if </span><span class="kw-2">*</span>NO_CONTAMINANT_FEATURES.lock().unwrap().deref() {
+                        export(<span class="kw-2">&amp;</span>flow.dump_without_contamination());
+                    } <span class="kw">else </span>{
+                        export(<span class="kw-2">&amp;</span>flow.dump());
+                    }
                 }
                 <span class="kw">for </span>entry <span class="kw">in </span>flow_map_print_ipv6.iter() {
                     <span class="kw">let </span>flow = entry.value();
-                    export(<span class="kw-2">&amp;</span>flow.dump());
+                    <span class="kw">if </span><span class="kw-2">*</span>NO_CONTAMINANT_FEATURES.lock().unwrap().deref() {
+                        export(<span class="kw-2">&amp;</span>flow.dump_without_contamination());
+                    } <span class="kw">else </span>{
+                        export(<span class="kw-2">&amp;</span>flow.dump());
+                    }
                 }
             }
         });
@@ -1743,7 +1817,11 @@
                 <span class="kw">let </span>end = get_duration(flow.get_first_timestamp(), timestamp) / <span class="number">1_000_000.0</span>;
 
                 <span class="kw">if </span>end &gt;= lifespan <span class="kw">as </span>f64 {
-                    export(<span class="kw-2">&amp;</span>flow.dump());
+                    <span class="kw">if </span><span class="kw-2">*</span>NO_CONTAMINANT_FEATURES.lock().unwrap().deref() {
+                        export(<span class="kw-2">&amp;</span>flow.dump_without_contamination());
+                    } <span class="kw">else </span>{
+                        export(<span class="kw-2">&amp;</span>flow.dump());
+                    }
                     keys_to_remove_ipv4.push(entry.key().clone());
                 }
             }
@@ -1755,7 +1833,11 @@
                 <span class="kw">let </span>end = get_duration(flow.get_first_timestamp(), timestamp) / <span class="number">1_000_000.0</span>;
 
                 <span class="kw">if </span>end &gt;= lifespan <span class="kw">as </span>f64 {
-                    export(<span class="kw-2">&amp;</span>flow.dump());
+                    <span class="kw">if </span><span class="kw-2">*</span>NO_CONTAMINANT_FEATURES.lock().unwrap().deref() {
+                        export(<span class="kw-2">&amp;</span>flow.dump_without_contamination());
+                    } <span class="kw">else </span>{
+                        export(<span class="kw-2">&amp;</span>flow.dump());
+                    }
                     keys_to_remove_ipv6.push(entry.key().clone());
                 }
             }
@@ -1777,12 +1859,20 @@
 
     <span class="kw">for </span>entry <span class="kw">in </span>flow_map_ipv4.iter() {
         <span class="kw">let </span>flow = entry.value();
-        export(<span class="kw-2">&amp;</span>flow.dump());
+        <span class="kw">if </span><span class="kw-2">*</span>NO_CONTAMINANT_FEATURES.lock().unwrap().deref() {
+            export(<span class="kw-2">&amp;</span>flow.dump_without_contamination());
+        } <span class="kw">else </span>{
+            export(<span class="kw-2">&amp;</span>flow.dump());
+        }
     }
 
     <span class="kw">for </span>entry <span class="kw">in </span>flow_map_ipv6.iter() {
         <span class="kw">let </span>flow = entry.value();
-        export(<span class="kw-2">&amp;</span>flow.dump());
+        <span class="kw">if </span><span class="kw-2">*</span>NO_CONTAMINANT_FEATURES.lock().unwrap().deref() {
+            export(<span class="kw-2">&amp;</span>flow.dump_without_contamination());
+        } <span class="kw">else </span>{
+            export(<span class="kw-2">&amp;</span>flow.dump());
+        }
     }
 
     <span class="macro">info!</span>(<span class="string">"Exiting..."</span>);
@@ -1877,12 +1967,20 @@
 
     <span class="kw">for </span>entry <span class="kw">in </span>flow_map_ipv4.iter() {
         <span class="kw">let </span>flow = entry.value();
-        export(<span class="kw-2">&amp;</span>flow.dump());
+        <span class="kw">if </span><span class="kw-2">*</span>NO_CONTAMINANT_FEATURES.lock().unwrap().deref() {
+            export(<span class="kw-2">&amp;</span>flow.dump_without_contamination());
+        } <span class="kw">else </span>{
+            export(<span class="kw-2">&amp;</span>flow.dump());
+        }
     }
 
     <span class="kw">for </span>entry <span class="kw">in </span>flow_map_ipv6.iter() {
         <span class="kw">let </span>flow = entry.value();
-        export(<span class="kw-2">&amp;</span>flow.dump());
+        <span class="kw">if </span><span class="kw-2">*</span>NO_CONTAMINANT_FEATURES.lock().unwrap().deref() {
+            export(<span class="kw-2">&amp;</span>flow.dump_without_contamination());
+        } <span class="kw">else </span>{
+            export(<span class="kw-2">&amp;</span>flow.dump());
+        }
     }
 
     <span class="kw">let </span>end = Instant::now();
@@ -1945,12 +2043,20 @@
 
     <span class="kw">for </span>entry <span class="kw">in </span>flow_map_ipv4.iter() {
         <span class="kw">let </span>flow = entry.value();
-        export(<span class="kw-2">&amp;</span>flow.dump());
+        <span class="kw">if </span><span class="kw-2">*</span>NO_CONTAMINANT_FEATURES.lock().unwrap().deref() {
+            export(<span class="kw-2">&amp;</span>flow.dump_without_contamination());
+        } <span class="kw">else </span>{
+            export(<span class="kw-2">&amp;</span>flow.dump());
+        }
     }
 
     <span class="kw">for </span>entry <span class="kw">in </span>flow_map_ipv6.iter() {
         <span class="kw">let </span>flow = entry.value();
-        export(<span class="kw-2">&amp;</span>flow.dump());
+        <span class="kw">if </span><span class="kw-2">*</span>NO_CONTAMINANT_FEATURES.lock().unwrap().deref() {
+            export(<span class="kw-2">&amp;</span>flow.dump_without_contamination());
+        } <span class="kw">else </span>{
+            export(<span class="kw-2">&amp;</span>flow.dump());
+        }
     }
 
     <span class="kw">let </span>end = Instant::now();
@@ -1963,7 +2069,7 @@
 
 <span class="doccomment">/// Export the flow to the set export function.
 /// 
-/// # Arguments
+/// ### Arguments
 /// 
 /// * `output` - The output to export.
 </span><span class="kw">fn </span>export(output: <span class="kw-2">&amp;</span>String) {
@@ -1987,7 +2093,7 @@
 
 <span class="doccomment">/// Processes an ipv4 packet and updates the flow map.
 ///
-/// # Arguments
+/// ### Arguments
 ///
 /// * `data` - Basic features of the packet.
 /// * `flow_map` - Map of flows.
@@ -2065,7 +2171,7 @@
 
 <span class="doccomment">/// Processes an ipv6 packet and updates the flow map.
 ///
-/// # Arguments
+/// ### Arguments
 ///
 /// * `data` - Basic features of the packet.
 /// * `flow_map` - Map of flows.
@@ -2144,7 +2250,7 @@
 
 <span class="doccomment">/// Redirects an ipv4 packet to the correct flow.
 ///
-/// # Arguments
+/// ### Arguments
 ///
 /// * `features_ipv4` - Basic features of the packet.
 /// * `flow_map` - Map of flows.
@@ -2178,7 +2284,7 @@
 
 <span class="doccomment">/// Redirects an ipv6 packet to the correct flow.
 ///
-/// # Arguments
+/// ### Arguments
 ///
 /// * `features_ipv6` - Basic features of the packet.
 /// * `flow_map` - Map of flows.
@@ -2212,11 +2318,11 @@
 
 <span class="doccomment">/// Extracts the basic features of an ipv4 packet pnet struct.
 ///
-/// # Arguments
+/// ### Arguments
 ///
 /// * `ipv4_packet` - Ipv4 packet pnet struct.
 ///
-/// # Returns
+/// ### Returns
 ///
 /// * `Option&lt;BasicFeaturesIpv4&gt;` - Basic features of the packet.
 </span><span class="kw">fn </span>extract_ipv4_features(ipv4_packet: <span class="kw-2">&amp;</span>Ipv4Packet) -&gt; <span class="prelude-ty">Option</span>&lt;BasicFeaturesIpv4&gt; {
@@ -2302,11 +2408,11 @@
 
 <span class="doccomment">/// Extracts the basic features of an ipv6 packet pnet struct.
 ///
-/// # Arguments
+/// ### Arguments
 ///
 /// * `ipv6_packet` - Ipv6 packet pnet struct.
 ///
-/// # Returns
+/// ### Returns
 ///
 /// * `Option&lt;BasicFeaturesIpv6&gt;` - Basic features of the packet.
 </span><span class="kw">fn </span>extract_ipv6_features(ipv6_packet: <span class="kw-2">&amp;</span>Ipv6Packet) -&gt; <span class="prelude-ty">Option</span>&lt;BasicFeaturesIpv6&gt; {

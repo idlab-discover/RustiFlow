@@ -190,10 +190,36 @@
 <a href="#188" id="188">188</a>
 <a href="#189" id="189">189</a>
 <a href="#190" id="190">190</a>
+<a href="#191" id="191">191</a>
+<a href="#192" id="192">192</a>
+<a href="#193" id="193">193</a>
+<a href="#194" id="194">194</a>
+<a href="#195" id="195">195</a>
+<a href="#196" id="196">196</a>
+<a href="#197" id="197">197</a>
+<a href="#198" id="198">198</a>
+<a href="#199" id="199">199</a>
+<a href="#200" id="200">200</a>
+<a href="#201" id="201">201</a>
+<a href="#202" id="202">202</a>
+<a href="#203" id="203">203</a>
+<a href="#204" id="204">204</a>
+<a href="#205" id="205">205</a>
+<a href="#206" id="206">206</a>
+<a href="#207" id="207">207</a>
+<a href="#208" id="208">208</a>
+<a href="#209" id="209">209</a>
+<a href="#210" id="210">210</a>
+<a href="#211" id="211">211</a>
+<a href="#212" id="212">212</a>
+<a href="#213" id="213">213</a>
+<a href="#214" id="214">214</a>
+<a href="#215" id="215">215</a>
+<a href="#216" id="216">216</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span>chrono::{DateTime, Utc};
-<span class="kw">use </span>std::{net::IpAddr, time::Instant};
+<span class="kw">use </span>std::{net::IpAddr, ops::Deref, time::Instant};
 
-<span class="kw">use </span><span class="kw">crate</span>::utils::utils::BasicFeatures;
+<span class="kw">use crate</span>::{utils::utils::BasicFeatures, NO_CONTAMINANT_FEATURES};
 
 <span class="kw">use super</span>::{basic_flow::BasicFlow, flow::Flow};
 
@@ -213,7 +239,7 @@
     /// Returns the flags feature string of the flow. If no flags were used
     /// the function will return ......
     ///
-    /// # Returns
+    /// ### Returns
     ///
     /// Returns a `String` containing the flags feature string of the flow.
     </span><span class="kw">fn </span>get_flags_string(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; String {
@@ -290,7 +316,11 @@
             </span>|| <span class="self">self</span>.basic_flow.fwd_rst_flag_count &gt; <span class="number">0
             </span>|| <span class="self">self</span>.basic_flow.bwd_rst_flag_count &gt; <span class="number">0
         </span>{
-            <span class="kw">return </span><span class="prelude-val">Some</span>(<span class="self">self</span>.dump());
+            <span class="kw">if </span><span class="kw-2">*</span>NO_CONTAMINANT_FEATURES.lock().unwrap().deref() {
+                <span class="kw">return </span><span class="prelude-val">Some</span>(<span class="self">self</span>.dump_without_contamination());
+            } <span class="kw">else </span>{
+                <span class="kw">return </span><span class="prelude-val">Some</span>(<span class="self">self</span>.dump());
+            }
         }
 
         <span class="prelude-val">None
@@ -317,6 +347,28 @@
             <span class="self">self</span>.basic_flow.port_source,
             <span class="self">self</span>.basic_flow.ip_destination,
             <span class="self">self</span>.basic_flow.port_destination,
+            <span class="self">self</span>.basic_flow.fwd_packet_count + <span class="self">self</span>.basic_flow.bwd_packet_count,
+            <span class="self">self</span>.bytes,
+            <span class="self">self</span>.get_flags_string(),
+        )
+    }
+
+    <span class="kw">fn </span>dump_without_contamination(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; String {
+        <span class="macro">format!</span>(
+            <span class="string">"{},{},{},{},{}"</span>,
+            <span class="self">self</span>.basic_flow
+                .last_timestamp
+                .signed_duration_since(<span class="self">self</span>.basic_flow.first_timestamp)
+                .num_milliseconds(),
+            <span class="kw">if </span><span class="self">self</span>.basic_flow.protocol == <span class="number">6 </span>{
+                <span class="string">"TCP"
+            </span>} <span class="kw">else if </span><span class="self">self</span>.basic_flow.protocol == <span class="number">17 </span>{
+                <span class="string">"UDP"
+            </span>} <span class="kw">else if </span><span class="self">self</span>.basic_flow.protocol == <span class="number">1 </span>{
+                <span class="string">"ICMP"
+            </span>} <span class="kw">else </span>{
+                <span class="string">"OTHER"
+            </span>},
             <span class="self">self</span>.basic_flow.fwd_packet_count + <span class="self">self</span>.basic_flow.bwd_packet_count,
             <span class="self">self</span>.bytes,
             <span class="self">self</span>.get_flags_string(),

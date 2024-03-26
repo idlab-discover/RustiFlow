@@ -181,11 +181,52 @@
 <a href="#179" id="179">179</a>
 <a href="#180" id="180">180</a>
 <a href="#181" id="181">181</a>
-</pre></div><pre class="rust"><code><span class="kw">use </span>std::{net::IpAddr, time::Instant};
+<a href="#182" id="182">182</a>
+<a href="#183" id="183">183</a>
+<a href="#184" id="184">184</a>
+<a href="#185" id="185">185</a>
+<a href="#186" id="186">186</a>
+<a href="#187" id="187">187</a>
+<a href="#188" id="188">188</a>
+<a href="#189" id="189">189</a>
+<a href="#190" id="190">190</a>
+<a href="#191" id="191">191</a>
+<a href="#192" id="192">192</a>
+<a href="#193" id="193">193</a>
+<a href="#194" id="194">194</a>
+<a href="#195" id="195">195</a>
+<a href="#196" id="196">196</a>
+<a href="#197" id="197">197</a>
+<a href="#198" id="198">198</a>
+<a href="#199" id="199">199</a>
+<a href="#200" id="200">200</a>
+<a href="#201" id="201">201</a>
+<a href="#202" id="202">202</a>
+<a href="#203" id="203">203</a>
+<a href="#204" id="204">204</a>
+<a href="#205" id="205">205</a>
+<a href="#206" id="206">206</a>
+<a href="#207" id="207">207</a>
+<a href="#208" id="208">208</a>
+<a href="#209" id="209">209</a>
+<a href="#210" id="210">210</a>
+<a href="#211" id="211">211</a>
+<a href="#212" id="212">212</a>
+<a href="#213" id="213">213</a>
+<a href="#214" id="214">214</a>
+<a href="#215" id="215">215</a>
+<a href="#216" id="216">216</a>
+<a href="#217" id="217">217</a>
+<a href="#218" id="218">218</a>
+<a href="#219" id="219">219</a>
+<a href="#220" id="220">220</a>
+<a href="#221" id="221">221</a>
+<a href="#222" id="222">222</a>
+</pre></div><pre class="rust"><code><span class="kw">use </span>std::{net::IpAddr, ops::Deref, time::Instant};
 
 <span class="kw">use </span>chrono::{DateTime, Utc};
 
-<span class="kw">use </span><span class="kw">crate</span>::utils::utils::BasicFeatures;
+<span class="kw">use crate</span>::{utils::utils::{get_duration, BasicFeatures}, NO_CONTAMINANT_FEATURES};
 
 <span class="kw">use </span><span class="kw">super</span>::flow::Flow;
 
@@ -321,13 +362,25 @@
             <span class="self">self</span>.bwd_cwe_flag_count += u32::from(packet.cwe_flag);
             <span class="self">self</span>.bwd_ece_flag_count += u32::from(packet.ece_flag);
         }
+
+        <span class="kw">if </span><span class="self">self</span>.flow_end_of_flow_ack &gt; <span class="number">0
+            </span>|| <span class="self">self</span>.fwd_rst_flag_count &gt; <span class="number">0
+            </span>|| <span class="self">self</span>.bwd_rst_flag_count &gt; <span class="number">0
+        </span>{
+            <span class="kw">if </span><span class="kw-2">*</span>NO_CONTAMINANT_FEATURES.lock().unwrap().deref() {
+                <span class="kw">return </span><span class="prelude-val">Some</span>(<span class="self">self</span>.dump_without_contamination());
+            } <span class="kw">else </span>{
+                <span class="kw">return </span><span class="prelude-val">Some</span>(<span class="self">self</span>.dump());
+            }
+        }
+
         <span class="prelude-val">None
     </span>}
 
     <span class="kw">fn </span>dump(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; String {
         <span class="macro">format!</span>(
             <span class="string">"{},{},{},{},{},{},{},{},{},{},{},{},{},\
-        {},{},{},{},{},{},{},{},{},{},{},{},{},{}"</span>,
+        {},{},{},{},{},{},{},{},{},{},{},{},{},{},{}"</span>,
             <span class="self">self</span>.flow_id,
             <span class="self">self</span>.ip_source,
             <span class="self">self</span>.port_source,
@@ -336,6 +389,35 @@
             <span class="self">self</span>.protocol,
             <span class="self">self</span>.first_timestamp,
             <span class="self">self</span>.last_timestamp,
+            get_duration(<span class="self">self</span>.first_timestamp, <span class="self">self</span>.last_timestamp),
+            <span class="self">self</span>.flow_end_of_flow_ack,
+            <span class="self">self</span>.fwd_fin_flag_count,
+            <span class="self">self</span>.fwd_syn_flag_count,
+            <span class="self">self</span>.fwd_rst_flag_count,
+            <span class="self">self</span>.fwd_psh_flag_count,
+            <span class="self">self</span>.fwd_ack_flag_count,
+            <span class="self">self</span>.fwd_urg_flag_count,
+            <span class="self">self</span>.fwd_cwe_flag_count,
+            <span class="self">self</span>.fwd_ece_flag_count,
+            <span class="self">self</span>.fwd_packet_count,
+            <span class="self">self</span>.bwd_fin_flag_count,
+            <span class="self">self</span>.bwd_syn_flag_count,
+            <span class="self">self</span>.bwd_rst_flag_count,
+            <span class="self">self</span>.bwd_psh_flag_count,
+            <span class="self">self</span>.bwd_ack_flag_count,
+            <span class="self">self</span>.bwd_urg_flag_count,
+            <span class="self">self</span>.bwd_cwe_flag_count,
+            <span class="self">self</span>.bwd_ece_flag_count,
+            <span class="self">self</span>.bwd_packet_count
+        )
+    }
+
+    <span class="kw">fn </span>dump_without_contamination(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; String {
+        <span class="macro">format!</span>(
+            <span class="string">"{},{},{},{},{},{},{},{},{},{},{},{},{},\
+            {},{},{},{},{},{},{},{}"</span>,
+            <span class="self">self</span>.protocol,
+            get_duration(<span class="self">self</span>.first_timestamp, <span class="self">self</span>.last_timestamp),
             <span class="self">self</span>.flow_end_of_flow_ack,
             <span class="self">self</span>.fwd_fin_flag_count,
             <span class="self">self</span>.fwd_syn_flag_count,

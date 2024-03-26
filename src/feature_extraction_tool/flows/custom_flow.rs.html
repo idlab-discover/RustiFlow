@@ -92,6 +92,11 @@
 <a href="#90" id="90">90</a>
 <a href="#91" id="91">91</a>
 <a href="#92" id="92">92</a>
+<a href="#93" id="93">93</a>
+<a href="#94" id="94">94</a>
+<a href="#95" id="95">95</a>
+<a href="#96" id="96">96</a>
+<a href="#97" id="97">97</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span>chrono::{DateTime, Utc};
 <span class="kw">use </span>std::{net::IpAddr, time::Instant};
 
@@ -155,6 +160,11 @@
 
     <span class="kw">fn </span>dump(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; String {
         <span class="comment">// Add here the dump of the custom flow.
+        </span><span class="macro">format!</span>(<span class="string">""</span>)
+    }
+
+    <span class="kw">fn </span>dump_without_contamination(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; String {
+        <span class="comment">// Add here the dump of the custom flow without contaminant features.
         </span><span class="macro">format!</span>(<span class="string">""</span>)
     }
 
