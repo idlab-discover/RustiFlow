@@ -39,7 +39,7 @@ use pnet::packet::{
 };
 use std::{
     fs::{File, OpenOptions},
-    io::BufWriter,
+    io::{BufWriter, Write},
     ops::{Deref, DerefMut},
 };
 use std::{
@@ -81,6 +81,9 @@ async fn main() {
 
             let mut ncf = NO_CONTAMINANT_FEATURES.lock().unwrap();
             *ncf = no_contaminant_features;
+
+            // needed to be dropped, because he stayed in scope.
+            drop(ncf);
 
             match export_method.method {
                 ExportMethodType::Print => {
@@ -483,6 +486,11 @@ where
         }
     }
 
+    // Making sure everything is flushed
+    if let Some(export_file) = EXPORT_FILE.lock().unwrap().deref_mut() {
+        export_file.flush()?;
+    }
+
     info!("Exiting...");
 
     Ok(())
@@ -605,6 +613,7 @@ where
 {
     let start = Instant::now();
     let mut amount_of_packets = 0;
+    let mut size: usize = 0;
 
     let flow_map_ipv4: Arc<DashMap<String, T>> = Arc::new(DashMap::new());
     let flow_map_ipv6: Arc<DashMap<String, T>> = Arc::new(DashMap::new());
@@ -624,6 +633,8 @@ where
     while let Ok(packet) = cap.next_packet() {
         if packet.data.len() > 14 {
             amount_of_packets += 1;
+            size += packet.data.len();
+
             let ethertype = u16::from_be_bytes([packet.data[14], packet.data[15]]);
             match ethertype {
                 SLL_IPV4 => {
@@ -669,8 +680,9 @@ where
 
     let end = Instant::now();
     println!(
-        "{} packets were processed in {:?} milliseconds",
+        "{} packets with total size of: {} were processed in {:?} milliseconds",
         amount_of_packets,
+        size,
         end.duration_since(start).as_millis()
     );
 }
@@ -1132,6 +1144,8 @@ mod tests {
             window_size: 1000,
         };
         process_packet_ipv4::<CicFlow>(&data_1, &flow_map, true);
+
+        assert_eq!(flow_map.len(), 1);
 
         let data_2 = BasicFeaturesIpv4 {
             ipv4_source: 2,
