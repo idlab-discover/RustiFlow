@@ -68,7 +68,7 @@ pub struct Output {
     #[clap(value_enum)]
     pub method: ExportMethodType,
 
-    /// File path for output (used if method is File)
+    /// File path for output (used if method is Csv)
     #[clap(required_if_eq("method", "Csv"))]
     pub export_path: Option<String>,
 }

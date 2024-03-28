@@ -28,7 +28,7 @@ use core::panic;
 use dashmap::DashMap;
 use flows::{basic_flow::BasicFlow, cidds_flow::CiddsFlow, flow::Flow, nf_flow::NfFlow};
 use lazy_static::lazy_static;
-use log::info;
+use log::{debug, info};
 use pnet::packet::{
     ethernet::{EtherTypes, EthernetPacket},
     ip::IpNextHeaderProtocols,
@@ -220,6 +220,17 @@ async fn handle_realtime<T>(
 where
     T: Flow + Send + Sync + 'static,
 {
+    // Bump the memlock rlimit. This is needed for older kernels that don't use the
+    // new memcg based accounting, see https://lwn.net/Articles/837122/
+    let rlim = libc::rlimit {
+        rlim_cur: libc::RLIM_INFINITY,
+        rlim_max: libc::RLIM_INFINITY,
+    };
+    let ret = unsafe { libc::setrlimit(libc::RLIMIT_MEMLOCK, &rlim) };
+    if ret != 0 {
+        debug!("remove limit on locked memory failed, ret is: {}", ret);
+    }
+    
     // Loading the eBPF program for egress, the macros make sure the correct file is loaded
     #[cfg(debug_assertions)]
     let mut bpf_egress_ipv4 = Ebpf::load(include_bytes_aligned!(
