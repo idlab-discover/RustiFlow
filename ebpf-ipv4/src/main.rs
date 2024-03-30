@@ -10,7 +10,6 @@ use aya_ebpf::{
 };
 
 use common::BasicFeaturesIpv4;
-use core::mem;
 use network_types::{
     eth::{EthHdr, EtherType},
     ip::{IpProto, Ipv4Hdr},
@@ -24,7 +23,8 @@ fn panic(_info: &core::panic::PanicInfo) -> ! {
 }
 
 #[map]
-static EVENTS_IPV4: PerfEventArray<BasicFeaturesIpv4> = PerfEventArray::with_max_entries(1024, 0);
+static EVENTS_IPV4: PerfEventArray<BasicFeaturesIpv4> =
+    PerfEventArray::with_max_entries(1024 * 1024, 0);
 
 #[classifier]
 pub fn tc_flow_track(ctx: TcContext) -> i32 {
