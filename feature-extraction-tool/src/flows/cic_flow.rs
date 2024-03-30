@@ -1,7 +1,10 @@
 use chrono::{DateTime, Utc};
 use std::{net::IpAddr, ops::Deref, time::Instant};
 
-use crate::{utils::utils::{get_duration, BasicFeatures}, NO_CONTAMINANT_FEATURES};
+use crate::{
+    utils::utils::{get_duration, BasicFeatures},
+    NO_CONTAMINANT_FEATURES,
+};
 
 use super::{basic_flow::BasicFlow, flow::Flow};
 
@@ -1138,8 +1141,8 @@ impl Flow for CicFlow {
         self.update_subflows(timestamp);
 
         if fwd {
-            self.update_fwd_pkt_len_stats(packet.data_length);
-            self.update_fwd_header_len_min(packet.header_length);
+            self.update_fwd_pkt_len_stats(packet.data_length as u32);
+            self.update_fwd_header_len_min(packet.header_length as u32);
 
             if self.basic_flow.fwd_packet_count > 1 {
                 self.update_fwd_iat_stats(
@@ -1157,11 +1160,11 @@ impl Flow for CicFlow {
                 self.fwd_act_data_pkt += 1;
             }
 
-            self.update_fwd_bulk_stats(timestamp, packet.data_length);
-            self.increase_fwd_header_length(packet.header_length);
+            self.update_fwd_bulk_stats(timestamp, packet.data_length as u32);
+            self.increase_fwd_header_length(packet.header_length as u32);
             self.fwd_last_timestamp = Some(*timestamp);
         } else {
-            self.update_bwd_pkt_len_stats(packet.data_length);
+            self.update_bwd_pkt_len_stats(packet.data_length as u32);
 
             if self.basic_flow.bwd_packet_count > 1 {
                 self.update_bwd_iat_stats(
@@ -1175,8 +1178,8 @@ impl Flow for CicFlow {
                 self.bwd_init_win_bytes = packet.window_size;
             }
 
-            self.update_bwd_bulk_stats(timestamp, packet.data_length);
-            self.increase_bwd_header_length(packet.header_length);
+            self.update_bwd_bulk_stats(timestamp, packet.data_length as u32);
+            self.increase_bwd_header_length(packet.header_length as u32);
             self.bwd_last_timestamp = Some(*timestamp);
         }
 

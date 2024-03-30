@@ -92,7 +92,7 @@ impl Flow for CiddsFlow {
     ) -> Option<String> {
         self.basic_flow.update_flow(packet, timestamp, fwd);
 
-        self.bytes += packet.length;
+        self.bytes += packet.length as u32;
 
         if self.basic_flow.flow_end_of_flow_ack > 0
             || self.basic_flow.fwd_rst_flag_count > 0

@@ -56,8 +56,8 @@ pub struct BasicFeatures {
     pub urg_flag: u8,
     pub cwe_flag: u8,
     pub ece_flag: u8,
-    pub data_length: u32,
-    pub header_length: u32,
-    pub length: u32,
+    pub data_length: u16,
+    pub header_length: u8,
+    pub length: u16,
     pub window_size: u16,
 }
