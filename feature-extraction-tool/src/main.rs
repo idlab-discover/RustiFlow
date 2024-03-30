@@ -1,18 +1,14 @@
 mod args;
 mod flows;
 mod output;
-mod parsers;
-mod records;
 mod utils;
 
 use crate::{
     flows::cic_flow::CicFlow,
     output::Export,
-    parsers::csv_parser::CsvParser,
-    records::{cic_record::CicRecord, print::Print},
     utils::utils::{create_flow_id, get_duration},
 };
-use args::{Cli, Commands, Dataset, ExportMethodType, FlowType, GeneratedMachineType};
+use args::{Cli, Commands, ExportMethodType, FlowType, GeneratedMachineType};
 use aya::{
     include_bytes_aligned,
     maps::AsyncPerfEventArray,
@@ -91,6 +87,7 @@ async fn main() {
                     let func = output::print::print;
                     let mut export_func = EXPORT_FUNCTION.lock().unwrap();
                     *export_func = Some(func);
+                    drop(export_func);
                 }
                 ExportMethodType::Csv => {
                     let func = output::csv::export_to_csv;
@@ -108,6 +105,7 @@ async fn main() {
                         let mut export_file = EXPORT_FILE.lock().unwrap();
                         *export_file = Some(BufWriter::new(file));
                     }
+                    drop(export_func);
                 }
             }
 
@@ -140,9 +138,6 @@ async fn main() {
                     }
                 }
             }
-        }
-        Commands::Dataset { dataset, path } => {
-            handle_dataset(dataset, &path);
         }
         Commands::Pcap {
             path,
@@ -329,9 +324,9 @@ where
         let total_lost_events_clone_egress_ipv4 = total_lost_events.clone();
 
         task::spawn(async move {
-            // 10 buffers with 10240 bytes each, meaning a capacity of 292 packets per buffer (280 bits per packet)
+            // 10 buffers with 98_304 bytes each, meaning a capacity of 4096 packets per buffer (24 bytes per packet)
             let mut buffers = (0..10)
-                .map(|_| BytesMut::with_capacity(10_240))
+                .map(|_| BytesMut::with_capacity(24 * 4096))
                 .collect::<Vec<_>>();
 
             loop {
@@ -353,7 +348,7 @@ where
 
         task::spawn(async move {
             let mut buffers = (0..10)
-                .map(|_| BytesMut::with_capacity(10_240))
+                .map(|_| BytesMut::with_capacity(24 * 4096))
                 .collect::<Vec<_>>();
 
             loop {
@@ -374,9 +369,9 @@ where
         let total_lost_events_clone_egress_ipv6 = total_lost_events.clone();
 
         task::spawn(async move {
-            // 10 buffers with 10240 bytes each, meaning a capacity of 173 packets per buffer (472 bits per packet)
+            // 10 buffers with 196_608 bytes each, meaning a capacity of 4096 packets per buffer (48 bytes per packet)
             let mut buffers = (0..10)
-                .map(|_| BytesMut::with_capacity(10_240))
+                .map(|_| BytesMut::with_capacity(48 * 4096))
                 .collect::<Vec<_>>();
 
             loop {
@@ -398,7 +393,7 @@ where
 
         task::spawn(async move {
             let mut buffers = (0..10)
-                .map(|_| BytesMut::with_capacity(10_240))
+                .map(|_| BytesMut::with_capacity(48 * 4096))
                 .collect::<Vec<_>>();
 
             loop {
@@ -527,46 +522,6 @@ where
     info!("Exiting...");
 
     Ok(())
-}
-
-fn handle_dataset(dataset: Dataset, path: &str) {
-    println!(
-        "Dataset feature extraction for {:?} from path: {}",
-        dataset, path
-    );
-
-    match dataset {
-        Dataset::CicIds2017 => {
-            if path.ends_with(".csv") {
-                let parser = CsvParser;
-
-                match parser.parse::<CicRecord>(path) {
-                    Ok(records) => {
-                        for record in records {
-                            match record {
-                                Ok(record) => {
-                                    record.print();
-                                }
-                                Err(err) => {
-                                    eprintln!("Error: {:?}", err);
-                                }
-                            }
-                        }
-                    }
-                    Err(err) => {
-                        eprintln!("Error: {:?}", err);
-                    }
-                }
-            } else if path.ends_with(".parquet") {
-                panic!("This file format is not supported yet...");
-            } else {
-                panic!("This file format is not supported...");
-            }
-        }
-        _ => {
-            panic!("This is not implemented yet...");
-        }
-    }
 }
 
 fn read_pcap_file_ethernet<T>(path: &str)

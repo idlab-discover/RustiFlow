@@ -1,5 +1,5 @@
 #![no_std]
-/// BasicFeaturesIpv4 is a struct collection all ipv4 traffic data and is 280 bits in size.
+/// BasicFeaturesIpv4 is a struct collection all ipv4 traffic data and is 24 bytes in size.
 #[repr(C)]
 #[derive(Copy, Clone, Debug, Hash, Eq, PartialEq)]
 pub struct BasicFeaturesIpv4 {
@@ -48,7 +48,7 @@ impl BasicFeaturesIpv4 {
 #[cfg(feature = "user")]
 unsafe impl aya::Pod for BasicFeaturesIpv4 {}
 
-/// BasicFeaturesIpv6 is a struct collection all ipv6 traffic data and is 472 bits in size.
+/// BasicFeaturesIpv6 is a struct collection all ipv6 traffic data and is 48 bytes in size.
 #[repr(C)]
 #[derive(Clone, Copy)]
 pub struct BasicFeaturesIpv6 {
