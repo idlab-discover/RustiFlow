@@ -2552,10 +2552,16 @@
 <a href="#2550" id="2550">2550</a>
 <a href="#2551" id="2551">2551</a>
 <a href="#2552" id="2552">2552</a>
+<a href="#2553" id="2553">2553</a>
+<a href="#2554" id="2554">2554</a>
+<a href="#2555" id="2555">2555</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span>chrono::{DateTime, Utc};
 <span class="kw">use </span>std::{net::IpAddr, ops::Deref, time::Instant};
 
-<span class="kw">use crate</span>::{utils::utils::{get_duration, BasicFeatures}, NO_CONTAMINANT_FEATURES};
+<span class="kw">use crate</span>::{
+    utils::utils::{get_duration, BasicFeatures},
+    NO_CONTAMINANT_FEATURES,
+};
 
 <span class="kw">use super</span>::{basic_flow::BasicFlow, flow::Flow};
 
@@ -3692,8 +3698,8 @@
         <span class="self">self</span>.update_subflows(timestamp);
 
         <span class="kw">if </span>fwd {
-            <span class="self">self</span>.update_fwd_pkt_len_stats(packet.data_length);
-            <span class="self">self</span>.update_fwd_header_len_min(packet.header_length);
+            <span class="self">self</span>.update_fwd_pkt_len_stats(packet.data_length <span class="kw">as </span>u32);
+            <span class="self">self</span>.update_fwd_header_len_min(packet.header_length <span class="kw">as </span>u32);
 
             <span class="kw">if </span><span class="self">self</span>.basic_flow.fwd_packet_count &gt; <span class="number">1 </span>{
                 <span class="self">self</span>.update_fwd_iat_stats(
@@ -3711,11 +3717,11 @@
                 <span class="self">self</span>.fwd_act_data_pkt += <span class="number">1</span>;
             }
 
-            <span class="self">self</span>.update_fwd_bulk_stats(timestamp, packet.data_length);
-            <span class="self">self</span>.increase_fwd_header_length(packet.header_length);
+            <span class="self">self</span>.update_fwd_bulk_stats(timestamp, packet.data_length <span class="kw">as </span>u32);
+            <span class="self">self</span>.increase_fwd_header_length(packet.header_length <span class="kw">as </span>u32);
             <span class="self">self</span>.fwd_last_timestamp = <span class="prelude-val">Some</span>(<span class="kw-2">*</span>timestamp);
         } <span class="kw">else </span>{
-            <span class="self">self</span>.update_bwd_pkt_len_stats(packet.data_length);
+            <span class="self">self</span>.update_bwd_pkt_len_stats(packet.data_length <span class="kw">as </span>u32);
 
             <span class="kw">if </span><span class="self">self</span>.basic_flow.bwd_packet_count &gt; <span class="number">1 </span>{
                 <span class="self">self</span>.update_bwd_iat_stats(
@@ -3729,8 +3735,8 @@
                 <span class="self">self</span>.bwd_init_win_bytes = packet.window_size;
             }
 
-            <span class="self">self</span>.update_bwd_bulk_stats(timestamp, packet.data_length);
-            <span class="self">self</span>.increase_bwd_header_length(packet.header_length);
+            <span class="self">self</span>.update_bwd_bulk_stats(timestamp, packet.data_length <span class="kw">as </span>u32);
+            <span class="self">self</span>.increase_bwd_header_length(packet.header_length <span class="kw">as </span>u32);
             <span class="self">self</span>.bwd_last_timestamp = <span class="prelude-val">Some</span>(<span class="kw-2">*</span>timestamp);
         }
 

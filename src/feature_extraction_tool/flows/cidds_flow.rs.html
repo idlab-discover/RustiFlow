@@ -310,7 +310,7 @@
     ) -&gt; <span class="prelude-ty">Option</span>&lt;String&gt; {
         <span class="self">self</span>.basic_flow.update_flow(packet, timestamp, fwd);
 
-        <span class="self">self</span>.bytes += packet.length;
+        <span class="self">self</span>.bytes += packet.length <span class="kw">as </span>u32;
 
         <span class="kw">if </span><span class="self">self</span>.basic_flow.flow_end_of_flow_ack &gt; <span class="number">0
             </span>|| <span class="self">self</span>.basic_flow.fwd_rst_flag_count &gt; <span class="number">0
