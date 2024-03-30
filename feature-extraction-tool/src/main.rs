@@ -39,8 +39,9 @@ use pnet::packet::{
 };
 use std::{
     fs::{File, OpenOptions},
-    io::{BufWriter, Write},
+    io::{BufWriter, Read, Write},
     ops::{Deref, DerefMut},
+    sync::atomic::{AtomicUsize, Ordering},
 };
 use std::{
     net::{Ipv4Addr, Ipv6Addr},
@@ -150,7 +151,6 @@ async fn main() {
             no_contaminant_features,
             export_method,
         } => {
-
             let mut ncf = NO_CONTAMINANT_FEATURES.lock().unwrap();
             *ncf = no_contaminant_features;
 
@@ -230,7 +230,7 @@ where
     if ret != 0 {
         debug!("remove limit on locked memory failed, ret is: {}", ret);
     }
-    
+
     // Loading the eBPF program for egress, the macros make sure the correct file is loaded
     #[cfg(debug_assertions)]
     let mut bpf_egress_ipv4 = Ebpf::load(include_bytes_aligned!(
@@ -320,10 +320,14 @@ where
 
     let flow_map_ipv6: Arc<DashMap<String, T>> = Arc::new(DashMap::new());
 
+    let total_lost_events = Arc::new(AtomicUsize::new(0));
+
     // Use all online CPUs to process the events in the user space
     for cpu_id in online_cpus()? {
         let mut buf_egress_ipv4 = flows_egress_ipv4.open(cpu_id, None)?;
         let flow_map_clone_egress_ipv4 = flow_map_ipv4.clone();
+        let total_lost_events_clone_egress_ipv4 = total_lost_events.clone();
+
         task::spawn(async move {
             // 10 buffers with 10240 bytes each, meaning a capacity of 292 packets per buffer (280 bits per packet)
             let mut buffers = (0..10)
@@ -332,6 +336,8 @@ where
 
             loop {
                 let events = buf_egress_ipv4.read_events(&mut buffers).await.unwrap();
+                total_lost_events_clone_egress_ipv4.fetch_add(events.lost, Ordering::SeqCst);
+
                 for buf in buffers.iter_mut().take(events.read) {
                     let ptr = buf.as_ptr() as *const BasicFeaturesIpv4;
                     let data = unsafe { ptr.read_unaligned() };
@@ -343,6 +349,8 @@ where
 
         let mut buf_ingress_ipv4 = flows_ingress_ipv4.open(cpu_id, None)?;
         let flow_map_clone_ingress_ipv4 = flow_map_ipv4.clone();
+        let total_lost_events_clone_ingress_ipv4 = total_lost_events.clone();
+
         task::spawn(async move {
             let mut buffers = (0..10)
                 .map(|_| BytesMut::with_capacity(10_240))
@@ -350,6 +358,8 @@ where
 
             loop {
                 let events = buf_ingress_ipv4.read_events(&mut buffers).await.unwrap();
+                total_lost_events_clone_ingress_ipv4.fetch_add(events.lost, Ordering::SeqCst);
+
                 for buf in buffers.iter_mut().take(events.read) {
                     let ptr = buf.as_ptr() as *const BasicFeaturesIpv4;
                     let data = unsafe { ptr.read_unaligned() };
@@ -361,6 +371,8 @@ where
 
         let mut buf_egress_ipv6 = flows_egress_ipv6.open(cpu_id, None)?;
         let flow_map_clone_egress_ipv6 = flow_map_ipv6.clone();
+        let total_lost_events_clone_egress_ipv6 = total_lost_events.clone();
+
         task::spawn(async move {
             // 10 buffers with 10240 bytes each, meaning a capacity of 173 packets per buffer (472 bits per packet)
             let mut buffers = (0..10)
@@ -369,6 +381,8 @@ where
 
             loop {
                 let events = buf_egress_ipv6.read_events(&mut buffers).await.unwrap();
+                total_lost_events_clone_egress_ipv6.fetch_add(events.lost, Ordering::SeqCst);
+
                 for buf in buffers.iter_mut().take(events.read) {
                     let ptr = buf.as_ptr() as *const BasicFeaturesIpv6;
                     let data = unsafe { ptr.read_unaligned() };
@@ -380,6 +394,8 @@ where
 
         let mut buf_ingress_ipv6 = flows_ingress_ipv6.open(cpu_id, None)?;
         let flow_map_clone_ingress_ipv6 = flow_map_ipv6.clone();
+        let total_lost_events_clone_ingress_ipv6 = total_lost_events.clone();
+
         task::spawn(async move {
             let mut buffers = (0..10)
                 .map(|_| BytesMut::with_capacity(10_240))
@@ -387,6 +403,8 @@ where
 
             loop {
                 let events = buf_ingress_ipv6.read_events(&mut buffers).await.unwrap();
+                total_lost_events_clone_ingress_ipv6.fetch_add(events.lost, Ordering::SeqCst);
+
                 for buf in buffers.iter_mut().take(events.read) {
                     let ptr = buf.as_ptr() as *const BasicFeaturesIpv6;
                     let data = unsafe { ptr.read_unaligned() };
@@ -502,6 +520,10 @@ where
         export_file.flush()?;
     }
 
+    info!(
+        "{} events were lost",
+        total_lost_events.load(Ordering::SeqCst)
+    );
     info!("Exiting...");
 
     Ok(())
@@ -699,9 +721,9 @@ where
 }
 
 /// Export the flow to the set export function.
-/// 
+///
 /// ### Arguments
-/// 
+///
 /// * `output` - The output to export.
 fn export(output: &String) {
     let export_func = EXPORT_FUNCTION.lock().unwrap();
@@ -710,9 +732,7 @@ fn export(output: &String) {
         let mut export_file_option = EXPORT_FILE.lock().unwrap();
         let mut flush_counter_option = FLUSH_COUNTER.lock().unwrap();
 
-        if let Some(ref mut flush_counter) = 
-            flush_counter_option.deref_mut()
-        {
+        if let Some(ref mut flush_counter) = flush_counter_option.deref_mut() {
             function(&output, export_file_option.deref_mut(), flush_counter);
         } else {
             log::error!("No export file set...")
@@ -736,15 +756,16 @@ where
     let timestamp = Instant::now();
     let destination = std::net::IpAddr::V4(Ipv4Addr::from(data.ipv4_destination));
     let source = std::net::IpAddr::V4(Ipv4Addr::from(data.ipv4_source));
+    let combined_flags = data.combined_flags;
     let features = BasicFeatures {
-        fin_flag: data.fin_flag,
-        syn_flag: data.syn_flag,
-        rst_flag: data.rst_flag,
-        psh_flag: data.psh_flag,
-        ack_flag: data.ack_flag,
-        urg_flag: data.urg_flag,
-        ece_flag: data.ece_flag,
-        cwe_flag: data.cwe_flag,
+        fin_flag: ((combined_flags & 0b00000001) != 0) as u8,
+        syn_flag: ((combined_flags & 0b00000010) != 0) as u8,
+        rst_flag: ((combined_flags & 0b00000100) != 0) as u8,
+        psh_flag: ((combined_flags & 0b00001000) != 0) as u8,
+        ack_flag: ((combined_flags & 0b00010000) != 0) as u8,
+        urg_flag: ((combined_flags & 0b00100000) != 0) as u8,
+        ece_flag: ((combined_flags & 0b01000000) != 0) as u8,
+        cwe_flag: ((combined_flags & 0b10000000) != 0) as u8,
         data_length: data.data_length,
         header_length: data.header_length,
         length: data.length,
@@ -814,15 +835,16 @@ where
     let timestamp = Instant::now();
     let destination = std::net::IpAddr::V6(Ipv6Addr::from(data.ipv6_destination));
     let source = std::net::IpAddr::V6(Ipv6Addr::from(data.ipv6_source));
+    let combined_flags = data.combined_flags;
     let features = BasicFeatures {
-        fin_flag: data.fin_flag,
-        syn_flag: data.syn_flag,
-        rst_flag: data.rst_flag,
-        psh_flag: data.psh_flag,
-        ack_flag: data.ack_flag,
-        urg_flag: data.urg_flag,
-        ece_flag: data.ece_flag,
-        cwe_flag: data.cwe_flag,
+        fin_flag: ((combined_flags & 0b00000001) != 0) as u8,
+        syn_flag: ((combined_flags & 0b00000010) != 0) as u8,
+        rst_flag: ((combined_flags & 0b00000100) != 0) as u8,
+        psh_flag: ((combined_flags & 0b00001000) != 0) as u8,
+        ack_flag: ((combined_flags & 0b00010000) != 0) as u8,
+        urg_flag: ((combined_flags & 0b00100000) != 0) as u8,
+        ece_flag: ((combined_flags & 0b01000000) != 0) as u8,
+        cwe_flag: ((combined_flags & 0b10000000) != 0) as u8,
         data_length: data.data_length,
         header_length: data.header_length,
         length: data.length,
@@ -964,18 +986,11 @@ fn extract_ipv4_features(ipv4_packet: &Ipv4Packet) -> Option<BasicFeaturesIpv4> 
     let source_port: u16;
     let destination_port: u16;
 
-    let mut syn_flag: u8 = 0;
-    let mut fin_flag: u8 = 0;
-    let mut rst_flag: u8 = 0;
-    let mut psh_flag: u8 = 0;
-    let mut ack_flag: u8 = 0;
-    let mut urg_flag: u8 = 0;
-    let mut ece_flag: u8 = 0;
-    let mut cwe_flag: u8 = 0;
+    let mut combined_flags: u8 = 0;
 
-    let data_length: u32;
-    let header_length: u32;
-    let length: u32;
+    let data_length: u16;
+    let header_length: u8;
+    let length: u16;
 
     let mut window_size: u16 = 0;
 
@@ -984,20 +999,13 @@ fn extract_ipv4_features(ipv4_packet: &Ipv4Packet) -> Option<BasicFeaturesIpv4> 
             source_port = tcp_packet.get_source();
             destination_port = tcp_packet.get_destination();
 
-            syn_flag = (tcp_packet.get_flags() & 0b0000_0010 != 0) as u8;
-            fin_flag = (tcp_packet.get_flags() & 0b0000_0001 != 0) as u8;
-            rst_flag = (tcp_packet.get_flags() & 0b0000_0100 != 0) as u8;
-            psh_flag = (tcp_packet.get_flags() & 0b0000_1000 != 0) as u8;
-            ack_flag = (tcp_packet.get_flags() & 0b0001_0000 != 0) as u8;
-            urg_flag = (tcp_packet.get_flags() & 0b0010_0000 != 0) as u8;
-            ece_flag = (tcp_packet.get_flags() & 0b0100_0000 != 0) as u8;
-            cwe_flag = (tcp_packet.get_flags() & 0b1000_0000 != 0) as u8;
-
-            data_length = tcp_packet.payload().len() as u32;
-            header_length = (tcp_packet.get_data_offset() * 4) as u32;
-            length = tcp_packet.packet().len() as u32;
+            data_length = tcp_packet.payload().len() as u16;
+            header_length = (tcp_packet.get_data_offset() * 4) as u8;
+            length = ipv4_packet.get_total_length();
 
             window_size = tcp_packet.get_window();
+
+            combined_flags = tcp_packet.get_flags();
         } else {
             return None;
         }
@@ -1006,9 +1014,9 @@ fn extract_ipv4_features(ipv4_packet: &Ipv4Packet) -> Option<BasicFeaturesIpv4> 
             source_port = udp_packet.get_source();
             destination_port = udp_packet.get_destination();
 
-            data_length = udp_packet.payload().len() as u32;
+            data_length = udp_packet.payload().len() as u16;
             header_length = 8;
-            length = udp_packet.packet().len() as u32;
+            length = udp_packet.get_length();
         } else {
             return None;
         }
@@ -1016,25 +1024,18 @@ fn extract_ipv4_features(ipv4_packet: &Ipv4Packet) -> Option<BasicFeaturesIpv4> 
         return None;
     }
 
-    Some(BasicFeaturesIpv4 {
-        ipv4_source: source_ip.into(),
-        ipv4_destination: destination_ip.into(),
-        port_source: source_port,
-        port_destination: destination_port,
-        protocol: protocol.0,
-        fin_flag,
-        syn_flag,
-        rst_flag,
-        psh_flag,
-        ack_flag,
-        urg_flag,
-        ece_flag,
-        cwe_flag,
+    Some(BasicFeaturesIpv4::new(
+        destination_ip.into(),
+        source_ip.into(),
+        destination_port,
+        source_port,
         data_length,
-        header_length,
         length,
         window_size,
-    })
+        combined_flags,
+        protocol.0,
+        header_length,
+    ))
 }
 
 /// Extracts the basic features of an ipv6 packet pnet struct.
@@ -1054,18 +1055,11 @@ fn extract_ipv6_features(ipv6_packet: &Ipv6Packet) -> Option<BasicFeaturesIpv6> 
     let source_port: u16;
     let destination_port: u16;
 
-    let mut syn_flag: u8 = 0;
-    let mut fin_flag: u8 = 0;
-    let mut rst_flag: u8 = 0;
-    let mut psh_flag: u8 = 0;
-    let mut ack_flag: u8 = 0;
-    let mut urg_flag: u8 = 0;
-    let mut ece_flag: u8 = 0;
-    let mut cwe_flag: u8 = 0;
+    let mut combined_flags: u8 = 0;
 
-    let data_length: u32;
-    let header_length: u32;
-    let length: u32;
+    let data_length: u16;
+    let header_length: u8;
+    let length: u16;
 
     let mut window_size: u16 = 0;
 
@@ -1074,20 +1068,13 @@ fn extract_ipv6_features(ipv6_packet: &Ipv6Packet) -> Option<BasicFeaturesIpv6> 
             source_port = tcp_packet.get_source();
             destination_port = tcp_packet.get_destination();
 
-            syn_flag = (tcp_packet.get_flags() & 0b0000_0010 != 0) as u8;
-            fin_flag = (tcp_packet.get_flags() & 0b0000_0001 != 0) as u8;
-            rst_flag = (tcp_packet.get_flags() & 0b0000_0100 != 0) as u8;
-            psh_flag = (tcp_packet.get_flags() & 0b0000_1000 != 0) as u8;
-            ack_flag = (tcp_packet.get_flags() & 0b0001_0000 != 0) as u8;
-            urg_flag = (tcp_packet.get_flags() & 0b0010_0000 != 0) as u8;
-            ece_flag = (tcp_packet.get_flags() & 0b0100_0000 != 0) as u8;
-            cwe_flag = (tcp_packet.get_flags() & 0b1000_0000 != 0) as u8;
-
-            data_length = tcp_packet.payload().len() as u32;
-            header_length = (tcp_packet.get_data_offset() * 4) as u32;
-            length = tcp_packet.packet().len() as u32;
+            data_length = tcp_packet.payload().len() as u16;
+            header_length = (tcp_packet.get_data_offset() * 4) as u8;
+            length = ipv6_packet.packet().bytes().count() as u16;
 
             window_size = tcp_packet.get_window();
+
+            combined_flags = tcp_packet.get_flags();
         } else {
             return None;
         }
@@ -1096,9 +1083,9 @@ fn extract_ipv6_features(ipv6_packet: &Ipv6Packet) -> Option<BasicFeaturesIpv6> 
             source_port = udp_packet.get_source();
             destination_port = udp_packet.get_destination();
 
-            data_length = udp_packet.payload().len() as u32;
+            data_length = udp_packet.payload().len() as u16;
             header_length = 8;
-            length = udp_packet.packet().len() as u32;
+            length = udp_packet.get_length();
         } else {
             return None;
         }
@@ -1106,25 +1093,18 @@ fn extract_ipv6_features(ipv6_packet: &Ipv6Packet) -> Option<BasicFeaturesIpv6> 
         return None;
     }
 
-    Some(BasicFeaturesIpv6 {
-        ipv6_source: source_ip.into(),
-        ipv6_destination: destination_ip.into(),
-        port_source: source_port,
-        port_destination: destination_port,
-        protocol: protocol.0,
-        fin_flag,
-        syn_flag,
-        rst_flag,
-        psh_flag,
-        ack_flag,
-        urg_flag,
-        ece_flag,
-        cwe_flag,
+    Some(BasicFeaturesIpv6::new(
+        destination_ip.into(),
+        source_ip.into(),
+        destination_port,
+        source_port,
         data_length,
-        header_length,
         length,
         window_size,
-    })
+        combined_flags,
+        protocol.0,
+        header_length,
+    ))
 }
 
 #[cfg(test)]
@@ -1141,19 +1121,14 @@ mod tests {
             ipv4_destination: 2,
             port_destination: 8000,
             protocol: 6,
-            fin_flag: 0,
-            syn_flag: 1,
-            rst_flag: 0,
-            psh_flag: 0,
-            ack_flag: 0,
-            urg_flag: 0,
-            ece_flag: 0,
-            cwe_flag: 0,
+            combined_flags: 0b00000010,
             data_length: 100,
             header_length: 20,
             length: 140,
             window_size: 1000,
+            _padding: [0; 3],
         };
+
         process_packet_ipv4::<CicFlow>(&data_1, &flow_map, true);
 
         assert_eq!(flow_map.len(), 1);
@@ -1164,18 +1139,12 @@ mod tests {
             ipv4_destination: 1,
             port_destination: 8080,
             protocol: 6,
-            fin_flag: 0,
-            syn_flag: 1,
-            rst_flag: 0,
-            psh_flag: 0,
-            ack_flag: 0,
-            urg_flag: 0,
-            ece_flag: 0,
-            cwe_flag: 0,
+            combined_flags: 0b00000010,
             data_length: 100,
             header_length: 20,
             length: 140,
             window_size: 1000,
+            _padding: [0; 3],
         };
         process_packet_ipv4(&data_2, &flow_map, false);
 
@@ -1187,18 +1156,12 @@ mod tests {
             ipv4_destination: 2,
             port_destination: 8000,
             protocol: 17,
-            fin_flag: 0,
-            syn_flag: 0,
-            rst_flag: 0,
-            psh_flag: 0,
-            ack_flag: 1,
-            urg_flag: 0,
-            ece_flag: 0,
-            cwe_flag: 0,
+            combined_flags: 0b00010000,
             data_length: 100,
             header_length: 20,
             length: 140,
             window_size: 1000,
+            _padding: [0; 3],
         };
         process_packet_ipv4(&data_3, &flow_map, true);
 
@@ -1210,18 +1173,12 @@ mod tests {
             ipv4_destination: 2,
             port_destination: 8000,
             protocol: 6,
-            fin_flag: 1,
-            syn_flag: 0,
-            rst_flag: 0,
-            psh_flag: 0,
-            ack_flag: 1,
-            urg_flag: 0,
-            ece_flag: 0,
-            cwe_flag: 0,
+            combined_flags: 0b00010001,
             data_length: 100,
             header_length: 20,
             length: 140,
             window_size: 1000,
+            _padding: [0; 3],
         };
         process_packet_ipv4(&data_4, &flow_map, true);
 
@@ -1233,18 +1190,12 @@ mod tests {
             ipv4_destination: 1,
             port_destination: 8080,
             protocol: 6,
-            fin_flag: 1,
-            syn_flag: 0,
-            rst_flag: 0,
-            psh_flag: 0,
-            ack_flag: 1,
-            urg_flag: 0,
-            ece_flag: 0,
-            cwe_flag: 0,
+            combined_flags: 0b00010001,
             data_length: 100,
             header_length: 20,
             length: 140,
             window_size: 1000,
+            _padding: [0; 3],
         };
         process_packet_ipv4(&data_5, &flow_map, false);
 
@@ -1256,18 +1207,12 @@ mod tests {
             ipv4_destination: 2,
             port_destination: 8000,
             protocol: 6,
-            fin_flag: 0,
-            syn_flag: 0,
-            rst_flag: 0,
-            psh_flag: 0,
-            ack_flag: 1,
-            urg_flag: 0,
-            ece_flag: 0,
-            cwe_flag: 0,
+            combined_flags: 0b00010000,
             data_length: 100,
             header_length: 20,
             length: 140,
             window_size: 1000,
+            _padding: [0; 3],
         };
         process_packet_ipv4(&data_6, &flow_map, true);
 
@@ -1279,18 +1224,12 @@ mod tests {
             ipv4_destination: 1,
             port_destination: 8080,
             protocol: 17,
-            fin_flag: 0,
-            syn_flag: 0,
-            rst_flag: 1,
-            psh_flag: 0,
-            ack_flag: 0,
-            urg_flag: 0,
-            ece_flag: 0,
-            cwe_flag: 0,
+            combined_flags: 0b00000100,
             data_length: 100,
             header_length: 20,
             length: 140,
             window_size: 1000,
+            _padding: [0; 3],
         };
         process_packet_ipv4(&data_7, &flow_map, false);
 
@@ -1302,18 +1241,12 @@ mod tests {
             ipv4_destination: 2,
             port_destination: 8000,
             protocol: 6,
-            fin_flag: 0,
-            syn_flag: 0,
-            rst_flag: 0,
-            psh_flag: 0,
-            ack_flag: 1,
-            urg_flag: 0,
-            ece_flag: 0,
-            cwe_flag: 0,
+            combined_flags: 0b00010000,
             data_length: 100,
             header_length: 20,
             length: 140,
             window_size: 1000,
+            _padding: [0; 3],
         };
         process_packet_ipv4(&data_8, &flow_map, true);
 
@@ -1325,18 +1258,12 @@ mod tests {
             ipv4_destination: 2,
             port_destination: 8000,
             protocol: 6,
-            fin_flag: 1,
-            syn_flag: 0,
-            rst_flag: 0,
-            psh_flag: 0,
-            ack_flag: 1,
-            urg_flag: 0,
-            ece_flag: 0,
-            cwe_flag: 0,
+            combined_flags: 0b00010001,
             data_length: 100,
             header_length: 20,
             length: 140,
             window_size: 1000,
+            _padding: [0; 3],
         };
         process_packet_ipv4(&data_9, &flow_map, true);
 
@@ -1348,18 +1275,12 @@ mod tests {
             ipv4_destination: 2,
             port_destination: 8000,
             protocol: 6,
-            fin_flag: 1,
-            syn_flag: 0,
-            rst_flag: 0,
-            psh_flag: 0,
-            ack_flag: 1,
-            urg_flag: 0,
-            ece_flag: 0,
-            cwe_flag: 0,
+            combined_flags: 0b00010001,
             data_length: 100,
             header_length: 20,
             length: 140,
             window_size: 1000,
+            _padding: [0; 3],
         };
 
         process_packet_ipv4(&data_10, &flow_map, true);
@@ -1372,18 +1293,12 @@ mod tests {
             ipv4_destination: 1,
             port_destination: 8080,
             protocol: 6,
-            fin_flag: 1,
-            syn_flag: 0,
-            rst_flag: 0,
-            psh_flag: 0,
-            ack_flag: 1,
-            urg_flag: 0,
-            ece_flag: 0,
-            cwe_flag: 0,
+            combined_flags: 0b00010001,
             data_length: 100,
             header_length: 20,
             length: 140,
             window_size: 1000,
+            _padding: [0; 3],
         };
         process_packet_ipv4(&data_11, &flow_map, false);
 
@@ -1395,18 +1310,12 @@ mod tests {
             ipv4_destination: 1,
             port_destination: 8080,
             protocol: 6,
-            fin_flag: 0,
-            syn_flag: 0,
-            rst_flag: 0,
-            psh_flag: 0,
-            ack_flag: 1,
-            urg_flag: 0,
-            ece_flag: 0,
-            cwe_flag: 0,
+            combined_flags: 0b00010000,
             data_length: 100,
             header_length: 20,
             length: 140,
             window_size: 1000,
+            _padding: [0; 3],
         };
         process_packet_ipv4(&data_12, &flow_map, false);
 
