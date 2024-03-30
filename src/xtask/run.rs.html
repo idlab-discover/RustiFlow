@@ -84,6 +84,14 @@
 <a href="#82" id="82">82</a>
 <a href="#83" id="83">83</a>
 <a href="#84" id="84">84</a>
+<a href="#85" id="85">85</a>
+<a href="#86" id="86">86</a>
+<a href="#87" id="87">87</a>
+<a href="#88" id="88">88</a>
+<a href="#89" id="89">89</a>
+<a href="#90" id="90">90</a>
+<a href="#91" id="91">91</a>
+<a href="#92" id="92">92</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span>std::process::Command;
 
 <span class="kw">use </span>anyhow::Context <span class="kw">as _</span>;
@@ -149,10 +157,18 @@
     <span class="kw">let </span>bin_path = <span class="macro">format!</span>(<span class="string">"target/{profile}/feature-extraction-tool"</span>);
 
     <span class="comment">// Determine if 'realtime' is the first argument in run_args
-    </span><span class="kw">let </span>use_sudo = opts.run_args.first().map(|arg| arg == <span class="string">"realtime"</span>).unwrap_or(<span class="bool-val">false</span>);
+    </span><span class="kw">let </span>use_sudo = opts
+        .run_args
+        .first()
+        .map(|arg| arg == <span class="string">"realtime"</span>)
+        .unwrap_or(<span class="bool-val">false</span>);
 
     <span class="comment">// configure args
-    </span><span class="kw">let </span>runner = <span class="kw">if </span>use_sudo { opts.runner.trim().split_terminator(<span class="string">' '</span>).collect() } <span class="kw">else </span>{ Vec::new() };
+    </span><span class="kw">let </span>runner = <span class="kw">if </span>use_sudo {
+        opts.runner.trim().split_terminator(<span class="string">' '</span>).collect()
+    } <span class="kw">else </span>{
+        Vec::new()
+    };
     <span class="kw">let </span><span class="kw-2">mut </span>args = runner;
     args.push(bin_path.as_str());
     args.extend(opts.run_args.iter().map(String::as_str)); <span class="comment">// directly extend with run_args

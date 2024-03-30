@@ -1,3 +1,0 @@
-(function() {var implementors = {
-"feature_extraction_tool":[["impl&lt;'de&gt; <a class=\"trait\" href=\"https://docs.rs/serde/1.0.197/serde/de/trait.Deserialize.html\" title=\"trait serde::de::Deserialize\">Deserialize</a>&lt;'de&gt; for <a class=\"struct\" href=\"feature_extraction_tool/records/cic_record/struct.CicRecord.html\" title=\"struct feature_extraction_tool::records::cic_record::CicRecord\">CicRecord</a>"]]
-};if (window.register_implementors) {window.register_implementors(implementors);} else {window.pending_implementors = implementors;}})()

@@ -99,7 +99,7 @@
 <a href="#97" id="97">97</a>
 <a href="#98" id="98">98</a>
 </pre></div><pre class="rust"><code><span class="attr">#![no_std]
-</span><span class="doccomment">/// BasicFeaturesIpv4 is a struct collection all ipv4 traffic data and is 280 bits in size.
+</span><span class="doccomment">/// BasicFeaturesIpv4 is a struct collection all ipv4 traffic data and is 24 bytes in size.
 </span><span class="attr">#[repr(C)]
 #[derive(Copy, Clone, Debug, Hash, Eq, PartialEq)]
 </span><span class="kw">pub struct </span>BasicFeaturesIpv4 {
@@ -148,7 +148,7 @@
 <span class="attr">#[cfg(feature = <span class="string">"user"</span>)]
 </span><span class="kw">unsafe impl </span>aya::Pod <span class="kw">for </span>BasicFeaturesIpv4 {}
 
-<span class="doccomment">/// BasicFeaturesIpv6 is a struct collection all ipv6 traffic data and is 472 bits in size.
+<span class="doccomment">/// BasicFeaturesIpv6 is a struct collection all ipv6 traffic data and is 48 bytes in size.
 </span><span class="attr">#[repr(C)]
 #[derive(Clone, Copy)]
 </span><span class="kw">pub struct </span>BasicFeaturesIpv6 {
