@@ -47,6 +47,7 @@ use std::{
 use tokio::time::{self, Duration};
 use tokio::{signal, task};
 use utils::utils::BasicFeatures;
+use std::convert::TryInto;
 
 lazy_static! {
     static ref EXPORT_FUNCTION: Arc<Mutex<Option<Export>>> = Arc::new(Mutex::new(None));
@@ -709,8 +710,8 @@ where
     T: Flow,
 {
     let timestamp = Instant::now();
-    let destination = std::net::IpAddr::V4(Ipv4Addr::from(data.ipv4_destination));
-    let source = std::net::IpAddr::V4(Ipv4Addr::from(data.ipv4_source));
+    let destination = std::net::IpAddr::V4(Ipv4Addr::from(u32::from_le_bytes(data.ipv4_source.to_be_bytes().try_into().expect("Invalid IP length"))));
+    let source = std::net::IpAddr::V4(Ipv4Addr::from(u32::from_le_bytes(data.ipv4_destination.to_be_bytes().try_into().expect("Invalid IP length"))));
     let combined_flags = data.combined_flags;
     let features = BasicFeatures {
         fin_flag: ((combined_flags & 0b00000001) != 0) as u8,
