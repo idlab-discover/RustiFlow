@@ -1280,6 +1280,15 @@
 <a href="#1278" id="1278">1278</a>
 <a href="#1279" id="1279">1279</a>
 <a href="#1280" id="1280">1280</a>
+<a href="#1281" id="1281">1281</a>
+<a href="#1282" id="1282">1282</a>
+<a href="#1283" id="1283">1283</a>
+<a href="#1284" id="1284">1284</a>
+<a href="#1285" id="1285">1285</a>
+<a href="#1286" id="1286">1286</a>
+<a href="#1287" id="1287">1287</a>
+<a href="#1288" id="1288">1288</a>
+<a href="#1289" id="1289">1289</a>
 </pre></div><pre class="rust"><code><span class="kw">mod </span>args;
 <span class="kw">mod </span>flows;
 <span class="kw">mod </span>output;
@@ -1329,7 +1338,6 @@
 <span class="kw">use </span>tokio::time::{<span class="self">self</span>, Duration};
 <span class="kw">use </span>tokio::{signal, task};
 <span class="kw">use </span>utils::utils::BasicFeatures;
-<span class="kw">use </span>std::convert::TryInto;
 
 <span class="macro">lazy_static!</span> {
     <span class="kw">static </span><span class="kw-2">ref </span>EXPORT_FUNCTION: Arc&lt;Mutex&lt;<span class="prelude-ty">Option</span>&lt;Export&gt;&gt;&gt; = Arc::new(Mutex::new(<span class="prelude-val">None</span>));
@@ -1992,8 +2000,18 @@
     </span>T: Flow,
 {
     <span class="kw">let </span>timestamp = Instant::now();
-    <span class="kw">let </span>destination = std::net::IpAddr::V4(Ipv4Addr::from(u32::from_le_bytes(data.ipv4_source.to_be_bytes().try_into().expect(<span class="string">"Invalid IP length"</span>))));
-    <span class="kw">let </span>source = std::net::IpAddr::V4(Ipv4Addr::from(u32::from_le_bytes(data.ipv4_destination.to_be_bytes().try_into().expect(<span class="string">"Invalid IP length"</span>))));
+    <span class="kw">let </span>destination = std::net::IpAddr::V4(Ipv4Addr::from(u32::from_le_bytes(
+        data.ipv4_source
+            .to_be_bytes()
+            .try_into()
+            .expect(<span class="string">"Invalid IP length"</span>),
+    )));
+    <span class="kw">let </span>source = std::net::IpAddr::V4(Ipv4Addr::from(u32::from_le_bytes(
+        data.ipv4_destination
+            .to_be_bytes()
+            .try_into()
+            .expect(<span class="string">"Invalid IP length"</span>),
+    )));
     <span class="kw">let </span>combined_flags = data.combined_flags;
     <span class="kw">let </span>features = BasicFeatures {
         fin_flag: ((combined_flags &amp; <span class="number">0b00000001</span>) != <span class="number">0</span>) <span class="kw">as </span>u8,
