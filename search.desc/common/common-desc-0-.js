@@ -1,0 +1,1 @@
+searchState.loadedDescShard("common", 0, "BasicFeaturesIpv4 is a struct collection all ipv4 traffic …\nBasicFeaturesIpv6 is a struct collection all ipv6 traffic …\nReturns the argument unchanged.\nReturns the argument unchanged.\nCalls <code>U::from(self)</code>.\nCalls <code>U::from(self)</code>.")
