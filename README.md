@@ -69,7 +69,7 @@ This tool is designed for robust and efficient feature extraction in network int
 ### Real-Time Traffic Capture:
 - **To Run/Build**:
   ```bash
-  RUST_LOG=info cargo xtask run -- realtime <interface> <flow_type> <flow_lifetime_sec> <output_method> [output_path] [dump_interval_sec]
+  RUST_LOG=info cargo xtask run -- realtime <interface> <flow_type> <flow_lifetime_sec> <output_method> [output_path] --interval [dump_interval_sec]
   ```
 - **Command Help**:
   ```bash
