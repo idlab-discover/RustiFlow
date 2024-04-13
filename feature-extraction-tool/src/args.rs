@@ -29,6 +29,7 @@ pub enum Commands {
         export_method: Output,
 
         /// The print interval for open flows in seconds, needs to be smaller than the flow maximum lifespan
+        #[clap(long)]
         interval: Option<u64>,
     },
 
