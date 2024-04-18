@@ -1287,6 +1287,18 @@
 <a href="#1287" id="1287">1287</a>
 <a href="#1288" id="1288">1288</a>
 <a href="#1289" id="1289">1289</a>
+<a href="#1290" id="1290">1290</a>
+<a href="#1291" id="1291">1291</a>
+<a href="#1292" id="1292">1292</a>
+<a href="#1293" id="1293">1293</a>
+<a href="#1294" id="1294">1294</a>
+<a href="#1295" id="1295">1295</a>
+<a href="#1296" id="1296">1296</a>
+<a href="#1297" id="1297">1297</a>
+<a href="#1298" id="1298">1298</a>
+<a href="#1299" id="1299">1299</a>
+<a href="#1300" id="1300">1300</a>
+<a href="#1301" id="1301">1301</a>
 </pre></div><pre class="rust"><code><span class="kw">mod </span>args;
 <span class="kw">mod </span>flows;
 <span class="kw">mod </span>output;
@@ -1311,7 +1323,7 @@
 <span class="kw">use </span>common::{BasicFeaturesIpv4, BasicFeaturesIpv6};
 <span class="kw">use </span>core::panic;
 <span class="kw">use </span>dashmap::DashMap;
-<span class="kw">use </span>flows::{basic_flow::BasicFlow, cidds_flow::CiddsFlow, flow::Flow, nf_flow::NfFlow};
+<span class="kw">use </span>flows::{basic_flow::BasicFlow, cidds_flow::CiddsFlow, custom_flow::CustomFlow, flow::Flow, nf_flow::NfFlow};
 <span class="kw">use </span>lazy_static::lazy_static;
 <span class="kw">use </span>log::{debug, info};
 <span class="kw">use </span>pnet::packet::{
@@ -1426,6 +1438,12 @@
                         <span class="macro">eprintln!</span>(<span class="string">"Error: {:?}"</span>, err);
                     }
                 }
+                FlowType::CustomFlow =&gt; {
+                    <span class="kw">if let </span><span class="prelude-val">Err</span>(err) = handle_realtime::&lt;CustomFlow&gt;(interface, interval, lifespan).<span class="kw">await
+                    </span>{
+                        <span class="macro">eprintln!</span>(<span class="string">"Error: {:?}"</span>, err);
+                    }
+                }
             }
         }
         Commands::Pcap {
@@ -1479,6 +1497,9 @@
                 (GeneratedMachineType::Windows, FlowType::NfFlow) =&gt; {
                     read_pcap_file_ethernet::&lt;NfFlow&gt;(<span class="kw-2">&amp;</span>path)
                 }
+                (GeneratedMachineType::Windows, FlowType::CustomFlow) =&gt; {
+                    read_pcap_file_ethernet::&lt;CustomFlow&gt;(<span class="kw-2">&amp;</span>path)
+                }
                 (GeneratedMachineType::Linux, FlowType::BasicFlow) =&gt; {
                     read_pcap_file_linux_cooked::&lt;BasicFlow&gt;(<span class="kw-2">&amp;</span>path)
                 }
@@ -1490,6 +1511,9 @@
                 }
                 (GeneratedMachineType::Linux, FlowType::NfFlow) =&gt; {
                     read_pcap_file_linux_cooked::&lt;NfFlow&gt;(<span class="kw-2">&amp;</span>path)
+                }
+                (GeneratedMachineType::Linux, FlowType::CustomFlow) =&gt; {
+                    read_pcap_file_linux_cooked::&lt;CustomFlow&gt;(<span class="kw-2">&amp;</span>path)
                 }
             }
         }
