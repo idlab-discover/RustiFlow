@@ -1299,8 +1299,7 @@ impl Flow for CicFlow {
             "{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},\
             {},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},\
             {},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},\
-            {},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{}",
-            self.basic_flow.protocol,
+            {},{},{},{},{}",
             get_duration(
                 self.basic_flow.first_timestamp,
                 self.basic_flow.last_timestamp
@@ -1310,11 +1309,9 @@ impl Flow for CicFlow {
             self.fwd_pkt_len_tot,
             self.bwd_pkt_len_tot,
             self.fwd_pkt_len_max,
-            self.get_fwd_packet_length_min(),
             self.fwd_pkt_len_mean,
             self.fwd_pkt_len_std,
             self.bwd_pkt_len_max,
-            self.get_bwd_packet_length_min(),
             self.bwd_pkt_len_mean,
             self.bwd_pkt_len_std,
             self.get_flow_bytes_s(),
@@ -1341,20 +1338,14 @@ impl Flow for CicFlow {
             self.bwd_header_length,
             self.get_fwd_packets_s(),
             self.get_bwd_packets_s(),
-            self.get_flow_packet_length_min(),
             self.get_flow_packet_length_max(),
             self.get_flow_packet_length_mean(),
             self.get_flow_packet_length_std(),
             self.get_flow_packet_length_variance(),
             self.basic_flow.fwd_fin_flag_count + self.basic_flow.bwd_fin_flag_count,
             self.basic_flow.fwd_syn_flag_count + self.basic_flow.bwd_syn_flag_count,
-            self.basic_flow.fwd_rst_flag_count + self.basic_flow.bwd_rst_flag_count,
-            self.basic_flow.fwd_psh_flag_count + self.basic_flow.bwd_psh_flag_count,
-            self.basic_flow.fwd_ack_flag_count + self.basic_flow.bwd_ack_flag_count,
             self.basic_flow.fwd_urg_flag_count + self.basic_flow.bwd_urg_flag_count,
             self.basic_flow.fwd_cwe_flag_count + self.basic_flow.bwd_cwe_flag_count,
-            self.basic_flow.fwd_ece_flag_count + self.basic_flow.bwd_ece_flag_count,
-            self.get_down_up_ratio(),
             self.get_fwd_packet_length_mean(),
             self.get_bwd_packet_length_mean(),
             self.get_fwd_bytes_bulk(),
@@ -1372,11 +1363,9 @@ impl Flow for CicFlow {
             self.fwd_act_data_pkt,
             self.get_fwd_header_len_min(), // known as min_seg_size_forward but this is actually the min header length in the forward direction
             self.active_mean,
-            self.active_std,
             self.active_max,
             self.get_active_min(),
             self.idle_mean,
-            self.idle_std,
             self.idle_max,
             self.get_idle_min(),
         )
