@@ -1,4 +1,4 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `feature-extraction-tool/src/flows/cic_flow.rs`."><title>cic_flow.rs - source</title><script>if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-46f98efaafac5295.ttf.woff2,FiraSans-Regular-018c141bf0843ffd.woff2,FiraSans-Medium-8f9a781e4970d388.woff2,SourceCodePro-Regular-562dcc5011b6de7d.ttf.woff2,SourceCodePro-Semibold-d899c5a5c4aeb14a.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2" crossorigin href="../../../static.files/${f}">`).join(""))</script><link rel="stylesheet" href="../../../static.files/normalize-76eba96aa4d2e634.css"><link rel="stylesheet" href="../../../static.files/rustdoc-2c208a72533b4dd0.css"><meta name="rustdoc-vars" data-root-path="../../../" data-static-root-path="../../../static.files/" data-current-crate="feature_extraction_tool" data-themes="" data-resource-suffix="" data-rustdoc-version="1.79.0-nightly (79424056b 2024-04-12)" data-channel="nightly" data-search-js="search-ffac13a0df2b1870.js" data-settings-js="settings-4313503d2e1961c2.js" ><script src="../../../static.files/storage-e32f0c247825364d.js"></script><script defer src="../../../static.files/src-script-e66d777a5a92e9b2.js"></script><script defer src="../../../src-files.js"></script><script defer src="../../../static.files/main-c97aec732c613ca4.js"></script><noscript><link rel="stylesheet" href="../../../static.files/noscript-09095024cf37855e.css"></noscript><link rel="alternate icon" type="image/png" href="../../../static.files/favicon-32x32-422f7d1d52889060.png"><link rel="icon" type="image/svg+xml" href="../../../static.files/favicon-2c020d218678b618.svg"></head><body class="rustdoc src"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="src-sidebar-title"><h2>Files</h2></div></nav><div class="sidebar-resizer"></div><main><nav class="sub"><form class="search-form"><span></span><div id="sidebar-button" tabindex="-1"><a href="../../../feature_extraction_tool/all.html" title="show sidebar"></a></div><input class="search-input" name="search" aria-label="Run search in the documentation" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" tabindex="-1"><a href="../../../help.html" title="help">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../../settings.html" title="settings">Settings</a></div></form></nav><section id="main-content" class="content"><div class="example-wrap"><div data-nosnippet><pre class="src-line-numbers"><a href="#1" id="1">1</a>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `feature-extraction-tool/src/flows/cic_flow.rs`."><title>cic_flow.rs - source</title><script>if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-46f98efaafac5295.ttf.woff2,FiraSans-Regular-018c141bf0843ffd.woff2,FiraSans-Medium-8f9a781e4970d388.woff2,SourceCodePro-Regular-562dcc5011b6de7d.ttf.woff2,SourceCodePro-Semibold-d899c5a5c4aeb14a.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2" crossorigin href="../../../static.files/${f}">`).join(""))</script><link rel="stylesheet" href="../../../static.files/normalize-76eba96aa4d2e634.css"><link rel="stylesheet" href="../../../static.files/rustdoc-2c208a72533b4dd0.css"><meta name="rustdoc-vars" data-root-path="../../../" data-static-root-path="../../../static.files/" data-current-crate="feature_extraction_tool" data-themes="" data-resource-suffix="" data-rustdoc-version="1.79.0-nightly (becebb315 2024-04-17)" data-channel="nightly" data-search-js="search-ffac13a0df2b1870.js" data-settings-js="settings-4313503d2e1961c2.js" ><script src="../../../static.files/storage-e32f0c247825364d.js"></script><script defer src="../../../static.files/src-script-e66d777a5a92e9b2.js"></script><script defer src="../../../src-files.js"></script><script defer src="../../../static.files/main-79b348b11ac95225.js"></script><noscript><link rel="stylesheet" href="../../../static.files/noscript-09095024cf37855e.css"></noscript><link rel="alternate icon" type="image/png" href="../../../static.files/favicon-32x32-422f7d1d52889060.png"><link rel="icon" type="image/svg+xml" href="../../../static.files/favicon-2c020d218678b618.svg"></head><body class="rustdoc src"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="src-sidebar-title"><h2>Files</h2></div></nav><div class="sidebar-resizer"></div><main><nav class="sub"><form class="search-form"><span></span><div id="sidebar-button" tabindex="-1"><a href="../../../feature_extraction_tool/all.html" title="show sidebar"></a></div><input class="search-input" name="search" aria-label="Run search in the documentation" autocomplete="off" spellcheck="false" placeholder="Type ‘S’ or ‘/’ to search, ‘?’ for more options…" type="search"><div id="help-button" tabindex="-1"><a href="../../../help.html" title="help">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../../settings.html" title="settings">Settings</a></div></form></nav><section id="main-content" class="content"><div class="example-wrap"><div data-nosnippet><pre class="src-line-numbers"><a href="#1" id="1">1</a>
 <a href="#2" id="2">2</a>
 <a href="#3" id="3">3</a>
 <a href="#4" id="4">4</a>
@@ -2542,17 +2542,6 @@
 <a href="#2542" id="2542">2542</a>
 <a href="#2543" id="2543">2543</a>
 <a href="#2544" id="2544">2544</a>
-<a href="#2545" id="2545">2545</a>
-<a href="#2546" id="2546">2546</a>
-<a href="#2547" id="2547">2547</a>
-<a href="#2548" id="2548">2548</a>
-<a href="#2549" id="2549">2549</a>
-<a href="#2550" id="2550">2550</a>
-<a href="#2551" id="2551">2551</a>
-<a href="#2552" id="2552">2552</a>
-<a href="#2553" id="2553">2553</a>
-<a href="#2554" id="2554">2554</a>
-<a href="#2555" id="2555">2555</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span>chrono::{DateTime, Utc};
 <span class="kw">use </span>std::{net::IpAddr, ops::Deref, time::Instant};
 
@@ -3854,8 +3843,7 @@
             <span class="string">"{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},\
             {},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},\
             {},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},\
-            {},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{}"</span>,
-            <span class="self">self</span>.basic_flow.protocol,
+            {},{},{},{},{}"</span>,
             get_duration(
                 <span class="self">self</span>.basic_flow.first_timestamp,
                 <span class="self">self</span>.basic_flow.last_timestamp
@@ -3865,11 +3853,9 @@
             <span class="self">self</span>.fwd_pkt_len_tot,
             <span class="self">self</span>.bwd_pkt_len_tot,
             <span class="self">self</span>.fwd_pkt_len_max,
-            <span class="self">self</span>.get_fwd_packet_length_min(),
             <span class="self">self</span>.fwd_pkt_len_mean,
             <span class="self">self</span>.fwd_pkt_len_std,
             <span class="self">self</span>.bwd_pkt_len_max,
-            <span class="self">self</span>.get_bwd_packet_length_min(),
             <span class="self">self</span>.bwd_pkt_len_mean,
             <span class="self">self</span>.bwd_pkt_len_std,
             <span class="self">self</span>.get_flow_bytes_s(),
@@ -3896,20 +3882,14 @@
             <span class="self">self</span>.bwd_header_length,
             <span class="self">self</span>.get_fwd_packets_s(),
             <span class="self">self</span>.get_bwd_packets_s(),
-            <span class="self">self</span>.get_flow_packet_length_min(),
             <span class="self">self</span>.get_flow_packet_length_max(),
             <span class="self">self</span>.get_flow_packet_length_mean(),
             <span class="self">self</span>.get_flow_packet_length_std(),
             <span class="self">self</span>.get_flow_packet_length_variance(),
             <span class="self">self</span>.basic_flow.fwd_fin_flag_count + <span class="self">self</span>.basic_flow.bwd_fin_flag_count,
             <span class="self">self</span>.basic_flow.fwd_syn_flag_count + <span class="self">self</span>.basic_flow.bwd_syn_flag_count,
-            <span class="self">self</span>.basic_flow.fwd_rst_flag_count + <span class="self">self</span>.basic_flow.bwd_rst_flag_count,
-            <span class="self">self</span>.basic_flow.fwd_psh_flag_count + <span class="self">self</span>.basic_flow.bwd_psh_flag_count,
-            <span class="self">self</span>.basic_flow.fwd_ack_flag_count + <span class="self">self</span>.basic_flow.bwd_ack_flag_count,
             <span class="self">self</span>.basic_flow.fwd_urg_flag_count + <span class="self">self</span>.basic_flow.bwd_urg_flag_count,
             <span class="self">self</span>.basic_flow.fwd_cwe_flag_count + <span class="self">self</span>.basic_flow.bwd_cwe_flag_count,
-            <span class="self">self</span>.basic_flow.fwd_ece_flag_count + <span class="self">self</span>.basic_flow.bwd_ece_flag_count,
-            <span class="self">self</span>.get_down_up_ratio(),
             <span class="self">self</span>.get_fwd_packet_length_mean(),
             <span class="self">self</span>.get_bwd_packet_length_mean(),
             <span class="self">self</span>.get_fwd_bytes_bulk(),
@@ -3927,11 +3907,9 @@
             <span class="self">self</span>.fwd_act_data_pkt,
             <span class="self">self</span>.get_fwd_header_len_min(), <span class="comment">// known as min_seg_size_forward but this is actually the min header length in the forward direction
             </span><span class="self">self</span>.active_mean,
-            <span class="self">self</span>.active_std,
             <span class="self">self</span>.active_max,
             <span class="self">self</span>.get_active_min(),
             <span class="self">self</span>.idle_mean,
-            <span class="self">self</span>.idle_std,
             <span class="self">self</span>.idle_max,
             <span class="self">self</span>.get_idle_min(),
         )
