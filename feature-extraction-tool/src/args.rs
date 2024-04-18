@@ -96,4 +96,7 @@ pub enum FlowType {
 
     /// Represents a nfstream inspired flow, giving 69 features.
     NfFlow,
+
+    /// Represents a flow that you can implement yourself.
+    CustomFlow,
 }

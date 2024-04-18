@@ -22,7 +22,7 @@ use clap::Parser;
 use common::{BasicFeaturesIpv4, BasicFeaturesIpv6};
 use core::panic;
 use dashmap::DashMap;
-use flows::{basic_flow::BasicFlow, cidds_flow::CiddsFlow, flow::Flow, nf_flow::NfFlow};
+use flows::{basic_flow::BasicFlow, cidds_flow::CiddsFlow, custom_flow::CustomFlow, flow::Flow, nf_flow::NfFlow};
 use lazy_static::lazy_static;
 use log::{debug, info};
 use pnet::packet::{
@@ -137,6 +137,12 @@ async fn main() {
                         eprintln!("Error: {:?}", err);
                     }
                 }
+                FlowType::CustomFlow => {
+                    if let Err(err) = handle_realtime::<CustomFlow>(interface, interval, lifespan).await
+                    {
+                        eprintln!("Error: {:?}", err);
+                    }
+                }
             }
         }
         Commands::Pcap {
@@ -190,6 +196,9 @@ async fn main() {
                 (GeneratedMachineType::Windows, FlowType::NfFlow) => {
                     read_pcap_file_ethernet::<NfFlow>(&path)
                 }
+                (GeneratedMachineType::Windows, FlowType::CustomFlow) => {
+                    read_pcap_file_ethernet::<CustomFlow>(&path)
+                }
                 (GeneratedMachineType::Linux, FlowType::BasicFlow) => {
                     read_pcap_file_linux_cooked::<BasicFlow>(&path)
                 }
@@ -201,6 +210,9 @@ async fn main() {
                 }
                 (GeneratedMachineType::Linux, FlowType::NfFlow) => {
                     read_pcap_file_linux_cooked::<NfFlow>(&path)
+                }
+                (GeneratedMachineType::Linux, FlowType::CustomFlow) => {
+                    read_pcap_file_linux_cooked::<CustomFlow>(&path)
                 }
             }
         }
