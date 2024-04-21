@@ -956,45 +956,63 @@ where
 ///
 /// * `Option<BasicFeaturesIpv4>` - Basic features of the packet.
 fn extract_ipv4_features(ipv4_packet: &Ipv4Packet) -> Option<BasicFeaturesIpv4> {
+    let source_ip = ipv4_packet.get_source();
+    let destination_ip = ipv4_packet.get_destination();
+    let protocol = ipv4_packet.get_next_level_protocol();
 
-    if ipv4_packet.get_next_level_protocol().0 == IpNextHeaderProtocols::Tcp.0 {
+    let source_port: u16;
+    let destination_port: u16;
+
+    let mut combined_flags: u8 = 0;
+
+    let data_length: u16;
+    let header_length: u8;
+    let length: u16;
+
+    let mut window_size: u16 = 0;
+
+    if protocol.0 == IpNextHeaderProtocols::Tcp.0 {
         if let Some(tcp_packet) = TcpPacket::new(ipv4_packet.payload()) {
-            return Some(BasicFeaturesIpv4::new(
-                ipv4_packet.get_destination().into(),
-                ipv4_packet.get_source().into(),
-                tcp_packet.get_destination(),
-                tcp_packet.get_source(),
-                tcp_packet.payload().len() as u16,
-                ipv4_packet.get_total_length(),
-                tcp_packet.get_window(),
-                tcp_packet.get_flags(),
-                ipv4_packet.get_next_level_protocol().0,
-                (tcp_packet.get_data_offset() * 4) as u8,
-            ));
+            source_port = tcp_packet.get_source();
+            destination_port = tcp_packet.get_destination();
+
+            data_length = tcp_packet.payload().len() as u16;
+            header_length = (tcp_packet.get_data_offset() * 4) as u8;
+            length = ipv4_packet.get_total_length();
+
+            window_size = tcp_packet.get_window();
+
+            combined_flags = tcp_packet.get_flags();
         } else {
             return None;
         }
-    } else if ipv4_packet.get_next_level_protocol().0 == IpNextHeaderProtocols::Udp.0 {
+    } else if protocol.0 == IpNextHeaderProtocols::Udp.0 {
         if let Some(udp_packet) = pnet::packet::udp::UdpPacket::new(ipv4_packet.payload()) {
+            source_port = udp_packet.get_source();
+            destination_port = udp_packet.get_destination();
 
-            return Some(BasicFeaturesIpv4::new(
-                ipv4_packet.get_destination().into(),
-                ipv4_packet.get_source().into(),
-                udp_packet.get_destination(),
-                udp_packet.get_source(),
-                udp_packet.payload().len() as u16,
-                udp_packet.get_length(),
-                0,
-                0,
-                ipv4_packet.get_next_level_protocol().0,
-                8,
-            ));
+            data_length = udp_packet.payload().len() as u16;
+            header_length = 8;
+            length = udp_packet.get_length();
         } else {
             return None;
         }
     } else {
         return None;
     }
+
+    Some(BasicFeaturesIpv4::new(
+        destination_ip.into(),
+        source_ip.into(),
+        destination_port,
+        source_port,
+        data_length,
+        length,
+        window_size,
+        combined_flags,
+        protocol.0,
+        header_length,
+    ))
 }
 
 /// Extracts the basic features of an ipv6 packet pnet struct.
@@ -1007,44 +1025,63 @@ fn extract_ipv4_features(ipv4_packet: &Ipv4Packet) -> Option<BasicFeaturesIpv4> 
 ///
 /// * `Option<BasicFeaturesIpv6>` - Basic features of the packet.
 fn extract_ipv6_features(ipv6_packet: &Ipv6Packet) -> Option<BasicFeaturesIpv6> {
+    let source_ip = ipv6_packet.get_source();
+    let destination_ip = ipv6_packet.get_destination();
+    let protocol = ipv6_packet.get_next_header();
 
-    if ipv6_packet.get_next_header() == IpNextHeaderProtocols::Tcp {
+    let source_port: u16;
+    let destination_port: u16;
+
+    let mut combined_flags: u8 = 0;
+
+    let data_length: u16;
+    let header_length: u8;
+    let length: u16;
+
+    let mut window_size: u16 = 0;
+
+    if protocol == IpNextHeaderProtocols::Tcp {
         if let Some(tcp_packet) = TcpPacket::new(ipv6_packet.payload()) {
-            return Some(BasicFeaturesIpv6::new(
-                ipv6_packet.get_destination().into(),
-                ipv6_packet.get_source().into(),
-                tcp_packet.get_destination(),
-                tcp_packet.get_source(),
-                tcp_packet.payload().len() as u16,
-                ipv6_packet.packet().bytes().count() as u16,
-                tcp_packet.get_window(),
-                tcp_packet.get_flags(),
-                ipv6_packet.get_next_header().0,
-                (tcp_packet.get_data_offset() * 4) as u8,
-            ));
+            source_port = tcp_packet.get_source();
+            destination_port = tcp_packet.get_destination();
+
+            data_length = tcp_packet.payload().len() as u16;
+            header_length = (tcp_packet.get_data_offset() * 4) as u8;
+            length = ipv6_packet.packet().bytes().count() as u16;
+
+            window_size = tcp_packet.get_window();
+
+            combined_flags = tcp_packet.get_flags();
         } else {
             return None;
         }
-    } else if ipv6_packet.get_next_header() == IpNextHeaderProtocols::Udp {
+    } else if protocol == IpNextHeaderProtocols::Udp {
         if let Some(udp_packet) = pnet::packet::udp::UdpPacket::new(ipv6_packet.payload()) {
-            return Some(BasicFeaturesIpv6::new(
-                ipv6_packet.get_destination().into(),
-                ipv6_packet.get_source().into(),
-                udp_packet.get_destination(),
-                udp_packet.get_source(),
-                udp_packet.payload().len() as u16,
-                ipv6_packet.packet().bytes().count() as u16,
-                0,
-                0,
-                ipv6_packet.get_next_header().0,
-                8,
-            ));
+            source_port = udp_packet.get_source();
+            destination_port = udp_packet.get_destination();
+
+            data_length = udp_packet.payload().len() as u16;
+            header_length = 8;
+            length = udp_packet.get_length();
         } else {
             return None;
         }
     } else {
         return None;
     }
+
+    Some(BasicFeaturesIpv6::new(
+        destination_ip.into(),
+        source_ip.into(),
+        destination_port,
+        source_port,
+        data_length,
+        length,
+        window_size,
+        combined_flags,
+        protocol.0,
+        header_length,
+    ))
 }
 
 #[cfg(test)]
