@@ -1262,6 +1262,43 @@
 <a href="#1262" id="1262">1262</a>
 <a href="#1263" id="1263">1263</a>
 <a href="#1264" id="1264">1264</a>
+<a href="#1265" id="1265">1265</a>
+<a href="#1266" id="1266">1266</a>
+<a href="#1267" id="1267">1267</a>
+<a href="#1268" id="1268">1268</a>
+<a href="#1269" id="1269">1269</a>
+<a href="#1270" id="1270">1270</a>
+<a href="#1271" id="1271">1271</a>
+<a href="#1272" id="1272">1272</a>
+<a href="#1273" id="1273">1273</a>
+<a href="#1274" id="1274">1274</a>
+<a href="#1275" id="1275">1275</a>
+<a href="#1276" id="1276">1276</a>
+<a href="#1277" id="1277">1277</a>
+<a href="#1278" id="1278">1278</a>
+<a href="#1279" id="1279">1279</a>
+<a href="#1280" id="1280">1280</a>
+<a href="#1281" id="1281">1281</a>
+<a href="#1282" id="1282">1282</a>
+<a href="#1283" id="1283">1283</a>
+<a href="#1284" id="1284">1284</a>
+<a href="#1285" id="1285">1285</a>
+<a href="#1286" id="1286">1286</a>
+<a href="#1287" id="1287">1287</a>
+<a href="#1288" id="1288">1288</a>
+<a href="#1289" id="1289">1289</a>
+<a href="#1290" id="1290">1290</a>
+<a href="#1291" id="1291">1291</a>
+<a href="#1292" id="1292">1292</a>
+<a href="#1293" id="1293">1293</a>
+<a href="#1294" id="1294">1294</a>
+<a href="#1295" id="1295">1295</a>
+<a href="#1296" id="1296">1296</a>
+<a href="#1297" id="1297">1297</a>
+<a href="#1298" id="1298">1298</a>
+<a href="#1299" id="1299">1299</a>
+<a href="#1300" id="1300">1300</a>
+<a href="#1301" id="1301">1301</a>
 </pre></div><pre class="rust"><code><span class="kw">mod </span>args;
 <span class="kw">mod </span>flows;
 <span class="kw">mod </span>output;
@@ -2220,45 +2257,63 @@
 ///
 /// * `Option&lt;BasicFeaturesIpv4&gt;` - Basic features of the packet.
 </span><span class="kw">fn </span>extract_ipv4_features(ipv4_packet: <span class="kw-2">&amp;</span>Ipv4Packet) -&gt; <span class="prelude-ty">Option</span>&lt;BasicFeaturesIpv4&gt; {
+    <span class="kw">let </span>source_ip = ipv4_packet.get_source();
+    <span class="kw">let </span>destination_ip = ipv4_packet.get_destination();
+    <span class="kw">let </span>protocol = ipv4_packet.get_next_level_protocol();
 
-    <span class="kw">if </span>ipv4_packet.get_next_level_protocol().<span class="number">0 </span>== IpNextHeaderProtocols::Tcp.<span class="number">0 </span>{
+    <span class="kw">let </span>source_port: u16;
+    <span class="kw">let </span>destination_port: u16;
+
+    <span class="kw">let </span><span class="kw-2">mut </span>combined_flags: u8 = <span class="number">0</span>;
+
+    <span class="kw">let </span>data_length: u16;
+    <span class="kw">let </span>header_length: u8;
+    <span class="kw">let </span>length: u16;
+
+    <span class="kw">let </span><span class="kw-2">mut </span>window_size: u16 = <span class="number">0</span>;
+
+    <span class="kw">if </span>protocol.<span class="number">0 </span>== IpNextHeaderProtocols::Tcp.<span class="number">0 </span>{
         <span class="kw">if let </span><span class="prelude-val">Some</span>(tcp_packet) = TcpPacket::new(ipv4_packet.payload()) {
-            <span class="kw">return </span><span class="prelude-val">Some</span>(BasicFeaturesIpv4::new(
-                ipv4_packet.get_destination().into(),
-                ipv4_packet.get_source().into(),
-                tcp_packet.get_destination(),
-                tcp_packet.get_source(),
-                tcp_packet.payload().len() <span class="kw">as </span>u16,
-                ipv4_packet.get_total_length(),
-                tcp_packet.get_window(),
-                tcp_packet.get_flags(),
-                ipv4_packet.get_next_level_protocol().<span class="number">0</span>,
-                (tcp_packet.get_data_offset() * <span class="number">4</span>) <span class="kw">as </span>u8,
-            ));
+            source_port = tcp_packet.get_source();
+            destination_port = tcp_packet.get_destination();
+
+            data_length = tcp_packet.payload().len() <span class="kw">as </span>u16;
+            header_length = (tcp_packet.get_data_offset() * <span class="number">4</span>) <span class="kw">as </span>u8;
+            length = ipv4_packet.get_total_length();
+
+            window_size = tcp_packet.get_window();
+
+            combined_flags = tcp_packet.get_flags();
         } <span class="kw">else </span>{
             <span class="kw">return </span><span class="prelude-val">None</span>;
         }
-    } <span class="kw">else if </span>ipv4_packet.get_next_level_protocol().<span class="number">0 </span>== IpNextHeaderProtocols::Udp.<span class="number">0 </span>{
+    } <span class="kw">else if </span>protocol.<span class="number">0 </span>== IpNextHeaderProtocols::Udp.<span class="number">0 </span>{
         <span class="kw">if let </span><span class="prelude-val">Some</span>(udp_packet) = pnet::packet::udp::UdpPacket::new(ipv4_packet.payload()) {
+            source_port = udp_packet.get_source();
+            destination_port = udp_packet.get_destination();
 
-            <span class="kw">return </span><span class="prelude-val">Some</span>(BasicFeaturesIpv4::new(
-                ipv4_packet.get_destination().into(),
-                ipv4_packet.get_source().into(),
-                udp_packet.get_destination(),
-                udp_packet.get_source(),
-                udp_packet.payload().len() <span class="kw">as </span>u16,
-                udp_packet.get_length(),
-                <span class="number">0</span>,
-                <span class="number">0</span>,
-                ipv4_packet.get_next_level_protocol().<span class="number">0</span>,
-                <span class="number">8</span>,
-            ));
+            data_length = udp_packet.payload().len() <span class="kw">as </span>u16;
+            header_length = <span class="number">8</span>;
+            length = udp_packet.get_length();
         } <span class="kw">else </span>{
             <span class="kw">return </span><span class="prelude-val">None</span>;
         }
     } <span class="kw">else </span>{
         <span class="kw">return </span><span class="prelude-val">None</span>;
     }
+
+    <span class="prelude-val">Some</span>(BasicFeaturesIpv4::new(
+        destination_ip.into(),
+        source_ip.into(),
+        destination_port,
+        source_port,
+        data_length,
+        length,
+        window_size,
+        combined_flags,
+        protocol.<span class="number">0</span>,
+        header_length,
+    ))
 }
 
 <span class="doccomment">/// Extracts the basic features of an ipv6 packet pnet struct.
@@ -2271,44 +2326,63 @@
 ///
 /// * `Option&lt;BasicFeaturesIpv6&gt;` - Basic features of the packet.
 </span><span class="kw">fn </span>extract_ipv6_features(ipv6_packet: <span class="kw-2">&amp;</span>Ipv6Packet) -&gt; <span class="prelude-ty">Option</span>&lt;BasicFeaturesIpv6&gt; {
+    <span class="kw">let </span>source_ip = ipv6_packet.get_source();
+    <span class="kw">let </span>destination_ip = ipv6_packet.get_destination();
+    <span class="kw">let </span>protocol = ipv6_packet.get_next_header();
 
-    <span class="kw">if </span>ipv6_packet.get_next_header() == IpNextHeaderProtocols::Tcp {
+    <span class="kw">let </span>source_port: u16;
+    <span class="kw">let </span>destination_port: u16;
+
+    <span class="kw">let </span><span class="kw-2">mut </span>combined_flags: u8 = <span class="number">0</span>;
+
+    <span class="kw">let </span>data_length: u16;
+    <span class="kw">let </span>header_length: u8;
+    <span class="kw">let </span>length: u16;
+
+    <span class="kw">let </span><span class="kw-2">mut </span>window_size: u16 = <span class="number">0</span>;
+
+    <span class="kw">if </span>protocol == IpNextHeaderProtocols::Tcp {
         <span class="kw">if let </span><span class="prelude-val">Some</span>(tcp_packet) = TcpPacket::new(ipv6_packet.payload()) {
-            <span class="kw">return </span><span class="prelude-val">Some</span>(BasicFeaturesIpv6::new(
-                ipv6_packet.get_destination().into(),
-                ipv6_packet.get_source().into(),
-                tcp_packet.get_destination(),
-                tcp_packet.get_source(),
-                tcp_packet.payload().len() <span class="kw">as </span>u16,
-                ipv6_packet.packet().bytes().count() <span class="kw">as </span>u16,
-                tcp_packet.get_window(),
-                tcp_packet.get_flags(),
-                ipv6_packet.get_next_header().<span class="number">0</span>,
-                (tcp_packet.get_data_offset() * <span class="number">4</span>) <span class="kw">as </span>u8,
-            ));
+            source_port = tcp_packet.get_source();
+            destination_port = tcp_packet.get_destination();
+
+            data_length = tcp_packet.payload().len() <span class="kw">as </span>u16;
+            header_length = (tcp_packet.get_data_offset() * <span class="number">4</span>) <span class="kw">as </span>u8;
+            length = ipv6_packet.packet().bytes().count() <span class="kw">as </span>u16;
+
+            window_size = tcp_packet.get_window();
+
+            combined_flags = tcp_packet.get_flags();
         } <span class="kw">else </span>{
             <span class="kw">return </span><span class="prelude-val">None</span>;
         }
-    } <span class="kw">else if </span>ipv6_packet.get_next_header() == IpNextHeaderProtocols::Udp {
+    } <span class="kw">else if </span>protocol == IpNextHeaderProtocols::Udp {
         <span class="kw">if let </span><span class="prelude-val">Some</span>(udp_packet) = pnet::packet::udp::UdpPacket::new(ipv6_packet.payload()) {
-            <span class="kw">return </span><span class="prelude-val">Some</span>(BasicFeaturesIpv6::new(
-                ipv6_packet.get_destination().into(),
-                ipv6_packet.get_source().into(),
-                udp_packet.get_destination(),
-                udp_packet.get_source(),
-                udp_packet.payload().len() <span class="kw">as </span>u16,
-                ipv6_packet.packet().bytes().count() <span class="kw">as </span>u16,
-                <span class="number">0</span>,
-                <span class="number">0</span>,
-                ipv6_packet.get_next_header().<span class="number">0</span>,
-                <span class="number">8</span>,
-            ));
+            source_port = udp_packet.get_source();
+            destination_port = udp_packet.get_destination();
+
+            data_length = udp_packet.payload().len() <span class="kw">as </span>u16;
+            header_length = <span class="number">8</span>;
+            length = udp_packet.get_length();
         } <span class="kw">else </span>{
             <span class="kw">return </span><span class="prelude-val">None</span>;
         }
     } <span class="kw">else </span>{
         <span class="kw">return </span><span class="prelude-val">None</span>;
     }
+
+    <span class="prelude-val">Some</span>(BasicFeaturesIpv6::new(
+        destination_ip.into(),
+        source_ip.into(),
+        destination_port,
+        source_port,
+        data_length,
+        length,
+        window_size,
+        combined_flags,
+        protocol.<span class="number">0</span>,
+        header_length,
+    ))
 }
 
 <span class="attr">#[cfg(test)]
