@@ -24,7 +24,7 @@ use core::panic;
 use dashmap::DashMap;
 use flows::{basic_flow::BasicFlow, cidds_flow::CiddsFlow, custom_flow::CustomFlow, flow::Flow, nf_flow::NfFlow};
 use lazy_static::lazy_static;
-use log::{debug, info};
+use log::{debug, info, error};
 use pnet::packet::{
     ethernet::{EtherTypes, EthernetPacket},
     ip::IpNextHeaderProtocols,
@@ -55,6 +55,9 @@ lazy_static! {
     static ref NO_CONTAMINANT_FEATURES: Arc<Mutex<bool>> = Arc::new(Mutex::new(false));
 }
 
+const UNDERLINE: &str = "#############################################################";
+const DIVIDER: &str = "-------------------------------------------------------------";
+
 #[tokio::main]
 async fn main() {
     env_logger::init();
@@ -75,6 +78,9 @@ async fn main() {
                     panic!("The interval needs to be smaller than the lifespan!");
                 }
             }
+            info!("{UNDERLINE}");
+            info!("Starting the feature extraction tool in realtime mode...");
+            info!("{UNDERLINE}");
 
             let mut ncf = NO_CONTAMINANT_FEATURES.lock().unwrap();
             *ncf = no_contaminant_features;
@@ -84,17 +90,25 @@ async fn main() {
 
             match export_method.method {
                 ExportMethodType::Print => {
+                    info!("Selecting the print export method...");
+                    info!("{DIVIDER}");
+
                     let func = output::print::print;
                     let mut export_func = EXPORT_FUNCTION.lock().unwrap();
                     *export_func = Some(func);
                     drop(export_func);
                 }
                 ExportMethodType::Csv => {
+                    
+
                     let func = output::csv::export_to_csv;
                     let mut export_func = EXPORT_FUNCTION.lock().unwrap();
                     *export_func = Some(func);
 
                     if let Some(path) = export_method.export_path {
+                        info!("Selecting the CSV export method with output file: {:?} ...", path);
+                        info!("{DIVIDER}");
+
                         let file = OpenOptions::new()
                             .create(true)
                             .append(true)
@@ -111,36 +125,61 @@ async fn main() {
 
             match flow_type {
                 FlowType::BasicFlow => {
+                    info!("Selecting the basic flow type...");
+                    info!("{DIVIDER}");
+                    info!("Starting!");
+                    info!("{UNDERLINE}");
+
                     if let Err(err) =
                         handle_realtime::<BasicFlow>(interface, interval, lifespan).await
                     {
-                        eprintln!("Error: {:?}", err);
+                        error!("Error: {:?}", err);
                     }
                 }
                 FlowType::CicFlow => {
+                    info!("Selecting the CIC flow type...");
+                    info!("{DIVIDER}");
+                    info!("Starting!");
+                    info!("{UNDERLINE}");
+
                     if let Err(err) =
                         handle_realtime::<CicFlow>(interface, interval, lifespan).await
                     {
-                        eprintln!("Error: {:?}", err);
+                        error!("Error: {:?}", err);
                     }
                 }
                 FlowType::CiddsFlow => {
+                    info!("Selecting the CIDDS flow type...");
+                    info!("{DIVIDER}");
+                    info!("Starting!");
+                    info!("{UNDERLINE}");
+
                     if let Err(err) =
                         handle_realtime::<CiddsFlow>(interface, interval, lifespan).await
                     {
-                        eprintln!("Error: {:?}", err);
+                        error!("Error: {:?}", err);
                     }
                 }
                 FlowType::NfFlow => {
+                    info!("Selecting the NF flow type...");
+                    info!("{DIVIDER}");
+                    info!("Starting!");
+                    info!("{UNDERLINE}");
+
                     if let Err(err) = handle_realtime::<NfFlow>(interface, interval, lifespan).await
                     {
-                        eprintln!("Error: {:?}", err);
+                        error!("Error: {:?}", err);
                     }
                 }
                 FlowType::CustomFlow => {
+                    info!("Selecting the custom flow type...");
+                    info!("{DIVIDER}");
+                    info!("Starting!");
+                    info!("{UNDERLINE}");
+
                     if let Err(err) = handle_realtime::<CustomFlow>(interface, interval, lifespan).await
                     {
-                        eprintln!("Error: {:?}", err);
+                        error!("Error: {:?}", err);
                     }
                 }
             }
@@ -158,8 +197,15 @@ async fn main() {
             // needed to be dropped, because he stayed in scope.
             drop(ncf);
 
+            info!("{UNDERLINE}");
+            info!("Starting the feature extraction tool in pcap mode...");
+            info!("{UNDERLINE}");
+
             match export_method.method {
                 ExportMethodType::Print => {
+                    info!("Selecting the print export method...");
+                    info!("{DIVIDER}");
+
                     let func = output::print::print;
                     let mut export_func = EXPORT_FUNCTION.lock().unwrap();
                     *export_func = Some(func);
@@ -170,6 +216,9 @@ async fn main() {
                     *export_func = Some(func);
 
                     if let Some(path) = export_method.export_path {
+                        info!("Selecting the CSV export method with output file: {:?} ...", path);
+                        info!("{DIVIDER}");
+
                         let file = OpenOptions::new()
                             .create(true)
                             .append(true)
@@ -185,33 +234,83 @@ async fn main() {
 
             match (machine_type, flow_type) {
                 (GeneratedMachineType::Windows, FlowType::BasicFlow) => {
+                    info!("Selecting the Windows Pcap processing with the basic flow type..");
+                    info!("{DIVIDER}");
+                    info!("Starting!");
+                    info!("{UNDERLINE}");
+
                     read_pcap_file_ethernet::<BasicFlow>(&path)
                 }
                 (GeneratedMachineType::Windows, FlowType::CicFlow) => {
+                    info!("Selecting the Windows Pcap processing with the CIC flow type...");
+                    info!("{DIVIDER}");
+                    info!("Starting!");
+                    info!("{UNDERLINE}");
+
                     read_pcap_file_ethernet::<CicFlow>(&path)
                 }
                 (GeneratedMachineType::Windows, FlowType::CiddsFlow) => {
+                    info!("Selecting the Windows Pcap processing with the CIDDS flow type...");
+                    info!("{DIVIDER}");
+                    info!("Starting!");
+                    info!("{UNDERLINE}");
+
                     read_pcap_file_ethernet::<CiddsFlow>(&path)
                 }
                 (GeneratedMachineType::Windows, FlowType::NfFlow) => {
+                    info!("Selecting the Windows Pcap processing with the NF flow type...");
+                    info!("{DIVIDER}");
+                    info!("Starting!");
+                    info!("{UNDERLINE}");
+
                     read_pcap_file_ethernet::<NfFlow>(&path)
                 }
                 (GeneratedMachineType::Windows, FlowType::CustomFlow) => {
+                    info!("Selecting the Windows Pcap processing with the custom flow type...");
+                    info!("{DIVIDER}");
+                    info!("Starting!");
+                    info!("{UNDERLINE}");
+
                     read_pcap_file_ethernet::<CustomFlow>(&path)
                 }
                 (GeneratedMachineType::Linux, FlowType::BasicFlow) => {
+                    info!("Selecting the Linux cooked Pcap processing with the basic flow type...");
+                    info!("{DIVIDER}");
+                    info!("Starting!");
+                    info!("{UNDERLINE}");
+
                     read_pcap_file_linux_cooked::<BasicFlow>(&path)
                 }
                 (GeneratedMachineType::Linux, FlowType::CicFlow) => {
+                    info!("Selecting the Linux cooked Pcap processing with the CIC flow type...");
+                    info!("{DIVIDER}");
+                    info!("Starting!");
+                    info!("{UNDERLINE}");
+
                     read_pcap_file_linux_cooked::<CicFlow>(&path)
                 }
                 (GeneratedMachineType::Linux, FlowType::CiddsFlow) => {
+                    info!("Selecting the Linux cooked Pcap processing with the CIDDS flow type...");
+                    info!("{DIVIDER}");
+                    info!("Starting!");
+                    info!("{UNDERLINE}");
+
                     read_pcap_file_linux_cooked::<CiddsFlow>(&path)
                 }
                 (GeneratedMachineType::Linux, FlowType::NfFlow) => {
+                    info!("Selecting the Linux cooked Pcap processing with the NF flow type...");
+                    info!("{DIVIDER}");
+                    info!("Starting!");
+                    info!("{UNDERLINE}");
+
                     read_pcap_file_linux_cooked::<NfFlow>(&path)
                 }
                 (GeneratedMachineType::Linux, FlowType::CustomFlow) => {
+                    info!("Selecting the Linux cooked Pcap processing with the custom flow type...");
+                    info!("{DIVIDER}");
+                    info!("Starting!");
+                    info!("{UNDERLINE}");
+
                     read_pcap_file_linux_cooked::<CustomFlow>(&path)
                 }
             }
@@ -511,6 +610,7 @@ where
         } else {
             export(&flow.dump());
         }
+
     }
 
     for entry in flow_map_ipv6.iter() {
@@ -520,6 +620,7 @@ where
         } else {
             export(&flow.dump());
         }
+
     }
 
     // Making sure everything is flushed
@@ -527,10 +628,15 @@ where
         export_file.flush()?;
     }
 
+    info!("{UNDERLINE}");
+    info!("A small report:");
+    info!("{UNDERLINE}");
+
     info!(
         "{} events were lost",
         total_lost_events.load(Ordering::SeqCst)
     );
+    info!("{DIVIDER}");
     info!("Exiting...");
 
     Ok(())
@@ -546,16 +652,22 @@ where
     let flow_map_ipv4: Arc<DashMap<String, T>> = Arc::new(DashMap::new());
     let flow_map_ipv6: Arc<DashMap<String, T>> = Arc::new(DashMap::new());
 
+    info!("Reading the pcap file: {:?} ...", path);
+
     let mut cap = match pcap::Capture::from_file(path) {
         Ok(c) => c,
         Err(e) => {
-            log::error!("Error opening file: {:?}", e);
+            error!("Error opening file: {:?}", e);
             return;
         }
     };
 
     while let Ok(packet) = cap.next_packet() {
         amount_of_packets += 1;
+        if amount_of_packets % 10_000 == 0 {
+            info!("{} packets have been processed...", amount_of_packets);
+        }
+
         if let Some(ethernet) = EthernetPacket::new(packet.data) {
             match ethernet.get_ethertype() {
                 EtherTypes::Ipv4 => {
@@ -573,11 +685,11 @@ where
                     }
                 }
                 _ => {
-                    log::debug!("Unknown EtherType, consider using Linux cooked capture by setting the machine type to linux");
+                    debug!("Unknown EtherType, consider using Linux cooked capture by setting the machine type to linux");
                 }
             }
         } else {
-            log::error!("Error parsing packet...");
+            error!("Error parsing packet...");
         }
     }
 
@@ -599,12 +711,13 @@ where
         }
     }
 
+    info!("{UNDERLINE}");
+    info!("A small report:");
+    info!("{UNDERLINE}");
+
     let end = Instant::now();
-    println!(
-        "{} packets were processed in {:?} milliseconds",
-        amount_of_packets,
-        end.duration_since(start).as_millis()
-    );
+    info!("{} packets processed", amount_of_packets);
+    info!("Duration: {:?} milliseconds", end.duration_since(start).as_millis());
 }
 
 fn read_pcap_file_linux_cooked<T>(path: &str)
@@ -613,10 +726,11 @@ where
 {
     let start = Instant::now();
     let mut amount_of_packets = 0;
-    let mut size: usize = 0;
 
     let flow_map_ipv4: Arc<DashMap<String, T>> = Arc::new(DashMap::new());
     let flow_map_ipv6: Arc<DashMap<String, T>> = Arc::new(DashMap::new());
+
+    info!("Reading the pcap file: {:?} ...", path);
 
     let mut cap = match pcap::Capture::from_file(path) {
         Ok(c) => c,
@@ -633,7 +747,9 @@ where
     while let Ok(packet) = cap.next_packet() {
         if packet.data.len() > 14 {
             amount_of_packets += 1;
-            size += packet.data.len();
+            if amount_of_packets % 10_000 == 0 {
+                info!("{} packets have been processed...", amount_of_packets);
+            }
 
             let ethertype = u16::from_be_bytes([packet.data[14], packet.data[15]]);
             match ethertype {
@@ -652,11 +768,11 @@ where
                     }
                 }
                 _ => {
-                    log::debug!("Unknown SLL EtherType, consider using Ethernet capture by setting the machine type to windows");
+                    debug!("Unknown SLL EtherType, consider using Ethernet capture by setting the machine type to windows");
                 }
             }
         } else {
-            log::error!("Packet too short to be SLL");
+            error!("Packet too short to be SLL");
         }
     }
 
@@ -678,13 +794,13 @@ where
         }
     }
 
+    info!("{UNDERLINE}");
+    info!("A small report:");
+    info!("{UNDERLINE}");
+
     let end = Instant::now();
-    println!(
-        "{} packets with total size of: {} were processed in {:?} milliseconds",
-        amount_of_packets,
-        size,
-        end.duration_since(start).as_millis()
-    );
+    info!("{} packets processed", amount_of_packets);
+    info!("Duration: {:} milliseconds", end.duration_since(start).as_millis());
 }
 
 /// Export the flow to the set export function.
@@ -702,10 +818,10 @@ fn export(output: &String) {
         if let Some(ref mut flush_counter) = flush_counter_option.deref_mut() {
             function(&output, export_file_option.deref_mut(), flush_counter);
         } else {
-            log::error!("No export file set...")
+            error!("No export file set...")
         }
     } else {
-        log::error!("No export function set...")
+        error!("No export function set...")
     }
 }
 
