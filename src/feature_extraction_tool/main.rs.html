@@ -1242,6 +1242,26 @@
 <a href="#1242" id="1242">1242</a>
 <a href="#1243" id="1243">1243</a>
 <a href="#1244" id="1244">1244</a>
+<a href="#1245" id="1245">1245</a>
+<a href="#1246" id="1246">1246</a>
+<a href="#1247" id="1247">1247</a>
+<a href="#1248" id="1248">1248</a>
+<a href="#1249" id="1249">1249</a>
+<a href="#1250" id="1250">1250</a>
+<a href="#1251" id="1251">1251</a>
+<a href="#1252" id="1252">1252</a>
+<a href="#1253" id="1253">1253</a>
+<a href="#1254" id="1254">1254</a>
+<a href="#1255" id="1255">1255</a>
+<a href="#1256" id="1256">1256</a>
+<a href="#1257" id="1257">1257</a>
+<a href="#1258" id="1258">1258</a>
+<a href="#1259" id="1259">1259</a>
+<a href="#1260" id="1260">1260</a>
+<a href="#1261" id="1261">1261</a>
+<a href="#1262" id="1262">1262</a>
+<a href="#1263" id="1263">1263</a>
+<a href="#1264" id="1264">1264</a>
 </pre></div><pre class="rust"><code><span class="kw">mod </span>args;
 <span class="kw">mod </span>flows;
 <span class="kw">mod </span>output;
@@ -1787,7 +1807,8 @@
     <span class="kw">let </span>start = Instant::now();
     <span class="kw">let </span><span class="kw-2">mut </span>amount_of_packets = <span class="number">0</span>;
 
-    <span class="kw">let </span>flow_map: Arc&lt;DashMap&lt;String, T&gt;&gt; = Arc::new(DashMap::new());
+    <span class="kw">let </span>flow_map_ipv4: Arc&lt;DashMap&lt;String, T&gt;&gt; = Arc::new(DashMap::new());
+    <span class="kw">let </span>flow_map_ipv6: Arc&lt;DashMap&lt;String, T&gt;&gt; = Arc::new(DashMap::new());
 
     <span class="kw">let </span><span class="kw-2">mut </span>cap = <span class="kw">match </span>pcap::Capture::from_file(path) {
         <span class="prelude-val">Ok</span>(c) =&gt; c,
@@ -1804,14 +1825,14 @@
                 EtherTypes::Ipv4 =&gt; {
                     <span class="kw">if let </span><span class="prelude-val">Some</span>(ipv4_packet) = Ipv4Packet::new(ethernet.payload()) {
                         <span class="kw">if let </span><span class="prelude-val">Some</span>(features_ipv4) = extract_ipv4_features(<span class="kw-2">&amp;</span>ipv4_packet) {
-                            redirect_packet_ipv4(<span class="kw-2">&amp;</span>features_ipv4, <span class="kw-2">&amp;</span>flow_map);
+                            redirect_packet_ipv4(<span class="kw-2">&amp;</span>features_ipv4, <span class="kw-2">&amp;</span>flow_map_ipv4);
                         }
                     }
                 }
                 EtherTypes::Ipv6 =&gt; {
                     <span class="kw">if let </span><span class="prelude-val">Some</span>(ipv6_packet) = Ipv6Packet::new(ethernet.payload()) {
                         <span class="kw">if let </span><span class="prelude-val">Some</span>(features_ipv6) = extract_ipv6_features(<span class="kw-2">&amp;</span>ipv6_packet) {
-                            redirect_packet_ipv6(<span class="kw-2">&amp;</span>features_ipv6, <span class="kw-2">&amp;</span>flow_map);
+                            redirect_packet_ipv6(<span class="kw-2">&amp;</span>features_ipv6, <span class="kw-2">&amp;</span>flow_map_ipv6);
                         }
                     }
                 }
@@ -1824,7 +1845,16 @@
         }
     }
 
-    <span class="kw">for </span>entry <span class="kw">in </span>flow_map.iter() {
+    <span class="kw">for </span>entry <span class="kw">in </span>flow_map_ipv4.iter() {
+        <span class="kw">let </span>flow = entry.value();
+        <span class="kw">if </span><span class="kw-2">*</span>NO_CONTAMINANT_FEATURES.lock().unwrap().deref() {
+            export(<span class="kw-2">&amp;</span>flow.dump_without_contamination());
+        } <span class="kw">else </span>{
+            export(<span class="kw-2">&amp;</span>flow.dump());
+        }
+    }
+
+    <span class="kw">for </span>entry <span class="kw">in </span>flow_map_ipv6.iter() {
         <span class="kw">let </span>flow = entry.value();
         <span class="kw">if </span><span class="kw-2">*</span>NO_CONTAMINANT_FEATURES.lock().unwrap().deref() {
             export(<span class="kw-2">&amp;</span>flow.dump_without_contamination());
@@ -1849,7 +1879,8 @@
     <span class="kw">let </span><span class="kw-2">mut </span>amount_of_packets = <span class="number">0</span>;
     <span class="kw">let </span><span class="kw-2">mut </span>size: usize = <span class="number">0</span>;
 
-    <span class="kw">let </span>flow_map: Arc&lt;DashMap&lt;String, T&gt;&gt; = Arc::new(DashMap::new());
+    <span class="kw">let </span>flow_map_ipv4: Arc&lt;DashMap&lt;String, T&gt;&gt; = Arc::new(DashMap::new());
+    <span class="kw">let </span>flow_map_ipv6: Arc&lt;DashMap&lt;String, T&gt;&gt; = Arc::new(DashMap::new());
 
     <span class="kw">let </span><span class="kw-2">mut </span>cap = <span class="kw">match </span>pcap::Capture::from_file(path) {
         <span class="prelude-val">Ok</span>(c) =&gt; c,
@@ -1873,14 +1904,14 @@
                 SLL_IPV4 =&gt; {
                     <span class="kw">if let </span><span class="prelude-val">Some</span>(ipv4_packet) = Ipv4Packet::new(<span class="kw-2">&amp;</span>packet.data[<span class="number">16</span>..]) {
                         <span class="kw">if let </span><span class="prelude-val">Some</span>(features_ipv4) = extract_ipv4_features(<span class="kw-2">&amp;</span>ipv4_packet) {
-                            redirect_packet_ipv4(<span class="kw-2">&amp;</span>features_ipv4, <span class="kw-2">&amp;</span>flow_map);
+                            redirect_packet_ipv4(<span class="kw-2">&amp;</span>features_ipv4, <span class="kw-2">&amp;</span>flow_map_ipv4);
                         }
                     }
                 }
                 SLL_IPV6 =&gt; {
                     <span class="kw">if let </span><span class="prelude-val">Some</span>(ipv6_packet) = Ipv6Packet::new(<span class="kw-2">&amp;</span>packet.data[<span class="number">16</span>..]) {
                         <span class="kw">if let </span><span class="prelude-val">Some</span>(features_ipv6) = extract_ipv6_features(<span class="kw-2">&amp;</span>ipv6_packet) {
-                            redirect_packet_ipv6(<span class="kw-2">&amp;</span>features_ipv6, <span class="kw-2">&amp;</span>flow_map);
+                            redirect_packet_ipv6(<span class="kw-2">&amp;</span>features_ipv6, <span class="kw-2">&amp;</span>flow_map_ipv6);
                         }
                     }
                 }
@@ -1893,7 +1924,16 @@
         }
     }
 
-    <span class="kw">for </span>entry <span class="kw">in </span>flow_map.iter() {
+    <span class="kw">for </span>entry <span class="kw">in </span>flow_map_ipv4.iter() {
+        <span class="kw">let </span>flow = entry.value();
+        <span class="kw">if </span><span class="kw-2">*</span>NO_CONTAMINANT_FEATURES.lock().unwrap().deref() {
+            export(<span class="kw-2">&amp;</span>flow.dump_without_contamination());
+        } <span class="kw">else </span>{
+            export(<span class="kw-2">&amp;</span>flow.dump());
+        }
+    }
+
+    <span class="kw">for </span>entry <span class="kw">in </span>flow_map_ipv6.iter() {
         <span class="kw">let </span>flow = entry.value();
         <span class="kw">if </span><span class="kw-2">*</span>NO_CONTAMINANT_FEATURES.lock().unwrap().deref() {
             export(<span class="kw-2">&amp;</span>flow.dump_without_contamination());
