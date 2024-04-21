@@ -543,7 +543,8 @@ where
     let start = Instant::now();
     let mut amount_of_packets = 0;
 
-    let flow_map: Arc<DashMap<String, T>> = Arc::new(DashMap::new());
+    let flow_map_ipv4: Arc<DashMap<String, T>> = Arc::new(DashMap::new());
+    let flow_map_ipv6: Arc<DashMap<String, T>> = Arc::new(DashMap::new());
 
     let mut cap = match pcap::Capture::from_file(path) {
         Ok(c) => c,
@@ -560,14 +561,14 @@ where
                 EtherTypes::Ipv4 => {
                     if let Some(ipv4_packet) = Ipv4Packet::new(ethernet.payload()) {
                         if let Some(features_ipv4) = extract_ipv4_features(&ipv4_packet) {
-                            redirect_packet_ipv4(&features_ipv4, &flow_map);
+                            redirect_packet_ipv4(&features_ipv4, &flow_map_ipv4);
                         }
                     }
                 }
                 EtherTypes::Ipv6 => {
                     if let Some(ipv6_packet) = Ipv6Packet::new(ethernet.payload()) {
                         if let Some(features_ipv6) = extract_ipv6_features(&ipv6_packet) {
-                            redirect_packet_ipv6(&features_ipv6, &flow_map);
+                            redirect_packet_ipv6(&features_ipv6, &flow_map_ipv6);
                         }
                     }
                 }
@@ -580,7 +581,16 @@ where
         }
     }
 
-    for entry in flow_map.iter() {
+    for entry in flow_map_ipv4.iter() {
+        let flow = entry.value();
+        if *NO_CONTAMINANT_FEATURES.lock().unwrap().deref() {
+            export(&flow.dump_without_contamination());
+        } else {
+            export(&flow.dump());
+        }
+    }
+
+    for entry in flow_map_ipv6.iter() {
         let flow = entry.value();
         if *NO_CONTAMINANT_FEATURES.lock().unwrap().deref() {
             export(&flow.dump_without_contamination());
@@ -605,7 +615,8 @@ where
     let mut amount_of_packets = 0;
     let mut size: usize = 0;
 
-    let flow_map: Arc<DashMap<String, T>> = Arc::new(DashMap::new());
+    let flow_map_ipv4: Arc<DashMap<String, T>> = Arc::new(DashMap::new());
+    let flow_map_ipv6: Arc<DashMap<String, T>> = Arc::new(DashMap::new());
 
     let mut cap = match pcap::Capture::from_file(path) {
         Ok(c) => c,
@@ -629,14 +640,14 @@ where
                 SLL_IPV4 => {
                     if let Some(ipv4_packet) = Ipv4Packet::new(&packet.data[16..]) {
                         if let Some(features_ipv4) = extract_ipv4_features(&ipv4_packet) {
-                            redirect_packet_ipv4(&features_ipv4, &flow_map);
+                            redirect_packet_ipv4(&features_ipv4, &flow_map_ipv4);
                         }
                     }
                 }
                 SLL_IPV6 => {
                     if let Some(ipv6_packet) = Ipv6Packet::new(&packet.data[16..]) {
                         if let Some(features_ipv6) = extract_ipv6_features(&ipv6_packet) {
-                            redirect_packet_ipv6(&features_ipv6, &flow_map);
+                            redirect_packet_ipv6(&features_ipv6, &flow_map_ipv6);
                         }
                     }
                 }
@@ -649,7 +660,16 @@ where
         }
     }
 
-    for entry in flow_map.iter() {
+    for entry in flow_map_ipv4.iter() {
+        let flow = entry.value();
+        if *NO_CONTAMINANT_FEATURES.lock().unwrap().deref() {
+            export(&flow.dump_without_contamination());
+        } else {
+            export(&flow.dump());
+        }
+    }
+
+    for entry in flow_map_ipv6.iter() {
         let flow = entry.value();
         if *NO_CONTAMINANT_FEATURES.lock().unwrap().deref() {
             export(&flow.dump_without_contamination());
