@@ -20,9 +20,9 @@ use chrono::{DateTime, Utc};
 ///
 /// A string representing the unique identifier of the network flow.
 pub fn create_flow_id(
-    ip_source: IpAddr,
+    ip_source: &IpAddr,
     port_source: u16,
-    ip_destination: IpAddr,
+    ip_destination: &IpAddr,
     port_destination: u16,
     protocol: u8,
 ) -> String {
