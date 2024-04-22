@@ -4,7 +4,7 @@ mod output;
 mod utils;
 
 use crate::{
-    flows::cic_flow::CicFlow,
+    flows::{cic_flow::CicFlow, ntl_flow::NTLFlow},
     output::Export,
     utils::utils::{create_flow_id, get_duration},
 };
@@ -171,6 +171,17 @@ async fn main() {
                         error!("Error: {:?}", err);
                     }
                 }
+                FlowType::NtlFlow => {
+                    info!("Selecting the Ntl flow type...");
+                    info!("{DIVIDER}");
+                    info!("Starting!");
+                    info!("{UNDERLINE}");
+
+                    if let Err(err) = handle_realtime::<NTLFlow>(interface, interval, lifespan).await
+                    {
+                        error!("Error: {:?}", err);
+                    }
+                }
                 FlowType::CustomFlow => {
                     info!("Selecting the custom flow type...");
                     info!("{DIVIDER}");
@@ -265,6 +276,14 @@ async fn main() {
 
                     read_pcap_file_ethernet::<NfFlow>(&path)
                 }
+                (GeneratedMachineType::Windows, FlowType::NtlFlow) => {
+                    info!("Selecting the Windows Pcap processing with the Ntl flow type...");
+                    info!("{DIVIDER}");
+                    info!("Starting!");
+                    info!("{UNDERLINE}");
+
+                    read_pcap_file_ethernet::<NTLFlow>(&path)
+                }
                 (GeneratedMachineType::Windows, FlowType::CustomFlow) => {
                     info!("Selecting the Windows Pcap processing with the custom flow type...");
                     info!("{DIVIDER}");
@@ -304,6 +323,14 @@ async fn main() {
                     info!("{UNDERLINE}");
 
                     read_pcap_file_linux_cooked::<NfFlow>(&path)
+                }
+                (GeneratedMachineType::Linux, FlowType::NtlFlow) => {
+                    info!("Selecting the Linux cooked Pcap processing with the Ntl flow type...");
+                    info!("{DIVIDER}");
+                    info!("Starting!");
+                    info!("{UNDERLINE}");
+
+                    read_pcap_file_linux_cooked::<NTLFlow>(&path)
                 }
                 (GeneratedMachineType::Linux, FlowType::CustomFlow) => {
                     info!("Selecting the Linux cooked Pcap processing with the custom flow type...");
