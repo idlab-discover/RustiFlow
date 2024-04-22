@@ -99,8 +99,6 @@ async fn main() {
                     drop(export_func);
                 }
                 ExportMethodType::Csv => {
-                    
-
                     let func = output::csv::export_to_csv;
                     let mut export_func = EXPORT_FUNCTION.lock().unwrap();
                     *export_func = Some(func);
