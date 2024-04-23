@@ -81,7 +81,6 @@ See the wiki for the different feature sets available.
   ```bash
   RUST_LOG=info cargo xtask run -- realtime --help
   ```
-- **Output**:
   ```bash
   Real-time feature extraction
 
@@ -133,8 +132,6 @@ See the wiki for the different feature sets available.
   ```bash
   RUST_LOG=info cargo xtask run -- pcap --help
   ```
-
-- **Output**:
   ```bash
   Feature extraction from a pcap file
 
