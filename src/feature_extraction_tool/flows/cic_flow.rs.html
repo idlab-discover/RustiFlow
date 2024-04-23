@@ -1,4 +1,4 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `feature-extraction-tool/src/flows/cic_flow.rs`."><title>cic_flow.rs - source</title><script>if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-46f98efaafac5295.ttf.woff2,FiraSans-Regular-018c141bf0843ffd.woff2,FiraSans-Medium-8f9a781e4970d388.woff2,SourceCodePro-Regular-562dcc5011b6de7d.ttf.woff2,SourceCodePro-Semibold-d899c5a5c4aeb14a.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2" crossorigin href="../../../static.files/${f}">`).join(""))</script><link rel="stylesheet" href="../../../static.files/normalize-76eba96aa4d2e634.css"><link rel="stylesheet" href="../../../static.files/rustdoc-081576b923113409.css"><meta name="rustdoc-vars" data-root-path="../../../" data-static-root-path="../../../static.files/" data-current-crate="feature_extraction_tool" data-themes="" data-resource-suffix="" data-rustdoc-version="1.79.0-nightly (dbce3b43b 2024-04-20)" data-channel="nightly" data-search-js="search-bf21c90c8c1d92b1.js" data-settings-js="settings-4313503d2e1961c2.js" ><script src="../../../static.files/storage-e32f0c247825364d.js"></script><script defer src="../../../static.files/src-script-e66d777a5a92e9b2.js"></script><script defer src="../../../src-files.js"></script><script defer src="../../../static.files/main-20a3ad099b048cf2.js"></script><noscript><link rel="stylesheet" href="../../../static.files/noscript-09095024cf37855e.css"></noscript><link rel="alternate icon" type="image/png" href="../../../static.files/favicon-32x32-422f7d1d52889060.png"><link rel="icon" type="image/svg+xml" href="../../../static.files/favicon-2c020d218678b618.svg"></head><body class="rustdoc src"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="src-sidebar-title"><h2>Files</h2></div></nav><div class="sidebar-resizer"></div><main><nav class="sub"><form class="search-form"><span></span><div id="sidebar-button" tabindex="-1"><a href="../../../feature_extraction_tool/all.html" title="show sidebar"></a></div><input class="search-input" name="search" aria-label="Run search in the documentation" autocomplete="off" spellcheck="false" placeholder="Type ‘S’ or ‘/’ to search, ‘?’ for more options…" type="search"><div id="help-button" tabindex="-1"><a href="../../../help.html" title="help">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../../settings.html" title="settings">Settings</a></div></form></nav><section id="main-content" class="content"><div class="example-wrap"><div data-nosnippet><pre class="src-line-numbers"><a href="#1" id="1">1</a>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `feature-extraction-tool/src/flows/cic_flow.rs`."><title>cic_flow.rs - source</title><script>if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-46f98efaafac5295.ttf.woff2,FiraSans-Regular-018c141bf0843ffd.woff2,FiraSans-Medium-8f9a781e4970d388.woff2,SourceCodePro-Regular-562dcc5011b6de7d.ttf.woff2,SourceCodePro-Semibold-d899c5a5c4aeb14a.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2" crossorigin href="../../../static.files/${f}">`).join(""))</script><link rel="stylesheet" href="../../../static.files/normalize-76eba96aa4d2e634.css"><link rel="stylesheet" href="../../../static.files/rustdoc-081576b923113409.css"><meta name="rustdoc-vars" data-root-path="../../../" data-static-root-path="../../../static.files/" data-current-crate="feature_extraction_tool" data-themes="" data-resource-suffix="" data-rustdoc-version="1.79.0-nightly (7f2fc33da 2024-04-22)" data-channel="nightly" data-search-js="search-bf21c90c8c1d92b1.js" data-settings-js="settings-4313503d2e1961c2.js" ><script src="../../../static.files/storage-e32f0c247825364d.js"></script><script defer src="../../../static.files/src-script-e66d777a5a92e9b2.js"></script><script defer src="../../../src-files.js"></script><script defer src="../../../static.files/main-20a3ad099b048cf2.js"></script><noscript><link rel="stylesheet" href="../../../static.files/noscript-09095024cf37855e.css"></noscript><link rel="alternate icon" type="image/png" href="../../../static.files/favicon-32x32-422f7d1d52889060.png"><link rel="icon" type="image/svg+xml" href="../../../static.files/favicon-2c020d218678b618.svg"></head><body class="rustdoc src"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="src-sidebar-title"><h2>Files</h2></div></nav><div class="sidebar-resizer"></div><main><nav class="sub"><form class="search-form"><span></span><div id="sidebar-button" tabindex="-1"><a href="../../../feature_extraction_tool/all.html" title="show sidebar"></a></div><input class="search-input" name="search" aria-label="Run search in the documentation" autocomplete="off" spellcheck="false" placeholder="Type ‘S’ or ‘/’ to search, ‘?’ for more options…" type="search"><div id="help-button" tabindex="-1"><a href="../../../help.html" title="help">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../../settings.html" title="settings">Settings</a></div></form></nav><section id="main-content" class="content"><div class="example-wrap"><div data-nosnippet><pre class="src-line-numbers"><a href="#1" id="1">1</a>
 <a href="#2" id="2">2</a>
 <a href="#3" id="3">3</a>
 <a href="#4" id="4">4</a>
@@ -2618,13 +2618,13 @@
     <span class="doccomment">/// The total header length of the forward flow.
     </span><span class="kw">pub </span>fwd_header_length: u32,
     <span class="doccomment">/// The total duration of bulk packets in the forward flow.
-    </span>fwd_bulk_duration: f64,
+    </span><span class="kw">pub </span>fwd_bulk_duration: f64,
     <span class="doccomment">/// The number of bulk packets in the forward flow.
-    </span>fwd_bulk_packet_count: u64,
+    </span><span class="kw">pub </span>fwd_bulk_packet_count: u64,
     <span class="doccomment">/// The total size of bulk packets in the forward flow.
-    </span>fwd_bulk_size_total: u32,
+    </span><span class="kw">pub </span>fwd_bulk_size_total: u32,
     <span class="doccomment">/// The number of bulk states in the forward flow.
-    </span>fwd_bulk_state_count: u64,
+    </span><span class="kw">pub </span>fwd_bulk_state_count: u64,
     <span class="doccomment">/// Helper variable for bulk packet count.
     </span>fwd_bulk_packet_count_help: u64,
     <span class="doccomment">/// Helper variable for bulk start timestamp.
@@ -2660,13 +2660,13 @@
     <span class="doccomment">/// The total header length of the backward flow.
     </span><span class="kw">pub </span>bwd_header_length: u32,
     <span class="doccomment">/// The total duration of bulk packets in the backward flow.
-    </span>bwd_bulk_duration: f64,
+    </span><span class="kw">pub </span>bwd_bulk_duration: f64,
     <span class="doccomment">/// The number of bulk packets in the backward flow.
-    </span>bwd_bulk_packet_count: u64,
+    </span><span class="kw">pub </span>bwd_bulk_packet_count: u64,
     <span class="doccomment">/// The total size of bulk packets in the backward flow.
-    </span>bwd_bulk_size_total: u32,
+    </span><span class="kw">pub </span>bwd_bulk_size_total: u32,
     <span class="doccomment">/// The number of bulk states in the backward flow.
-    </span>bwd_bulk_state_count: u64,
+    </span><span class="kw">pub </span>bwd_bulk_state_count: u64,
     <span class="doccomment">/// Helper variable for bulk packet count.
     </span>bwd_bulk_packet_count_help: u64,
     <span class="doccomment">/// Helper variable for bulk start timestamp.
@@ -3272,7 +3272,7 @@
     /// ### Returns
     ///
     /// Variance of the flow's packet lengths, or 0 if not enough data.
-    </span><span class="kw">fn </span>get_flow_packet_length_variance(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; f64 {
+    </span><span class="kw">pub fn </span>get_flow_packet_length_variance(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; f64 {
         <span class="kw">if </span><span class="self">self</span>.basic_flow.fwd_packet_count &lt; <span class="number">1
             </span>|| <span class="self">self</span>.basic_flow.bwd_packet_count &lt; <span class="number">1
             </span>|| <span class="self">self</span>.basic_flow.fwd_packet_count + <span class="self">self</span>.basic_flow.bwd_packet_count &lt; <span class="number">3
@@ -3307,7 +3307,7 @@
     /// ### Returns
     ///
     /// The down/up ratio of the flow, or 0 if there are no backward packets.
-    </span><span class="kw">fn </span>get_down_up_ratio(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; f64 {
+    </span><span class="kw">pub fn </span>get_down_up_ratio(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; f64 {
         <span class="kw">if </span><span class="self">self</span>.basic_flow.bwd_packet_count &gt; <span class="number">0 </span>{
             <span class="kw">return </span><span class="self">self</span>.basic_flow.fwd_packet_count <span class="kw">as </span>f64
                 / <span class="self">self</span>.basic_flow.bwd_packet_count <span class="kw">as </span>f64;
@@ -3386,7 +3386,7 @@
     /// ### Returns
     ///
     /// Forward packets per second rate of the flow.
-    </span><span class="kw">fn </span>get_fwd_packets_s(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; f64 {
+    </span><span class="kw">pub fn </span>get_fwd_packets_s(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; f64 {
         <span class="self">self</span>.basic_flow.fwd_packet_count <span class="kw">as </span>f64
             / (get_duration(
                 <span class="self">self</span>.basic_flow.first_timestamp,
@@ -3402,7 +3402,7 @@
     /// ### Returns
     ///
     /// Backward packets per second rate of the flow.
-    </span><span class="kw">fn </span>get_bwd_packets_s(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; f64 {
+    </span><span class="kw">pub fn </span>get_bwd_packets_s(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; f64 {
         <span class="self">self</span>.basic_flow.bwd_packet_count <span class="kw">as </span>f64
             / (get_duration(
                 <span class="self">self</span>.basic_flow.first_timestamp,
@@ -3418,7 +3418,7 @@
     /// ### Returns
     ///
     /// Average size of forward bulk transfers, or 0 if there are no bulk transfers.
-    </span><span class="kw">fn </span>get_fwd_bytes_bulk(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; f64 {
+    </span><span class="kw">pub fn </span>get_fwd_bytes_bulk(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; f64 {
         <span class="kw">if </span><span class="self">self</span>.fwd_bulk_state_count == <span class="number">0 </span>{
             <span class="kw">return </span><span class="number">0.0</span>;
         }
@@ -3434,7 +3434,7 @@
     /// ### Returns
     ///
     /// Average number of packets in forward bulk transfers, or 0 if there are no bulk transfers.
-    </span><span class="kw">fn </span>get_fwd_packets_bulk(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; f64 {
+    </span><span class="kw">pub fn </span>get_fwd_packets_bulk(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; f64 {
         <span class="kw">if </span><span class="self">self</span>.fwd_bulk_state_count == <span class="number">0 </span>{
             <span class="kw">return </span><span class="number">0.0</span>;
         }
@@ -3450,7 +3450,7 @@
     /// ### Returns
     ///
     /// Forward bulk data transfer rate in bytes per second, or 0 if there are no forward bulk transfers.
-    </span><span class="kw">fn </span>get_fwd_bulk_rate(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; f64 {
+    </span><span class="kw">pub fn </span>get_fwd_bulk_rate(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; f64 {
         <span class="kw">if </span><span class="self">self</span>.fwd_bulk_duration == <span class="number">0.0 </span>{
             <span class="kw">return </span><span class="number">0.0</span>;
         }
@@ -3466,7 +3466,7 @@
     /// ### Returns
     ///
     /// Average size of backward bulk transfers, or 0 if there are no bulk transfers.
-    </span><span class="kw">fn </span>get_bwd_bytes_bulk(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; f64 {
+    </span><span class="kw">pub fn </span>get_bwd_bytes_bulk(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; f64 {
         <span class="kw">if </span><span class="self">self</span>.bwd_bulk_state_count == <span class="number">0 </span>{
             <span class="kw">return </span><span class="number">0.0</span>;
         }
@@ -3482,7 +3482,7 @@
     /// ### Returns
     ///
     /// Average number of packets in backward bulk transfers, or 0 if there are no bulk transfers.
-    </span><span class="kw">fn </span>get_bwd_packets_bulk(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; f64 {
+    </span><span class="kw">pub fn </span>get_bwd_packets_bulk(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; f64 {
         <span class="kw">if </span><span class="self">self</span>.bwd_bulk_state_count == <span class="number">0 </span>{
             <span class="kw">return </span><span class="number">0.0</span>;
         }
@@ -3498,7 +3498,7 @@
     /// ### Returns
     ///
     /// Backward bulk data transfer rate in bytes per second, or 0 if there are no backward bulk transfers.
-    </span><span class="kw">fn </span>get_bwd_bulk_rate(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; f64 {
+    </span><span class="kw">pub fn </span>get_bwd_bulk_rate(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; f64 {
         <span class="kw">if </span><span class="self">self</span>.bwd_bulk_duration == <span class="number">0.0 </span>{
             <span class="kw">return </span><span class="number">0.0</span>;
         }
@@ -3513,7 +3513,7 @@
     /// ### Returns
     ///
     /// Average number of forward packets per subflow, or 0 if there are no subflows.
-    </span><span class="kw">fn </span>get_sf_fwd_packets(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; f64 {
+    </span><span class="kw">pub fn </span>get_sf_fwd_packets(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; f64 {
         <span class="kw">if </span><span class="self">self</span>.sf_count == <span class="number">0 </span>{
             <span class="kw">return </span><span class="number">0.0</span>;
         }
@@ -3527,7 +3527,7 @@
     /// ### Returns
     ///
     /// Average number of forward bytes per subflow, or 0 if there are no subflows.
-    </span><span class="kw">fn </span>get_sf_fwd_bytes(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; f64 {
+    </span><span class="kw">pub fn </span>get_sf_fwd_bytes(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; f64 {
         <span class="kw">if </span><span class="self">self</span>.sf_count == <span class="number">0 </span>{
             <span class="kw">return </span><span class="number">0.0</span>;
         }
@@ -3541,7 +3541,7 @@
     /// ### Returns
     ///
     /// Average number of backward packets per subflow, or 0 if there are no subflows.
-    </span><span class="kw">fn </span>get_sf_bwd_packets(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; f64 {
+    </span><span class="kw">pub fn </span>get_sf_bwd_packets(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; f64 {
         <span class="kw">if </span><span class="self">self</span>.sf_count == <span class="number">0 </span>{
             <span class="kw">return </span><span class="number">0.0</span>;
         }
@@ -3556,7 +3556,7 @@
     /// ### Returns
     ///
     /// Average number of backward bytes per subflow, or 0 if there are no subflows.
-    </span><span class="kw">fn </span>get_sf_bwd_bytes(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; f64 {
+    </span><span class="kw">pub fn </span>get_sf_bwd_bytes(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; f64 {
         <span class="kw">if </span><span class="self">self</span>.sf_count == <span class="number">0 </span>{
             <span class="kw">return </span><span class="number">0.0</span>;
         }
@@ -3571,7 +3571,7 @@
     /// ### Returns
     ///
     /// Minimum active time in microseconds, or 0.0 if not set.
-    </span><span class="kw">fn </span>get_active_min(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; f64 {
+    </span><span class="kw">pub fn </span>get_active_min(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; f64 {
         <span class="kw">if </span><span class="self">self</span>.active_min == f64::MAX {
             <span class="number">0.0
         </span>} <span class="kw">else </span>{
@@ -3587,7 +3587,7 @@
     /// ### Returns
     ///
     /// Minimum idle time in microseconds, or 0.0 if not set.
-    </span><span class="kw">fn </span>get_idle_min(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; f64 {
+    </span><span class="kw">pub fn </span>get_idle_min(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; f64 {
         <span class="kw">if </span><span class="self">self</span>.idle_min == f64::MAX {
             <span class="number">0.0
         </span>} <span class="kw">else </span>{
