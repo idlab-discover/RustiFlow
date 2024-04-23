@@ -1,10 +1,12 @@
-# Network Intrusion Detection System Feature Extraction Tool
+# RustiFlow: A NIDS Feature Extraction Tool
+
+![RustiFlow Logo](RustiFlow.png)
 
 ## Overview
 
-This tool is designed for robust and efficient feature extraction in network intrusion detection systems. Leveraging Rust language and eBPF, it excels in processing high volumes of network traffic with remarkable speed and throughput.
+This tool is designed for robust and efficient feature extraction in network intrusion detection systems. Leveraging Rust language and eBPF, it excels in processing high volumes of network traffic with remarkable speed and throughput. (When your traffic is already captured, don't worry! It also has a build in pcap reader.) With various pre-defined feature sets and the ability to create custom feature sets, RustiFlow offers a versatile solution for network security applications.
 
-![Badge displaying GitHub Actions Workflow Status](https://img.shields.io/github/actions/workflow/status/matissecallewaert/nids-feature-extraction-tool/rust.yml?logo=github) ![Badge linking to the project documentation website](https://img.shields.io/website?url=https%3A%2F%2Fmatissecallewaert.github.io%2Fnids-feature-extraction-tool&label=Documentation) ![Ubuntu 22](https://img.shields.io/badge/Tested%20on%20ubuntu%2022-purple?logo=ubuntu) ![Ubuntu 20](https://img.shields.io/badge/Tested%20on%20ubuntu%2020-purple?logo=ubuntu)
+![Badge displaying GitHub Actions Workflow Status](https://img.shields.io/github/actions/workflow/status/matissecallewaert/RustiFlow/rust.yml?logo=github) ![Badge linking to the project documentation website](https://img.shields.io/website?url=https%3A%2F%2Fmatissecallewaert.github.io%2FRustiFlow&label=Documentation) ![GitHub license](https://img.shields.io/github/license/matissecallewaert/RustiFlow) ![Ubuntu 22](https://img.shields.io/badge/Tested%20on%20ubuntu%2022-purple?logo=ubuntu) ![Ubuntu 20](https://img.shields.io/badge/Tested%20on%20ubuntu%2020-purple?logo=ubuntu)
 
 ![Animated image showing network flows](flows.gif)
 
@@ -17,7 +19,11 @@ This tool is designed for robust and efficient feature extraction in network int
 
 ## Feature sets
 
+See the wiki for the different feature sets available.
 
+## Architecture
+
+![RustiFlow Architecture](arch.svg)
 
 ## Installation Guide
 
@@ -75,6 +81,48 @@ This tool is designed for robust and efficient feature extraction in network int
   ```bash
   RUST_LOG=info cargo xtask run -- realtime --help
   ```
+- **Output**:
+  ```bash
+  Real-time feature extraction
+
+  Usage: feature-extraction-tool realtime [OPTIONS] <INTERFACE> <FLOW_TYPE> <LIFESPAN> <METHOD> [EXPORT_PATH]
+
+  Arguments:
+    <INTERFACE>
+            The network interface to capture packets from
+
+    <FLOW_TYPE>
+            Possible values:
+            - basic-flow:  A basic flow that stores the basic features of a flow
+            - cic-flow:    Represents the CIC Flow, giving 83 features
+            - cidds-flow:  Represents the CIDDS Flow, giving 10 features
+            - nf-flow:     Represents a nfstream inspired flow, giving 69 features
+            - ntl-flow:    Represents the NTL Flow, giving 120 features
+            - custom-flow: Represents a flow that you can implement yourself
+
+    <LIFESPAN>
+            The maximum lifespan of a flow in seconds
+
+    <METHOD>
+            Output method
+
+            Possible values:
+            - print: The output will be printed to the console
+            - csv:   The output will be written to a CSV file
+
+    [EXPORT_PATH]
+            File path for output (used if method is Csv)
+
+  Options:
+    -n, --no-contaminant-features
+            Whether not to include contaminant features
+
+        --interval <INTERVAL>
+            The print interval for open flows in seconds, needs to be smaller than the flow maximum lifespan
+
+    -h, --help
+            Print help (see a summary with '-h')
+  ```
 
 ### Reading from a Pcap File:
 - **To Run/Build**:
@@ -86,6 +134,49 @@ This tool is designed for robust and efficient feature extraction in network int
   RUST_LOG=info cargo xtask run -- pcap --help
   ```
 
-**Note:** For specific logging levels, adjust `RUST_LOG` to `error` for error messages, and `debug` for debug messages.
+- **Output**:
+  ```bash
+  Feature extraction from a pcap file
+
+  Usage: feature-extraction-tool pcap [OPTIONS] <MACHINE_TYPE> <FLOW_TYPE> <PATH> <METHOD> [EXPORT_PATH]
+
+  Arguments:
+    <MACHINE_TYPE>
+            Possible values:
+            - windows: The pcap file was generated on a Windows machine
+            - linux:   The pcap file was generated on a Linux machine
+
+    <FLOW_TYPE>
+            Possible values:
+            - basic-flow:  A basic flow that stores the basic features of a flow
+            - cic-flow:    Represents the CIC Flow, giving 83 features
+            - cidds-flow:  Represents the CIDDS Flow, giving 10 features
+            - nf-flow:     Represents a nfstream inspired flow, giving 69 features
+            - ntl-flow:    Represents the NTL Flow, giving 120 features
+            - custom-flow: Represents a flow that you can implement yourself
+
+    <PATH>
+            The relative path to the pcap file
+
+    <METHOD>
+            Output method
+
+            Possible values:
+            - print: The output will be printed to the console
+            - csv:   The output will be written to a CSV file
+
+    [EXPORT_PATH]
+            File path for output (used if method is Csv)
+
+  Options:
+    -n, --no-contaminant-features
+            Whether not to include contaminant features
+
+    -h, --help
+            Print help (see a summary with '-h')
+
+  ```
+
+**Note:** For specific logging levels, adjust `RUST_LOG` to `error` for error messages, and `debug` for debug messages. If you don't want any additional logs, just remove `RUST_LOG=info`.
 
 ---
