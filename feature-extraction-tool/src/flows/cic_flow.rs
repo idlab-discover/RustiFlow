@@ -74,13 +74,13 @@ pub struct CicFlow {
     /// The total header length of the forward flow.
     pub fwd_header_length: u32,
     /// The total duration of bulk packets in the forward flow.
-    fwd_bulk_duration: f64,
+    pub fwd_bulk_duration: f64,
     /// The number of bulk packets in the forward flow.
-    fwd_bulk_packet_count: u64,
+    pub fwd_bulk_packet_count: u64,
     /// The total size of bulk packets in the forward flow.
-    fwd_bulk_size_total: u32,
+    pub fwd_bulk_size_total: u32,
     /// The number of bulk states in the forward flow.
-    fwd_bulk_state_count: u64,
+    pub fwd_bulk_state_count: u64,
     /// Helper variable for bulk packet count.
     fwd_bulk_packet_count_help: u64,
     /// Helper variable for bulk start timestamp.
@@ -116,13 +116,13 @@ pub struct CicFlow {
     /// The total header length of the backward flow.
     pub bwd_header_length: u32,
     /// The total duration of bulk packets in the backward flow.
-    bwd_bulk_duration: f64,
+    pub bwd_bulk_duration: f64,
     /// The number of bulk packets in the backward flow.
-    bwd_bulk_packet_count: u64,
+    pub bwd_bulk_packet_count: u64,
     /// The total size of bulk packets in the backward flow.
-    bwd_bulk_size_total: u32,
+    pub bwd_bulk_size_total: u32,
     /// The number of bulk states in the backward flow.
-    bwd_bulk_state_count: u64,
+    pub bwd_bulk_state_count: u64,
     /// Helper variable for bulk packet count.
     bwd_bulk_packet_count_help: u64,
     /// Helper variable for bulk start timestamp.
@@ -728,7 +728,7 @@ impl CicFlow {
     /// ### Returns
     ///
     /// Variance of the flow's packet lengths, or 0 if not enough data.
-    fn get_flow_packet_length_variance(&self) -> f64 {
+    pub fn get_flow_packet_length_variance(&self) -> f64 {
         if self.basic_flow.fwd_packet_count < 1
             || self.basic_flow.bwd_packet_count < 1
             || self.basic_flow.fwd_packet_count + self.basic_flow.bwd_packet_count < 3
@@ -763,7 +763,7 @@ impl CicFlow {
     /// ### Returns
     ///
     /// The down/up ratio of the flow, or 0 if there are no backward packets.
-    fn get_down_up_ratio(&self) -> f64 {
+    pub fn get_down_up_ratio(&self) -> f64 {
         if self.basic_flow.bwd_packet_count > 0 {
             return self.basic_flow.fwd_packet_count as f64
                 / self.basic_flow.bwd_packet_count as f64;
@@ -842,7 +842,7 @@ impl CicFlow {
     /// ### Returns
     ///
     /// Forward packets per second rate of the flow.
-    fn get_fwd_packets_s(&self) -> f64 {
+    pub fn get_fwd_packets_s(&self) -> f64 {
         self.basic_flow.fwd_packet_count as f64
             / (get_duration(
                 self.basic_flow.first_timestamp,
@@ -858,7 +858,7 @@ impl CicFlow {
     /// ### Returns
     ///
     /// Backward packets per second rate of the flow.
-    fn get_bwd_packets_s(&self) -> f64 {
+    pub fn get_bwd_packets_s(&self) -> f64 {
         self.basic_flow.bwd_packet_count as f64
             / (get_duration(
                 self.basic_flow.first_timestamp,
@@ -874,7 +874,7 @@ impl CicFlow {
     /// ### Returns
     ///
     /// Average size of forward bulk transfers, or 0 if there are no bulk transfers.
-    fn get_fwd_bytes_bulk(&self) -> f64 {
+    pub fn get_fwd_bytes_bulk(&self) -> f64 {
         if self.fwd_bulk_state_count == 0 {
             return 0.0;
         }
@@ -890,7 +890,7 @@ impl CicFlow {
     /// ### Returns
     ///
     /// Average number of packets in forward bulk transfers, or 0 if there are no bulk transfers.
-    fn get_fwd_packets_bulk(&self) -> f64 {
+    pub fn get_fwd_packets_bulk(&self) -> f64 {
         if self.fwd_bulk_state_count == 0 {
             return 0.0;
         }
@@ -906,7 +906,7 @@ impl CicFlow {
     /// ### Returns
     ///
     /// Forward bulk data transfer rate in bytes per second, or 0 if there are no forward bulk transfers.
-    fn get_fwd_bulk_rate(&self) -> f64 {
+    pub fn get_fwd_bulk_rate(&self) -> f64 {
         if self.fwd_bulk_duration == 0.0 {
             return 0.0;
         }
@@ -922,7 +922,7 @@ impl CicFlow {
     /// ### Returns
     ///
     /// Average size of backward bulk transfers, or 0 if there are no bulk transfers.
-    fn get_bwd_bytes_bulk(&self) -> f64 {
+    pub fn get_bwd_bytes_bulk(&self) -> f64 {
         if self.bwd_bulk_state_count == 0 {
             return 0.0;
         }
@@ -938,7 +938,7 @@ impl CicFlow {
     /// ### Returns
     ///
     /// Average number of packets in backward bulk transfers, or 0 if there are no bulk transfers.
-    fn get_bwd_packets_bulk(&self) -> f64 {
+    pub fn get_bwd_packets_bulk(&self) -> f64 {
         if self.bwd_bulk_state_count == 0 {
             return 0.0;
         }
@@ -954,7 +954,7 @@ impl CicFlow {
     /// ### Returns
     ///
     /// Backward bulk data transfer rate in bytes per second, or 0 if there are no backward bulk transfers.
-    fn get_bwd_bulk_rate(&self) -> f64 {
+    pub fn get_bwd_bulk_rate(&self) -> f64 {
         if self.bwd_bulk_duration == 0.0 {
             return 0.0;
         }
@@ -969,7 +969,7 @@ impl CicFlow {
     /// ### Returns
     ///
     /// Average number of forward packets per subflow, or 0 if there are no subflows.
-    fn get_sf_fwd_packets(&self) -> f64 {
+    pub fn get_sf_fwd_packets(&self) -> f64 {
         if self.sf_count == 0 {
             return 0.0;
         }
@@ -983,7 +983,7 @@ impl CicFlow {
     /// ### Returns
     ///
     /// Average number of forward bytes per subflow, or 0 if there are no subflows.
-    fn get_sf_fwd_bytes(&self) -> f64 {
+    pub fn get_sf_fwd_bytes(&self) -> f64 {
         if self.sf_count == 0 {
             return 0.0;
         }
@@ -997,7 +997,7 @@ impl CicFlow {
     /// ### Returns
     ///
     /// Average number of backward packets per subflow, or 0 if there are no subflows.
-    fn get_sf_bwd_packets(&self) -> f64 {
+    pub fn get_sf_bwd_packets(&self) -> f64 {
         if self.sf_count == 0 {
             return 0.0;
         }
@@ -1012,7 +1012,7 @@ impl CicFlow {
     /// ### Returns
     ///
     /// Average number of backward bytes per subflow, or 0 if there are no subflows.
-    fn get_sf_bwd_bytes(&self) -> f64 {
+    pub fn get_sf_bwd_bytes(&self) -> f64 {
         if self.sf_count == 0 {
             return 0.0;
         }
@@ -1027,7 +1027,7 @@ impl CicFlow {
     /// ### Returns
     ///
     /// Minimum active time in microseconds, or 0.0 if not set.
-    fn get_active_min(&self) -> f64 {
+    pub fn get_active_min(&self) -> f64 {
         if self.active_min == f64::MAX {
             0.0
         } else {
@@ -1043,7 +1043,7 @@ impl CicFlow {
     /// ### Returns
     ///
     /// Minimum idle time in microseconds, or 0.0 if not set.
-    fn get_idle_min(&self) -> f64 {
+    pub fn get_idle_min(&self) -> f64 {
         if self.idle_min == f64::MAX {
             0.0
         } else {
