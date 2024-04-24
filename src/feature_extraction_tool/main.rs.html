@@ -1,4 +1,4 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `feature-extraction-tool/src/main.rs`."><title>main.rs - source</title><script>if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-46f98efaafac5295.ttf.woff2,FiraSans-Regular-018c141bf0843ffd.woff2,FiraSans-Medium-8f9a781e4970d388.woff2,SourceCodePro-Regular-562dcc5011b6de7d.ttf.woff2,SourceCodePro-Semibold-d899c5a5c4aeb14a.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2" crossorigin href="../../static.files/${f}">`).join(""))</script><link rel="stylesheet" href="../../static.files/normalize-76eba96aa4d2e634.css"><link rel="stylesheet" href="../../static.files/rustdoc-081576b923113409.css"><meta name="rustdoc-vars" data-root-path="../../" data-static-root-path="../../static.files/" data-current-crate="feature_extraction_tool" data-themes="" data-resource-suffix="" data-rustdoc-version="1.79.0-nightly (7f2fc33da 2024-04-22)" data-channel="nightly" data-search-js="search-bf21c90c8c1d92b1.js" data-settings-js="settings-4313503d2e1961c2.js" ><script src="../../static.files/storage-e32f0c247825364d.js"></script><script defer src="../../static.files/src-script-e66d777a5a92e9b2.js"></script><script defer src="../../src-files.js"></script><script defer src="../../static.files/main-20a3ad099b048cf2.js"></script><noscript><link rel="stylesheet" href="../../static.files/noscript-09095024cf37855e.css"></noscript><link rel="alternate icon" type="image/png" href="../../static.files/favicon-32x32-422f7d1d52889060.png"><link rel="icon" type="image/svg+xml" href="../../static.files/favicon-2c020d218678b618.svg"></head><body class="rustdoc src"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="src-sidebar-title"><h2>Files</h2></div></nav><div class="sidebar-resizer"></div><main><nav class="sub"><form class="search-form"><span></span><div id="sidebar-button" tabindex="-1"><a href="../../feature_extraction_tool/all.html" title="show sidebar"></a></div><input class="search-input" name="search" aria-label="Run search in the documentation" autocomplete="off" spellcheck="false" placeholder="Type ‘S’ or ‘/’ to search, ‘?’ for more options…" type="search"><div id="help-button" tabindex="-1"><a href="../../help.html" title="help">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../settings.html" title="settings">Settings</a></div></form></nav><section id="main-content" class="content"><div class="example-wrap"><div data-nosnippet><pre class="src-line-numbers"><a href="#1" id="1">1</a>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `feature-extraction-tool/src/main.rs`."><title>main.rs - source</title><script>if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-46f98efaafac5295.ttf.woff2,FiraSans-Regular-018c141bf0843ffd.woff2,FiraSans-Medium-8f9a781e4970d388.woff2,SourceCodePro-Regular-562dcc5011b6de7d.ttf.woff2,SourceCodePro-Semibold-d899c5a5c4aeb14a.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2" crossorigin href="../../static.files/${f}">`).join(""))</script><link rel="stylesheet" href="../../static.files/normalize-76eba96aa4d2e634.css"><link rel="stylesheet" href="../../static.files/rustdoc-081576b923113409.css"><meta name="rustdoc-vars" data-root-path="../../" data-static-root-path="../../static.files/" data-current-crate="feature_extraction_tool" data-themes="" data-resource-suffix="" data-rustdoc-version="1.79.0-nightly (244da22fa 2024-04-23)" data-channel="nightly" data-search-js="search-bf21c90c8c1d92b1.js" data-settings-js="settings-4313503d2e1961c2.js" ><script src="../../static.files/storage-e32f0c247825364d.js"></script><script defer src="../../static.files/src-script-e66d777a5a92e9b2.js"></script><script defer src="../../src-files.js"></script><script defer src="../../static.files/main-20a3ad099b048cf2.js"></script><noscript><link rel="stylesheet" href="../../static.files/noscript-09095024cf37855e.css"></noscript><link rel="alternate icon" type="image/png" href="../../static.files/favicon-32x32-422f7d1d52889060.png"><link rel="icon" type="image/svg+xml" href="../../static.files/favicon-2c020d218678b618.svg"></head><body class="rustdoc src"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="src-sidebar-title"><h2>Files</h2></div></nav><div class="sidebar-resizer"></div><main><nav class="sub"><form class="search-form"><span></span><div id="sidebar-button" tabindex="-1"><a href="../../feature_extraction_tool/all.html" title="show sidebar"></a></div><input class="search-input" name="search" aria-label="Run search in the documentation" autocomplete="off" spellcheck="false" placeholder="Type ‘S’ or ‘/’ to search, ‘?’ for more options…" type="search"><div id="help-button" tabindex="-1"><a href="../../help.html" title="help">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../settings.html" title="settings">Settings</a></div></form></nav><section id="main-content" class="content"><div class="example-wrap"><div data-nosnippet><pre class="src-line-numbers"><a href="#1" id="1">1</a>
 <a href="#2" id="2">2</a>
 <a href="#3" id="3">3</a>
 <a href="#4" id="4">4</a>
@@ -1395,51 +1395,6 @@
 <a href="#1395" id="1395">1395</a>
 <a href="#1396" id="1396">1396</a>
 <a href="#1397" id="1397">1397</a>
-<a href="#1398" id="1398">1398</a>
-<a href="#1399" id="1399">1399</a>
-<a href="#1400" id="1400">1400</a>
-<a href="#1401" id="1401">1401</a>
-<a href="#1402" id="1402">1402</a>
-<a href="#1403" id="1403">1403</a>
-<a href="#1404" id="1404">1404</a>
-<a href="#1405" id="1405">1405</a>
-<a href="#1406" id="1406">1406</a>
-<a href="#1407" id="1407">1407</a>
-<a href="#1408" id="1408">1408</a>
-<a href="#1409" id="1409">1409</a>
-<a href="#1410" id="1410">1410</a>
-<a href="#1411" id="1411">1411</a>
-<a href="#1412" id="1412">1412</a>
-<a href="#1413" id="1413">1413</a>
-<a href="#1414" id="1414">1414</a>
-<a href="#1415" id="1415">1415</a>
-<a href="#1416" id="1416">1416</a>
-<a href="#1417" id="1417">1417</a>
-<a href="#1418" id="1418">1418</a>
-<a href="#1419" id="1419">1419</a>
-<a href="#1420" id="1420">1420</a>
-<a href="#1421" id="1421">1421</a>
-<a href="#1422" id="1422">1422</a>
-<a href="#1423" id="1423">1423</a>
-<a href="#1424" id="1424">1424</a>
-<a href="#1425" id="1425">1425</a>
-<a href="#1426" id="1426">1426</a>
-<a href="#1427" id="1427">1427</a>
-<a href="#1428" id="1428">1428</a>
-<a href="#1429" id="1429">1429</a>
-<a href="#1430" id="1430">1430</a>
-<a href="#1431" id="1431">1431</a>
-<a href="#1432" id="1432">1432</a>
-<a href="#1433" id="1433">1433</a>
-<a href="#1434" id="1434">1434</a>
-<a href="#1435" id="1435">1435</a>
-<a href="#1436" id="1436">1436</a>
-<a href="#1437" id="1437">1437</a>
-<a href="#1438" id="1438">1438</a>
-<a href="#1439" id="1439">1439</a>
-<a href="#1440" id="1440">1440</a>
-<a href="#1441" id="1441">1441</a>
-<a href="#1442" id="1442">1442</a>
 </pre></div><pre class="rust"><code><span class="kw">mod </span>args;
 <span class="kw">mod </span>flows;
 <span class="kw">mod </span>output;
@@ -1450,7 +1405,7 @@
     output::Export,
     utils::utils::{create_flow_id, get_duration},
 };
-<span class="kw">use </span>args::{Cli, Commands, ExportMethodType, FlowType, GeneratedMachineType};
+<span class="kw">use </span>args::{Cli, Commands, ExportMethodType, FlowType};
 <span class="kw">use </span>aya::{
     include_bytes_aligned,
     maps::AsyncPerfEventArray,
@@ -1637,8 +1592,8 @@
         }
         Commands::Pcap {
             path,
-            machine_type,
             flow_type,
+            lifespan,
             no_contaminant_features,
             export_method,
         } =&gt; {
@@ -1683,103 +1638,55 @@
                 }
             }
 
-            <span class="kw">match </span>(machine_type, flow_type) {
-                (GeneratedMachineType::Windows, FlowType::BasicFlow) =&gt; {
-                    <span class="macro">info!</span>(<span class="string">"Selecting the Windows Pcap processing with the basic flow type.."</span>);
+            <span class="kw">match </span>flow_type {
+                FlowType::BasicFlow =&gt; {
+                    <span class="macro">info!</span>(<span class="string">"Selecting the  basic flow type.."</span>);
                     <span class="macro">info!</span>(<span class="string">"{DIVIDER}"</span>);
                     <span class="macro">info!</span>(<span class="string">"Starting!"</span>);
                     <span class="macro">info!</span>(<span class="string">"{UNDERLINE}"</span>);
 
-                    read_pcap_file_ethernet::&lt;BasicFlow&gt;(<span class="kw-2">&amp;</span>path)
-                }
-                (GeneratedMachineType::Windows, FlowType::CicFlow) =&gt; {
-                    <span class="macro">info!</span>(<span class="string">"Selecting the Windows Pcap processing with the CIC flow type..."</span>);
+                    read_pcap_file::&lt;BasicFlow&gt;(<span class="kw-2">&amp;</span>path, lifespan).<span class="kw">await
+                </span>}
+                FlowType::CicFlow =&gt; {
+                    <span class="macro">info!</span>(<span class="string">"Selecting the CIC flow type..."</span>);
                     <span class="macro">info!</span>(<span class="string">"{DIVIDER}"</span>);
                     <span class="macro">info!</span>(<span class="string">"Starting!"</span>);
                     <span class="macro">info!</span>(<span class="string">"{UNDERLINE}"</span>);
 
-                    read_pcap_file_ethernet::&lt;CicFlow&gt;(<span class="kw-2">&amp;</span>path)
-                }
-                (GeneratedMachineType::Windows, FlowType::CiddsFlow) =&gt; {
-                    <span class="macro">info!</span>(<span class="string">"Selecting the Windows Pcap processing with the CIDDS flow type..."</span>);
+                    read_pcap_file::&lt;CicFlow&gt;(<span class="kw-2">&amp;</span>path, lifespan).<span class="kw">await
+                </span>}
+                FlowType::CiddsFlow =&gt; {
+                    <span class="macro">info!</span>(<span class="string">"Selecting the CIDDS flow type..."</span>);
                     <span class="macro">info!</span>(<span class="string">"{DIVIDER}"</span>);
                     <span class="macro">info!</span>(<span class="string">"Starting!"</span>);
                     <span class="macro">info!</span>(<span class="string">"{UNDERLINE}"</span>);
 
-                    read_pcap_file_ethernet::&lt;CiddsFlow&gt;(<span class="kw-2">&amp;</span>path)
-                }
-                (GeneratedMachineType::Windows, FlowType::NfFlow) =&gt; {
-                    <span class="macro">info!</span>(<span class="string">"Selecting the Windows Pcap processing with the NF flow type..."</span>);
+                    read_pcap_file::&lt;CiddsFlow&gt;(<span class="kw-2">&amp;</span>path, lifespan).<span class="kw">await
+                </span>}
+                FlowType::NfFlow =&gt; {
+                    <span class="macro">info!</span>(<span class="string">"Selecting the NF flow type..."</span>);
                     <span class="macro">info!</span>(<span class="string">"{DIVIDER}"</span>);
                     <span class="macro">info!</span>(<span class="string">"Starting!"</span>);
                     <span class="macro">info!</span>(<span class="string">"{UNDERLINE}"</span>);
 
-                    read_pcap_file_ethernet::&lt;NfFlow&gt;(<span class="kw-2">&amp;</span>path)
-                }
-                (GeneratedMachineType::Windows, FlowType::NtlFlow) =&gt; {
-                    <span class="macro">info!</span>(<span class="string">"Selecting the Windows Pcap processing with the Ntl flow type..."</span>);
+                    read_pcap_file::&lt;NfFlow&gt;(<span class="kw-2">&amp;</span>path, lifespan).<span class="kw">await
+                </span>}
+                FlowType::NtlFlow =&gt; {
+                    <span class="macro">info!</span>(<span class="string">"Selecting the Ntl flow type..."</span>);
                     <span class="macro">info!</span>(<span class="string">"{DIVIDER}"</span>);
                     <span class="macro">info!</span>(<span class="string">"Starting!"</span>);
                     <span class="macro">info!</span>(<span class="string">"{UNDERLINE}"</span>);
 
-                    read_pcap_file_ethernet::&lt;NTLFlow&gt;(<span class="kw-2">&amp;</span>path)
-                }
-                (GeneratedMachineType::Windows, FlowType::CustomFlow) =&gt; {
-                    <span class="macro">info!</span>(<span class="string">"Selecting the Windows Pcap processing with the custom flow type..."</span>);
+                    read_pcap_file::&lt;NTLFlow&gt;(<span class="kw-2">&amp;</span>path, lifespan).<span class="kw">await
+                </span>}
+                FlowType::CustomFlow =&gt; {
+                    <span class="macro">info!</span>(<span class="string">"Selecting the custom flow type..."</span>);
                     <span class="macro">info!</span>(<span class="string">"{DIVIDER}"</span>);
                     <span class="macro">info!</span>(<span class="string">"Starting!"</span>);
                     <span class="macro">info!</span>(<span class="string">"{UNDERLINE}"</span>);
 
-                    read_pcap_file_ethernet::&lt;CustomFlow&gt;(<span class="kw-2">&amp;</span>path)
-                }
-                (GeneratedMachineType::Linux, FlowType::BasicFlow) =&gt; {
-                    <span class="macro">info!</span>(<span class="string">"Selecting the Linux cooked Pcap processing with the basic flow type..."</span>);
-                    <span class="macro">info!</span>(<span class="string">"{DIVIDER}"</span>);
-                    <span class="macro">info!</span>(<span class="string">"Starting!"</span>);
-                    <span class="macro">info!</span>(<span class="string">"{UNDERLINE}"</span>);
-
-                    read_pcap_file_linux_cooked::&lt;BasicFlow&gt;(<span class="kw-2">&amp;</span>path)
-                }
-                (GeneratedMachineType::Linux, FlowType::CicFlow) =&gt; {
-                    <span class="macro">info!</span>(<span class="string">"Selecting the Linux cooked Pcap processing with the CIC flow type..."</span>);
-                    <span class="macro">info!</span>(<span class="string">"{DIVIDER}"</span>);
-                    <span class="macro">info!</span>(<span class="string">"Starting!"</span>);
-                    <span class="macro">info!</span>(<span class="string">"{UNDERLINE}"</span>);
-
-                    read_pcap_file_linux_cooked::&lt;CicFlow&gt;(<span class="kw-2">&amp;</span>path)
-                }
-                (GeneratedMachineType::Linux, FlowType::CiddsFlow) =&gt; {
-                    <span class="macro">info!</span>(<span class="string">"Selecting the Linux cooked Pcap processing with the CIDDS flow type..."</span>);
-                    <span class="macro">info!</span>(<span class="string">"{DIVIDER}"</span>);
-                    <span class="macro">info!</span>(<span class="string">"Starting!"</span>);
-                    <span class="macro">info!</span>(<span class="string">"{UNDERLINE}"</span>);
-
-                    read_pcap_file_linux_cooked::&lt;CiddsFlow&gt;(<span class="kw-2">&amp;</span>path)
-                }
-                (GeneratedMachineType::Linux, FlowType::NfFlow) =&gt; {
-                    <span class="macro">info!</span>(<span class="string">"Selecting the Linux cooked Pcap processing with the NF flow type..."</span>);
-                    <span class="macro">info!</span>(<span class="string">"{DIVIDER}"</span>);
-                    <span class="macro">info!</span>(<span class="string">"Starting!"</span>);
-                    <span class="macro">info!</span>(<span class="string">"{UNDERLINE}"</span>);
-
-                    read_pcap_file_linux_cooked::&lt;NfFlow&gt;(<span class="kw-2">&amp;</span>path)
-                }
-                (GeneratedMachineType::Linux, FlowType::NtlFlow) =&gt; {
-                    <span class="macro">info!</span>(<span class="string">"Selecting the Linux cooked Pcap processing with the Ntl flow type..."</span>);
-                    <span class="macro">info!</span>(<span class="string">"{DIVIDER}"</span>);
-                    <span class="macro">info!</span>(<span class="string">"Starting!"</span>);
-                    <span class="macro">info!</span>(<span class="string">"{UNDERLINE}"</span>);
-
-                    read_pcap_file_linux_cooked::&lt;NTLFlow&gt;(<span class="kw-2">&amp;</span>path)
-                }
-                (GeneratedMachineType::Linux, FlowType::CustomFlow) =&gt; {
-                    <span class="macro">info!</span>(<span class="string">"Selecting the Linux cooked Pcap processing with the custom flow type..."</span>);
-                    <span class="macro">info!</span>(<span class="string">"{DIVIDER}"</span>);
-                    <span class="macro">info!</span>(<span class="string">"Starting!"</span>);
-                    <span class="macro">info!</span>(<span class="string">"{UNDERLINE}"</span>);
-
-                    read_pcap_file_linux_cooked::&lt;CustomFlow&gt;(<span class="kw-2">&amp;</span>path)
-                }
+                    read_pcap_file::&lt;CustomFlow&gt;(<span class="kw-2">&amp;</span>path, lifespan).<span class="kw">await
+                </span>}
             }
         }
     }
@@ -2109,12 +2016,16 @@
     <span class="prelude-val">Ok</span>(())
 }
 
-<span class="kw">fn </span>read_pcap_file_ethernet&lt;T&gt;(path: <span class="kw-2">&amp;</span>str)
+<span class="kw">async fn </span>read_pcap_file&lt;T&gt;(path: <span class="kw-2">&amp;</span>str, lifespan: u64)
 <span class="kw">where
-    </span>T: Flow,
+</span>T: Flow + Send + Sync + <span class="lifetime">'static</span>,
 {
     <span class="kw">let </span>start = Instant::now();
     <span class="kw">let </span><span class="kw-2">mut </span>amount_of_packets = <span class="number">0</span>;
+
+    <span class="comment">// Define constants for Linux cooked capture EtherTypes
+    </span><span class="kw">const </span>SLL_IPV4: u16 = <span class="number">0x0800</span>;
+    <span class="kw">const </span>SLL_IPV6: u16 = <span class="number">0x86DD</span>;
 
     <span class="kw">let </span>flow_map_ipv4: Arc&lt;DashMap&lt;String, T&gt;&gt; = Arc::new(DashMap::new());
     <span class="kw">let </span>flow_map_ipv6: Arc&lt;DashMap&lt;String, T&gt;&gt; = Arc::new(DashMap::new());
@@ -2130,16 +2041,15 @@
     };
 
     <span class="kw">while let </span><span class="prelude-val">Ok</span>(packet) = cap.next_packet() {
-        amount_of_packets += <span class="number">1</span>;
-        <span class="kw">if </span>amount_of_packets % <span class="number">10_000 </span>== <span class="number">0 </span>{
-            <span class="macro">info!</span>(<span class="string">"{} packets have been processed..."</span>, amount_of_packets);
-        }
-
         <span class="kw">if let </span><span class="prelude-val">Some</span>(ethernet) = EthernetPacket::new(packet.data) {
             <span class="kw">match </span>ethernet.get_ethertype() {
                 EtherTypes::Ipv4 =&gt; {
                     <span class="kw">if let </span><span class="prelude-val">Some</span>(ipv4_packet) = Ipv4Packet::new(ethernet.payload()) {
                         <span class="kw">if let </span><span class="prelude-val">Some</span>(features_ipv4) = extract_ipv4_features(<span class="kw-2">&amp;</span>ipv4_packet) {
+                            amount_of_packets += <span class="number">1</span>;
+                            <span class="kw">if </span>amount_of_packets % <span class="number">10_000 </span>== <span class="number">0 </span>{
+                                <span class="macro">info!</span>(<span class="string">"{} packets have been processed..."</span>, amount_of_packets);
+                            }
                             redirect_packet_ipv4(<span class="kw-2">&amp;</span>features_ipv4, <span class="kw-2">&amp;</span>flow_map_ipv4);
                         }
                     }
@@ -2147,18 +2057,101 @@
                 EtherTypes::Ipv6 =&gt; {
                     <span class="kw">if let </span><span class="prelude-val">Some</span>(ipv6_packet) = Ipv6Packet::new(ethernet.payload()) {
                         <span class="kw">if let </span><span class="prelude-val">Some</span>(features_ipv6) = extract_ipv6_features(<span class="kw-2">&amp;</span>ipv6_packet) {
+                            amount_of_packets += <span class="number">1</span>;
+                            <span class="kw">if </span>amount_of_packets % <span class="number">10_000 </span>== <span class="number">0 </span>{
+                                <span class="macro">info!</span>(<span class="string">"{} packets have been processed..."</span>, amount_of_packets);
+                            }
                             redirect_packet_ipv6(<span class="kw-2">&amp;</span>features_ipv6, <span class="kw-2">&amp;</span>flow_map_ipv6);
                         }
                     }
                 }
                 <span class="kw">_ </span>=&gt; {
-                    <span class="macro">debug!</span>(<span class="string">"Unknown EtherType, consider using Linux cooked capture by setting the machine type to linux"</span>);
+                    <span class="kw">let </span>ethertype = u16::from_be_bytes([packet.data[<span class="number">14</span>], packet.data[<span class="number">15</span>]]);
+                    <span class="kw">match </span>ethertype {
+                        SLL_IPV4 =&gt; {
+                            <span class="kw">if let </span><span class="prelude-val">Some</span>(ipv4_packet) = Ipv4Packet::new(<span class="kw-2">&amp;</span>packet.data[<span class="number">16</span>..]) {
+                                <span class="kw">if let </span><span class="prelude-val">Some</span>(features_ipv4) = extract_ipv4_features(<span class="kw-2">&amp;</span>ipv4_packet) {
+                                    amount_of_packets += <span class="number">1</span>;
+                                    <span class="kw">if </span>amount_of_packets % <span class="number">10_000 </span>== <span class="number">0 </span>{
+                                        <span class="macro">info!</span>(<span class="string">"{} packets have been processed..."</span>, amount_of_packets);
+                                    }
+                                    redirect_packet_ipv4(<span class="kw-2">&amp;</span>features_ipv4, <span class="kw-2">&amp;</span>flow_map_ipv4);
+                                }
+                            }
+                        }
+                        SLL_IPV6 =&gt; {
+                            <span class="kw">if let </span><span class="prelude-val">Some</span>(ipv6_packet) = Ipv6Packet::new(<span class="kw-2">&amp;</span>packet.data[<span class="number">16</span>..]) {
+                                <span class="kw">if let </span><span class="prelude-val">Some</span>(features_ipv6) = extract_ipv6_features(<span class="kw-2">&amp;</span>ipv6_packet) {
+                                    amount_of_packets += <span class="number">1</span>;
+                                    <span class="kw">if </span>amount_of_packets % <span class="number">10_000 </span>== <span class="number">0 </span>{
+                                        <span class="macro">info!</span>(<span class="string">"{} packets have been processed..."</span>, amount_of_packets);
+                                    }
+                                    redirect_packet_ipv6(<span class="kw-2">&amp;</span>features_ipv6, <span class="kw-2">&amp;</span>flow_map_ipv6);
+                                }
+                            }
+                        }
+                        <span class="kw">_ </span>=&gt; {
+                            <span class="macro">debug!</span>(<span class="string">"Unknown SLL EtherType!"</span>);
+                        }
+                    }
                 }
             }
         } <span class="kw">else </span>{
             <span class="macro">error!</span>(<span class="string">"Error parsing packet..."</span>);
         }
     }
+
+    <span class="kw">let </span>flow_map_end_ipv4 = flow_map_ipv4.clone();
+    <span class="kw">let </span>flow_map_end_ipv6 = flow_map_ipv6.clone();
+    task::spawn(<span class="kw">async move </span>{
+        <span class="kw">let </span><span class="kw-2">mut </span>interval = time::interval(Duration::from_secs(<span class="number">2</span>));
+        <span class="kw">loop </span>{
+            interval.tick().<span class="kw">await</span>;
+            <span class="kw">let </span>timestamp = Utc::now();
+
+            <span class="comment">// Collect keys to remove
+            </span><span class="kw">let </span><span class="kw-2">mut </span>keys_to_remove_ipv4 = Vec::new();
+            <span class="kw">for </span>entry <span class="kw">in </span>flow_map_end_ipv4.iter() {
+                <span class="kw">let </span>flow = entry.value();
+                <span class="kw">let </span>end = get_duration(flow.get_first_timestamp(), timestamp) / <span class="number">1_000_000.0</span>;
+
+                <span class="kw">if </span>end &gt;= lifespan <span class="kw">as </span>f64 {
+                    <span class="kw">if </span><span class="kw-2">*</span>NO_CONTAMINANT_FEATURES.lock().unwrap().deref() {
+                        export(<span class="kw-2">&amp;</span>flow.dump_without_contamination());
+                    } <span class="kw">else </span>{
+                        export(<span class="kw-2">&amp;</span>flow.dump());
+                    }
+                    keys_to_remove_ipv4.push(entry.key().clone());
+                }
+            }
+
+            <span class="comment">// Collect keys to remove
+            </span><span class="kw">let </span><span class="kw-2">mut </span>keys_to_remove_ipv6 = Vec::new();
+            <span class="kw">for </span>entry <span class="kw">in </span>flow_map_end_ipv6.iter() {
+                <span class="kw">let </span>flow = entry.value();
+                <span class="kw">let </span>end = get_duration(flow.get_first_timestamp(), timestamp) / <span class="number">1_000_000.0</span>;
+
+                <span class="kw">if </span>end &gt;= lifespan <span class="kw">as </span>f64 {
+                    <span class="kw">if </span><span class="kw-2">*</span>NO_CONTAMINANT_FEATURES.lock().unwrap().deref() {
+                        export(<span class="kw-2">&amp;</span>flow.dump_without_contamination());
+                    } <span class="kw">else </span>{
+                        export(<span class="kw-2">&amp;</span>flow.dump());
+                    }
+                    keys_to_remove_ipv6.push(entry.key().clone());
+                }
+            }
+
+            <span class="comment">// Remove entries outside of the iteration
+            </span><span class="kw">for </span>key <span class="kw">in </span>keys_to_remove_ipv4 {
+                flow_map_end_ipv4.remove(<span class="kw-2">&amp;</span>key);
+            }
+
+            <span class="comment">// Remove entries outside of the iteration
+            </span><span class="kw">for </span>key <span class="kw">in </span>keys_to_remove_ipv6 {
+                flow_map_end_ipv6.remove(<span class="kw-2">&amp;</span>key);
+            }
+        }
+    });
 
     <span class="kw">for </span>entry <span class="kw">in </span>flow_map_ipv4.iter() {
         <span class="kw">let </span>flow = entry.value();
@@ -2185,89 +2178,6 @@
     <span class="kw">let </span>end = Instant::now();
     <span class="macro">info!</span>(<span class="string">"{} packets processed"</span>, amount_of_packets);
     <span class="macro">info!</span>(<span class="string">"Duration: {:?} milliseconds"</span>, end.duration_since(start).as_millis());
-}
-
-<span class="kw">fn </span>read_pcap_file_linux_cooked&lt;T&gt;(path: <span class="kw-2">&amp;</span>str)
-<span class="kw">where
-    </span>T: Flow,
-{
-    <span class="kw">let </span>start = Instant::now();
-    <span class="kw">let </span><span class="kw-2">mut </span>amount_of_packets = <span class="number">0</span>;
-
-    <span class="kw">let </span>flow_map_ipv4: Arc&lt;DashMap&lt;String, T&gt;&gt; = Arc::new(DashMap::new());
-    <span class="kw">let </span>flow_map_ipv6: Arc&lt;DashMap&lt;String, T&gt;&gt; = Arc::new(DashMap::new());
-
-    <span class="macro">info!</span>(<span class="string">"Reading the pcap file: {:?} ..."</span>, path);
-
-    <span class="kw">let </span><span class="kw-2">mut </span>cap = <span class="kw">match </span>pcap::Capture::from_file(path) {
-        <span class="prelude-val">Ok</span>(c) =&gt; c,
-        <span class="prelude-val">Err</span>(e) =&gt; {
-            <span class="macro">log::error!</span>(<span class="string">"Error opening file: {:?}"</span>, e);
-            <span class="kw">return</span>;
-        }
-    };
-
-    <span class="comment">// Define constants for Linux cooked capture EtherTypes
-    </span><span class="kw">const </span>SLL_IPV4: u16 = <span class="number">0x0800</span>;
-    <span class="kw">const </span>SLL_IPV6: u16 = <span class="number">0x86DD</span>;
-
-    <span class="kw">while let </span><span class="prelude-val">Ok</span>(packet) = cap.next_packet() {
-        <span class="kw">if </span>packet.data.len() &gt; <span class="number">14 </span>{
-            amount_of_packets += <span class="number">1</span>;
-            <span class="kw">if </span>amount_of_packets % <span class="number">10_000 </span>== <span class="number">0 </span>{
-                <span class="macro">info!</span>(<span class="string">"{} packets have been processed..."</span>, amount_of_packets);
-            }
-
-            <span class="kw">let </span>ethertype = u16::from_be_bytes([packet.data[<span class="number">14</span>], packet.data[<span class="number">15</span>]]);
-            <span class="kw">match </span>ethertype {
-                SLL_IPV4 =&gt; {
-                    <span class="kw">if let </span><span class="prelude-val">Some</span>(ipv4_packet) = Ipv4Packet::new(<span class="kw-2">&amp;</span>packet.data[<span class="number">16</span>..]) {
-                        <span class="kw">if let </span><span class="prelude-val">Some</span>(features_ipv4) = extract_ipv4_features(<span class="kw-2">&amp;</span>ipv4_packet) {
-                            redirect_packet_ipv4(<span class="kw-2">&amp;</span>features_ipv4, <span class="kw-2">&amp;</span>flow_map_ipv4);
-                        }
-                    }
-                }
-                SLL_IPV6 =&gt; {
-                    <span class="kw">if let </span><span class="prelude-val">Some</span>(ipv6_packet) = Ipv6Packet::new(<span class="kw-2">&amp;</span>packet.data[<span class="number">16</span>..]) {
-                        <span class="kw">if let </span><span class="prelude-val">Some</span>(features_ipv6) = extract_ipv6_features(<span class="kw-2">&amp;</span>ipv6_packet) {
-                            redirect_packet_ipv6(<span class="kw-2">&amp;</span>features_ipv6, <span class="kw-2">&amp;</span>flow_map_ipv6);
-                        }
-                    }
-                }
-                <span class="kw">_ </span>=&gt; {
-                    <span class="macro">debug!</span>(<span class="string">"Unknown SLL EtherType, consider using Ethernet capture by setting the machine type to windows"</span>);
-                }
-            }
-        } <span class="kw">else </span>{
-            <span class="macro">error!</span>(<span class="string">"Packet too short to be SLL"</span>);
-        }
-    }
-
-    <span class="kw">for </span>entry <span class="kw">in </span>flow_map_ipv4.iter() {
-        <span class="kw">let </span>flow = entry.value();
-        <span class="kw">if </span><span class="kw-2">*</span>NO_CONTAMINANT_FEATURES.lock().unwrap().deref() {
-            export(<span class="kw-2">&amp;</span>flow.dump_without_contamination());
-        } <span class="kw">else </span>{
-            export(<span class="kw-2">&amp;</span>flow.dump());
-        }
-    }
-
-    <span class="kw">for </span>entry <span class="kw">in </span>flow_map_ipv6.iter() {
-        <span class="kw">let </span>flow = entry.value();
-        <span class="kw">if </span><span class="kw-2">*</span>NO_CONTAMINANT_FEATURES.lock().unwrap().deref() {
-            export(<span class="kw-2">&amp;</span>flow.dump_without_contamination());
-        } <span class="kw">else </span>{
-            export(<span class="kw-2">&amp;</span>flow.dump());
-        }
-    }
-
-    <span class="macro">info!</span>(<span class="string">"{UNDERLINE}"</span>);
-    <span class="macro">info!</span>(<span class="string">"A small report:"</span>);
-    <span class="macro">info!</span>(<span class="string">"{UNDERLINE}"</span>);
-
-    <span class="kw">let </span>end = Instant::now();
-    <span class="macro">info!</span>(<span class="string">"{} packets processed"</span>, amount_of_packets);
-    <span class="macro">info!</span>(<span class="string">"Duration: {:} milliseconds"</span>, end.duration_since(start).as_millis());
 }
 
 <span class="doccomment">/// Export the flow to the set export function.
