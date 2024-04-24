@@ -73,15 +73,10 @@ See the wiki for the different feature sets available.
 ## Usage Instructions
 
 ### Real-Time Traffic Capture:
-- **To Run/Build**:
-  ```bash
-  RUST_LOG=info cargo xtask run -- realtime <interface> <flow_type> <flow_lifetime_sec> <output_method> [output_path] --interval [dump_interval_sec]
-  ```
 - **Command Help**:
   ```bash
   RUST_LOG=info cargo xtask run -- realtime --help
   ```
-- **Output**:
   ```bash
   Real-time feature extraction
 
@@ -125,27 +120,17 @@ See the wiki for the different feature sets available.
   ```
 
 ### Reading from a Pcap File:
-- **To Run/Build**:
-  ```bash
-  RUST_LOG=info cargo xtask run -- pcap <machine_type> <flow_type> <input_path> <output_method> [output_path]
-  ```
+
 - **Command Help**:
   ```bash
   RUST_LOG=info cargo xtask run -- pcap --help
   ```
-
-- **Output**:
   ```bash
   Feature extraction from a pcap file
 
-  Usage: feature-extraction-tool pcap [OPTIONS] <MACHINE_TYPE> <FLOW_TYPE> <PATH> <METHOD> [EXPORT_PATH]
+  Usage: feature-extraction-tool pcap [OPTIONS] <FLOW_TYPE> <LIFESPAN> <PATH> <METHOD> [EXPORT_PATH]
 
   Arguments:
-    <MACHINE_TYPE>
-            Possible values:
-            - windows: The pcap file was generated on a Windows machine
-            - linux:   The pcap file was generated on a Linux machine
-
     <FLOW_TYPE>
             Possible values:
             - basic-flow:  A basic flow that stores the basic features of a flow
@@ -154,6 +139,9 @@ See the wiki for the different feature sets available.
             - nf-flow:     Represents a nfstream inspired flow, giving 69 features
             - ntl-flow:    Represents the NTL Flow, giving 120 features
             - custom-flow: Represents a flow that you can implement yourself
+
+    <LIFESPAN>
+            The maximum lifespan of a flow in seconds
 
     <PATH>
             The relative path to the pcap file
