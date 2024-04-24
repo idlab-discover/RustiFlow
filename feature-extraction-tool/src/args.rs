@@ -36,10 +36,10 @@ pub enum Commands {
     /// Feature extraction from a pcap file
     Pcap {
         #[clap(value_enum)]
-        machine_type: GeneratedMachineType,
-
-        #[clap(value_enum)]
         flow_type: FlowType,
+
+        /// The maximum lifespan of a flow in seconds
+        lifespan: u64,
 
         /// The relative path to the pcap file
         path: String,
@@ -72,15 +72,6 @@ pub enum ExportMethodType {
 
     /// The output will be written to a CSV file
     Csv,
-}
-
-#[derive(clap::ValueEnum, Clone, Debug)]
-pub enum GeneratedMachineType {
-    /// The pcap file was generated on a Windows machine
-    Windows,
-
-    /// The pcap file was generated on a Linux machine
-    Linux,
 }
 
 #[derive(clap::ValueEnum, Clone, Debug)]

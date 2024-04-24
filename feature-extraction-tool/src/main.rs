@@ -8,7 +8,7 @@ use crate::{
     output::Export,
     utils::utils::{create_flow_id, get_duration},
 };
-use args::{Cli, Commands, ExportMethodType, FlowType, GeneratedMachineType};
+use args::{Cli, Commands, ExportMethodType, FlowType};
 use aya::{
     include_bytes_aligned,
     maps::AsyncPerfEventArray,
@@ -195,8 +195,8 @@ async fn main() {
         }
         Commands::Pcap {
             path,
-            machine_type,
             flow_type,
+            lifespan,
             no_contaminant_features,
             export_method,
         } => {
@@ -241,102 +241,54 @@ async fn main() {
                 }
             }
 
-            match (machine_type, flow_type) {
-                (GeneratedMachineType::Windows, FlowType::BasicFlow) => {
-                    info!("Selecting the Windows Pcap processing with the basic flow type..");
+            match flow_type {
+                FlowType::BasicFlow => {
+                    info!("Selecting the  basic flow type..");
                     info!("{DIVIDER}");
                     info!("Starting!");
                     info!("{UNDERLINE}");
 
-                    read_pcap_file_ethernet::<BasicFlow>(&path)
+                    read_pcap_file::<BasicFlow>(&path, lifespan).await
                 }
-                (GeneratedMachineType::Windows, FlowType::CicFlow) => {
-                    info!("Selecting the Windows Pcap processing with the CIC flow type...");
+                FlowType::CicFlow => {
+                    info!("Selecting the CIC flow type...");
                     info!("{DIVIDER}");
                     info!("Starting!");
                     info!("{UNDERLINE}");
 
-                    read_pcap_file_ethernet::<CicFlow>(&path)
+                    read_pcap_file::<CicFlow>(&path, lifespan).await
                 }
-                (GeneratedMachineType::Windows, FlowType::CiddsFlow) => {
-                    info!("Selecting the Windows Pcap processing with the CIDDS flow type...");
+                FlowType::CiddsFlow => {
+                    info!("Selecting the CIDDS flow type...");
                     info!("{DIVIDER}");
                     info!("Starting!");
                     info!("{UNDERLINE}");
 
-                    read_pcap_file_ethernet::<CiddsFlow>(&path)
+                    read_pcap_file::<CiddsFlow>(&path, lifespan).await
                 }
-                (GeneratedMachineType::Windows, FlowType::NfFlow) => {
-                    info!("Selecting the Windows Pcap processing with the NF flow type...");
+                FlowType::NfFlow => {
+                    info!("Selecting the NF flow type...");
                     info!("{DIVIDER}");
                     info!("Starting!");
                     info!("{UNDERLINE}");
 
-                    read_pcap_file_ethernet::<NfFlow>(&path)
+                    read_pcap_file::<NfFlow>(&path, lifespan).await
                 }
-                (GeneratedMachineType::Windows, FlowType::NtlFlow) => {
-                    info!("Selecting the Windows Pcap processing with the Ntl flow type...");
+                FlowType::NtlFlow => {
+                    info!("Selecting the Ntl flow type...");
                     info!("{DIVIDER}");
                     info!("Starting!");
                     info!("{UNDERLINE}");
 
-                    read_pcap_file_ethernet::<NTLFlow>(&path)
+                    read_pcap_file::<NTLFlow>(&path, lifespan).await
                 }
-                (GeneratedMachineType::Windows, FlowType::CustomFlow) => {
-                    info!("Selecting the Windows Pcap processing with the custom flow type...");
+                FlowType::CustomFlow => {
+                    info!("Selecting the custom flow type...");
                     info!("{DIVIDER}");
                     info!("Starting!");
                     info!("{UNDERLINE}");
 
-                    read_pcap_file_ethernet::<CustomFlow>(&path)
-                }
-                (GeneratedMachineType::Linux, FlowType::BasicFlow) => {
-                    info!("Selecting the Linux cooked Pcap processing with the basic flow type...");
-                    info!("{DIVIDER}");
-                    info!("Starting!");
-                    info!("{UNDERLINE}");
-
-                    read_pcap_file_linux_cooked::<BasicFlow>(&path)
-                }
-                (GeneratedMachineType::Linux, FlowType::CicFlow) => {
-                    info!("Selecting the Linux cooked Pcap processing with the CIC flow type...");
-                    info!("{DIVIDER}");
-                    info!("Starting!");
-                    info!("{UNDERLINE}");
-
-                    read_pcap_file_linux_cooked::<CicFlow>(&path)
-                }
-                (GeneratedMachineType::Linux, FlowType::CiddsFlow) => {
-                    info!("Selecting the Linux cooked Pcap processing with the CIDDS flow type...");
-                    info!("{DIVIDER}");
-                    info!("Starting!");
-                    info!("{UNDERLINE}");
-
-                    read_pcap_file_linux_cooked::<CiddsFlow>(&path)
-                }
-                (GeneratedMachineType::Linux, FlowType::NfFlow) => {
-                    info!("Selecting the Linux cooked Pcap processing with the NF flow type...");
-                    info!("{DIVIDER}");
-                    info!("Starting!");
-                    info!("{UNDERLINE}");
-
-                    read_pcap_file_linux_cooked::<NfFlow>(&path)
-                }
-                (GeneratedMachineType::Linux, FlowType::NtlFlow) => {
-                    info!("Selecting the Linux cooked Pcap processing with the Ntl flow type...");
-                    info!("{DIVIDER}");
-                    info!("Starting!");
-                    info!("{UNDERLINE}");
-
-                    read_pcap_file_linux_cooked::<NTLFlow>(&path)
-                }
-                (GeneratedMachineType::Linux, FlowType::CustomFlow) => {
-                    info!("Selecting the Linux cooked Pcap processing with the custom flow type...");
-                    info!("{DIVIDER}");
-                    info!("Starting!");
-                    info!("{UNDERLINE}");
-
-                    read_pcap_file_linux_cooked::<CustomFlow>(&path)
+                    read_pcap_file::<CustomFlow>(&path, lifespan).await
                 }
             }
         }
@@ -667,12 +619,16 @@ where
     Ok(())
 }
 
-fn read_pcap_file_ethernet<T>(path: &str)
+async fn read_pcap_file<T>(path: &str, lifespan: u64)
 where
-    T: Flow,
+T: Flow + Send + Sync + 'static,
 {
     let start = Instant::now();
     let mut amount_of_packets = 0;
+
+    // Define constants for Linux cooked capture EtherTypes
+    const SLL_IPV4: u16 = 0x0800;
+    const SLL_IPV6: u16 = 0x86DD;
 
     let flow_map_ipv4: Arc<DashMap<String, T>> = Arc::new(DashMap::new());
     let flow_map_ipv6: Arc<DashMap<String, T>> = Arc::new(DashMap::new());
@@ -688,16 +644,15 @@ where
     };
 
     while let Ok(packet) = cap.next_packet() {
-        amount_of_packets += 1;
-        if amount_of_packets % 10_000 == 0 {
-            info!("{} packets have been processed...", amount_of_packets);
-        }
-
         if let Some(ethernet) = EthernetPacket::new(packet.data) {
             match ethernet.get_ethertype() {
                 EtherTypes::Ipv4 => {
                     if let Some(ipv4_packet) = Ipv4Packet::new(ethernet.payload()) {
                         if let Some(features_ipv4) = extract_ipv4_features(&ipv4_packet) {
+                            amount_of_packets += 1;
+                            if amount_of_packets % 10_000 == 0 {
+                                info!("{} packets have been processed...", amount_of_packets);
+                            }
                             redirect_packet_ipv4(&features_ipv4, &flow_map_ipv4);
                         }
                     }
@@ -705,18 +660,101 @@ where
                 EtherTypes::Ipv6 => {
                     if let Some(ipv6_packet) = Ipv6Packet::new(ethernet.payload()) {
                         if let Some(features_ipv6) = extract_ipv6_features(&ipv6_packet) {
+                            amount_of_packets += 1;
+                            if amount_of_packets % 10_000 == 0 {
+                                info!("{} packets have been processed...", amount_of_packets);
+                            }
                             redirect_packet_ipv6(&features_ipv6, &flow_map_ipv6);
                         }
                     }
                 }
                 _ => {
-                    debug!("Unknown EtherType, consider using Linux cooked capture by setting the machine type to linux");
+                    let ethertype = u16::from_be_bytes([packet.data[14], packet.data[15]]);
+                    match ethertype {
+                        SLL_IPV4 => {
+                            if let Some(ipv4_packet) = Ipv4Packet::new(&packet.data[16..]) {
+                                if let Some(features_ipv4) = extract_ipv4_features(&ipv4_packet) {
+                                    amount_of_packets += 1;
+                                    if amount_of_packets % 10_000 == 0 {
+                                        info!("{} packets have been processed...", amount_of_packets);
+                                    }
+                                    redirect_packet_ipv4(&features_ipv4, &flow_map_ipv4);
+                                }
+                            }
+                        }
+                        SLL_IPV6 => {
+                            if let Some(ipv6_packet) = Ipv6Packet::new(&packet.data[16..]) {
+                                if let Some(features_ipv6) = extract_ipv6_features(&ipv6_packet) {
+                                    amount_of_packets += 1;
+                                    if amount_of_packets % 10_000 == 0 {
+                                        info!("{} packets have been processed...", amount_of_packets);
+                                    }
+                                    redirect_packet_ipv6(&features_ipv6, &flow_map_ipv6);
+                                }
+                            }
+                        }
+                        _ => {
+                            debug!("Unknown SLL EtherType!");
+                        }
+                    }
                 }
             }
         } else {
             error!("Error parsing packet...");
         }
     }
+
+    let flow_map_end_ipv4 = flow_map_ipv4.clone();
+    let flow_map_end_ipv6 = flow_map_ipv6.clone();
+    task::spawn(async move {
+        let mut interval = time::interval(Duration::from_secs(2));
+        loop {
+            interval.tick().await;
+            let timestamp = Utc::now();
+
+            // Collect keys to remove
+            let mut keys_to_remove_ipv4 = Vec::new();
+            for entry in flow_map_end_ipv4.iter() {
+                let flow = entry.value();
+                let end = get_duration(flow.get_first_timestamp(), timestamp) / 1_000_000.0;
+
+                if end >= lifespan as f64 {
+                    if *NO_CONTAMINANT_FEATURES.lock().unwrap().deref() {
+                        export(&flow.dump_without_contamination());
+                    } else {
+                        export(&flow.dump());
+                    }
+                    keys_to_remove_ipv4.push(entry.key().clone());
+                }
+            }
+
+            // Collect keys to remove
+            let mut keys_to_remove_ipv6 = Vec::new();
+            for entry in flow_map_end_ipv6.iter() {
+                let flow = entry.value();
+                let end = get_duration(flow.get_first_timestamp(), timestamp) / 1_000_000.0;
+
+                if end >= lifespan as f64 {
+                    if *NO_CONTAMINANT_FEATURES.lock().unwrap().deref() {
+                        export(&flow.dump_without_contamination());
+                    } else {
+                        export(&flow.dump());
+                    }
+                    keys_to_remove_ipv6.push(entry.key().clone());
+                }
+            }
+
+            // Remove entries outside of the iteration
+            for key in keys_to_remove_ipv4 {
+                flow_map_end_ipv4.remove(&key);
+            }
+
+            // Remove entries outside of the iteration
+            for key in keys_to_remove_ipv6 {
+                flow_map_end_ipv6.remove(&key);
+            }
+        }
+    });
 
     for entry in flow_map_ipv4.iter() {
         let flow = entry.value();
@@ -743,89 +781,6 @@ where
     let end = Instant::now();
     info!("{} packets processed", amount_of_packets);
     info!("Duration: {:?} milliseconds", end.duration_since(start).as_millis());
-}
-
-fn read_pcap_file_linux_cooked<T>(path: &str)
-where
-    T: Flow,
-{
-    let start = Instant::now();
-    let mut amount_of_packets = 0;
-
-    let flow_map_ipv4: Arc<DashMap<String, T>> = Arc::new(DashMap::new());
-    let flow_map_ipv6: Arc<DashMap<String, T>> = Arc::new(DashMap::new());
-
-    info!("Reading the pcap file: {:?} ...", path);
-
-    let mut cap = match pcap::Capture::from_file(path) {
-        Ok(c) => c,
-        Err(e) => {
-            log::error!("Error opening file: {:?}", e);
-            return;
-        }
-    };
-
-    // Define constants for Linux cooked capture EtherTypes
-    const SLL_IPV4: u16 = 0x0800;
-    const SLL_IPV6: u16 = 0x86DD;
-
-    while let Ok(packet) = cap.next_packet() {
-        if packet.data.len() > 14 {
-            amount_of_packets += 1;
-            if amount_of_packets % 10_000 == 0 {
-                info!("{} packets have been processed...", amount_of_packets);
-            }
-
-            let ethertype = u16::from_be_bytes([packet.data[14], packet.data[15]]);
-            match ethertype {
-                SLL_IPV4 => {
-                    if let Some(ipv4_packet) = Ipv4Packet::new(&packet.data[16..]) {
-                        if let Some(features_ipv4) = extract_ipv4_features(&ipv4_packet) {
-                            redirect_packet_ipv4(&features_ipv4, &flow_map_ipv4);
-                        }
-                    }
-                }
-                SLL_IPV6 => {
-                    if let Some(ipv6_packet) = Ipv6Packet::new(&packet.data[16..]) {
-                        if let Some(features_ipv6) = extract_ipv6_features(&ipv6_packet) {
-                            redirect_packet_ipv6(&features_ipv6, &flow_map_ipv6);
-                        }
-                    }
-                }
-                _ => {
-                    debug!("Unknown SLL EtherType, consider using Ethernet capture by setting the machine type to windows");
-                }
-            }
-        } else {
-            error!("Packet too short to be SLL");
-        }
-    }
-
-    for entry in flow_map_ipv4.iter() {
-        let flow = entry.value();
-        if *NO_CONTAMINANT_FEATURES.lock().unwrap().deref() {
-            export(&flow.dump_without_contamination());
-        } else {
-            export(&flow.dump());
-        }
-    }
-
-    for entry in flow_map_ipv6.iter() {
-        let flow = entry.value();
-        if *NO_CONTAMINANT_FEATURES.lock().unwrap().deref() {
-            export(&flow.dump_without_contamination());
-        } else {
-            export(&flow.dump());
-        }
-    }
-
-    info!("{UNDERLINE}");
-    info!("A small report:");
-    info!("{UNDERLINE}");
-
-    let end = Instant::now();
-    info!("{} packets processed", amount_of_packets);
-    info!("Duration: {:} milliseconds", end.duration_since(start).as_millis());
 }
 
 /// Export the flow to the set export function.
