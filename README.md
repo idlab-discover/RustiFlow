@@ -112,6 +112,9 @@ See the wiki for the different feature sets available.
     -n, --no-contaminant-features
             Whether not to include contaminant features
 
+    -o, --only-ingress
+            Only ingress traffic will be captured
+
         --interval <INTERVAL>
             The print interval for open flows in seconds, needs to be smaller than the flow maximum lifespan
 
