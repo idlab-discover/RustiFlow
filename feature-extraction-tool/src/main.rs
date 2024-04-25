@@ -71,6 +71,7 @@ async fn main() {
             export_method,
             lifespan,
             no_contaminant_features,
+            only_ingress,
             interval,
         } => {
             if let Some(interval) = interval {
@@ -129,7 +130,7 @@ async fn main() {
                     info!("{UNDERLINE}");
 
                     if let Err(err) =
-                        handle_realtime::<BasicFlow>(interface, interval, lifespan).await
+                        handle_realtime::<BasicFlow>(interface, interval, lifespan, only_ingress).await
                     {
                         error!("Error: {:?}", err);
                     }
@@ -141,7 +142,7 @@ async fn main() {
                     info!("{UNDERLINE}");
 
                     if let Err(err) =
-                        handle_realtime::<CicFlow>(interface, interval, lifespan).await
+                        handle_realtime::<CicFlow>(interface, interval, lifespan, only_ingress).await
                     {
                         error!("Error: {:?}", err);
                     }
@@ -153,7 +154,7 @@ async fn main() {
                     info!("{UNDERLINE}");
 
                     if let Err(err) =
-                        handle_realtime::<CiddsFlow>(interface, interval, lifespan).await
+                        handle_realtime::<CiddsFlow>(interface, interval, lifespan, only_ingress).await
                     {
                         error!("Error: {:?}", err);
                     }
@@ -164,7 +165,7 @@ async fn main() {
                     info!("Starting!");
                     info!("{UNDERLINE}");
 
-                    if let Err(err) = handle_realtime::<NfFlow>(interface, interval, lifespan).await
+                    if let Err(err) = handle_realtime::<NfFlow>(interface, interval, lifespan, only_ingress).await
                     {
                         error!("Error: {:?}", err);
                     }
@@ -175,7 +176,7 @@ async fn main() {
                     info!("Starting!");
                     info!("{UNDERLINE}");
 
-                    if let Err(err) = handle_realtime::<NTLFlow>(interface, interval, lifespan).await
+                    if let Err(err) = handle_realtime::<NTLFlow>(interface, interval, lifespan, only_ingress).await
                     {
                         error!("Error: {:?}", err);
                     }
@@ -186,7 +187,7 @@ async fn main() {
                     info!("Starting!");
                     info!("{UNDERLINE}");
 
-                    if let Err(err) = handle_realtime::<CustomFlow>(interface, interval, lifespan).await
+                    if let Err(err) = handle_realtime::<CustomFlow>(interface, interval, lifespan, only_ingress).await
                     {
                         error!("Error: {:?}", err);
                     }
@@ -299,6 +300,7 @@ async fn handle_realtime<T>(
     interface: String,
     interval: Option<u64>,
     lifespan: u64,
+    only_ingress: bool,
 ) -> Result<(), anyhow::Error>
 where
     T: Flow + Send + Sync + 'static,
@@ -352,23 +354,25 @@ where
         "../../target/bpfel-unknown-none/release/feature-extraction-tool-ipv6"
     ))?;
 
-    // Loading and attaching the eBPF program function for egress
-    let _ = tc::qdisc_add_clsact(interface.as_str());
-    let program_egress_ipv4: &mut SchedClassifier = bpf_egress_ipv4
-        .program_mut("tc_flow_track")
-        .unwrap()
-        .try_into()?;
-    program_egress_ipv4.load()?;
-    program_egress_ipv4.attach(&interface, TcAttachType::Egress)?;
+    if !only_ingress {
+        // Loading and attaching the eBPF program function for egress
+        let _ = tc::qdisc_add_clsact(interface.as_str());
+        let program_egress_ipv4: &mut SchedClassifier = bpf_egress_ipv4
+            .program_mut("tc_flow_track")
+            .unwrap()
+            .try_into()?;
+        program_egress_ipv4.load()?;
+        program_egress_ipv4.attach(&interface, TcAttachType::Egress)?;
 
-    let _ = tc::qdisc_add_clsact(interface.as_str());
-    let program_egress_ipv6: &mut SchedClassifier = bpf_egress_ipv6
-        .program_mut("tc_flow_track")
-        .unwrap()
-        .try_into()?;
-    program_egress_ipv6.load()?;
-    program_egress_ipv6.attach(&interface, TcAttachType::Egress)?;
-
+        let _ = tc::qdisc_add_clsact(interface.as_str());
+        let program_egress_ipv6: &mut SchedClassifier = bpf_egress_ipv6
+            .program_mut("tc_flow_track")
+            .unwrap()
+            .try_into()?;
+        program_egress_ipv6.load()?;
+        program_egress_ipv6.attach(&interface, TcAttachType::Egress)?;
+    }
+    
     // Loading and attaching the eBPF program function for ingress
     let _ = tc::qdisc_add_clsact(interface.as_str());
     let program_ingress_ipv4: &mut SchedClassifier = bpf_ingress_ipv4
