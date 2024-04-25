@@ -1395,6 +1395,10 @@
 <a href="#1395" id="1395">1395</a>
 <a href="#1396" id="1396">1396</a>
 <a href="#1397" id="1397">1397</a>
+<a href="#1398" id="1398">1398</a>
+<a href="#1399" id="1399">1399</a>
+<a href="#1400" id="1400">1400</a>
+<a href="#1401" id="1401">1401</a>
 </pre></div><pre class="rust"><code><span class="kw">mod </span>args;
 <span class="kw">mod </span>flows;
 <span class="kw">mod </span>output;
@@ -1468,6 +1472,7 @@
             export_method,
             lifespan,
             no_contaminant_features,
+            only_ingress,
             interval,
         } =&gt; {
             <span class="kw">if let </span><span class="prelude-val">Some</span>(interval) = interval {
@@ -1526,7 +1531,7 @@
                     <span class="macro">info!</span>(<span class="string">"{UNDERLINE}"</span>);
 
                     <span class="kw">if let </span><span class="prelude-val">Err</span>(err) =
-                        handle_realtime::&lt;BasicFlow&gt;(interface, interval, lifespan).<span class="kw">await
+                        handle_realtime::&lt;BasicFlow&gt;(interface, interval, lifespan, only_ingress).<span class="kw">await
                     </span>{
                         <span class="macro">error!</span>(<span class="string">"Error: {:?}"</span>, err);
                     }
@@ -1538,7 +1543,7 @@
                     <span class="macro">info!</span>(<span class="string">"{UNDERLINE}"</span>);
 
                     <span class="kw">if let </span><span class="prelude-val">Err</span>(err) =
-                        handle_realtime::&lt;CicFlow&gt;(interface, interval, lifespan).<span class="kw">await
+                        handle_realtime::&lt;CicFlow&gt;(interface, interval, lifespan, only_ingress).<span class="kw">await
                     </span>{
                         <span class="macro">error!</span>(<span class="string">"Error: {:?}"</span>, err);
                     }
@@ -1550,7 +1555,7 @@
                     <span class="macro">info!</span>(<span class="string">"{UNDERLINE}"</span>);
 
                     <span class="kw">if let </span><span class="prelude-val">Err</span>(err) =
-                        handle_realtime::&lt;CiddsFlow&gt;(interface, interval, lifespan).<span class="kw">await
+                        handle_realtime::&lt;CiddsFlow&gt;(interface, interval, lifespan, only_ingress).<span class="kw">await
                     </span>{
                         <span class="macro">error!</span>(<span class="string">"Error: {:?}"</span>, err);
                     }
@@ -1561,7 +1566,7 @@
                     <span class="macro">info!</span>(<span class="string">"Starting!"</span>);
                     <span class="macro">info!</span>(<span class="string">"{UNDERLINE}"</span>);
 
-                    <span class="kw">if let </span><span class="prelude-val">Err</span>(err) = handle_realtime::&lt;NfFlow&gt;(interface, interval, lifespan).<span class="kw">await
+                    <span class="kw">if let </span><span class="prelude-val">Err</span>(err) = handle_realtime::&lt;NfFlow&gt;(interface, interval, lifespan, only_ingress).<span class="kw">await
                     </span>{
                         <span class="macro">error!</span>(<span class="string">"Error: {:?}"</span>, err);
                     }
@@ -1572,7 +1577,7 @@
                     <span class="macro">info!</span>(<span class="string">"Starting!"</span>);
                     <span class="macro">info!</span>(<span class="string">"{UNDERLINE}"</span>);
 
-                    <span class="kw">if let </span><span class="prelude-val">Err</span>(err) = handle_realtime::&lt;NTLFlow&gt;(interface, interval, lifespan).<span class="kw">await
+                    <span class="kw">if let </span><span class="prelude-val">Err</span>(err) = handle_realtime::&lt;NTLFlow&gt;(interface, interval, lifespan, only_ingress).<span class="kw">await
                     </span>{
                         <span class="macro">error!</span>(<span class="string">"Error: {:?}"</span>, err);
                     }
@@ -1583,7 +1588,7 @@
                     <span class="macro">info!</span>(<span class="string">"Starting!"</span>);
                     <span class="macro">info!</span>(<span class="string">"{UNDERLINE}"</span>);
 
-                    <span class="kw">if let </span><span class="prelude-val">Err</span>(err) = handle_realtime::&lt;CustomFlow&gt;(interface, interval, lifespan).<span class="kw">await
+                    <span class="kw">if let </span><span class="prelude-val">Err</span>(err) = handle_realtime::&lt;CustomFlow&gt;(interface, interval, lifespan, only_ingress).<span class="kw">await
                     </span>{
                         <span class="macro">error!</span>(<span class="string">"Error: {:?}"</span>, err);
                     }
@@ -1696,6 +1701,7 @@
     interface: String,
     interval: <span class="prelude-ty">Option</span>&lt;u64&gt;,
     lifespan: u64,
+    only_ingress: bool,
 ) -&gt; <span class="prelude-ty">Result</span>&lt;(), anyhow::Error&gt;
 <span class="kw">where
     </span>T: Flow + Send + Sync + <span class="lifetime">'static</span>,
@@ -1749,23 +1755,25 @@
         <span class="string">"../../target/bpfel-unknown-none/release/feature-extraction-tool-ipv6"
     </span>))<span class="question-mark">?</span>;
 
-    <span class="comment">// Loading and attaching the eBPF program function for egress
-    </span><span class="kw">let _ </span>= tc::qdisc_add_clsact(interface.as_str());
-    <span class="kw">let </span>program_egress_ipv4: <span class="kw-2">&amp;mut </span>SchedClassifier = bpf_egress_ipv4
-        .program_mut(<span class="string">"tc_flow_track"</span>)
-        .unwrap()
-        .try_into()<span class="question-mark">?</span>;
-    program_egress_ipv4.load()<span class="question-mark">?</span>;
-    program_egress_ipv4.attach(<span class="kw-2">&amp;</span>interface, TcAttachType::Egress)<span class="question-mark">?</span>;
+    <span class="kw">if </span>!only_ingress {
+        <span class="comment">// Loading and attaching the eBPF program function for egress
+        </span><span class="kw">let _ </span>= tc::qdisc_add_clsact(interface.as_str());
+        <span class="kw">let </span>program_egress_ipv4: <span class="kw-2">&amp;mut </span>SchedClassifier = bpf_egress_ipv4
+            .program_mut(<span class="string">"tc_flow_track"</span>)
+            .unwrap()
+            .try_into()<span class="question-mark">?</span>;
+        program_egress_ipv4.load()<span class="question-mark">?</span>;
+        program_egress_ipv4.attach(<span class="kw-2">&amp;</span>interface, TcAttachType::Egress)<span class="question-mark">?</span>;
 
-    <span class="kw">let _ </span>= tc::qdisc_add_clsact(interface.as_str());
-    <span class="kw">let </span>program_egress_ipv6: <span class="kw-2">&amp;mut </span>SchedClassifier = bpf_egress_ipv6
-        .program_mut(<span class="string">"tc_flow_track"</span>)
-        .unwrap()
-        .try_into()<span class="question-mark">?</span>;
-    program_egress_ipv6.load()<span class="question-mark">?</span>;
-    program_egress_ipv6.attach(<span class="kw-2">&amp;</span>interface, TcAttachType::Egress)<span class="question-mark">?</span>;
-
+        <span class="kw">let _ </span>= tc::qdisc_add_clsact(interface.as_str());
+        <span class="kw">let </span>program_egress_ipv6: <span class="kw-2">&amp;mut </span>SchedClassifier = bpf_egress_ipv6
+            .program_mut(<span class="string">"tc_flow_track"</span>)
+            .unwrap()
+            .try_into()<span class="question-mark">?</span>;
+        program_egress_ipv6.load()<span class="question-mark">?</span>;
+        program_egress_ipv6.attach(<span class="kw-2">&amp;</span>interface, TcAttachType::Egress)<span class="question-mark">?</span>;
+    }
+    
     <span class="comment">// Loading and attaching the eBPF program function for ingress
     </span><span class="kw">let _ </span>= tc::qdisc_add_clsact(interface.as_str());
     <span class="kw">let </span>program_ingress_ipv4: <span class="kw-2">&amp;mut </span>SchedClassifier = bpf_ingress_ipv4
