@@ -24,6 +24,10 @@ pub enum Commands {
         #[clap(short, long, action = clap::ArgAction::SetTrue)]
         no_contaminant_features: bool,
 
+        /// Only ingress traffic will be captured
+        #[clap(short, long, action = clap::ArgAction::SetTrue)]
+        only_ingress: bool,
+
         /// Output method
         #[clap(flatten)]
         export_method: Output,
