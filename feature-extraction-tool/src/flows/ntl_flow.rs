@@ -322,9 +322,9 @@ impl Flow for NTLFlow {
             self.get_bwd_header_length_min(),
             self.bwd_header_len_mean,
             self.bwd_header_len_std,
-            self.basic_flow.fwd_pkt_len_mean, // duplicate
-            self.basic_flow.bwd_pkt_len_mean, // duplicate
-            self.basic_flow.get_flow_packet_length_mean(), // duplicate
+            self.basic_flow.get_fwd_segment_length_mean(),
+            self.basic_flow.get_bwd_segment_length_mean(),
+            self.basic_flow.get_flow_segment_length_mean(),
             self.basic_flow.fwd_init_win_bytes,
             self.basic_flow.bwd_init_win_bytes,
             self.basic_flow.get_active_min(),
@@ -427,7 +427,7 @@ impl Flow for NTLFlow {
             {},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},\
             {},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},\
             {},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},\
-            {},{},{},{},{},{},{},{},{}",
+            {},{},{},{},{},{},{},{},{},{},{},{}",
             get_duration(
                 self.basic_flow.basic_flow.first_timestamp,
                 self.basic_flow.basic_flow.last_timestamp
@@ -468,6 +468,9 @@ impl Flow for NTLFlow {
             self.get_bwd_header_length_min(),
             self.bwd_header_len_mean,
             self.bwd_header_len_std,
+            self.basic_flow.get_fwd_segment_length_mean(),
+            self.basic_flow.get_bwd_segment_length_mean(),
+            self.basic_flow.get_flow_segment_length_mean(),
             self.basic_flow.fwd_init_win_bytes,
             self.basic_flow.bwd_init_win_bytes,
             self.basic_flow.get_active_min(),

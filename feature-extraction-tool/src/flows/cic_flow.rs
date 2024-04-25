@@ -53,6 +53,8 @@ pub struct CicFlow {
     pub fwd_last_timestamp: Option<Instant>,
     /// The total length of packets in the forward flow.
     pub fwd_pkt_len_tot: u32,
+    /// The total length of transport layer segments in the forward flow (tcp/udp header + data).
+    pub fwd_seg_len_tot: u32,
     /// The maximum length of packets in the forward flow.
     pub fwd_pkt_len_max: u32,
     /// The minimum length of packets in the forward flow.
@@ -95,6 +97,8 @@ pub struct CicFlow {
     pub bwd_last_timestamp: Option<Instant>,
     /// The total length of packets in the backward flow.
     pub bwd_pkt_len_tot: u32,
+    /// The total length of transport layer segments in the backward flow (tcp/udp header + data).
+    pub bwd_seg_len_tot: u32,
     /// The maximum length of packets in the backward flow.
     pub bwd_pkt_len_max: u32,
     /// The minimum length of packets in the backward flow.
@@ -720,6 +724,19 @@ impl CicFlow {
             / (self.basic_flow.fwd_packet_count + self.basic_flow.bwd_packet_count) as f32
     }
 
+    /// Calculates the mean packet segment length of the flow, averaging both forward and backward packet segment lengths.
+    ///
+    /// The mean is computed by considering the lengths and counts of packets in both directions.
+    ///
+    /// ### Returns
+    ///
+    /// Mean packet segment length of the flow.
+    pub fn get_flow_segment_length_mean(&self) -> f32 {
+        (self.get_fwd_segment_length_mean() * self.basic_flow.fwd_packet_count as f32
+            + self.get_bwd_segment_length_mean() * self.basic_flow.bwd_packet_count as f32) as f32
+            / (self.basic_flow.fwd_packet_count + self.basic_flow.bwd_packet_count) as f32
+    }
+
     /// Calculates the variance of the packet lengths in the flow.
     ///
     /// Computes the variance by considering the standard deviations of packet lengths
@@ -772,34 +789,34 @@ impl CicFlow {
         0.0
     }
 
-    /// Retrieves the mean length of forward packets.
+    /// Retrieves the mean segment length of forward packets.
     ///
-    /// Calculates the average length of forward packets by dividing the total length
+    /// Calculates the average segment length of forward packets by dividing the total segments length
     /// of forward packets by their count. Returns 0 if no forward packets are present.
     ///
     /// ### Returns
     ///
-    /// Mean length of forward packets, or 0 if no forward packets are present.
-    fn get_fwd_packet_length_mean(&self) -> u32 {
+    /// Mean segment length of forward packets, or 0 if no forward packets are present.
+    pub fn get_fwd_segment_length_mean(&self) -> f32 {
         if self.basic_flow.fwd_packet_count == 0 {
-            return 0;
+            return 0.0;
         }
-        self.fwd_pkt_len_tot / self.basic_flow.fwd_packet_count
+        self.fwd_seg_len_tot as f32 / self.basic_flow.fwd_packet_count as f32
     }
 
-    /// Retrieves the mean length of backward packets.
+    /// Retrieves the mean segemnt length of backward packets.
     ///
-    /// Similar to `get_fwd_packet_length_mean`, but calculates the average length
+    /// Similar to `get_fwd_segment_length_mean`, but calculates the average segment length
     /// for backward packets. Returns 0 if no backward packets are present.
     ///
     /// ### Returns
     ///
-    /// Mean length of backward packets, or 0 if no backward packets are present.
-    fn get_bwd_packet_length_mean(&self) -> u32 {
+    /// Mean segment length of backward packets, or 0 if no backward packets are present.
+    pub fn get_bwd_segment_length_mean(&self) -> f32 {
         if self.basic_flow.bwd_packet_count == 0 {
-            return 0;
+            return 0.0;
         }
-        self.bwd_pkt_len_tot / self.basic_flow.bwd_packet_count
+        self.bwd_seg_len_tot as f32 / self.basic_flow.bwd_packet_count as f32
     }
 
     /// Calculates the bytes per second rate of the flow.
@@ -1089,6 +1106,7 @@ impl Flow for CicFlow {
             fwd_header_len_min: u32::MAX,
             fwd_last_timestamp: None,
             fwd_pkt_len_tot: 0,
+            fwd_seg_len_tot: 0,
             fwd_pkt_len_max: 0,
             fwd_pkt_len_min: u32::MAX,
             fwd_pkt_len_mean: 0.0,
@@ -1110,6 +1128,7 @@ impl Flow for CicFlow {
             bwd_init_win_bytes: 0,
             bwd_last_timestamp: None,
             bwd_pkt_len_tot: 0,
+            bwd_seg_len_tot: 0,
             bwd_pkt_len_max: 0,
             bwd_pkt_len_min: u32::MAX,
             bwd_pkt_len_mean: 0.0,
@@ -1144,6 +1163,8 @@ impl Flow for CicFlow {
             self.update_fwd_pkt_len_stats(packet.data_length as u32);
             self.update_fwd_header_len_min(packet.header_length as u32);
 
+            self.fwd_seg_len_tot += packet.length as u32;
+
             if self.basic_flow.fwd_packet_count > 1 {
                 self.update_fwd_iat_stats(
                     timestamp
@@ -1165,6 +1186,8 @@ impl Flow for CicFlow {
             self.fwd_last_timestamp = Some(*timestamp);
         } else {
             self.update_bwd_pkt_len_stats(packet.data_length as u32);
+
+            self.bwd_seg_len_tot += packet.length as u32;
 
             if self.basic_flow.bwd_packet_count > 1 {
                 self.update_bwd_iat_stats(
@@ -1265,9 +1288,9 @@ impl Flow for CicFlow {
             self.basic_flow.fwd_cwe_flag_count + self.basic_flow.bwd_cwe_flag_count,
             self.basic_flow.fwd_ece_flag_count + self.basic_flow.bwd_ece_flag_count,
             self.get_down_up_ratio(),
-            self.get_flow_packet_length_mean(), // this is a duplicate feature
-            self.get_fwd_packet_length_mean(),
-            self.get_bwd_packet_length_mean(),
+            self.get_flow_segment_length_mean(), // this is a duplicate feature
+            self.get_fwd_segment_length_mean(),
+            self.get_bwd_segment_length_mean(),
             self.fwd_header_length, // this is a duplicate feature
             self.get_fwd_bytes_bulk(),
             self.get_fwd_packets_bulk(),
@@ -1346,8 +1369,8 @@ impl Flow for CicFlow {
             self.basic_flow.fwd_syn_flag_count + self.basic_flow.bwd_syn_flag_count,
             self.basic_flow.fwd_urg_flag_count + self.basic_flow.bwd_urg_flag_count,
             self.basic_flow.fwd_cwe_flag_count + self.basic_flow.bwd_cwe_flag_count,
-            self.get_fwd_packet_length_mean(),
-            self.get_bwd_packet_length_mean(),
+            self.get_fwd_segment_length_mean(),
+            self.get_bwd_segment_length_mean(),
             self.get_fwd_bytes_bulk(),
             self.get_fwd_packets_bulk(),
             self.get_fwd_bulk_rate(),
@@ -2029,23 +2052,23 @@ mod tests {
     }
 
     #[test]
-    fn test_get_fwd_packet_length_mean() {
+    fn test_get_fwd_segment_length_mean() {
         let mut cic_flow = setup_cic_flow();
 
-        cic_flow.fwd_pkt_len_tot = 100;
+        cic_flow.fwd_seg_len_tot = 100;
         cic_flow.basic_flow.fwd_packet_count = 5;
 
-        assert_eq!(cic_flow.get_fwd_packet_length_mean(), 20);
+        assert_eq!(cic_flow.get_fwd_segment_length_mean(), 20.0);
     }
 
     #[test]
-    fn test_get_bwd_packet_length_mean() {
+    fn test_get_bwd_segment_length_mean() {
         let mut cic_flow = setup_cic_flow();
 
-        cic_flow.bwd_pkt_len_tot = 100;
+        cic_flow.bwd_seg_len_tot = 100;
         cic_flow.basic_flow.bwd_packet_count = 5;
 
-        assert_eq!(cic_flow.get_bwd_packet_length_mean(), 20);
+        assert_eq!(cic_flow.get_bwd_segment_length_mean(), 20.0);
     }
 
     #[test]
