@@ -52,7 +52,9 @@ lazy_static! {
     static ref EXPORT_FUNCTION: Arc<Mutex<Option<Export>>> = Arc::new(Mutex::new(None));
     static ref EXPORT_FILE: Arc<Mutex<Option<BufWriter<File>>>> = Arc::new(Mutex::new(None));
     static ref FLUSH_COUNTER: Arc<Mutex<Option<u8>>> = Arc::new(Mutex::new(Some(0)));
+    static ref AMOUNT_OF_FLOWS: Arc<Mutex<Option<usize>>> = Arc::new(Mutex::new(Some(0)));
     static ref NO_CONTAMINANT_FEATURES: Arc<Mutex<bool>> = Arc::new(Mutex::new(false));
+    static ref PATH: Arc<Mutex<String>> = Arc::new(Mutex::new(String::new()));
 }
 
 const UNDERLINE: &str = "#############################################################";
@@ -107,6 +109,9 @@ async fn main() {
                     if let Some(path) = export_method.export_path {
                         info!("Selecting the CSV export method with output file: {:?} ...", path);
                         info!("{DIVIDER}");
+
+                        let mut static_path = PATH.lock().unwrap();
+                        *static_path = path.clone();
 
                         let file = OpenOptions::new()
                             .create(true)
@@ -794,12 +799,37 @@ T: Flow + Send + Sync + 'static,
 /// * `output` - The output to export.
 fn export(output: &String) {
     let export_func = EXPORT_FUNCTION.lock().unwrap();
+    let amount_of_flows = AMOUNT_OF_FLOWS.lock().unwrap();
 
     if let Some(function) = export_func.deref() {
         let mut export_file_option = EXPORT_FILE.lock().unwrap();
         let mut flush_counter_option = FLUSH_COUNTER.lock().unwrap();
 
         if let Some(ref mut flush_counter) = flush_counter_option.deref_mut() {
+            amount_of_flows.deref().map(|mut amount| {
+                amount += 1;
+                if amount % 1000 == 0 {
+                    info!("{} flows have been processed...", amount);
+                }
+                if amount % 100_000 == 0 {
+                    info!("Opening new file...");
+                    if let Some(file) = export_file_option.deref_mut() {
+                        file.flush().unwrap();
+                    }
+
+                    let path = PATH.lock().unwrap();
+
+                    let file = OpenOptions::new()
+                        .create(true)
+                        .append(true)
+                        .open(path.clone().replace(".csv", format!("_{}.csv", amount).as_str()))
+                        .unwrap_or_else(|err| {
+                            panic!("Error opening file: {:?}", err);
+                        });
+
+                    *export_file_option = Some(BufWriter::new(file));
+                }
+            });
             function(&output, export_file_option.deref_mut(), flush_counter);
         } else {
             error!("No export file set...")
