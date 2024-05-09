@@ -1,4 +1,4 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `feature-extraction-tool/src/main.rs`."><title>main.rs - source</title><script>if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-46f98efaafac5295.ttf.woff2,FiraSans-Regular-018c141bf0843ffd.woff2,FiraSans-Medium-8f9a781e4970d388.woff2,SourceCodePro-Regular-562dcc5011b6de7d.ttf.woff2,SourceCodePro-Semibold-d899c5a5c4aeb14a.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2" crossorigin href="../../static.files/${f}">`).join(""))</script><link rel="stylesheet" href="../../static.files/normalize-76eba96aa4d2e634.css"><link rel="stylesheet" href="../../static.files/rustdoc-b21aa549bf6d91ff.css"><meta name="rustdoc-vars" data-root-path="../../" data-static-root-path="../../static.files/" data-current-crate="feature_extraction_tool" data-themes="" data-resource-suffix="" data-rustdoc-version="1.80.0-nightly (9c9b56879 2024-05-05)" data-channel="nightly" data-search-js="search-d52510db62a78183.js" data-settings-js="settings-4313503d2e1961c2.js" ><script src="../../static.files/storage-e32f0c247825364d.js"></script><script defer src="../../static.files/src-script-e66d777a5a92e9b2.js"></script><script defer src="../../src-files.js"></script><script defer src="../../static.files/main-20a3ad099b048cf2.js"></script><noscript><link rel="stylesheet" href="../../static.files/noscript-09095024cf37855e.css"></noscript><link rel="alternate icon" type="image/png" href="../../static.files/favicon-32x32-422f7d1d52889060.png"><link rel="icon" type="image/svg+xml" href="../../static.files/favicon-2c020d218678b618.svg"></head><body class="rustdoc src"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="src-sidebar-title"><h2>Files</h2></div></nav><div class="sidebar-resizer"></div><main><nav class="sub"><form class="search-form"><span></span><div id="sidebar-button" tabindex="-1"><a href="../../feature_extraction_tool/all.html" title="show sidebar"></a></div><input class="search-input" name="search" aria-label="Run search in the documentation" autocomplete="off" spellcheck="false" placeholder="Type ‘S’ or ‘/’ to search, ‘?’ for more options…" type="search"><div id="help-button" tabindex="-1"><a href="../../help.html" title="help">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../settings.html" title="settings">Settings</a></div></form></nav><section id="main-content" class="content"><div class="example-wrap"><div data-nosnippet><pre class="src-line-numbers"><a href="#1" id="1">1</a>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `feature-extraction-tool/src/main.rs`."><title>main.rs - source</title><script>if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-46f98efaafac5295.ttf.woff2,FiraSans-Regular-018c141bf0843ffd.woff2,FiraSans-Medium-8f9a781e4970d388.woff2,SourceCodePro-Regular-562dcc5011b6de7d.ttf.woff2,SourceCodePro-Semibold-d899c5a5c4aeb14a.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2" crossorigin href="../../static.files/${f}">`).join(""))</script><link rel="stylesheet" href="../../static.files/normalize-76eba96aa4d2e634.css"><link rel="stylesheet" href="../../static.files/rustdoc-dd39b87e5fcfba68.css"><meta name="rustdoc-vars" data-root-path="../../" data-static-root-path="../../static.files/" data-current-crate="feature_extraction_tool" data-themes="" data-resource-suffix="" data-rustdoc-version="1.80.0-nightly (87293c958 2024-05-08)" data-channel="nightly" data-search-js="search-d52510db62a78183.js" data-settings-js="settings-4313503d2e1961c2.js" ><script src="../../static.files/storage-118b08c4c78b968e.js"></script><script defer src="../../static.files/src-script-e66d777a5a92e9b2.js"></script><script defer src="../../src-files.js"></script><script defer src="../../static.files/main-20a3ad099b048cf2.js"></script><noscript><link rel="stylesheet" href="../../static.files/noscript-df360f571f6edeae.css"></noscript><link rel="alternate icon" type="image/png" href="../../static.files/favicon-32x32-422f7d1d52889060.png"><link rel="icon" type="image/svg+xml" href="../../static.files/favicon-2c020d218678b618.svg"></head><body class="rustdoc src"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="src-sidebar-title"><h2>Files</h2></div></nav><div class="sidebar-resizer"></div><main><rustdoc-search></rustdoc-search><section id="main-content" class="content"><div class="example-wrap"><div data-nosnippet><pre class="src-line-numbers"><a href="#1" id="1">1</a>
 <a href="#2" id="2">2</a>
 <a href="#3" id="3">3</a>
 <a href="#4" id="4">4</a>
@@ -1399,6 +1399,36 @@
 <a href="#1399" id="1399">1399</a>
 <a href="#1400" id="1400">1400</a>
 <a href="#1401" id="1401">1401</a>
+<a href="#1402" id="1402">1402</a>
+<a href="#1403" id="1403">1403</a>
+<a href="#1404" id="1404">1404</a>
+<a href="#1405" id="1405">1405</a>
+<a href="#1406" id="1406">1406</a>
+<a href="#1407" id="1407">1407</a>
+<a href="#1408" id="1408">1408</a>
+<a href="#1409" id="1409">1409</a>
+<a href="#1410" id="1410">1410</a>
+<a href="#1411" id="1411">1411</a>
+<a href="#1412" id="1412">1412</a>
+<a href="#1413" id="1413">1413</a>
+<a href="#1414" id="1414">1414</a>
+<a href="#1415" id="1415">1415</a>
+<a href="#1416" id="1416">1416</a>
+<a href="#1417" id="1417">1417</a>
+<a href="#1418" id="1418">1418</a>
+<a href="#1419" id="1419">1419</a>
+<a href="#1420" id="1420">1420</a>
+<a href="#1421" id="1421">1421</a>
+<a href="#1422" id="1422">1422</a>
+<a href="#1423" id="1423">1423</a>
+<a href="#1424" id="1424">1424</a>
+<a href="#1425" id="1425">1425</a>
+<a href="#1426" id="1426">1426</a>
+<a href="#1427" id="1427">1427</a>
+<a href="#1428" id="1428">1428</a>
+<a href="#1429" id="1429">1429</a>
+<a href="#1430" id="1430">1430</a>
+<a href="#1431" id="1431">1431</a>
 </pre></div><pre class="rust"><code><span class="kw">mod </span>args;
 <span class="kw">mod </span>flows;
 <span class="kw">mod </span>output;
@@ -1453,7 +1483,9 @@
     <span class="kw">static </span><span class="kw-2">ref </span>EXPORT_FUNCTION: Arc&lt;Mutex&lt;<span class="prelude-ty">Option</span>&lt;Export&gt;&gt;&gt; = Arc::new(Mutex::new(<span class="prelude-val">None</span>));
     <span class="kw">static </span><span class="kw-2">ref </span>EXPORT_FILE: Arc&lt;Mutex&lt;<span class="prelude-ty">Option</span>&lt;BufWriter&lt;File&gt;&gt;&gt;&gt; = Arc::new(Mutex::new(<span class="prelude-val">None</span>));
     <span class="kw">static </span><span class="kw-2">ref </span>FLUSH_COUNTER: Arc&lt;Mutex&lt;<span class="prelude-ty">Option</span>&lt;u8&gt;&gt;&gt; = Arc::new(Mutex::new(<span class="prelude-val">Some</span>(<span class="number">0</span>)));
+    <span class="kw">static </span><span class="kw-2">ref </span>AMOUNT_OF_FLOWS: Arc&lt;Mutex&lt;<span class="prelude-ty">Option</span>&lt;usize&gt;&gt;&gt; = Arc::new(Mutex::new(<span class="prelude-val">Some</span>(<span class="number">0</span>)));
     <span class="kw">static </span><span class="kw-2">ref </span>NO_CONTAMINANT_FEATURES: Arc&lt;Mutex&lt;bool&gt;&gt; = Arc::new(Mutex::new(<span class="bool-val">false</span>));
+    <span class="kw">static </span><span class="kw-2">ref </span>PATH: Arc&lt;Mutex&lt;String&gt;&gt; = Arc::new(Mutex::new(String::new()));
 }
 
 <span class="kw">const </span>UNDERLINE: <span class="kw-2">&amp;</span>str = <span class="string">"#############################################################"</span>;
@@ -1508,6 +1540,9 @@
                     <span class="kw">if let </span><span class="prelude-val">Some</span>(path) = export_method.export_path {
                         <span class="macro">info!</span>(<span class="string">"Selecting the CSV export method with output file: {:?} ..."</span>, path);
                         <span class="macro">info!</span>(<span class="string">"{DIVIDER}"</span>);
+
+                        <span class="kw">let </span><span class="kw-2">mut </span>static_path = PATH.lock().unwrap();
+                        <span class="kw-2">*</span>static_path = path.clone();
 
                         <span class="kw">let </span>file = OpenOptions::new()
                             .create(<span class="bool-val">true</span>)
@@ -2195,12 +2230,37 @@
 /// * `output` - The output to export.
 </span><span class="kw">fn </span>export(output: <span class="kw-2">&amp;</span>String) {
     <span class="kw">let </span>export_func = EXPORT_FUNCTION.lock().unwrap();
+    <span class="kw">let </span>amount_of_flows = AMOUNT_OF_FLOWS.lock().unwrap();
 
     <span class="kw">if let </span><span class="prelude-val">Some</span>(function) = export_func.deref() {
         <span class="kw">let </span><span class="kw-2">mut </span>export_file_option = EXPORT_FILE.lock().unwrap();
         <span class="kw">let </span><span class="kw-2">mut </span>flush_counter_option = FLUSH_COUNTER.lock().unwrap();
 
         <span class="kw">if let </span><span class="prelude-val">Some</span>(<span class="kw-2">ref mut </span>flush_counter) = flush_counter_option.deref_mut() {
+            amount_of_flows.deref().map(|<span class="kw-2">mut </span>amount| {
+                amount += <span class="number">1</span>;
+                <span class="kw">if </span>amount % <span class="number">1000 </span>== <span class="number">0 </span>{
+                    <span class="macro">info!</span>(<span class="string">"{} flows have been processed..."</span>, amount);
+                }
+                <span class="kw">if </span>amount % <span class="number">100_000 </span>== <span class="number">0 </span>{
+                    <span class="macro">info!</span>(<span class="string">"Opening new file..."</span>);
+                    <span class="kw">if let </span><span class="prelude-val">Some</span>(file) = export_file_option.deref_mut() {
+                        file.flush().unwrap();
+                    }
+
+                    <span class="kw">let </span>path = PATH.lock().unwrap();
+
+                    <span class="kw">let </span>file = OpenOptions::new()
+                        .create(<span class="bool-val">true</span>)
+                        .append(<span class="bool-val">true</span>)
+                        .open(path.clone().replace(<span class="string">".csv"</span>, <span class="macro">format!</span>(<span class="string">"_{}.csv"</span>, amount).as_str()))
+                        .unwrap_or_else(|err| {
+                            <span class="macro">panic!</span>(<span class="string">"Error opening file: {:?}"</span>, err);
+                        });
+
+                    <span class="kw-2">*</span>export_file_option = <span class="prelude-val">Some</span>(BufWriter::new(file));
+                }
+            });
             function(<span class="kw-2">&amp;</span>output, export_file_option.deref_mut(), flush_counter);
         } <span class="kw">else </span>{
             <span class="macro">error!</span>(<span class="string">"No export file set..."</span>)
