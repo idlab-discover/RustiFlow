@@ -72,6 +72,25 @@ See the wiki for the different feature sets available.
 
 ## Usage Instructions
 
+### Using the Container:
+
+Make sure that you don't use docker desktop and that you don't have it installed on your machine. If you have this setup, it will not work as intended as the `--network host` will not link the container to the host network, but to the network of a VM that docker desktop uses.
+
+- **Build the Container**:
+  ```bash
+  docker build -t rustiflow .
+  ```
+- **Run the Container**:
+  ```bash
+  docker run --network host -v /path/on/host:/app rustiflow [ARGS like you are used to]
+  ```
+  Run it with the --privileged flag if you want to capture traffic in real-time.
+- **Example**:
+  ```bash
+  docker run --network host -v /home/user/pcap:/app rustiflow pcap basic-flow 60 /app/pcap.pcap print
+  docker run --privileged --network host -v /home/matisse/Documents:/app rustiflow realtime enp5s0 cic-flow 60 csv /app/output.csv
+  ```
+
 ### Real-Time Traffic Capture:
 - **Command Help**:
   ```bash
