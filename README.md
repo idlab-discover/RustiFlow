@@ -28,6 +28,12 @@ See the wiki for the different feature sets available.
 ## Using the release binary:
 
 Copy the rustiflow binary that you can find in this repo in releases to a location of your choice or to the `/usr/local/bin` folder.
+If it does not have the right permissions, you can run the following command:
+
+```bash
+chmod +x /path/to/rustiflow
+```
+
 You can then run the binary with the following commands:
 
 See the [help menu](#usage-instructions) for the different options available.
