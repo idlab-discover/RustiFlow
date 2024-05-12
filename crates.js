@@ -1,1 +1,1 @@
-window.ALL_CRATES = ["common","feature_extraction_tool","xtask"];
+window.ALL_CRATES = ["common","rustiflow","xtask"];

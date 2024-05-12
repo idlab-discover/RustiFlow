@@ -1,4 +1,4 @@
 (function() {var implementors = {
-"feature_extraction_tool":[["impl Args for <a class=\"struct\" href=\"feature_extraction_tool/args/struct.Cli.html\" title=\"struct feature_extraction_tool::args::Cli\">Cli</a>"],["impl Args for <a class=\"struct\" href=\"feature_extraction_tool/args/struct.Output.html\" title=\"struct feature_extraction_tool::args::Output\">Output</a>"]],
+"rustiflow":[["impl Args for <a class=\"struct\" href=\"rustiflow/args/struct.Cli.html\" title=\"struct rustiflow::args::Cli\">Cli</a>"],["impl Args for <a class=\"struct\" href=\"rustiflow/args/struct.Output.html\" title=\"struct rustiflow::args::Output\">Output</a>"]],
 "xtask":[["impl Args for <a class=\"struct\" href=\"xtask/build_ebpf/struct.Options.html\" title=\"struct xtask::build_ebpf::Options\">Options</a>"],["impl Args for <a class=\"struct\" href=\"xtask/run/struct.Options.html\" title=\"struct xtask::run::Options\">Options</a>"],["impl Args for <a class=\"struct\" href=\"xtask/struct.Options.html\" title=\"struct xtask::Options\">Options</a>"]]
 };if (window.register_implementors) {window.register_implementors(implementors);} else {window.pending_implementors = implementors;}})()
