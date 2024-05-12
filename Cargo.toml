@@ -1,2 +1,2 @@
 [workspace]
-members = ["feature-extraction-tool", "common", "xtask"]
+members = ["rustiflow", "common", "xtask"]

@@ -25,7 +25,41 @@ See the wiki for the different feature sets available.
 
 ![RustiFlow Architecture](arch.svg)
 
-## Installation Guide
+## Using the release binary:
+
+Copy the rustiflow binary that you can find in this repo in releases to a location of your choice or to the `/usr/local/bin` folder.
+You can then run the binary with the following commands:
+
+See the [help menu](#usage-instructions) for the different options available.
+
+```bash
+RUST_LOG=info rustiflow pcap basic-flow 60 /path/to/pcap.pcap print
+```
+
+```bash
+sudo RUST_LOG=info rustiflow realtime enp5s0 cic-flow 60 csv /path/to/output.csv
+```
+
+## Using the Container:
+
+Make sure that you don't use docker desktop and that you don't have it installed on your machine. If you have this setup, it will not work as intended as the `--network host` will not link the container to the host network, but to the network of a VM that docker desktop uses.
+
+- **Build the Container**:
+  ```bash
+  docker build -t rustiflow .
+  ```
+- **Run the Container**:
+  ```bash
+  docker run --network host -v /path/on/host:/app rustiflow [ARGS like you are used to]
+  ```
+  Run it with the --privileged flag if you want to capture traffic in real-time.
+- **Example**:
+  ```bash
+  docker run --network host -v /home/user/pcap:/app rustiflow pcap basic-flow 60 /app/pcap.pcap print
+  docker run --privileged --network host -v /home/matisse/Documents:/app rustiflow realtime enp5s0 cic-flow 60 csv /app/output.csv
+  ```
+
+## Installation Guide for development
 
 ### Prerequisites:
 - **libpcap-dev**:
@@ -72,25 +106,6 @@ See the wiki for the different feature sets available.
 
 ## Usage Instructions
 
-### Using the Container:
-
-Make sure that you don't use docker desktop and that you don't have it installed on your machine. If you have this setup, it will not work as intended as the `--network host` will not link the container to the host network, but to the network of a VM that docker desktop uses.
-
-- **Build the Container**:
-  ```bash
-  docker build -t rustiflow .
-  ```
-- **Run the Container**:
-  ```bash
-  docker run --network host -v /path/on/host:/app rustiflow [ARGS like you are used to]
-  ```
-  Run it with the --privileged flag if you want to capture traffic in real-time.
-- **Example**:
-  ```bash
-  docker run --network host -v /home/user/pcap:/app rustiflow pcap basic-flow 60 /app/pcap.pcap print
-  docker run --privileged --network host -v /home/matisse/Documents:/app rustiflow realtime enp5s0 cic-flow 60 csv /app/output.csv
-  ```
-
 ### Real-Time Traffic Capture:
 - **Command Help**:
   ```bash
@@ -99,7 +114,7 @@ Make sure that you don't use docker desktop and that you don't have it installed
   ```bash
   Real-time feature extraction
 
-  Usage: feature-extraction-tool realtime [OPTIONS] <INTERFACE> <FLOW_TYPE> <LIFESPAN> <METHOD> [EXPORT_PATH]
+  Usage: rustiflow realtime [OPTIONS] <INTERFACE> <FLOW_TYPE> <LIFESPAN> <METHOD> [EXPORT_PATH]
 
   Arguments:
     <INTERFACE>
@@ -150,7 +165,7 @@ Make sure that you don't use docker desktop and that you don't have it installed
   ```bash
   Feature extraction from a pcap file
 
-  Usage: feature-extraction-tool pcap [OPTIONS] <FLOW_TYPE> <LIFESPAN> <PATH> <METHOD> [EXPORT_PATH]
+  Usage: rustiflow pcap [OPTIONS] <FLOW_TYPE> <LIFESPAN> <PATH> <METHOD> [EXPORT_PATH]
 
   Arguments:
     <FLOW_TYPE>

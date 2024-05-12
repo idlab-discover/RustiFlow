@@ -60,7 +60,7 @@ pub fn run(opts: Options) -> Result<(), anyhow::Error> {
 
     // profile we are building (release or debug)
     let profile = if opts.release { "release" } else { "debug" };
-    let bin_path = format!("target/{profile}/feature-extraction-tool");
+    let bin_path = format!("target/{profile}/rustiflow");
 
     // Determine if 'realtime' is the first argument in run_args
     let use_sudo = opts

@@ -38,4 +38,4 @@ RUN cargo xtask ebpf-ipv6 --release
 RUN cargo build --release
 
 # Command
-ENTRYPOINT ["./target/release/feature-extraction-tool"]
+ENTRYPOINT ["./target/release/rustiflow"]
