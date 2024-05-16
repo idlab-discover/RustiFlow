@@ -20,6 +20,7 @@ RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y \
 
 ENV PATH="/root/.cargo/bin:${PATH}"
 ENV PATH="/usr/lib/linux-tools/5.8.0-63-generic:$PATH"
+ENV RUST_LOG=info
 
 # Copy
 WORKDIR /usr/src/app
