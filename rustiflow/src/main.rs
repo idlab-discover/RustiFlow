@@ -303,6 +303,11 @@ async fn main() {
     }
 }
 
+/// Helper function to open a raw socket.
+/// 
+/// ### Returns
+/// 
+/// * `Result<RawFd, nix::Error>` - The file descriptor of the socket.
 fn open_raw_socket() -> Result<RawFd, nix::Error> {
     let fd = unsafe {
         libc::socket(
@@ -317,9 +322,14 @@ fn open_raw_socket() -> Result<RawFd, nix::Error> {
         Ok(fd)
     }
 }
-
+/// Helper function to set a socket to promiscuous mode.
+///
+/// ### Arguments
+///
+/// * `fd` - The raw socket.
+/// * `iface_name` - The name of the interface.
+/// * `enable` - Enable or disable promiscuous mode.
 fn set_promiscuous_mode(fd: RawFd, iface_name: &str, enable: bool) -> Result<(), nix::Error> {
-    // Prepare the ifreq structure
     let mut ifreq = ifreq_for(iface_name);
 
     // Prepare the request code for setting flags
@@ -350,14 +360,17 @@ fn set_promiscuous_mode(fd: RawFd, iface_name: &str, enable: bool) -> Result<(),
     Ok(())
 }
 
-// Helper function to create an ifreq structure
+/// Helper function to create an ifreq structure
+///
+/// ### Arguments
+///
+/// * `iface_name` - The name of the interface.
 fn ifreq_for(iface_name: &str) -> libc::ifreq {
     let mut ifreq = libc::ifreq {
         ifr_name: [0; libc::IFNAMSIZ],
         ifr_ifru: libc::__c_anonymous_ifr_ifru { ifru_flags: 0 },
     };
 
-    // Copy the interface name into ifr_name
     let name_bytes = iface_name.as_bytes();
     for (i, &b) in name_bytes.iter().enumerate() {
         ifreq.ifr_name[i] = b as i8;
@@ -375,12 +388,8 @@ async fn handle_realtime<T>(
 where
     T: Flow + Send + Sync + 'static,
 {
-    // Open a raw socket
     let sock_fd = open_raw_socket().expect("Failed to open socket");
-
-    // Set the interface to promiscuous mode
     set_promiscuous_mode(sock_fd, &interface, true).expect("Failed to set promiscuous mode");
-
 
     // Bump the memlock rlimit. This is needed for older kernels that don't use the
     // new memcg based accounting, see https://lwn.net/Articles/837122/
