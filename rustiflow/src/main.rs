@@ -47,6 +47,8 @@ use std::{
 use tokio::time::{self, Duration};
 use tokio::{signal, task};
 use utils::utils::BasicFeatures;
+use std::os::unix::io::RawFd;
+use nix::unistd::close;
 
 lazy_static! {
     static ref EXPORT_FUNCTION: Arc<Mutex<Option<Export>>> = Arc::new(Mutex::new(None));
@@ -301,6 +303,69 @@ async fn main() {
     }
 }
 
+fn open_raw_socket() -> Result<RawFd, nix::Error> {
+    let fd = unsafe {
+        libc::socket(
+            libc::AF_PACKET,
+            libc::SOCK_RAW,
+            libc::ETH_P_ALL.to_be() as i32
+        )
+    };
+    if fd < 0 {
+        Err(nix::Error::last())
+    } else {
+        Ok(fd)
+    }
+}
+
+fn set_promiscuous_mode(fd: RawFd, iface_name: &str, enable: bool) -> Result<(), nix::Error> {
+    // Prepare the ifreq structure
+    let mut ifreq = ifreq_for(iface_name);
+
+    // Prepare the request code for setting flags
+    const SIOCGIFFLAGS: libc::c_ulong = 0x8913; // get flags
+    const SIOCSIFFLAGS: libc::c_ulong = 0x8914; // set flags
+
+    // Get the current flags
+    unsafe {
+        if libc::ioctl(fd, SIOCGIFFLAGS, &mut ifreq) < 0 {
+            return Err(nix::Error::last());
+        }
+    }
+
+    // Modify the flags to set or clear the promiscuous mode bit
+    if enable {
+        unsafe { ifreq.ifr_ifru.ifru_flags |= libc::IFF_PROMISC as i16 };
+    } else {
+        unsafe { ifreq.ifr_ifru.ifru_flags &= !(libc::IFF_PROMISC as i16) };
+    }
+
+    // Set the modified flags
+    unsafe {
+        if libc::ioctl(fd, SIOCSIFFLAGS, &ifreq) < 0 {
+            return Err(nix::Error::last());
+        }
+    }
+
+    Ok(())
+}
+
+// Helper function to create an ifreq structure
+fn ifreq_for(iface_name: &str) -> libc::ifreq {
+    let mut ifreq = libc::ifreq {
+        ifr_name: [0; libc::IFNAMSIZ],
+        ifr_ifru: libc::__c_anonymous_ifr_ifru { ifru_flags: 0 },
+    };
+
+    // Copy the interface name into ifr_name
+    let name_bytes = iface_name.as_bytes();
+    for (i, &b) in name_bytes.iter().enumerate() {
+        ifreq.ifr_name[i] = b as i8;
+    }
+
+    ifreq
+}
+
 async fn handle_realtime<T>(
     interface: String,
     interval: Option<u64>,
@@ -310,6 +375,13 @@ async fn handle_realtime<T>(
 where
     T: Flow + Send + Sync + 'static,
 {
+    // Open a raw socket
+    let sock_fd = open_raw_socket().expect("Failed to open socket");
+
+    // Set the interface to promiscuous mode
+    set_promiscuous_mode(sock_fd, &interface, true).expect("Failed to set promiscuous mode");
+
+
     // Bump the memlock rlimit. This is needed for older kernels that don't use the
     // new memcg based accounting, see https://lwn.net/Articles/837122/
     let rlim = libc::rlimit {
@@ -588,6 +660,8 @@ where
 
     info!("Waiting for Ctrl-C...");
     signal::ctrl_c().await?;
+
+    close(sock_fd).expect("Failed to close socket");
 
     for entry in flow_map_ipv4.iter() {
         let flow = entry.value();
