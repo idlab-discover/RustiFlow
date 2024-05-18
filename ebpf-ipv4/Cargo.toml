@@ -10,7 +10,7 @@ common = { path = "../common" }
 network-types = "0.0.5"
 
 [[bin]]
-name = "feature-extraction-tool-ipv4"
+name = "rustiflow-ebpf-ipv4"
 path = "src/main.rs"
 
 [profile.dev]

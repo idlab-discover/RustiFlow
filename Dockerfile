@@ -27,7 +27,7 @@ WORKDIR /usr/src/app
 COPY Cargo.toml Cargo.lock ./
 COPY .cargo ./.cargo
 COPY common ./common
-COPY feature-extraction-tool ./feature-extraction-tool
+COPY rustiflow ./rustiflow
 COPY xtask ./xtask
 COPY rustfmt.toml .
 COPY ebpf-ipv4 ./ebpf-ipv4
