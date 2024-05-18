@@ -324,39 +324,39 @@ where
     // Loading the eBPF program for egress, the macros make sure the correct file is loaded
     #[cfg(debug_assertions)]
     let mut bpf_egress_ipv4 = Ebpf::load(include_bytes_aligned!(
-        "../../target/bpfel-unknown-none/debug/feature-extraction-tool-ipv4"
+        "../../target/bpfel-unknown-none/debug/rustiflow-ebpf-ipv4"
     ))?;
     #[cfg(not(debug_assertions))]
     let mut bpf_egress_ipv4 = Ebpf::load(include_bytes_aligned!(
-        "../../target/bpfel-unknown-none/release/feature-extraction-tool-ipv4"
+        "../../target/bpfel-unknown-none/release/rustiflow-ebpf-ipv4"
     ))?;
 
     #[cfg(debug_assertions)]
     let mut bpf_egress_ipv6 = Ebpf::load(include_bytes_aligned!(
-        "../../target/bpfel-unknown-none/debug/feature-extraction-tool-ipv6"
+        "../../target/bpfel-unknown-none/debug/rustiflow-ebpf-ipv6"
     ))?;
     #[cfg(not(debug_assertions))]
     let mut bpf_egress_ipv6 = Ebpf::load(include_bytes_aligned!(
-        "../../target/bpfel-unknown-none/release/feature-extraction-tool-ipv6"
+        "../../target/bpfel-unknown-none/release/rustiflow-ebpf-ipv6"
     ))?;
 
     // Loading the eBPF program for ingress, the macros make sure the correct file is loaded
     #[cfg(debug_assertions)]
     let mut bpf_ingress_ipv4 = Ebpf::load(include_bytes_aligned!(
-        "../../target/bpfel-unknown-none/debug/feature-extraction-tool-ipv4"
+        "../../target/bpfel-unknown-none/debug/rustiflow-ebpf-ipv4"
     ))?;
     #[cfg(not(debug_assertions))]
     let mut bpf_ingress_ipv4 = Ebpf::load(include_bytes_aligned!(
-        "../../target/bpfel-unknown-none/release/feature-extraction-tool-ipv4"
+        "../../target/bpfel-unknown-none/release/rustiflow-ebpf-ipv4"
     ))?;
 
     #[cfg(debug_assertions)]
     let mut bpf_ingress_ipv6 = Ebpf::load(include_bytes_aligned!(
-        "../../target/bpfel-unknown-none/debug/feature-extraction-tool-ipv6"
+        "../../target/bpfel-unknown-none/debug/rustiflow-ebpf-ipv6"
     ))?;
     #[cfg(not(debug_assertions))]
     let mut bpf_ingress_ipv6 = Ebpf::load(include_bytes_aligned!(
-        "../../target/bpfel-unknown-none/release/feature-extraction-tool-ipv6"
+        "../../target/bpfel-unknown-none/release/rustiflow-ebpf-ipv6"
     ))?;
 
     if !only_ingress {
