@@ -1,5 +1,7 @@
 use std::{
-    net::IpAddr, ops::Deref, time::{Instant, SystemTime, UNIX_EPOCH}
+    net::IpAddr,
+    ops::Deref,
+    time::{Instant, SystemTime, UNIX_EPOCH},
 };
 
 use chrono::{DateTime, Utc};
@@ -147,18 +149,43 @@ impl Flow for NfFlow {
     }
 
     fn dump_without_contamination(&self) -> String {
-        format!("{},{},{},{},{},{},{},{},{},{},{},{},{},\
+        format!(
+            "{},{},{},{},{},{},{},{},{},{},{},{},{},\
         {},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},\
         {},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},\
         {},{},{},{},{},{},{},{},{},{},{},{},{}",
             self.cic_flow.basic_flow.protocol,
-            self.last_timestamp.duration_since(UNIX_EPOCH).unwrap().as_millis() - self.first_timestamp.duration_since(UNIX_EPOCH).unwrap().as_millis(),
+            self.last_timestamp
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_millis()
+                - self
+                    .first_timestamp
+                    .duration_since(UNIX_EPOCH)
+                    .unwrap()
+                    .as_millis(),
             self.cic_flow.basic_flow.fwd_packet_count + self.cic_flow.basic_flow.bwd_packet_count,
             self.cic_flow.fwd_pkt_len_tot + self.cic_flow.bwd_pkt_len_tot,
-            self.fwd_last_timestamp.duration_since(UNIX_EPOCH).unwrap().as_millis() - self.fwd_first_timestamp.duration_since(UNIX_EPOCH).unwrap().as_millis(),
+            self.fwd_last_timestamp
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_millis()
+                - self
+                    .fwd_first_timestamp
+                    .duration_since(UNIX_EPOCH)
+                    .unwrap()
+                    .as_millis(),
             self.cic_flow.basic_flow.fwd_packet_count,
             self.cic_flow.fwd_pkt_len_tot,
-            self.bwd_last_timestamp.duration_since(UNIX_EPOCH).unwrap().as_millis() - self.bwd_first_timestamp.duration_since(UNIX_EPOCH).unwrap().as_millis(),
+            self.bwd_last_timestamp
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_millis()
+                - self
+                    .bwd_first_timestamp
+                    .duration_since(UNIX_EPOCH)
+                    .unwrap()
+                    .as_millis(),
             self.cic_flow.basic_flow.bwd_packet_count,
             self.cic_flow.bwd_pkt_len_tot,
             self.cic_flow.get_flow_packet_length_min(),
@@ -185,14 +212,22 @@ impl Flow for NfFlow {
             self.cic_flow.bwd_iat_mean / 1000.0,
             self.cic_flow.bwd_iat_std / 1000.0,
             self.cic_flow.bwd_iat_max / 1000.0,
-            self.cic_flow.basic_flow.fwd_syn_flag_count + self.cic_flow.basic_flow.bwd_syn_flag_count,
-            self.cic_flow.basic_flow.fwd_cwe_flag_count + self.cic_flow.basic_flow.bwd_cwe_flag_count,
-            self.cic_flow.basic_flow.fwd_ece_flag_count + self.cic_flow.basic_flow.bwd_ece_flag_count,
-            self.cic_flow.basic_flow.fwd_urg_flag_count + self.cic_flow.basic_flow.bwd_urg_flag_count,
-            self.cic_flow.basic_flow.fwd_ack_flag_count + self.cic_flow.basic_flow.bwd_ack_flag_count,
-            self.cic_flow.basic_flow.fwd_psh_flag_count + self.cic_flow.basic_flow.bwd_psh_flag_count,
-            self.cic_flow.basic_flow.fwd_rst_flag_count + self.cic_flow.basic_flow.bwd_rst_flag_count,
-            self.cic_flow.basic_flow.fwd_fin_flag_count + self.cic_flow.basic_flow.bwd_fin_flag_count,
+            self.cic_flow.basic_flow.fwd_syn_flag_count
+                + self.cic_flow.basic_flow.bwd_syn_flag_count,
+            self.cic_flow.basic_flow.fwd_cwe_flag_count
+                + self.cic_flow.basic_flow.bwd_cwe_flag_count,
+            self.cic_flow.basic_flow.fwd_ece_flag_count
+                + self.cic_flow.basic_flow.bwd_ece_flag_count,
+            self.cic_flow.basic_flow.fwd_urg_flag_count
+                + self.cic_flow.basic_flow.bwd_urg_flag_count,
+            self.cic_flow.basic_flow.fwd_ack_flag_count
+                + self.cic_flow.basic_flow.bwd_ack_flag_count,
+            self.cic_flow.basic_flow.fwd_psh_flag_count
+                + self.cic_flow.basic_flow.bwd_psh_flag_count,
+            self.cic_flow.basic_flow.fwd_rst_flag_count
+                + self.cic_flow.basic_flow.bwd_rst_flag_count,
+            self.cic_flow.basic_flow.fwd_fin_flag_count
+                + self.cic_flow.basic_flow.bwd_fin_flag_count,
             self.cic_flow.basic_flow.fwd_syn_flag_count,
             self.cic_flow.basic_flow.fwd_cwe_flag_count,
             self.cic_flow.basic_flow.fwd_ece_flag_count,

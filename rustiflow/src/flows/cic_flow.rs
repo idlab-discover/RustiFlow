@@ -2,7 +2,7 @@ use chrono::{DateTime, Utc};
 use std::{net::IpAddr, ops::Deref, time::Instant};
 
 use crate::{
-    utils::utils::{get_duration, BasicFeatures},
+    utils::utils::{calculate_mean, calculate_std, get_duration, BasicFeatures},
     NO_CONTAMINANT_FEATURES,
 };
 
@@ -199,14 +199,18 @@ impl CicFlow {
         self.fwd_pkt_len_tot += len;
 
         // update mean and std
-        let new_fwd_pkt_len_mean =
-            (((self.basic_flow.fwd_packet_count - 1) as f32 * self.fwd_pkt_len_mean) + len as f32)
-                / self.basic_flow.fwd_packet_count as f32;
-        self.fwd_pkt_len_std = ((((self.basic_flow.fwd_packet_count - 1) as f32
-            * self.fwd_pkt_len_std.powf(2.0))
-            + ((len as f32 - self.fwd_pkt_len_mean) * (len as f32 - new_fwd_pkt_len_mean)))
-            / self.basic_flow.fwd_packet_count as f32)
-            .sqrt();
+        let new_fwd_pkt_len_mean = calculate_mean(
+            self.basic_flow.fwd_packet_count as u64,
+            self.fwd_pkt_len_mean as f64,
+            len as f64,
+        ) as f32;
+        self.fwd_pkt_len_std = calculate_std(
+            self.basic_flow.fwd_packet_count as u64,
+            self.fwd_pkt_len_std as f64,
+            self.fwd_pkt_len_mean as f64,
+            new_fwd_pkt_len_mean as f64,
+            len as f64,
+        ) as f32;
         self.fwd_pkt_len_mean = new_fwd_pkt_len_mean;
     }
 
@@ -231,14 +235,18 @@ impl CicFlow {
         self.bwd_pkt_len_tot += len;
 
         // update mean and std
-        let new_bwd_pkt_len_mean =
-            (((self.basic_flow.bwd_packet_count - 1) as f32 * self.bwd_pkt_len_mean) + len as f32)
-                / self.basic_flow.bwd_packet_count as f32;
-        self.bwd_pkt_len_std = ((((self.basic_flow.bwd_packet_count - 1) as f32
-            * self.bwd_pkt_len_std.powf(2.0))
-            + ((len as f32 - self.bwd_pkt_len_mean) * (len as f32 - new_bwd_pkt_len_mean)))
-            / self.basic_flow.bwd_packet_count as f32)
-            .sqrt();
+        let new_bwd_pkt_len_mean = calculate_mean(
+            self.basic_flow.bwd_packet_count as u64,
+            self.bwd_pkt_len_mean as f64,
+            len as f64,
+        ) as f32;
+        self.bwd_pkt_len_std = calculate_std(
+            self.basic_flow.bwd_packet_count as u64,
+            self.bwd_pkt_len_std as f64,
+            self.bwd_pkt_len_mean as f64,
+            new_bwd_pkt_len_mean as f64,
+            len as f64,
+        ) as f32;
         self.bwd_pkt_len_mean = new_bwd_pkt_len_mean;
     }
 
@@ -262,14 +270,18 @@ impl CicFlow {
         self.fwd_iat_total += iat;
 
         // update mean and std
-        let new_fwd_iat_mean = ((self.basic_flow.fwd_packet_count - 2) as f64 * self.fwd_iat_mean
-            + iat)
-            / (self.basic_flow.fwd_packet_count - 1) as f64;
-        self.fwd_iat_std = ((((self.basic_flow.fwd_packet_count - 2) as f64
-            * self.fwd_iat_std.powf(2.0))
-            + ((iat - self.fwd_iat_mean) * (iat - new_fwd_iat_mean)))
-            / (self.basic_flow.fwd_packet_count - 1) as f64)
-            .sqrt();
+        let new_fwd_iat_mean = calculate_mean(
+            (self.basic_flow.fwd_packet_count - 1) as u64,
+            self.fwd_iat_mean,
+            iat,
+        );
+        self.fwd_iat_std = calculate_std(
+            (self.basic_flow.fwd_packet_count - 1) as u64,
+            self.fwd_iat_std,
+            self.fwd_iat_mean,
+            new_fwd_iat_mean,
+            iat,
+        );
         self.fwd_iat_mean = new_fwd_iat_mean;
     }
 
@@ -293,14 +305,18 @@ impl CicFlow {
         self.bwd_iat_total += iat;
 
         // update mean and std
-        let new_bwd_iat_mean = ((self.basic_flow.bwd_packet_count - 2) as f64 * self.bwd_iat_mean
-            + iat)
-            / (self.basic_flow.bwd_packet_count - 1) as f64;
-        self.bwd_iat_std = ((((self.basic_flow.bwd_packet_count - 2) as f64
-            * self.bwd_iat_std.powf(2.0))
-            + ((iat - self.bwd_iat_mean) * (iat - new_bwd_iat_mean)))
-            / (self.basic_flow.bwd_packet_count - 1) as f64)
-            .sqrt();
+        let new_bwd_iat_mean = calculate_mean(
+            (self.basic_flow.bwd_packet_count - 1) as u64,
+            self.bwd_iat_mean,
+            iat,
+        );
+        self.bwd_iat_std = calculate_std(
+            (self.basic_flow.bwd_packet_count - 1) as u64,
+            self.bwd_iat_std,
+            self.bwd_iat_mean,
+            new_bwd_iat_mean,
+            iat,
+        );
         self.bwd_iat_mean = new_bwd_iat_mean;
     }
 
@@ -324,12 +340,14 @@ impl CicFlow {
         }
 
         // update mean and std
-        let new_active_mean = (((self.active_count - 1) as f64 * self.active_mean) + duration)
-            / self.active_count as f64;
-        self.active_std = ((((self.active_count - 1) as f64 * self.active_std.powf(2.0))
-            + ((duration - self.active_mean) * (duration - new_active_mean)))
-            / self.active_count as f64)
-            .sqrt();
+        let new_active_mean = calculate_mean(self.active_count as u64, self.active_mean, duration);
+        self.active_std = calculate_std(
+            self.active_count as u64,
+            self.active_std,
+            self.active_mean,
+            new_active_mean,
+            duration,
+        );
         self.active_mean = new_active_mean;
     }
 
@@ -353,12 +371,14 @@ impl CicFlow {
         }
 
         // update mean and std
-        let new_idle_mean =
-            (((self.idle_count - 1) as f64 * self.idle_mean) + duration) / self.idle_count as f64;
-        self.idle_std = ((((self.idle_count - 1) as f64 * self.idle_std.powf(2.0))
-            + ((duration - self.idle_mean) * (duration - new_idle_mean)))
-            / self.idle_count as f64)
-            .sqrt();
+        let new_idle_mean = calculate_mean(self.idle_count as u64, self.idle_mean, duration);
+        self.idle_std = calculate_std(
+            self.idle_count as u64,
+            self.idle_std,
+            self.idle_mean,
+            new_idle_mean,
+            duration,
+        );
         self.idle_mean = new_idle_mean;
     }
 
@@ -733,7 +753,8 @@ impl CicFlow {
     /// Mean packet segment length of the flow.
     pub fn get_flow_segment_length_mean(&self) -> f32 {
         (self.get_fwd_segment_length_mean() * self.basic_flow.fwd_packet_count as f32
-            + self.get_bwd_segment_length_mean() * self.basic_flow.bwd_packet_count as f32) as f32
+            + self.get_bwd_segment_length_mean() * self.basic_flow.bwd_packet_count as f32)
+            as f32
             / (self.basic_flow.fwd_packet_count + self.basic_flow.bwd_packet_count) as f32
     }
 

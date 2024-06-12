@@ -22,9 +22,12 @@ use clap::Parser;
 use common::{BasicFeaturesIpv4, BasicFeaturesIpv6};
 use core::panic;
 use dashmap::DashMap;
-use flows::{basic_flow::BasicFlow, cidds_flow::CiddsFlow, custom_flow::CustomFlow, flow::Flow, nf_flow::NfFlow};
+use flows::{
+    basic_flow::BasicFlow, cidds_flow::CiddsFlow, custom_flow::CustomFlow, flow::Flow,
+    nf_flow::NfFlow,
+};
 use lazy_static::lazy_static;
-use log::{debug, info, error};
+use log::{debug, error, info};
 use pnet::packet::{
     ethernet::{EtherTypes, EthernetPacket},
     ip::IpNextHeaderProtocols,
@@ -107,7 +110,10 @@ async fn main() {
                     *export_func = Some(func);
 
                     if let Some(path) = export_method.export_path {
-                        info!("Selecting the CSV export method with output file: {:?} ...", path);
+                        info!(
+                            "Selecting the CSV export method with output file: {:?} ...",
+                            path
+                        );
                         info!("{DIVIDER}");
 
                         let mut static_path = PATH.lock().unwrap();
@@ -135,7 +141,8 @@ async fn main() {
                     info!("{UNDERLINE}");
 
                     if let Err(err) =
-                        handle_realtime::<BasicFlow>(interface, interval, lifespan, only_ingress).await
+                        handle_realtime::<BasicFlow>(interface, interval, lifespan, only_ingress)
+                            .await
                     {
                         error!("Error: {:?}", err);
                     }
@@ -147,7 +154,8 @@ async fn main() {
                     info!("{UNDERLINE}");
 
                     if let Err(err) =
-                        handle_realtime::<CicFlow>(interface, interval, lifespan, only_ingress).await
+                        handle_realtime::<CicFlow>(interface, interval, lifespan, only_ingress)
+                            .await
                     {
                         error!("Error: {:?}", err);
                     }
@@ -159,7 +167,8 @@ async fn main() {
                     info!("{UNDERLINE}");
 
                     if let Err(err) =
-                        handle_realtime::<CiddsFlow>(interface, interval, lifespan, only_ingress).await
+                        handle_realtime::<CiddsFlow>(interface, interval, lifespan, only_ingress)
+                            .await
                     {
                         error!("Error: {:?}", err);
                     }
@@ -170,7 +179,8 @@ async fn main() {
                     info!("Starting!");
                     info!("{UNDERLINE}");
 
-                    if let Err(err) = handle_realtime::<NfFlow>(interface, interval, lifespan, only_ingress).await
+                    if let Err(err) =
+                        handle_realtime::<NfFlow>(interface, interval, lifespan, only_ingress).await
                     {
                         error!("Error: {:?}", err);
                     }
@@ -181,7 +191,9 @@ async fn main() {
                     info!("Starting!");
                     info!("{UNDERLINE}");
 
-                    if let Err(err) = handle_realtime::<NTLFlow>(interface, interval, lifespan, only_ingress).await
+                    if let Err(err) =
+                        handle_realtime::<NTLFlow>(interface, interval, lifespan, only_ingress)
+                            .await
                     {
                         error!("Error: {:?}", err);
                     }
@@ -192,7 +204,9 @@ async fn main() {
                     info!("Starting!");
                     info!("{UNDERLINE}");
 
-                    if let Err(err) = handle_realtime::<CustomFlow>(interface, interval, lifespan, only_ingress).await
+                    if let Err(err) =
+                        handle_realtime::<CustomFlow>(interface, interval, lifespan, only_ingress)
+                            .await
                     {
                         error!("Error: {:?}", err);
                     }
@@ -231,7 +245,10 @@ async fn main() {
                     *export_func = Some(func);
 
                     if let Some(path) = export_method.export_path {
-                        info!("Selecting the CSV export method with output file: {:?} ...", path);
+                        info!(
+                            "Selecting the CSV export method with output file: {:?} ...",
+                            path
+                        );
                         info!("{DIVIDER}");
 
                         let file = OpenOptions::new()
@@ -377,7 +394,7 @@ where
         program_egress_ipv6.load()?;
         program_egress_ipv6.attach(&interface, TcAttachType::Egress)?;
     }
-    
+
     // Loading and attaching the eBPF program function for ingress
     let _ = tc::qdisc_add_clsact(interface.as_str());
     let program_ingress_ipv4: &mut SchedClassifier = bpf_ingress_ipv4
@@ -596,7 +613,6 @@ where
         } else {
             export(&flow.dump());
         }
-
     }
 
     for entry in flow_map_ipv6.iter() {
@@ -606,7 +622,6 @@ where
         } else {
             export(&flow.dump());
         }
-
     }
 
     // Making sure everything is flushed
@@ -630,7 +645,7 @@ where
 
 async fn read_pcap_file<T>(path: &str, lifespan: u64)
 where
-T: Flow + Send + Sync + 'static,
+    T: Flow + Send + Sync + 'static,
 {
     let start = Instant::now();
     let mut amount_of_packets = 0;
@@ -685,7 +700,10 @@ T: Flow + Send + Sync + 'static,
                                 if let Some(features_ipv4) = extract_ipv4_features(&ipv4_packet) {
                                     amount_of_packets += 1;
                                     if amount_of_packets % 10_000 == 0 {
-                                        info!("{} packets have been processed...", amount_of_packets);
+                                        info!(
+                                            "{} packets have been processed...",
+                                            amount_of_packets
+                                        );
                                     }
                                     redirect_packet_ipv4(&features_ipv4, &flow_map_ipv4);
                                 }
@@ -696,7 +714,10 @@ T: Flow + Send + Sync + 'static,
                                 if let Some(features_ipv6) = extract_ipv6_features(&ipv6_packet) {
                                     amount_of_packets += 1;
                                     if amount_of_packets % 10_000 == 0 {
-                                        info!("{} packets have been processed...", amount_of_packets);
+                                        info!(
+                                            "{} packets have been processed...",
+                                            amount_of_packets
+                                        );
                                     }
                                     redirect_packet_ipv6(&features_ipv6, &flow_map_ipv6);
                                 }
@@ -789,7 +810,10 @@ T: Flow + Send + Sync + 'static,
 
     let end = Instant::now();
     info!("{} packets processed", amount_of_packets);
-    info!("Duration: {:?} milliseconds", end.duration_since(start).as_millis());
+    info!(
+        "Duration: {:?} milliseconds",
+        end.duration_since(start).as_millis()
+    );
 }
 
 /// Export the flow to the set export function.
@@ -822,7 +846,10 @@ fn export(output: &String) {
                     let file = OpenOptions::new()
                         .create(true)
                         .append(true)
-                        .open(path.clone().replace(".csv", format!("_{}.csv", amount).as_str()))
+                        .open(
+                            path.clone()
+                                .replace(".csv", format!("_{}.csv", amount).as_str()),
+                        )
                         .unwrap_or_else(|err| {
                             panic!("Error opening file: {:?}", err);
                         });

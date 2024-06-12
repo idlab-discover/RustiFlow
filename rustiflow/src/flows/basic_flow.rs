@@ -2,7 +2,10 @@ use std::{net::IpAddr, ops::Deref, time::Instant};
 
 use chrono::{DateTime, Utc};
 
-use crate::{utils::utils::{get_duration, BasicFeatures}, NO_CONTAMINANT_FEATURES};
+use crate::{
+    utils::utils::{get_duration, BasicFeatures},
+    NO_CONTAMINANT_FEATURES,
+};
 
 use super::flow::Flow;
 
