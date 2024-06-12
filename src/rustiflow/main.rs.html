@@ -1,4 +1,4 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `rustiflow/src/main.rs`."><title>main.rs - source</title><script>if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-46f98efaafac5295.ttf.woff2,FiraSans-Regular-018c141bf0843ffd.woff2,FiraSans-Medium-8f9a781e4970d388.woff2,SourceCodePro-Regular-562dcc5011b6de7d.ttf.woff2,SourceCodePro-Semibold-d899c5a5c4aeb14a.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2" crossorigin href="../../static.files/${f}">`).join(""))</script><link rel="stylesheet" href="../../static.files/normalize-76eba96aa4d2e634.css"><link rel="stylesheet" href="../../static.files/rustdoc-dd39b87e5fcfba68.css"><meta name="rustdoc-vars" data-root-path="../../" data-static-root-path="../../static.files/" data-current-crate="rustiflow" data-themes="" data-resource-suffix="" data-rustdoc-version="1.80.0-nightly (1a7397988 2024-05-17)" data-channel="nightly" data-search-js="search-d52510db62a78183.js" data-settings-js="settings-4313503d2e1961c2.js" ><script src="../../static.files/storage-118b08c4c78b968e.js"></script><script defer src="../../static.files/src-script-e66d777a5a92e9b2.js"></script><script defer src="../../src-files.js"></script><script defer src="../../static.files/main-20a3ad099b048cf2.js"></script><noscript><link rel="stylesheet" href="../../static.files/noscript-df360f571f6edeae.css"></noscript><link rel="alternate icon" type="image/png" href="../../static.files/favicon-32x32-422f7d1d52889060.png"><link rel="icon" type="image/svg+xml" href="../../static.files/favicon-2c020d218678b618.svg"></head><body class="rustdoc src"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="src-sidebar-title"><h2>Files</h2></div></nav><div class="sidebar-resizer"></div><main><rustdoc-search></rustdoc-search><section id="main-content" class="content"><div class="example-wrap"><div data-nosnippet><pre class="src-line-numbers"><a href="#1" id="1">1</a>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `rustiflow/src/main.rs`."><title>main.rs - source</title><script>if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-46f98efaafac5295.ttf.woff2,FiraSans-Regular-018c141bf0843ffd.woff2,FiraSans-Medium-8f9a781e4970d388.woff2,SourceCodePro-Regular-562dcc5011b6de7d.ttf.woff2,SourceCodePro-Semibold-d899c5a5c4aeb14a.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2" crossorigin href="../../static.files/${f}">`).join(""))</script><link rel="stylesheet" href="../../static.files/normalize-76eba96aa4d2e634.css"><link rel="stylesheet" href="../../static.files/rustdoc-dd39b87e5fcfba68.css"><meta name="rustdoc-vars" data-root-path="../../" data-static-root-path="../../static.files/" data-current-crate="rustiflow" data-themes="" data-resource-suffix="" data-rustdoc-version="1.81.0-nightly (d0227c6a1 2024-06-11)" data-channel="nightly" data-search-js="search-0fe7219eb170c82e.js" data-settings-js="settings-4313503d2e1961c2.js" ><script src="../../static.files/storage-118b08c4c78b968e.js"></script><script defer src="../../static.files/src-script-e66d777a5a92e9b2.js"></script><script defer src="../../src-files.js"></script><script defer src="../../static.files/main-20a3ad099b048cf2.js"></script><noscript><link rel="stylesheet" href="../../static.files/noscript-df360f571f6edeae.css"></noscript><link rel="alternate icon" type="image/png" href="../../static.files/favicon-32x32-422f7d1d52889060.png"><link rel="icon" type="image/svg+xml" href="../../static.files/favicon-2c020d218678b618.svg"></head><body class="rustdoc src"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="src-sidebar-title"><h2>Files</h2></div></nav><div class="sidebar-resizer"></div><main><rustdoc-search></rustdoc-search><section id="main-content" class="content"><div class="example-wrap"><div data-nosnippet><pre class="src-line-numbers"><a href="#1" id="1">1</a>
 <a href="#2" id="2">2</a>
 <a href="#3" id="3">3</a>
 <a href="#4" id="4">4</a>
@@ -1429,6 +1429,33 @@
 <a href="#1429" id="1429">1429</a>
 <a href="#1430" id="1430">1430</a>
 <a href="#1431" id="1431">1431</a>
+<a href="#1432" id="1432">1432</a>
+<a href="#1433" id="1433">1433</a>
+<a href="#1434" id="1434">1434</a>
+<a href="#1435" id="1435">1435</a>
+<a href="#1436" id="1436">1436</a>
+<a href="#1437" id="1437">1437</a>
+<a href="#1438" id="1438">1438</a>
+<a href="#1439" id="1439">1439</a>
+<a href="#1440" id="1440">1440</a>
+<a href="#1441" id="1441">1441</a>
+<a href="#1442" id="1442">1442</a>
+<a href="#1443" id="1443">1443</a>
+<a href="#1444" id="1444">1444</a>
+<a href="#1445" id="1445">1445</a>
+<a href="#1446" id="1446">1446</a>
+<a href="#1447" id="1447">1447</a>
+<a href="#1448" id="1448">1448</a>
+<a href="#1449" id="1449">1449</a>
+<a href="#1450" id="1450">1450</a>
+<a href="#1451" id="1451">1451</a>
+<a href="#1452" id="1452">1452</a>
+<a href="#1453" id="1453">1453</a>
+<a href="#1454" id="1454">1454</a>
+<a href="#1455" id="1455">1455</a>
+<a href="#1456" id="1456">1456</a>
+<a href="#1457" id="1457">1457</a>
+<a href="#1458" id="1458">1458</a>
 </pre></div><pre class="rust"><code><span class="kw">mod </span>args;
 <span class="kw">mod </span>flows;
 <span class="kw">mod </span>output;
@@ -1453,9 +1480,12 @@
 <span class="kw">use </span>common::{BasicFeaturesIpv4, BasicFeaturesIpv6};
 <span class="kw">use </span>core::panic;
 <span class="kw">use </span>dashmap::DashMap;
-<span class="kw">use </span>flows::{basic_flow::BasicFlow, cidds_flow::CiddsFlow, custom_flow::CustomFlow, flow::Flow, nf_flow::NfFlow};
+<span class="kw">use </span>flows::{
+    basic_flow::BasicFlow, cidds_flow::CiddsFlow, custom_flow::CustomFlow, flow::Flow,
+    nf_flow::NfFlow,
+};
 <span class="kw">use </span>lazy_static::lazy_static;
-<span class="kw">use </span>log::{debug, info, error};
+<span class="kw">use </span>log::{debug, error, info};
 <span class="kw">use </span>pnet::packet::{
     ethernet::{EtherTypes, EthernetPacket},
     ip::IpNextHeaderProtocols,
@@ -1538,7 +1568,10 @@
                     <span class="kw-2">*</span>export_func = <span class="prelude-val">Some</span>(func);
 
                     <span class="kw">if let </span><span class="prelude-val">Some</span>(path) = export_method.export_path {
-                        <span class="macro">info!</span>(<span class="string">"Selecting the CSV export method with output file: {:?} ..."</span>, path);
+                        <span class="macro">info!</span>(
+                            <span class="string">"Selecting the CSV export method with output file: {:?} ..."</span>,
+                            path
+                        );
                         <span class="macro">info!</span>(<span class="string">"{DIVIDER}"</span>);
 
                         <span class="kw">let </span><span class="kw-2">mut </span>static_path = PATH.lock().unwrap();
@@ -1566,7 +1599,8 @@
                     <span class="macro">info!</span>(<span class="string">"{UNDERLINE}"</span>);
 
                     <span class="kw">if let </span><span class="prelude-val">Err</span>(err) =
-                        handle_realtime::&lt;BasicFlow&gt;(interface, interval, lifespan, only_ingress).<span class="kw">await
+                        handle_realtime::&lt;BasicFlow&gt;(interface, interval, lifespan, only_ingress)
+                            .<span class="kw">await
                     </span>{
                         <span class="macro">error!</span>(<span class="string">"Error: {:?}"</span>, err);
                     }
@@ -1578,7 +1612,8 @@
                     <span class="macro">info!</span>(<span class="string">"{UNDERLINE}"</span>);
 
                     <span class="kw">if let </span><span class="prelude-val">Err</span>(err) =
-                        handle_realtime::&lt;CicFlow&gt;(interface, interval, lifespan, only_ingress).<span class="kw">await
+                        handle_realtime::&lt;CicFlow&gt;(interface, interval, lifespan, only_ingress)
+                            .<span class="kw">await
                     </span>{
                         <span class="macro">error!</span>(<span class="string">"Error: {:?}"</span>, err);
                     }
@@ -1590,7 +1625,8 @@
                     <span class="macro">info!</span>(<span class="string">"{UNDERLINE}"</span>);
 
                     <span class="kw">if let </span><span class="prelude-val">Err</span>(err) =
-                        handle_realtime::&lt;CiddsFlow&gt;(interface, interval, lifespan, only_ingress).<span class="kw">await
+                        handle_realtime::&lt;CiddsFlow&gt;(interface, interval, lifespan, only_ingress)
+                            .<span class="kw">await
                     </span>{
                         <span class="macro">error!</span>(<span class="string">"Error: {:?}"</span>, err);
                     }
@@ -1601,7 +1637,8 @@
                     <span class="macro">info!</span>(<span class="string">"Starting!"</span>);
                     <span class="macro">info!</span>(<span class="string">"{UNDERLINE}"</span>);
 
-                    <span class="kw">if let </span><span class="prelude-val">Err</span>(err) = handle_realtime::&lt;NfFlow&gt;(interface, interval, lifespan, only_ingress).<span class="kw">await
+                    <span class="kw">if let </span><span class="prelude-val">Err</span>(err) =
+                        handle_realtime::&lt;NfFlow&gt;(interface, interval, lifespan, only_ingress).<span class="kw">await
                     </span>{
                         <span class="macro">error!</span>(<span class="string">"Error: {:?}"</span>, err);
                     }
@@ -1612,7 +1649,9 @@
                     <span class="macro">info!</span>(<span class="string">"Starting!"</span>);
                     <span class="macro">info!</span>(<span class="string">"{UNDERLINE}"</span>);
 
-                    <span class="kw">if let </span><span class="prelude-val">Err</span>(err) = handle_realtime::&lt;NTLFlow&gt;(interface, interval, lifespan, only_ingress).<span class="kw">await
+                    <span class="kw">if let </span><span class="prelude-val">Err</span>(err) =
+                        handle_realtime::&lt;NTLFlow&gt;(interface, interval, lifespan, only_ingress)
+                            .<span class="kw">await
                     </span>{
                         <span class="macro">error!</span>(<span class="string">"Error: {:?}"</span>, err);
                     }
@@ -1623,7 +1662,9 @@
                     <span class="macro">info!</span>(<span class="string">"Starting!"</span>);
                     <span class="macro">info!</span>(<span class="string">"{UNDERLINE}"</span>);
 
-                    <span class="kw">if let </span><span class="prelude-val">Err</span>(err) = handle_realtime::&lt;CustomFlow&gt;(interface, interval, lifespan, only_ingress).<span class="kw">await
+                    <span class="kw">if let </span><span class="prelude-val">Err</span>(err) =
+                        handle_realtime::&lt;CustomFlow&gt;(interface, interval, lifespan, only_ingress)
+                            .<span class="kw">await
                     </span>{
                         <span class="macro">error!</span>(<span class="string">"Error: {:?}"</span>, err);
                     }
@@ -1662,7 +1703,10 @@
                     <span class="kw-2">*</span>export_func = <span class="prelude-val">Some</span>(func);
 
                     <span class="kw">if let </span><span class="prelude-val">Some</span>(path) = export_method.export_path {
-                        <span class="macro">info!</span>(<span class="string">"Selecting the CSV export method with output file: {:?} ..."</span>, path);
+                        <span class="macro">info!</span>(
+                            <span class="string">"Selecting the CSV export method with output file: {:?} ..."</span>,
+                            path
+                        );
                         <span class="macro">info!</span>(<span class="string">"{DIVIDER}"</span>);
 
                         <span class="kw">let </span>file = OpenOptions::new()
@@ -1808,7 +1852,7 @@
         program_egress_ipv6.load()<span class="question-mark">?</span>;
         program_egress_ipv6.attach(<span class="kw-2">&amp;</span>interface, TcAttachType::Egress)<span class="question-mark">?</span>;
     }
-    
+
     <span class="comment">// Loading and attaching the eBPF program function for ingress
     </span><span class="kw">let _ </span>= tc::qdisc_add_clsact(interface.as_str());
     <span class="kw">let </span>program_ingress_ipv4: <span class="kw-2">&amp;mut </span>SchedClassifier = bpf_ingress_ipv4
@@ -2027,7 +2071,6 @@
         } <span class="kw">else </span>{
             export(<span class="kw-2">&amp;</span>flow.dump());
         }
-
     }
 
     <span class="kw">for </span>entry <span class="kw">in </span>flow_map_ipv6.iter() {
@@ -2037,7 +2080,6 @@
         } <span class="kw">else </span>{
             export(<span class="kw-2">&amp;</span>flow.dump());
         }
-
     }
 
     <span class="comment">// Making sure everything is flushed
@@ -2061,7 +2103,7 @@
 
 <span class="kw">async fn </span>read_pcap_file&lt;T&gt;(path: <span class="kw-2">&amp;</span>str, lifespan: u64)
 <span class="kw">where
-</span>T: Flow + Send + Sync + <span class="lifetime">'static</span>,
+    </span>T: Flow + Send + Sync + <span class="lifetime">'static</span>,
 {
     <span class="kw">let </span>start = Instant::now();
     <span class="kw">let </span><span class="kw-2">mut </span>amount_of_packets = <span class="number">0</span>;
@@ -2116,7 +2158,10 @@
                                 <span class="kw">if let </span><span class="prelude-val">Some</span>(features_ipv4) = extract_ipv4_features(<span class="kw-2">&amp;</span>ipv4_packet) {
                                     amount_of_packets += <span class="number">1</span>;
                                     <span class="kw">if </span>amount_of_packets % <span class="number">10_000 </span>== <span class="number">0 </span>{
-                                        <span class="macro">info!</span>(<span class="string">"{} packets have been processed..."</span>, amount_of_packets);
+                                        <span class="macro">info!</span>(
+                                            <span class="string">"{} packets have been processed..."</span>,
+                                            amount_of_packets
+                                        );
                                     }
                                     redirect_packet_ipv4(<span class="kw-2">&amp;</span>features_ipv4, <span class="kw-2">&amp;</span>flow_map_ipv4);
                                 }
@@ -2127,7 +2172,10 @@
                                 <span class="kw">if let </span><span class="prelude-val">Some</span>(features_ipv6) = extract_ipv6_features(<span class="kw-2">&amp;</span>ipv6_packet) {
                                     amount_of_packets += <span class="number">1</span>;
                                     <span class="kw">if </span>amount_of_packets % <span class="number">10_000 </span>== <span class="number">0 </span>{
-                                        <span class="macro">info!</span>(<span class="string">"{} packets have been processed..."</span>, amount_of_packets);
+                                        <span class="macro">info!</span>(
+                                            <span class="string">"{} packets have been processed..."</span>,
+                                            amount_of_packets
+                                        );
                                     }
                                     redirect_packet_ipv6(<span class="kw-2">&amp;</span>features_ipv6, <span class="kw-2">&amp;</span>flow_map_ipv6);
                                 }
@@ -2220,7 +2268,10 @@
 
     <span class="kw">let </span>end = Instant::now();
     <span class="macro">info!</span>(<span class="string">"{} packets processed"</span>, amount_of_packets);
-    <span class="macro">info!</span>(<span class="string">"Duration: {:?} milliseconds"</span>, end.duration_since(start).as_millis());
+    <span class="macro">info!</span>(
+        <span class="string">"Duration: {:?} milliseconds"</span>,
+        end.duration_since(start).as_millis()
+    );
 }
 
 <span class="doccomment">/// Export the flow to the set export function.
@@ -2253,7 +2304,10 @@
                     <span class="kw">let </span>file = OpenOptions::new()
                         .create(<span class="bool-val">true</span>)
                         .append(<span class="bool-val">true</span>)
-                        .open(path.clone().replace(<span class="string">".csv"</span>, <span class="macro">format!</span>(<span class="string">"_{}.csv"</span>, amount).as_str()))
+                        .open(
+                            path.clone()
+                                .replace(<span class="string">".csv"</span>, <span class="macro">format!</span>(<span class="string">"_{}.csv"</span>, amount).as_str()),
+                        )
                         .unwrap_or_else(|err| {
                             <span class="macro">panic!</span>(<span class="string">"Error opening file: {:?}"</span>, err);
                         });

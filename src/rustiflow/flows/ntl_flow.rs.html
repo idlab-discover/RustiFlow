@@ -1,4 +1,4 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `rustiflow/src/flows/ntl_flow.rs`."><title>ntl_flow.rs - source</title><script>if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-46f98efaafac5295.ttf.woff2,FiraSans-Regular-018c141bf0843ffd.woff2,FiraSans-Medium-8f9a781e4970d388.woff2,SourceCodePro-Regular-562dcc5011b6de7d.ttf.woff2,SourceCodePro-Semibold-d899c5a5c4aeb14a.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2" crossorigin href="../../../static.files/${f}">`).join(""))</script><link rel="stylesheet" href="../../../static.files/normalize-76eba96aa4d2e634.css"><link rel="stylesheet" href="../../../static.files/rustdoc-dd39b87e5fcfba68.css"><meta name="rustdoc-vars" data-root-path="../../../" data-static-root-path="../../../static.files/" data-current-crate="rustiflow" data-themes="" data-resource-suffix="" data-rustdoc-version="1.80.0-nightly (1a7397988 2024-05-17)" data-channel="nightly" data-search-js="search-d52510db62a78183.js" data-settings-js="settings-4313503d2e1961c2.js" ><script src="../../../static.files/storage-118b08c4c78b968e.js"></script><script defer src="../../../static.files/src-script-e66d777a5a92e9b2.js"></script><script defer src="../../../src-files.js"></script><script defer src="../../../static.files/main-20a3ad099b048cf2.js"></script><noscript><link rel="stylesheet" href="../../../static.files/noscript-df360f571f6edeae.css"></noscript><link rel="alternate icon" type="image/png" href="../../../static.files/favicon-32x32-422f7d1d52889060.png"><link rel="icon" type="image/svg+xml" href="../../../static.files/favicon-2c020d218678b618.svg"></head><body class="rustdoc src"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="src-sidebar-title"><h2>Files</h2></div></nav><div class="sidebar-resizer"></div><main><rustdoc-search></rustdoc-search><section id="main-content" class="content"><div class="example-wrap"><div data-nosnippet><pre class="src-line-numbers"><a href="#1" id="1">1</a>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `rustiflow/src/flows/ntl_flow.rs`."><title>ntl_flow.rs - source</title><script>if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-46f98efaafac5295.ttf.woff2,FiraSans-Regular-018c141bf0843ffd.woff2,FiraSans-Medium-8f9a781e4970d388.woff2,SourceCodePro-Regular-562dcc5011b6de7d.ttf.woff2,SourceCodePro-Semibold-d899c5a5c4aeb14a.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2" crossorigin href="../../../static.files/${f}">`).join(""))</script><link rel="stylesheet" href="../../../static.files/normalize-76eba96aa4d2e634.css"><link rel="stylesheet" href="../../../static.files/rustdoc-dd39b87e5fcfba68.css"><meta name="rustdoc-vars" data-root-path="../../../" data-static-root-path="../../../static.files/" data-current-crate="rustiflow" data-themes="" data-resource-suffix="" data-rustdoc-version="1.81.0-nightly (d0227c6a1 2024-06-11)" data-channel="nightly" data-search-js="search-0fe7219eb170c82e.js" data-settings-js="settings-4313503d2e1961c2.js" ><script src="../../../static.files/storage-118b08c4c78b968e.js"></script><script defer src="../../../static.files/src-script-e66d777a5a92e9b2.js"></script><script defer src="../../../src-files.js"></script><script defer src="../../../static.files/main-20a3ad099b048cf2.js"></script><noscript><link rel="stylesheet" href="../../../static.files/noscript-df360f571f6edeae.css"></noscript><link rel="alternate icon" type="image/png" href="../../../static.files/favicon-32x32-422f7d1d52889060.png"><link rel="icon" type="image/svg+xml" href="../../../static.files/favicon-2c020d218678b618.svg"></head><body class="rustdoc src"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="src-sidebar-title"><h2>Files</h2></div></nav><div class="sidebar-resizer"></div><main><rustdoc-search></rustdoc-search><section id="main-content" class="content"><div class="example-wrap"><div data-nosnippet><pre class="src-line-numbers"><a href="#1" id="1">1</a>
 <a href="#2" id="2">2</a>
 <a href="#3" id="3">3</a>
 <a href="#4" id="4">4</a>
@@ -754,11 +754,69 @@
 <a href="#754" id="754">754</a>
 <a href="#755" id="755">755</a>
 <a href="#756" id="756">756</a>
+<a href="#757" id="757">757</a>
+<a href="#758" id="758">758</a>
+<a href="#759" id="759">759</a>
+<a href="#760" id="760">760</a>
+<a href="#761" id="761">761</a>
+<a href="#762" id="762">762</a>
+<a href="#763" id="763">763</a>
+<a href="#764" id="764">764</a>
+<a href="#765" id="765">765</a>
+<a href="#766" id="766">766</a>
+<a href="#767" id="767">767</a>
+<a href="#768" id="768">768</a>
+<a href="#769" id="769">769</a>
+<a href="#770" id="770">770</a>
+<a href="#771" id="771">771</a>
+<a href="#772" id="772">772</a>
+<a href="#773" id="773">773</a>
+<a href="#774" id="774">774</a>
+<a href="#775" id="775">775</a>
+<a href="#776" id="776">776</a>
+<a href="#777" id="777">777</a>
+<a href="#778" id="778">778</a>
+<a href="#779" id="779">779</a>
+<a href="#780" id="780">780</a>
+<a href="#781" id="781">781</a>
+<a href="#782" id="782">782</a>
+<a href="#783" id="783">783</a>
+<a href="#784" id="784">784</a>
+<a href="#785" id="785">785</a>
+<a href="#786" id="786">786</a>
+<a href="#787" id="787">787</a>
+<a href="#788" id="788">788</a>
+<a href="#789" id="789">789</a>
+<a href="#790" id="790">790</a>
+<a href="#791" id="791">791</a>
+<a href="#792" id="792">792</a>
+<a href="#793" id="793">793</a>
+<a href="#794" id="794">794</a>
+<a href="#795" id="795">795</a>
+<a href="#796" id="796">796</a>
+<a href="#797" id="797">797</a>
+<a href="#798" id="798">798</a>
+<a href="#799" id="799">799</a>
+<a href="#800" id="800">800</a>
+<a href="#801" id="801">801</a>
+<a href="#802" id="802">802</a>
+<a href="#803" id="803">803</a>
+<a href="#804" id="804">804</a>
+<a href="#805" id="805">805</a>
+<a href="#806" id="806">806</a>
+<a href="#807" id="807">807</a>
+<a href="#808" id="808">808</a>
+<a href="#809" id="809">809</a>
+<a href="#810" id="810">810</a>
+<a href="#811" id="811">811</a>
+<a href="#812" id="812">812</a>
+<a href="#813" id="813">813</a>
+<a href="#814" id="814">814</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span>chrono::{DateTime, Utc};
 <span class="kw">use </span>std::ops::Deref;
 <span class="kw">use </span>std::{net::IpAddr, time::Instant};
 
-<span class="kw">use </span><span class="kw">crate</span>::utils::utils::{get_duration, BasicFeatures};
+<span class="kw">use </span><span class="kw">crate</span>::utils::utils::{calculate_mean, calculate_std, get_duration, BasicFeatures};
 <span class="kw">use </span><span class="kw">crate</span>::NO_CONTAMINANT_FEATURES;
 
 <span class="kw">use super</span>::{cic_flow::CicFlow, flow::Flow};
@@ -788,7 +846,6 @@
 }
 
 <span class="kw">impl </span>NTLFlow {
-
     <span class="doccomment">/// Updates statistics for the header length of forward packets.
     ///
     /// This method updates the maximum, minimum, total, mean, and standard deviation
@@ -811,14 +868,18 @@
         </span><span class="self">self</span>.basic_flow.fwd_header_length += len;
 
         <span class="comment">// update mean and std
-        </span><span class="kw">let </span>new_fwd_header_len_mean =
-            (((<span class="self">self</span>.basic_flow.basic_flow.fwd_packet_count - <span class="number">1</span>) <span class="kw">as </span>f32 * <span class="self">self</span>.fwd_header_len_mean) + len <span class="kw">as </span>f32)
-                / <span class="self">self</span>.basic_flow.basic_flow.fwd_packet_count <span class="kw">as </span>f32;
-        <span class="self">self</span>.fwd_header_len_std = ((((<span class="self">self</span>.basic_flow.basic_flow.fwd_packet_count - <span class="number">1</span>) <span class="kw">as </span>f32
-            * <span class="self">self</span>.fwd_header_len_std.powf(<span class="number">2.0</span>))
-            + ((len <span class="kw">as </span>f32 - <span class="self">self</span>.fwd_header_len_mean) * (len <span class="kw">as </span>f32 - new_fwd_header_len_mean)))
-            / <span class="self">self</span>.basic_flow.basic_flow.fwd_packet_count <span class="kw">as </span>f32)
-            .sqrt();
+        </span><span class="kw">let </span>new_fwd_header_len_mean = calculate_mean(
+            <span class="self">self</span>.basic_flow.basic_flow.fwd_packet_count <span class="kw">as </span>u64,
+            <span class="self">self</span>.fwd_header_len_mean <span class="kw">as </span>f64,
+            len <span class="kw">as </span>f64,
+        ) <span class="kw">as </span>f32;
+        <span class="self">self</span>.fwd_header_len_std = calculate_std(
+            <span class="self">self</span>.basic_flow.basic_flow.fwd_packet_count <span class="kw">as </span>u64,
+            <span class="self">self</span>.fwd_header_len_std <span class="kw">as </span>f64,
+            <span class="self">self</span>.fwd_header_len_mean <span class="kw">as </span>f64,
+            new_fwd_header_len_mean <span class="kw">as </span>f64,
+            len <span class="kw">as </span>f64,
+        ) <span class="kw">as </span>f32;
         <span class="self">self</span>.fwd_header_len_mean = new_fwd_header_len_mean;
     }
 
@@ -844,14 +905,18 @@
         </span><span class="self">self</span>.basic_flow.bwd_header_length += len;
 
         <span class="comment">// update mean and std
-        </span><span class="kw">let </span>new_bwd_header_len_mean =
-            (((<span class="self">self</span>.basic_flow.basic_flow.bwd_packet_count - <span class="number">1</span>) <span class="kw">as </span>f32 * <span class="self">self</span>.bwd_header_len_mean) + len <span class="kw">as </span>f32)
-                / <span class="self">self</span>.basic_flow.basic_flow.bwd_packet_count <span class="kw">as </span>f32;
-        <span class="self">self</span>.bwd_header_len_std = ((((<span class="self">self</span>.basic_flow.basic_flow.bwd_packet_count - <span class="number">1</span>) <span class="kw">as </span>f32
-            * <span class="self">self</span>.bwd_header_len_std.powf(<span class="number">2.0</span>))
-            + ((len <span class="kw">as </span>f32 - <span class="self">self</span>.bwd_header_len_mean) * (len <span class="kw">as </span>f32 - new_bwd_header_len_mean)))
-            / <span class="self">self</span>.basic_flow.basic_flow.bwd_packet_count <span class="kw">as </span>f32)
-            .sqrt();
+        </span><span class="kw">let </span>new_bwd_header_len_mean = calculate_mean(
+            <span class="self">self</span>.basic_flow.basic_flow.bwd_packet_count <span class="kw">as </span>u64,
+            <span class="self">self</span>.bwd_header_len_mean <span class="kw">as </span>f64,
+            len <span class="kw">as </span>f64,
+        ) <span class="kw">as </span>f32;
+        <span class="self">self</span>.bwd_header_len_std = calculate_std(
+            <span class="self">self</span>.basic_flow.basic_flow.bwd_packet_count <span class="kw">as </span>u64,
+            <span class="self">self</span>.bwd_header_len_std <span class="kw">as </span>f64,
+            <span class="self">self</span>.bwd_header_len_mean <span class="kw">as </span>f64,
+            new_bwd_header_len_mean <span class="kw">as </span>f64,
+            len <span class="kw">as </span>f64,
+        ) <span class="kw">as </span>f32;
         <span class="self">self</span>.bwd_header_len_mean = new_bwd_header_len_mean;
     }
 
@@ -930,8 +995,10 @@
     /// Mean packet header length of the flow.
     </span><span class="kw">pub fn </span>get_flow_header_length_mean(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; f32 {
         (<span class="self">self</span>.fwd_header_len_mean * <span class="self">self</span>.basic_flow.basic_flow.fwd_packet_count <span class="kw">as </span>f32
-            + <span class="self">self</span>.bwd_header_len_mean * <span class="self">self</span>.basic_flow.basic_flow.bwd_packet_count <span class="kw">as </span>f32) <span class="kw">as </span>f32
-            / (<span class="self">self</span>.basic_flow.basic_flow.fwd_packet_count + <span class="self">self</span>.basic_flow.basic_flow.bwd_packet_count) <span class="kw">as </span>f32
+            + <span class="self">self</span>.bwd_header_len_mean * <span class="self">self</span>.basic_flow.basic_flow.bwd_packet_count <span class="kw">as </span>f32)
+            <span class="kw">as </span>f32
+            / (<span class="self">self</span>.basic_flow.basic_flow.fwd_packet_count
+                + <span class="self">self</span>.basic_flow.basic_flow.bwd_packet_count) <span class="kw">as </span>f32
     }
 
     <span class="doccomment">/// Calculates the variance of the packet lengths in the flow.
@@ -945,7 +1012,9 @@
     </span><span class="kw">pub fn </span>get_flow_header_length_variance(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; f64 {
         <span class="kw">if </span><span class="self">self</span>.basic_flow.basic_flow.fwd_packet_count &lt; <span class="number">1
             </span>|| <span class="self">self</span>.basic_flow.basic_flow.bwd_packet_count &lt; <span class="number">1
-            </span>|| <span class="self">self</span>.basic_flow.basic_flow.fwd_packet_count + <span class="self">self</span>.basic_flow.basic_flow.bwd_packet_count &lt; <span class="number">3
+            </span>|| <span class="self">self</span>.basic_flow.basic_flow.fwd_packet_count
+                + <span class="self">self</span>.basic_flow.basic_flow.bwd_packet_count
+                &lt; <span class="number">3
         </span>{
             <span class="kw">return </span><span class="number">0.0</span>;
         }
@@ -955,7 +1024,9 @@
 
         ((<span class="self">self</span>.basic_flow.basic_flow.fwd_packet_count - <span class="number">1</span>) <span class="kw">as </span>f64 * fwd_pkt_std_squared <span class="kw">as </span>f64
             + (<span class="self">self</span>.basic_flow.basic_flow.bwd_packet_count - <span class="number">1</span>) <span class="kw">as </span>f64 * bwd_pkt_std_squared <span class="kw">as </span>f64)
-            / (<span class="self">self</span>.basic_flow.basic_flow.fwd_packet_count + <span class="self">self</span>.basic_flow.basic_flow.bwd_packet_count - <span class="number">2</span>) <span class="kw">as </span>f64
+            / (<span class="self">self</span>.basic_flow.basic_flow.fwd_packet_count
+                + <span class="self">self</span>.basic_flow.basic_flow.bwd_packet_count
+                - <span class="number">2</span>) <span class="kw">as </span>f64
     }
 
     <span class="doccomment">/// Retrieves the standard deviation of packet lengths in the flow.
@@ -1009,11 +1080,10 @@
 
         <span class="kw">if </span>fwd {
             <span class="self">self</span>.update_fwd_header_len_stats(packet.header_length <span class="kw">as </span>u32);
-        }
-        <span class="kw">else </span>{
+        } <span class="kw">else </span>{
             <span class="self">self</span>.update_bwd_header_len_stats(packet.header_length <span class="kw">as </span>u32);
         }
-        
+
         <span class="kw">if </span>end.is_some() {
             <span class="kw">if </span><span class="kw-2">*</span>NO_CONTAMINANT_FEATURES.lock().unwrap().deref() {
                 <span class="kw">return </span><span class="prelude-val">Some</span>(<span class="self">self</span>.dump_without_contamination());
@@ -1026,7 +1096,8 @@
     </span>}
 
     <span class="kw">fn </span>dump(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; String {
-        <span class="macro">format!</span>(<span class="string">"{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},\
+        <span class="macro">format!</span>(
+            <span class="string">"{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},\
             {},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},\
             {},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},\
             {},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},\
@@ -1042,7 +1113,8 @@
                 <span class="self">self</span>.basic_flow.basic_flow.first_timestamp,
                 <span class="self">self</span>.basic_flow.basic_flow.last_timestamp
             ),
-            <span class="self">self</span>.basic_flow.basic_flow.fwd_packet_count + <span class="self">self</span>.basic_flow.basic_flow.bwd_packet_count,
+            <span class="self">self</span>.basic_flow.basic_flow.fwd_packet_count
+                + <span class="self">self</span>.basic_flow.basic_flow.bwd_packet_count,
             <span class="self">self</span>.basic_flow.basic_flow.fwd_packet_count,
             <span class="self">self</span>.basic_flow.basic_flow.bwd_packet_count,
             <span class="self">self</span>.basic_flow.fwd_pkt_len_tot + <span class="self">self</span>.basic_flow.bwd_pkt_len_tot,
@@ -1091,30 +1163,43 @@
             <span class="self">self</span>.basic_flow.idle_max,
             <span class="self">self</span>.basic_flow.idle_mean,
             <span class="self">self</span>.basic_flow.idle_std,
-            (<span class="self">self</span>.basic_flow.fwd_pkt_len_tot + <span class="self">self</span>.basic_flow.bwd_pkt_len_tot) <span class="kw">as </span>f64 / (get_duration(
-                <span class="self">self</span>.basic_flow.basic_flow.first_timestamp,
-                <span class="self">self</span>.basic_flow.basic_flow.last_timestamp
-            )) / <span class="number">1_000_000.0</span>,
-            <span class="self">self</span>.basic_flow.fwd_pkt_len_tot <span class="kw">as </span>f64 / (get_duration(
-                <span class="self">self</span>.basic_flow.basic_flow.first_timestamp,
-                <span class="self">self</span>.basic_flow.basic_flow.last_timestamp
-            )) / <span class="number">1_000_000.0</span>,
-            <span class="self">self</span>.basic_flow.bwd_pkt_len_tot <span class="kw">as </span>f64 / (get_duration(
-                <span class="self">self</span>.basic_flow.basic_flow.first_timestamp,
-                <span class="self">self</span>.basic_flow.basic_flow.last_timestamp
-            )) / <span class="number">1_000_000.0</span>,
-            (<span class="self">self</span>.basic_flow.basic_flow.fwd_packet_count + <span class="self">self</span>.basic_flow.basic_flow.bwd_packet_count) <span class="kw">as </span>f64 / (get_duration(
-                <span class="self">self</span>.basic_flow.basic_flow.first_timestamp, 
-                <span class="self">self</span>.basic_flow.basic_flow.last_timestamp
-            )) / <span class="number">1_000_000.0</span>,
-            <span class="self">self</span>.basic_flow.basic_flow.bwd_packet_count <span class="kw">as </span>f64 / (get_duration(
-                <span class="self">self</span>.basic_flow.basic_flow.first_timestamp, 
-                <span class="self">self</span>.basic_flow.basic_flow.last_timestamp
-            )) / <span class="number">1_000_000.0</span>,
-            <span class="self">self</span>.basic_flow.basic_flow.fwd_packet_count <span class="kw">as </span>f64 / (get_duration(
-                <span class="self">self</span>.basic_flow.basic_flow.first_timestamp, 
-                <span class="self">self</span>.basic_flow.basic_flow.last_timestamp
-            )) / <span class="number">1_000_000.0</span>,
+            (<span class="self">self</span>.basic_flow.fwd_pkt_len_tot + <span class="self">self</span>.basic_flow.bwd_pkt_len_tot) <span class="kw">as </span>f64
+                / (get_duration(
+                    <span class="self">self</span>.basic_flow.basic_flow.first_timestamp,
+                    <span class="self">self</span>.basic_flow.basic_flow.last_timestamp
+                ))
+                / <span class="number">1_000_000.0</span>,
+            <span class="self">self</span>.basic_flow.fwd_pkt_len_tot <span class="kw">as </span>f64
+                / (get_duration(
+                    <span class="self">self</span>.basic_flow.basic_flow.first_timestamp,
+                    <span class="self">self</span>.basic_flow.basic_flow.last_timestamp
+                ))
+                / <span class="number">1_000_000.0</span>,
+            <span class="self">self</span>.basic_flow.bwd_pkt_len_tot <span class="kw">as </span>f64
+                / (get_duration(
+                    <span class="self">self</span>.basic_flow.basic_flow.first_timestamp,
+                    <span class="self">self</span>.basic_flow.basic_flow.last_timestamp
+                ))
+                / <span class="number">1_000_000.0</span>,
+            (<span class="self">self</span>.basic_flow.basic_flow.fwd_packet_count
+                + <span class="self">self</span>.basic_flow.basic_flow.bwd_packet_count) <span class="kw">as </span>f64
+                / (get_duration(
+                    <span class="self">self</span>.basic_flow.basic_flow.first_timestamp,
+                    <span class="self">self</span>.basic_flow.basic_flow.last_timestamp
+                ))
+                / <span class="number">1_000_000.0</span>,
+            <span class="self">self</span>.basic_flow.basic_flow.bwd_packet_count <span class="kw">as </span>f64
+                / (get_duration(
+                    <span class="self">self</span>.basic_flow.basic_flow.first_timestamp,
+                    <span class="self">self</span>.basic_flow.basic_flow.last_timestamp
+                ))
+                / <span class="number">1_000_000.0</span>,
+            <span class="self">self</span>.basic_flow.basic_flow.fwd_packet_count <span class="kw">as </span>f64
+                / (get_duration(
+                    <span class="self">self</span>.basic_flow.basic_flow.first_timestamp,
+                    <span class="self">self</span>.basic_flow.basic_flow.last_timestamp
+                ))
+                / <span class="number">1_000_000.0</span>,
             <span class="self">self</span>.basic_flow.get_down_up_ratio(),
             <span class="self">self</span>.basic_flow.get_fwd_bytes_bulk(),
             <span class="self">self</span>.basic_flow.get_fwd_packets_bulk(),
@@ -1130,14 +1215,22 @@
             <span class="self">self</span>.basic_flow.bwd_bulk_size_total,
             <span class="self">self</span>.basic_flow.bwd_bulk_packet_count,
             <span class="self">self</span>.basic_flow.bwd_bulk_duration,
-            <span class="self">self</span>.basic_flow.basic_flow.fwd_fin_flag_count + <span class="self">self</span>.basic_flow.basic_flow.bwd_fin_flag_count,
-            <span class="self">self</span>.basic_flow.basic_flow.fwd_psh_flag_count + <span class="self">self</span>.basic_flow.basic_flow.bwd_psh_flag_count,
-            <span class="self">self</span>.basic_flow.basic_flow.fwd_urg_flag_count + <span class="self">self</span>.basic_flow.basic_flow.bwd_urg_flag_count,
-            <span class="self">self</span>.basic_flow.basic_flow.fwd_ece_flag_count + <span class="self">self</span>.basic_flow.basic_flow.bwd_ece_flag_count,
-            <span class="self">self</span>.basic_flow.basic_flow.fwd_syn_flag_count + <span class="self">self</span>.basic_flow.basic_flow.bwd_syn_flag_count,
-            <span class="self">self</span>.basic_flow.basic_flow.fwd_ack_flag_count + <span class="self">self</span>.basic_flow.basic_flow.bwd_ack_flag_count,
-            <span class="self">self</span>.basic_flow.basic_flow.fwd_cwe_flag_count + <span class="self">self</span>.basic_flow.basic_flow.bwd_cwe_flag_count,
-            <span class="self">self</span>.basic_flow.basic_flow.fwd_rst_flag_count + <span class="self">self</span>.basic_flow.basic_flow.bwd_rst_flag_count,
+            <span class="self">self</span>.basic_flow.basic_flow.fwd_fin_flag_count
+                + <span class="self">self</span>.basic_flow.basic_flow.bwd_fin_flag_count,
+            <span class="self">self</span>.basic_flow.basic_flow.fwd_psh_flag_count
+                + <span class="self">self</span>.basic_flow.basic_flow.bwd_psh_flag_count,
+            <span class="self">self</span>.basic_flow.basic_flow.fwd_urg_flag_count
+                + <span class="self">self</span>.basic_flow.basic_flow.bwd_urg_flag_count,
+            <span class="self">self</span>.basic_flow.basic_flow.fwd_ece_flag_count
+                + <span class="self">self</span>.basic_flow.basic_flow.bwd_ece_flag_count,
+            <span class="self">self</span>.basic_flow.basic_flow.fwd_syn_flag_count
+                + <span class="self">self</span>.basic_flow.basic_flow.bwd_syn_flag_count,
+            <span class="self">self</span>.basic_flow.basic_flow.fwd_ack_flag_count
+                + <span class="self">self</span>.basic_flow.basic_flow.bwd_ack_flag_count,
+            <span class="self">self</span>.basic_flow.basic_flow.fwd_cwe_flag_count
+                + <span class="self">self</span>.basic_flow.basic_flow.bwd_cwe_flag_count,
+            <span class="self">self</span>.basic_flow.basic_flow.fwd_rst_flag_count
+                + <span class="self">self</span>.basic_flow.basic_flow.bwd_rst_flag_count,
             <span class="self">self</span>.basic_flow.basic_flow.fwd_fin_flag_count,
             <span class="self">self</span>.basic_flow.basic_flow.fwd_psh_flag_count,
             <span class="self">self</span>.basic_flow.basic_flow.fwd_urg_flag_count,
@@ -1178,7 +1271,8 @@
 
     <span class="kw">fn </span>dump_without_contamination(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; String {
         <span class="comment">// Can be further updated after more research
-        </span><span class="macro">format!</span>(<span class="string">"{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},\
+        </span><span class="macro">format!</span>(
+            <span class="string">"{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},\
             {},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},\
             {},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},\
             {},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},\
@@ -1188,7 +1282,8 @@
                 <span class="self">self</span>.basic_flow.basic_flow.first_timestamp,
                 <span class="self">self</span>.basic_flow.basic_flow.last_timestamp
             ),
-            <span class="self">self</span>.basic_flow.basic_flow.fwd_packet_count + <span class="self">self</span>.basic_flow.basic_flow.bwd_packet_count,
+            <span class="self">self</span>.basic_flow.basic_flow.fwd_packet_count
+                + <span class="self">self</span>.basic_flow.basic_flow.bwd_packet_count,
             <span class="self">self</span>.basic_flow.basic_flow.fwd_packet_count,
             <span class="self">self</span>.basic_flow.basic_flow.bwd_packet_count,
             <span class="self">self</span>.basic_flow.fwd_pkt_len_tot + <span class="self">self</span>.basic_flow.bwd_pkt_len_tot,
@@ -1237,30 +1332,43 @@
             <span class="self">self</span>.basic_flow.idle_max,
             <span class="self">self</span>.basic_flow.idle_mean,
             <span class="self">self</span>.basic_flow.idle_std,
-            (<span class="self">self</span>.basic_flow.fwd_pkt_len_tot + <span class="self">self</span>.basic_flow.bwd_pkt_len_tot) <span class="kw">as </span>f64 / (get_duration(
-                <span class="self">self</span>.basic_flow.basic_flow.first_timestamp,
-                <span class="self">self</span>.basic_flow.basic_flow.last_timestamp
-            )) / <span class="number">1_000_000.0</span>,
-            <span class="self">self</span>.basic_flow.fwd_pkt_len_tot <span class="kw">as </span>f64 / (get_duration(
-                <span class="self">self</span>.basic_flow.basic_flow.first_timestamp,
-                <span class="self">self</span>.basic_flow.basic_flow.last_timestamp
-            )) / <span class="number">1_000_000.0</span>,
-            <span class="self">self</span>.basic_flow.bwd_pkt_len_tot <span class="kw">as </span>f64 / (get_duration(
-                <span class="self">self</span>.basic_flow.basic_flow.first_timestamp,
-                <span class="self">self</span>.basic_flow.basic_flow.last_timestamp
-            )) / <span class="number">1_000_000.0</span>,
-            (<span class="self">self</span>.basic_flow.basic_flow.fwd_packet_count + <span class="self">self</span>.basic_flow.basic_flow.bwd_packet_count) <span class="kw">as </span>f64 / (get_duration(
-                <span class="self">self</span>.basic_flow.basic_flow.first_timestamp, 
-                <span class="self">self</span>.basic_flow.basic_flow.last_timestamp
-            )) / <span class="number">1_000_000.0</span>,
-            <span class="self">self</span>.basic_flow.basic_flow.bwd_packet_count <span class="kw">as </span>f64 / (get_duration(
-                <span class="self">self</span>.basic_flow.basic_flow.first_timestamp, 
-                <span class="self">self</span>.basic_flow.basic_flow.last_timestamp
-            )) / <span class="number">1_000_000.0</span>,
-            <span class="self">self</span>.basic_flow.basic_flow.fwd_packet_count <span class="kw">as </span>f64 / (get_duration(
-                <span class="self">self</span>.basic_flow.basic_flow.first_timestamp, 
-                <span class="self">self</span>.basic_flow.basic_flow.last_timestamp
-            )) / <span class="number">1_000_000.0</span>,
+            (<span class="self">self</span>.basic_flow.fwd_pkt_len_tot + <span class="self">self</span>.basic_flow.bwd_pkt_len_tot) <span class="kw">as </span>f64
+                / (get_duration(
+                    <span class="self">self</span>.basic_flow.basic_flow.first_timestamp,
+                    <span class="self">self</span>.basic_flow.basic_flow.last_timestamp
+                ))
+                / <span class="number">1_000_000.0</span>,
+            <span class="self">self</span>.basic_flow.fwd_pkt_len_tot <span class="kw">as </span>f64
+                / (get_duration(
+                    <span class="self">self</span>.basic_flow.basic_flow.first_timestamp,
+                    <span class="self">self</span>.basic_flow.basic_flow.last_timestamp
+                ))
+                / <span class="number">1_000_000.0</span>,
+            <span class="self">self</span>.basic_flow.bwd_pkt_len_tot <span class="kw">as </span>f64
+                / (get_duration(
+                    <span class="self">self</span>.basic_flow.basic_flow.first_timestamp,
+                    <span class="self">self</span>.basic_flow.basic_flow.last_timestamp
+                ))
+                / <span class="number">1_000_000.0</span>,
+            (<span class="self">self</span>.basic_flow.basic_flow.fwd_packet_count
+                + <span class="self">self</span>.basic_flow.basic_flow.bwd_packet_count) <span class="kw">as </span>f64
+                / (get_duration(
+                    <span class="self">self</span>.basic_flow.basic_flow.first_timestamp,
+                    <span class="self">self</span>.basic_flow.basic_flow.last_timestamp
+                ))
+                / <span class="number">1_000_000.0</span>,
+            <span class="self">self</span>.basic_flow.basic_flow.bwd_packet_count <span class="kw">as </span>f64
+                / (get_duration(
+                    <span class="self">self</span>.basic_flow.basic_flow.first_timestamp,
+                    <span class="self">self</span>.basic_flow.basic_flow.last_timestamp
+                ))
+                / <span class="number">1_000_000.0</span>,
+            <span class="self">self</span>.basic_flow.basic_flow.fwd_packet_count <span class="kw">as </span>f64
+                / (get_duration(
+                    <span class="self">self</span>.basic_flow.basic_flow.first_timestamp,
+                    <span class="self">self</span>.basic_flow.basic_flow.last_timestamp
+                ))
+                / <span class="number">1_000_000.0</span>,
             <span class="self">self</span>.basic_flow.get_down_up_ratio(),
             <span class="self">self</span>.basic_flow.get_fwd_bytes_bulk(),
             <span class="self">self</span>.basic_flow.get_fwd_packets_bulk(),
@@ -1276,14 +1384,22 @@
             <span class="self">self</span>.basic_flow.bwd_bulk_size_total,
             <span class="self">self</span>.basic_flow.bwd_bulk_packet_count,
             <span class="self">self</span>.basic_flow.bwd_bulk_duration,
-            <span class="self">self</span>.basic_flow.basic_flow.fwd_fin_flag_count + <span class="self">self</span>.basic_flow.basic_flow.bwd_fin_flag_count,
-            <span class="self">self</span>.basic_flow.basic_flow.fwd_psh_flag_count + <span class="self">self</span>.basic_flow.basic_flow.bwd_psh_flag_count,
-            <span class="self">self</span>.basic_flow.basic_flow.fwd_urg_flag_count + <span class="self">self</span>.basic_flow.basic_flow.bwd_urg_flag_count,
-            <span class="self">self</span>.basic_flow.basic_flow.fwd_ece_flag_count + <span class="self">self</span>.basic_flow.basic_flow.bwd_ece_flag_count,
-            <span class="self">self</span>.basic_flow.basic_flow.fwd_syn_flag_count + <span class="self">self</span>.basic_flow.basic_flow.bwd_syn_flag_count,
-            <span class="self">self</span>.basic_flow.basic_flow.fwd_ack_flag_count + <span class="self">self</span>.basic_flow.basic_flow.bwd_ack_flag_count,
-            <span class="self">self</span>.basic_flow.basic_flow.fwd_cwe_flag_count + <span class="self">self</span>.basic_flow.basic_flow.bwd_cwe_flag_count,
-            <span class="self">self</span>.basic_flow.basic_flow.fwd_rst_flag_count + <span class="self">self</span>.basic_flow.basic_flow.bwd_rst_flag_count,
+            <span class="self">self</span>.basic_flow.basic_flow.fwd_fin_flag_count
+                + <span class="self">self</span>.basic_flow.basic_flow.bwd_fin_flag_count,
+            <span class="self">self</span>.basic_flow.basic_flow.fwd_psh_flag_count
+                + <span class="self">self</span>.basic_flow.basic_flow.bwd_psh_flag_count,
+            <span class="self">self</span>.basic_flow.basic_flow.fwd_urg_flag_count
+                + <span class="self">self</span>.basic_flow.basic_flow.bwd_urg_flag_count,
+            <span class="self">self</span>.basic_flow.basic_flow.fwd_ece_flag_count
+                + <span class="self">self</span>.basic_flow.basic_flow.bwd_ece_flag_count,
+            <span class="self">self</span>.basic_flow.basic_flow.fwd_syn_flag_count
+                + <span class="self">self</span>.basic_flow.basic_flow.bwd_syn_flag_count,
+            <span class="self">self</span>.basic_flow.basic_flow.fwd_ack_flag_count
+                + <span class="self">self</span>.basic_flow.basic_flow.bwd_ack_flag_count,
+            <span class="self">self</span>.basic_flow.basic_flow.fwd_cwe_flag_count
+                + <span class="self">self</span>.basic_flow.basic_flow.bwd_cwe_flag_count,
+            <span class="self">self</span>.basic_flow.basic_flow.fwd_rst_flag_count
+                + <span class="self">self</span>.basic_flow.basic_flow.bwd_rst_flag_count,
             <span class="self">self</span>.basic_flow.basic_flow.fwd_fin_flag_count,
             <span class="self">self</span>.basic_flow.basic_flow.fwd_psh_flag_count,
             <span class="self">self</span>.basic_flow.basic_flow.fwd_urg_flag_count,
@@ -1442,7 +1558,7 @@
     </span><span class="kw">fn </span>test_get_flow_packet_length_min() {
         <span class="kw">let </span><span class="kw-2">mut </span>cic_flow = setup_ntl_flow();
 
-        cic_flow.fwd_header_len_min= <span class="number">100</span>;
+        cic_flow.fwd_header_len_min = <span class="number">100</span>;
         cic_flow.bwd_header_len_min = <span class="number">50</span>;
 
         <span class="macro">assert_eq!</span>(cic_flow.get_flow_header_length_min(), <span class="number">50</span>);

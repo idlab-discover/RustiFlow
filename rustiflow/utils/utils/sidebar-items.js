@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"fn":["create_flow_id","get_duration"],"struct":["BasicFeatures"]};
+window.SIDEBAR_ITEMS = {"fn":["calculate_mean","calculate_std","create_flow_id","get_duration"],"struct":["BasicFeatures"]};
