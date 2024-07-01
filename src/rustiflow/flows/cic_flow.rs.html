@@ -2586,6 +2586,14 @@
 <a href="#2586" id="2586">2586</a>
 <a href="#2587" id="2587">2587</a>
 <a href="#2588" id="2588">2588</a>
+<a href="#2589" id="2589">2589</a>
+<a href="#2590" id="2590">2590</a>
+<a href="#2591" id="2591">2591</a>
+<a href="#2592" id="2592">2592</a>
+<a href="#2593" id="2593">2593</a>
+<a href="#2594" id="2594">2594</a>
+<a href="#2595" id="2595">2595</a>
+<a href="#2596" id="2596">2596</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span>chrono::{DateTime, Utc};
 <span class="kw">use </span>std::{net::IpAddr, ops::Deref, time::Instant};
 
@@ -3686,6 +3694,7 @@
         ipv4_destination: IpAddr,
         port_destination: u16,
         protocol: u8,
+        ts_date: DateTime&lt;Utc&gt;,
     ) -&gt; <span class="self">Self </span>{
         CicFlow {
             basic_flow: BasicFlow::new(
@@ -3695,6 +3704,7 @@
                 ipv4_destination,
                 port_destination,
                 protocol,
+                ts_date,
             ),
             sf_last_packet_timestamp: <span class="prelude-val">None</span>,
             sf_count: <span class="number">0</span>,
@@ -3763,9 +3773,10 @@
         <span class="kw-2">&amp;mut </span><span class="self">self</span>,
         packet: <span class="kw-2">&amp;</span>BasicFeatures,
         timestamp: <span class="kw-2">&amp;</span>Instant,
+        ts_date: DateTime&lt;Utc&gt;,
         fwd: bool,
     ) -&gt; <span class="prelude-ty">Option</span>&lt;String&gt; {
-        <span class="self">self</span>.basic_flow.update_flow(packet, timestamp, fwd);
+        <span class="self">self</span>.basic_flow.update_flow(packet, timestamp, ts_date, fwd);
         <span class="self">self</span>.update_subflows(timestamp);
 
         <span class="kw">if </span>fwd {
@@ -4027,6 +4038,7 @@
             IpAddr::V4(Ipv4Addr::from(<span class="number">2</span>)),
             <span class="number">8080</span>,
             <span class="number">6</span>,
+            chrono::Utc::now(),
         )
     }
 
@@ -4823,6 +4835,7 @@
             IpAddr::V4(Ipv4Addr::from(<span class="number">2</span>)),
             <span class="number">8080</span>,
             <span class="number">6</span>,
+            chrono::Utc::now(),
         );
         <span class="kw">let </span>packet = BasicFeatures {
             fin_flag: <span class="number">1</span>,
@@ -4840,7 +4853,7 @@
         };
         <span class="kw">let </span>timestamp = Instant::now();
 
-        cic_flow.update_flow(<span class="kw-2">&amp;</span>packet, <span class="kw-2">&amp;</span>timestamp, <span class="bool-val">true</span>);
+        cic_flow.update_flow(<span class="kw-2">&amp;</span>packet, <span class="kw-2">&amp;</span>timestamp, chrono::Utc::now() , <span class="bool-val">true</span>);
 
         <span class="macro">assert_eq!</span>(cic_flow.basic_flow.fwd_packet_count, <span class="number">1</span>);
         <span class="macro">assert_eq!</span>(cic_flow.basic_flow.bwd_packet_count, <span class="number">0</span>);
@@ -4897,6 +4910,7 @@
             IpAddr::V4(Ipv4Addr::from(<span class="number">2</span>)),
             <span class="number">8080</span>,
             <span class="number">6</span>,
+            chrono::Utc::now(),
         );
         <span class="kw">let </span>packet = BasicFeatures {
             fin_flag: <span class="number">1</span>,
@@ -4914,7 +4928,7 @@
         };
         <span class="kw">let </span>timestamp = Instant::now();
 
-        cic_flow.update_flow(<span class="kw-2">&amp;</span>packet, <span class="kw-2">&amp;</span>timestamp, <span class="bool-val">false</span>);
+        cic_flow.update_flow(<span class="kw-2">&amp;</span>packet, <span class="kw-2">&amp;</span>timestamp, chrono::Utc::now(), <span class="bool-val">false</span>);
 
         <span class="macro">assert_eq!</span>(cic_flow.basic_flow.fwd_packet_count, <span class="number">0</span>);
         <span class="macro">assert_eq!</span>(cic_flow.basic_flow.bwd_packet_count, <span class="number">1</span>);
@@ -4971,6 +4985,7 @@
             IpAddr::V4(Ipv4Addr::from(<span class="number">2</span>)),
             <span class="number">8080</span>,
             <span class="number">6</span>,
+            chrono::Utc::now(),
         );
         <span class="kw">let </span>packet_1 = BasicFeatures {
             fin_flag: <span class="number">1</span>,
@@ -4988,7 +5003,7 @@
         };
         <span class="kw">let </span>timestamp_1 = Instant::now();
 
-        cic_flow.update_flow(<span class="kw-2">&amp;</span>packet_1, <span class="kw-2">&amp;</span>timestamp_1, <span class="bool-val">true</span>);
+        cic_flow.update_flow(<span class="kw-2">&amp;</span>packet_1, <span class="kw-2">&amp;</span>timestamp_1, chrono::Utc::now(), <span class="bool-val">true</span>);
 
         std::thread::sleep(std::time::Duration::from_secs(<span class="number">1</span>));
 
@@ -5008,7 +5023,7 @@
         };
         <span class="kw">let </span>timestamp_2 = Instant::now();
 
-        cic_flow.update_flow(<span class="kw-2">&amp;</span>packet_2, <span class="kw-2">&amp;</span>timestamp_2, <span class="bool-val">true</span>);
+        cic_flow.update_flow(<span class="kw-2">&amp;</span>packet_2, <span class="kw-2">&amp;</span>timestamp_2, chrono::Utc::now(), <span class="bool-val">true</span>);
 
         <span class="macro">assert_eq!</span>(cic_flow.basic_flow.fwd_packet_count, <span class="number">2</span>);
         <span class="macro">assert_eq!</span>(cic_flow.basic_flow.bwd_packet_count, <span class="number">0</span>);
@@ -5077,6 +5092,7 @@
             IpAddr::V4(Ipv4Addr::from(<span class="number">2</span>)),
             <span class="number">8080</span>,
             <span class="number">6</span>,
+            chrono::Utc::now(),
         );
         <span class="kw">let </span>packet_1 = BasicFeatures {
             fin_flag: <span class="number">1</span>,
@@ -5094,7 +5110,7 @@
         };
         <span class="kw">let </span>timestamp_1 = Instant::now();
 
-        cic_flow.update_flow(<span class="kw-2">&amp;</span>packet_1, <span class="kw-2">&amp;</span>timestamp_1, <span class="bool-val">false</span>);
+        cic_flow.update_flow(<span class="kw-2">&amp;</span>packet_1, <span class="kw-2">&amp;</span>timestamp_1, chrono::Utc::now(), <span class="bool-val">false</span>);
 
         std::thread::sleep(std::time::Duration::from_secs(<span class="number">1</span>));
 
@@ -5114,7 +5130,7 @@
         };
         <span class="kw">let </span>timestamp_2 = Instant::now();
 
-        cic_flow.update_flow(<span class="kw-2">&amp;</span>packet_2, <span class="kw-2">&amp;</span>timestamp_2, <span class="bool-val">false</span>);
+        cic_flow.update_flow(<span class="kw-2">&amp;</span>packet_2, <span class="kw-2">&amp;</span>timestamp_2, chrono::Utc::now(), <span class="bool-val">false</span>);
 
         <span class="macro">assert_eq!</span>(cic_flow.basic_flow.fwd_packet_count, <span class="number">0</span>);
         <span class="macro">assert_eq!</span>(cic_flow.basic_flow.bwd_packet_count, <span class="number">2</span>);

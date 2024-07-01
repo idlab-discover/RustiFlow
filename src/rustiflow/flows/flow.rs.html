@@ -84,6 +84,8 @@
 <a href="#84" id="84">84</a>
 <a href="#85" id="85">85</a>
 <a href="#86" id="86">86</a>
+<a href="#87" id="87">87</a>
+<a href="#88" id="88">88</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span>chrono::{DateTime, Utc};
 <span class="kw">use </span>std::{net::IpAddr, time::Instant};
 
@@ -119,6 +121,7 @@
         ipv4_destination: IpAddr,
         port_destination: u16,
         protocol: u8,
+        ts_date: DateTime&lt;Utc&gt;,
     ) -&gt; <span class="self">Self</span>;
 
     <span class="doccomment">/// Updates the flow with a new packet.
@@ -140,6 +143,7 @@
         <span class="kw-2">&amp;mut </span><span class="self">self</span>,
         packet: <span class="kw-2">&amp;</span>BasicFeatures,
         timestamp: <span class="kw-2">&amp;</span>Instant,
+        ts_date: DateTime&lt;Utc&gt;,
         fwd: bool,
     ) -&gt; <span class="prelude-ty">Option</span>&lt;String&gt;;
 

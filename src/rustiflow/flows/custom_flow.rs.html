@@ -95,6 +95,9 @@
 <a href="#95" id="95">95</a>
 <a href="#96" id="96">96</a>
 <a href="#97" id="97">97</a>
+<a href="#98" id="98">98</a>
+<a href="#99" id="99">99</a>
+<a href="#100" id="100">100</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span>chrono::{DateTime, Utc};
 <span class="kw">use </span>std::{net::IpAddr, time::Instant};
 
@@ -122,6 +125,7 @@
         ipv4_destination: IpAddr,
         port_destination: u16,
         protocol: u8,
+        ts_date: DateTime&lt;Utc&gt;,
     ) -&gt; <span class="self">Self </span>{
         CustomFlow {
             basic_flow: BasicFlow::new(
@@ -131,6 +135,7 @@
                 ipv4_destination,
                 port_destination,
                 protocol,
+                ts_date
             ),
             <span class="comment">// Add here the initialization of the additional features.
         </span>}
@@ -140,9 +145,10 @@
         <span class="kw-2">&amp;mut </span><span class="self">self</span>,
         packet: <span class="kw-2">&amp;</span>BasicFeatures,
         timestamp: <span class="kw-2">&amp;</span>Instant,
+        ts_date: DateTime&lt;Utc&gt;,
         fwd: bool,
     ) -&gt; <span class="prelude-ty">Option</span>&lt;String&gt; {
-        <span class="self">self</span>.basic_flow.update_flow(packet, timestamp, fwd);
+        <span class="self">self</span>.basic_flow.update_flow(packet, timestamp, ts_date, fwd);
 
         <span class="comment">// Add here the update of the additional features.
 

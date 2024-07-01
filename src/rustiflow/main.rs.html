@@ -1456,6 +1456,93 @@
 <a href="#1456" id="1456">1456</a>
 <a href="#1457" id="1457">1457</a>
 <a href="#1458" id="1458">1458</a>
+<a href="#1459" id="1459">1459</a>
+<a href="#1460" id="1460">1460</a>
+<a href="#1461" id="1461">1461</a>
+<a href="#1462" id="1462">1462</a>
+<a href="#1463" id="1463">1463</a>
+<a href="#1464" id="1464">1464</a>
+<a href="#1465" id="1465">1465</a>
+<a href="#1466" id="1466">1466</a>
+<a href="#1467" id="1467">1467</a>
+<a href="#1468" id="1468">1468</a>
+<a href="#1469" id="1469">1469</a>
+<a href="#1470" id="1470">1470</a>
+<a href="#1471" id="1471">1471</a>
+<a href="#1472" id="1472">1472</a>
+<a href="#1473" id="1473">1473</a>
+<a href="#1474" id="1474">1474</a>
+<a href="#1475" id="1475">1475</a>
+<a href="#1476" id="1476">1476</a>
+<a href="#1477" id="1477">1477</a>
+<a href="#1478" id="1478">1478</a>
+<a href="#1479" id="1479">1479</a>
+<a href="#1480" id="1480">1480</a>
+<a href="#1481" id="1481">1481</a>
+<a href="#1482" id="1482">1482</a>
+<a href="#1483" id="1483">1483</a>
+<a href="#1484" id="1484">1484</a>
+<a href="#1485" id="1485">1485</a>
+<a href="#1486" id="1486">1486</a>
+<a href="#1487" id="1487">1487</a>
+<a href="#1488" id="1488">1488</a>
+<a href="#1489" id="1489">1489</a>
+<a href="#1490" id="1490">1490</a>
+<a href="#1491" id="1491">1491</a>
+<a href="#1492" id="1492">1492</a>
+<a href="#1493" id="1493">1493</a>
+<a href="#1494" id="1494">1494</a>
+<a href="#1495" id="1495">1495</a>
+<a href="#1496" id="1496">1496</a>
+<a href="#1497" id="1497">1497</a>
+<a href="#1498" id="1498">1498</a>
+<a href="#1499" id="1499">1499</a>
+<a href="#1500" id="1500">1500</a>
+<a href="#1501" id="1501">1501</a>
+<a href="#1502" id="1502">1502</a>
+<a href="#1503" id="1503">1503</a>
+<a href="#1504" id="1504">1504</a>
+<a href="#1505" id="1505">1505</a>
+<a href="#1506" id="1506">1506</a>
+<a href="#1507" id="1507">1507</a>
+<a href="#1508" id="1508">1508</a>
+<a href="#1509" id="1509">1509</a>
+<a href="#1510" id="1510">1510</a>
+<a href="#1511" id="1511">1511</a>
+<a href="#1512" id="1512">1512</a>
+<a href="#1513" id="1513">1513</a>
+<a href="#1514" id="1514">1514</a>
+<a href="#1515" id="1515">1515</a>
+<a href="#1516" id="1516">1516</a>
+<a href="#1517" id="1517">1517</a>
+<a href="#1518" id="1518">1518</a>
+<a href="#1519" id="1519">1519</a>
+<a href="#1520" id="1520">1520</a>
+<a href="#1521" id="1521">1521</a>
+<a href="#1522" id="1522">1522</a>
+<a href="#1523" id="1523">1523</a>
+<a href="#1524" id="1524">1524</a>
+<a href="#1525" id="1525">1525</a>
+<a href="#1526" id="1526">1526</a>
+<a href="#1527" id="1527">1527</a>
+<a href="#1528" id="1528">1528</a>
+<a href="#1529" id="1529">1529</a>
+<a href="#1530" id="1530">1530</a>
+<a href="#1531" id="1531">1531</a>
+<a href="#1532" id="1532">1532</a>
+<a href="#1533" id="1533">1533</a>
+<a href="#1534" id="1534">1534</a>
+<a href="#1535" id="1535">1535</a>
+<a href="#1536" id="1536">1536</a>
+<a href="#1537" id="1537">1537</a>
+<a href="#1538" id="1538">1538</a>
+<a href="#1539" id="1539">1539</a>
+<a href="#1540" id="1540">1540</a>
+<a href="#1541" id="1541">1541</a>
+<a href="#1542" id="1542">1542</a>
+<a href="#1543" id="1543">1543</a>
+<a href="#1544" id="1544">1544</a>
+<a href="#1545" id="1545">1545</a>
 </pre></div><pre class="rust"><code><span class="kw">mod </span>args;
 <span class="kw">mod </span>flows;
 <span class="kw">mod </span>output;
@@ -1475,7 +1562,7 @@
     Ebpf,
 };
 <span class="kw">use </span>bytes::BytesMut;
-<span class="kw">use </span>chrono::Utc;
+<span class="kw">use </span>chrono::{DateTime, Utc};
 <span class="kw">use </span>clap::Parser;
 <span class="kw">use </span>common::{BasicFeaturesIpv4, BasicFeaturesIpv6};
 <span class="kw">use </span>core::panic;
@@ -1499,6 +1586,7 @@
     io::{BufWriter, Read, Write},
     ops::{Deref, DerefMut},
     sync::atomic::{AtomicUsize, Ordering},
+    time::{SystemTime, UNIX_EPOCH},
 };
 <span class="kw">use </span>std::{
     net::{Ipv4Addr, Ipv6Addr},
@@ -1909,7 +1997,7 @@
                     <span class="kw">let </span>ptr = buf.as_ptr() <span class="kw">as </span><span class="kw-2">*const </span>BasicFeaturesIpv4;
                     <span class="kw">let </span>data = <span class="kw">unsafe </span>{ ptr.read_unaligned() };
 
-                    process_packet_ipv4(<span class="kw-2">&amp;</span>data, <span class="kw-2">&amp;</span>flow_map_clone_egress_ipv4, <span class="bool-val">false</span>);
+                    process_packet_ipv4(<span class="kw-2">&amp;</span>data, <span class="kw-2">&amp;</span>flow_map_clone_egress_ipv4, <span class="bool-val">false</span>, <span class="prelude-val">None</span>, <span class="prelude-val">None</span>);
                 }
             }
         });
@@ -1931,7 +2019,7 @@
                     <span class="kw">let </span>ptr = buf.as_ptr() <span class="kw">as </span><span class="kw-2">*const </span>BasicFeaturesIpv4;
                     <span class="kw">let </span>data = <span class="kw">unsafe </span>{ ptr.read_unaligned() };
 
-                    process_packet_ipv4(<span class="kw-2">&amp;</span>data, <span class="kw-2">&amp;</span>flow_map_clone_ingress_ipv4, <span class="bool-val">true</span>);
+                    process_packet_ipv4(<span class="kw-2">&amp;</span>data, <span class="kw-2">&amp;</span>flow_map_clone_ingress_ipv4, <span class="bool-val">true</span>, <span class="prelude-val">None</span>, <span class="prelude-val">None</span>);
                 }
             }
         });
@@ -1954,7 +2042,7 @@
                     <span class="kw">let </span>ptr = buf.as_ptr() <span class="kw">as </span><span class="kw-2">*const </span>BasicFeaturesIpv6;
                     <span class="kw">let </span>data = <span class="kw">unsafe </span>{ ptr.read_unaligned() };
 
-                    process_packet_ipv6(<span class="kw-2">&amp;</span>data, <span class="kw-2">&amp;</span>flow_map_clone_egress_ipv6, <span class="bool-val">false</span>);
+                    process_packet_ipv6(<span class="kw-2">&amp;</span>data, <span class="kw-2">&amp;</span>flow_map_clone_egress_ipv6, <span class="bool-val">false</span>, <span class="prelude-val">None</span>, <span class="prelude-val">None</span>);
                 }
             }
         });
@@ -1976,7 +2064,7 @@
                     <span class="kw">let </span>ptr = buf.as_ptr() <span class="kw">as </span><span class="kw-2">*const </span>BasicFeaturesIpv6;
                     <span class="kw">let </span>data = <span class="kw">unsafe </span>{ ptr.read_unaligned() };
 
-                    process_packet_ipv6(<span class="kw-2">&amp;</span>data, <span class="kw-2">&amp;</span>flow_map_clone_ingress_ipv6, <span class="bool-val">true</span>);
+                    process_packet_ipv6(<span class="kw-2">&amp;</span>data, <span class="kw-2">&amp;</span>flow_map_clone_ingress_ipv6, <span class="bool-val">true</span>, <span class="prelude-val">None</span>, <span class="prelude-val">None</span>);
                 }
             }
         });
@@ -2126,6 +2214,22 @@
     };
 
     <span class="kw">while let </span><span class="prelude-val">Ok</span>(packet) = cap.next_packet() {
+        <span class="kw">let </span>ts = packet.header.ts;
+
+        <span class="kw">let </span>system_time = timeval_to_system_time(ts.tv_sec, ts.tv_usec);
+        <span class="kw">let </span>now = SystemTime::now();
+
+        <span class="kw">let </span>elapsed_duration = <span class="kw">match </span>now.duration_since(system_time) {
+            <span class="prelude-val">Ok</span>(duration) =&gt; duration,
+            <span class="prelude-val">Err</span>(e) =&gt; {
+                <span class="macro">error!</span>(<span class="string">"Error calculating duration: {:?}"</span>, e);
+                Duration::new(<span class="number">0</span>, <span class="number">0</span>)
+            }
+        };
+
+        <span class="kw">let </span>ts_instant = Instant::now() - elapsed_duration;
+        <span class="kw">let </span>ts_datetime = system_time_to_datetime(system_time);
+
         <span class="kw">if let </span><span class="prelude-val">Some</span>(ethernet) = EthernetPacket::new(packet.data) {
             <span class="kw">match </span>ethernet.get_ethertype() {
                 EtherTypes::Ipv4 =&gt; {
@@ -2135,7 +2239,7 @@
                             <span class="kw">if </span>amount_of_packets % <span class="number">10_000 </span>== <span class="number">0 </span>{
                                 <span class="macro">info!</span>(<span class="string">"{} packets have been processed..."</span>, amount_of_packets);
                             }
-                            redirect_packet_ipv4(<span class="kw-2">&amp;</span>features_ipv4, <span class="kw-2">&amp;</span>flow_map_ipv4);
+                            redirect_packet_ipv4(<span class="kw-2">&amp;</span>features_ipv4, <span class="kw-2">&amp;</span>flow_map_ipv4, ts_instant, ts_datetime);
                         }
                     }
                 }
@@ -2146,7 +2250,7 @@
                             <span class="kw">if </span>amount_of_packets % <span class="number">10_000 </span>== <span class="number">0 </span>{
                                 <span class="macro">info!</span>(<span class="string">"{} packets have been processed..."</span>, amount_of_packets);
                             }
-                            redirect_packet_ipv6(<span class="kw-2">&amp;</span>features_ipv6, <span class="kw-2">&amp;</span>flow_map_ipv6);
+                            redirect_packet_ipv6(<span class="kw-2">&amp;</span>features_ipv6, <span class="kw-2">&amp;</span>flow_map_ipv6, ts_instant, ts_datetime);
                         }
                     }
                 }
@@ -2163,7 +2267,12 @@
                                             amount_of_packets
                                         );
                                     }
-                                    redirect_packet_ipv4(<span class="kw-2">&amp;</span>features_ipv4, <span class="kw-2">&amp;</span>flow_map_ipv4);
+                                    redirect_packet_ipv4(
+                                        <span class="kw-2">&amp;</span>features_ipv4,
+                                        <span class="kw-2">&amp;</span>flow_map_ipv4,
+                                        ts_instant,
+                                        ts_datetime,
+                                    );
                                 }
                             }
                         }
@@ -2177,7 +2286,12 @@
                                             amount_of_packets
                                         );
                                     }
-                                    redirect_packet_ipv6(<span class="kw-2">&amp;</span>features_ipv6, <span class="kw-2">&amp;</span>flow_map_ipv6);
+                                    redirect_packet_ipv6(
+                                        <span class="kw-2">&amp;</span>features_ipv6,
+                                        <span class="kw-2">&amp;</span>flow_map_ipv6,
+                                        ts_instant,
+                                        ts_datetime,
+                                    );
                                 }
                             }
                         }
@@ -2331,11 +2445,29 @@
 /// * `data` - Basic features of the packet.
 /// * `flow_map` - Map of flows.
 /// * `fwd` - Direction of the packet.
-</span><span class="kw">fn </span>process_packet_ipv4&lt;T&gt;(data: <span class="kw-2">&amp;</span>BasicFeaturesIpv4, flow_map: <span class="kw-2">&amp;</span>Arc&lt;DashMap&lt;String, T&gt;&gt;, fwd: bool)
-<span class="kw">where
+/// * `timestamp` - Timestamp of the packet.
+</span><span class="kw">fn </span>process_packet_ipv4&lt;T&gt;(
+    data: <span class="kw-2">&amp;</span>BasicFeaturesIpv4,
+    flow_map: <span class="kw-2">&amp;</span>Arc&lt;DashMap&lt;String, T&gt;&gt;,
+    fwd: bool,
+    timestamp: <span class="prelude-ty">Option</span>&lt;Instant&gt;,
+    ts_datetime: <span class="prelude-ty">Option</span>&lt;DateTime&lt;Utc&gt;&gt;,
+) <span class="kw">where
     </span>T: Flow,
 {
-    <span class="kw">let </span>timestamp = Instant::now();
+    <span class="kw">let </span>ts;
+    <span class="kw">let </span>ts_date;
+    <span class="kw">if let </span><span class="prelude-val">Some</span>(timestamp) = timestamp {
+        ts = timestamp;
+    } <span class="kw">else </span>{
+        ts = Instant::now();
+    }
+
+    <span class="kw">if let </span><span class="prelude-val">Some</span>(ts_datetime) = ts_datetime {
+        ts_date = ts_datetime;
+    } <span class="kw">else </span>{
+        ts_date = Utc::now();
+    }
     <span class="kw">let </span>destination = std::net::IpAddr::V4(Ipv4Addr::from(u32::from_le_bytes(
         data.ipv4_source
             .to_be_bytes()
@@ -2392,6 +2524,7 @@
                 destination,
                 data.port_destination,
                 data.protocol,
+                ts_date,
             )
         } <span class="kw">else </span>{
             T::new(
@@ -2401,11 +2534,12 @@
                 source,
                 data.port_source,
                 data.protocol,
+                ts_date,
             )
         }
     });
 
-    <span class="kw">let </span>end = entry.update_flow(<span class="kw-2">&amp;</span>features, <span class="kw-2">&amp;</span>timestamp, fwd);
+    <span class="kw">let </span>end = entry.update_flow(<span class="kw-2">&amp;</span>features, <span class="kw-2">&amp;</span>ts, ts_date, fwd);
     <span class="kw">if </span>end.is_some() {
         export(<span class="kw-2">&amp;</span>end.unwrap());
         drop(entry);
@@ -2420,11 +2554,28 @@
 /// * `data` - Basic features of the packet.
 /// * `flow_map` - Map of flows.
 /// * `fwd` - Direction of the packet.
-</span><span class="kw">fn </span>process_packet_ipv6&lt;T&gt;(data: <span class="kw-2">&amp;</span>BasicFeaturesIpv6, flow_map: <span class="kw-2">&amp;</span>Arc&lt;DashMap&lt;String, T&gt;&gt;, fwd: bool)
-<span class="kw">where
+/// * `timestamp` - Timestamp of the packet.
+</span><span class="kw">fn </span>process_packet_ipv6&lt;T&gt;(
+    data: <span class="kw-2">&amp;</span>BasicFeaturesIpv6,
+    flow_map: <span class="kw-2">&amp;</span>Arc&lt;DashMap&lt;String, T&gt;&gt;,
+    fwd: bool,
+    timestamp: <span class="prelude-ty">Option</span>&lt;Instant&gt;,
+    ts_datetime: <span class="prelude-ty">Option</span>&lt;DateTime&lt;Utc&gt;&gt;,
+) <span class="kw">where
     </span>T: Flow,
 {
-    <span class="kw">let </span>timestamp = Instant::now();
+    <span class="kw">let </span>ts;
+    <span class="kw">let </span>ts_date;
+    <span class="kw">if let </span><span class="prelude-val">Some</span>(timestamp) = timestamp {
+        ts = timestamp;
+    } <span class="kw">else </span>{
+        ts = Instant::now();
+    }
+    <span class="kw">if let </span><span class="prelude-val">Some</span>(ts_datetime) = ts_datetime {
+        ts_date = ts_datetime;
+    } <span class="kw">else </span>{
+        ts_date = Utc::now();
+    }
     <span class="kw">let </span>destination = std::net::IpAddr::V6(Ipv6Addr::from(data.ipv6_destination));
     <span class="kw">let </span>source = std::net::IpAddr::V6(Ipv6Addr::from(data.ipv6_source));
     <span class="kw">let </span>combined_flags = data.combined_flags;
@@ -2472,6 +2623,7 @@
                 destination,
                 data.port_destination,
                 data.protocol,
+                ts_date,
             )
         } <span class="kw">else </span>{
             T::new(
@@ -2481,11 +2633,12 @@
                 source,
                 data.port_source,
                 data.protocol,
+                ts_date,
             )
         }
     });
 
-    <span class="kw">let </span>end = entry.update_flow(<span class="kw-2">&amp;</span>features, <span class="kw-2">&amp;</span>timestamp, fwd);
+    <span class="kw">let </span>end = entry.update_flow(<span class="kw-2">&amp;</span>features, <span class="kw-2">&amp;</span>ts, ts_date, fwd);
     <span class="kw">if </span>end.is_some() {
         export(<span class="kw-2">&amp;</span>end.unwrap());
         drop(entry);
@@ -2499,8 +2652,13 @@
 ///
 /// * `features_ipv4` - Basic features of the packet.
 /// * `flow_map` - Map of flows.
-</span><span class="kw">fn </span>redirect_packet_ipv4&lt;T&gt;(features_ipv4: <span class="kw-2">&amp;</span>BasicFeaturesIpv4, flow_map: <span class="kw-2">&amp;</span>Arc&lt;DashMap&lt;String, T&gt;&gt;)
-<span class="kw">where
+/// * `timestamp` - Timestamp of the packet.
+</span><span class="kw">fn </span>redirect_packet_ipv4&lt;T&gt;(
+    features_ipv4: <span class="kw-2">&amp;</span>BasicFeaturesIpv4,
+    flow_map: <span class="kw-2">&amp;</span>Arc&lt;DashMap&lt;String, T&gt;&gt;,
+    timestamp: Instant,
+    ts_datetime: DateTime&lt;Utc&gt;,
+) <span class="kw">where
     </span>T: Flow,
 {
     <span class="kw">let </span>fwd_flow_id = create_flow_id(
@@ -2519,11 +2677,11 @@
     );
 
     <span class="kw">if </span>flow_map.contains_key(<span class="kw-2">&amp;</span>fwd_flow_id) {
-        process_packet_ipv4(<span class="kw-2">&amp;</span>features_ipv4, <span class="kw-2">&amp;</span>flow_map, <span class="bool-val">true</span>);
+        process_packet_ipv4(<span class="kw-2">&amp;</span>features_ipv4, <span class="kw-2">&amp;</span>flow_map, <span class="bool-val">true</span>, <span class="prelude-val">Some</span>(timestamp), <span class="prelude-val">Some</span>(ts_datetime));
     } <span class="kw">else if </span>flow_map.contains_key(<span class="kw-2">&amp;</span>bwd_flow_id) {
-        process_packet_ipv4(<span class="kw-2">&amp;</span>features_ipv4, <span class="kw-2">&amp;</span>flow_map, <span class="bool-val">false</span>);
+        process_packet_ipv4(<span class="kw-2">&amp;</span>features_ipv4, <span class="kw-2">&amp;</span>flow_map, <span class="bool-val">false</span>, <span class="prelude-val">Some</span>(timestamp), <span class="prelude-val">Some</span>(ts_datetime));
     } <span class="kw">else </span>{
-        process_packet_ipv4(<span class="kw-2">&amp;</span>features_ipv4, <span class="kw-2">&amp;</span>flow_map, <span class="bool-val">true</span>);
+        process_packet_ipv4(<span class="kw-2">&amp;</span>features_ipv4, <span class="kw-2">&amp;</span>flow_map, <span class="bool-val">true</span>, <span class="prelude-val">Some</span>(timestamp), <span class="prelude-val">Some</span>(ts_datetime));
     }
 }
 
@@ -2533,8 +2691,13 @@
 ///
 /// * `features_ipv6` - Basic features of the packet.
 /// * `flow_map` - Map of flows.
-</span><span class="kw">fn </span>redirect_packet_ipv6&lt;T&gt;(features_ipv6: <span class="kw-2">&amp;</span>BasicFeaturesIpv6, flow_map: <span class="kw-2">&amp;</span>Arc&lt;DashMap&lt;String, T&gt;&gt;)
-<span class="kw">where
+/// * `timestamp` - Timestamp of the packet.
+</span><span class="kw">fn </span>redirect_packet_ipv6&lt;T&gt;(
+    features_ipv6: <span class="kw-2">&amp;</span>BasicFeaturesIpv6,
+    flow_map: <span class="kw-2">&amp;</span>Arc&lt;DashMap&lt;String, T&gt;&gt;,
+    timestamp: Instant,
+    ts_datetime: DateTime&lt;Utc&gt;,
+) <span class="kw">where
     </span>T: Flow,
 {
     <span class="kw">let </span>fwd_flow_id = create_flow_id(
@@ -2553,11 +2716,11 @@
     );
 
     <span class="kw">if </span>flow_map.contains_key(<span class="kw-2">&amp;</span>fwd_flow_id) {
-        process_packet_ipv6(<span class="kw-2">&amp;</span>features_ipv6, <span class="kw-2">&amp;</span>flow_map, <span class="bool-val">true</span>);
+        process_packet_ipv6(<span class="kw-2">&amp;</span>features_ipv6, <span class="kw-2">&amp;</span>flow_map, <span class="bool-val">true</span>, <span class="prelude-val">Some</span>(timestamp), <span class="prelude-val">Some</span>(ts_datetime));
     } <span class="kw">else if </span>flow_map.contains_key(<span class="kw-2">&amp;</span>bwd_flow_id) {
-        process_packet_ipv6(<span class="kw-2">&amp;</span>features_ipv6, <span class="kw-2">&amp;</span>flow_map, <span class="bool-val">false</span>);
+        process_packet_ipv6(<span class="kw-2">&amp;</span>features_ipv6, <span class="kw-2">&amp;</span>flow_map, <span class="bool-val">false</span>, <span class="prelude-val">Some</span>(timestamp), <span class="prelude-val">Some</span>(ts_datetime));
     } <span class="kw">else </span>{
-        process_packet_ipv6(<span class="kw-2">&amp;</span>features_ipv6, <span class="kw-2">&amp;</span>flow_map, <span class="bool-val">true</span>);
+        process_packet_ipv6(<span class="kw-2">&amp;</span>features_ipv6, <span class="kw-2">&amp;</span>flow_map, <span class="bool-val">true</span>, <span class="prelude-val">Some</span>(timestamp), <span class="prelude-val">Some</span>(ts_datetime));
     }
 }
 
@@ -2699,6 +2862,17 @@
     ))
 }
 
+<span class="kw">fn </span>timeval_to_system_time(tv_sec: i64, tv_usec: i64) -&gt; SystemTime {
+    UNIX_EPOCH + Duration::new(tv_sec <span class="kw">as </span>u64, (tv_usec * <span class="number">1000</span>) <span class="kw">as </span>u32)
+}
+
+<span class="kw">fn </span>system_time_to_datetime(system_time: SystemTime) -&gt; DateTime&lt;Utc&gt; {
+    <span class="kw">let </span>duration_since_epoch = system_time.duration_since(UNIX_EPOCH)
+        .expect(<span class="string">"Time went backwards"</span>);
+    <span class="kw">let </span>datetime = DateTime::&lt;Utc&gt;::from(UNIX_EPOCH + duration_since_epoch);
+    datetime
+}
+
 <span class="attr">#[cfg(test)]
 </span><span class="kw">mod </span>tests {
     <span class="kw">use super</span>::<span class="kw-2">*</span>;
@@ -2721,7 +2895,7 @@
             _padding: [<span class="number">0</span>; <span class="number">3</span>],
         };
 
-        process_packet_ipv4::&lt;CicFlow&gt;(<span class="kw-2">&amp;</span>data_1, <span class="kw-2">&amp;</span>flow_map, <span class="bool-val">true</span>);
+        process_packet_ipv4::&lt;CicFlow&gt;(<span class="kw-2">&amp;</span>data_1, <span class="kw-2">&amp;</span>flow_map, <span class="bool-val">true</span>, <span class="prelude-val">None</span>, <span class="prelude-val">None</span>);
 
         <span class="macro">assert_eq!</span>(flow_map.len(), <span class="number">1</span>);
 
@@ -2738,7 +2912,7 @@
             window_size: <span class="number">1000</span>,
             _padding: [<span class="number">0</span>; <span class="number">3</span>],
         };
-        process_packet_ipv4(<span class="kw-2">&amp;</span>data_2, <span class="kw-2">&amp;</span>flow_map, <span class="bool-val">false</span>);
+        process_packet_ipv4(<span class="kw-2">&amp;</span>data_2, <span class="kw-2">&amp;</span>flow_map, <span class="bool-val">false</span>, <span class="prelude-val">None</span>, <span class="prelude-val">None</span>);
 
         <span class="macro">assert_eq!</span>(flow_map.len(), <span class="number">1</span>);
         <span class="comment">// 17 is for udp, here we just use it to create a new flow
@@ -2755,7 +2929,7 @@
             window_size: <span class="number">1000</span>,
             _padding: [<span class="number">0</span>; <span class="number">3</span>],
         };
-        process_packet_ipv4(<span class="kw-2">&amp;</span>data_3, <span class="kw-2">&amp;</span>flow_map, <span class="bool-val">true</span>);
+        process_packet_ipv4(<span class="kw-2">&amp;</span>data_3, <span class="kw-2">&amp;</span>flow_map, <span class="bool-val">true</span>, <span class="prelude-val">None</span>, <span class="prelude-val">None</span>);
 
         <span class="macro">assert_eq!</span>(flow_map.len(), <span class="number">2</span>);
 
@@ -2772,7 +2946,7 @@
             window_size: <span class="number">1000</span>,
             _padding: [<span class="number">0</span>; <span class="number">3</span>],
         };
-        process_packet_ipv4(<span class="kw-2">&amp;</span>data_4, <span class="kw-2">&amp;</span>flow_map, <span class="bool-val">true</span>);
+        process_packet_ipv4(<span class="kw-2">&amp;</span>data_4, <span class="kw-2">&amp;</span>flow_map, <span class="bool-val">true</span>, <span class="prelude-val">None</span>, <span class="prelude-val">None</span>);
 
         <span class="macro">assert_eq!</span>(flow_map.len(), <span class="number">2</span>);
 
@@ -2789,7 +2963,7 @@
             window_size: <span class="number">1000</span>,
             _padding: [<span class="number">0</span>; <span class="number">3</span>],
         };
-        process_packet_ipv4(<span class="kw-2">&amp;</span>data_5, <span class="kw-2">&amp;</span>flow_map, <span class="bool-val">false</span>);
+        process_packet_ipv4(<span class="kw-2">&amp;</span>data_5, <span class="kw-2">&amp;</span>flow_map, <span class="bool-val">false</span>, <span class="prelude-val">None </span>,<span class="prelude-val">None</span>);
 
         <span class="macro">assert_eq!</span>(flow_map.len(), <span class="number">2</span>);
 
@@ -2806,7 +2980,7 @@
             window_size: <span class="number">1000</span>,
             _padding: [<span class="number">0</span>; <span class="number">3</span>],
         };
-        process_packet_ipv4(<span class="kw-2">&amp;</span>data_6, <span class="kw-2">&amp;</span>flow_map, <span class="bool-val">true</span>);
+        process_packet_ipv4(<span class="kw-2">&amp;</span>data_6, <span class="kw-2">&amp;</span>flow_map, <span class="bool-val">true</span>, <span class="prelude-val">None </span>,<span class="prelude-val">None</span>);
 
         <span class="macro">assert_eq!</span>(flow_map.len(), <span class="number">1</span>);
 
@@ -2823,7 +2997,7 @@
             window_size: <span class="number">1000</span>,
             _padding: [<span class="number">0</span>; <span class="number">3</span>],
         };
-        process_packet_ipv4(<span class="kw-2">&amp;</span>data_7, <span class="kw-2">&amp;</span>flow_map, <span class="bool-val">false</span>);
+        process_packet_ipv4(<span class="kw-2">&amp;</span>data_7, <span class="kw-2">&amp;</span>flow_map, <span class="bool-val">false</span>, <span class="prelude-val">None </span>,<span class="prelude-val">None</span>);
 
         <span class="macro">assert_eq!</span>(flow_map.len(), <span class="number">0</span>);
 
@@ -2840,7 +3014,7 @@
             window_size: <span class="number">1000</span>,
             _padding: [<span class="number">0</span>; <span class="number">3</span>],
         };
-        process_packet_ipv4(<span class="kw-2">&amp;</span>data_8, <span class="kw-2">&amp;</span>flow_map, <span class="bool-val">true</span>);
+        process_packet_ipv4(<span class="kw-2">&amp;</span>data_8, <span class="kw-2">&amp;</span>flow_map, <span class="bool-val">true</span>, <span class="prelude-val">None </span>,<span class="prelude-val">None</span>);
 
         <span class="macro">assert_eq!</span>(flow_map.len(), <span class="number">1</span>);
 
@@ -2857,7 +3031,7 @@
             window_size: <span class="number">1000</span>,
             _padding: [<span class="number">0</span>; <span class="number">3</span>],
         };
-        process_packet_ipv4(<span class="kw-2">&amp;</span>data_9, <span class="kw-2">&amp;</span>flow_map, <span class="bool-val">true</span>);
+        process_packet_ipv4(<span class="kw-2">&amp;</span>data_9, <span class="kw-2">&amp;</span>flow_map, <span class="bool-val">true</span>, <span class="prelude-val">None </span>,<span class="prelude-val">None</span>);
 
         <span class="macro">assert_eq!</span>(flow_map.len(), <span class="number">1</span>);
 
@@ -2875,7 +3049,7 @@
             _padding: [<span class="number">0</span>; <span class="number">3</span>],
         };
 
-        process_packet_ipv4(<span class="kw-2">&amp;</span>data_10, <span class="kw-2">&amp;</span>flow_map, <span class="bool-val">true</span>);
+        process_packet_ipv4(<span class="kw-2">&amp;</span>data_10, <span class="kw-2">&amp;</span>flow_map, <span class="bool-val">true</span>, <span class="prelude-val">None </span>,<span class="prelude-val">None</span>);
 
         <span class="macro">assert_eq!</span>(flow_map.len(), <span class="number">1</span>);
 
@@ -2892,7 +3066,7 @@
             window_size: <span class="number">1000</span>,
             _padding: [<span class="number">0</span>; <span class="number">3</span>],
         };
-        process_packet_ipv4(<span class="kw-2">&amp;</span>data_11, <span class="kw-2">&amp;</span>flow_map, <span class="bool-val">false</span>);
+        process_packet_ipv4(<span class="kw-2">&amp;</span>data_11, <span class="kw-2">&amp;</span>flow_map, <span class="bool-val">false</span>, <span class="prelude-val">None </span>,<span class="prelude-val">None</span>);
 
         <span class="macro">assert_eq!</span>(flow_map.len(), <span class="number">1</span>);
 
@@ -2909,7 +3083,7 @@
             window_size: <span class="number">1000</span>,
             _padding: [<span class="number">0</span>; <span class="number">3</span>],
         };
-        process_packet_ipv4(<span class="kw-2">&amp;</span>data_12, <span class="kw-2">&amp;</span>flow_map, <span class="bool-val">false</span>);
+        process_packet_ipv4(<span class="kw-2">&amp;</span>data_12, <span class="kw-2">&amp;</span>flow_map, <span class="bool-val">false</span>, <span class="prelude-val">None </span>,<span class="prelude-val">None</span>);
 
         <span class="macro">assert_eq!</span>(flow_map.len(), <span class="number">0</span>);
     }

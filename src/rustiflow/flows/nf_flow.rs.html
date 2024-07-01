@@ -251,6 +251,9 @@
 <a href="#251" id="251">251</a>
 <a href="#252" id="252">252</a>
 <a href="#253" id="253">253</a>
+<a href="#254" id="254">254</a>
+<a href="#255" id="255">255</a>
+<a href="#256" id="256">256</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span>std::{
     net::IpAddr,
     ops::Deref,
@@ -284,6 +287,7 @@
         ipv4_destination: IpAddr,
         port_destination: u16,
         protocol: u8,
+        ts_date: DateTime&lt;Utc&gt;,
     ) -&gt; <span class="self">Self </span>{
         NfFlow {
             cic_flow: CicFlow::new(
@@ -293,13 +297,14 @@
                 ipv4_destination,
                 port_destination,
                 protocol,
+                ts_date,
             ),
-            first_timestamp: SystemTime::now(),
-            last_timestamp: SystemTime::now(),
-            fwd_first_timestamp: SystemTime::now(),
-            fwd_last_timestamp: SystemTime::now(),
-            bwd_first_timestamp: SystemTime::now(),
-            bwd_last_timestamp: SystemTime::now(),
+            first_timestamp: ts_date.into(),
+            last_timestamp: ts_date.into(),
+            fwd_first_timestamp: ts_date.into(),
+            fwd_last_timestamp: ts_date.into(),
+            bwd_first_timestamp: ts_date.into(),
+            bwd_last_timestamp: ts_date.into(),
         }
     }
 
@@ -307,15 +312,16 @@
         <span class="kw-2">&amp;mut </span><span class="self">self</span>,
         packet: <span class="kw-2">&amp;</span>BasicFeatures,
         timestamp: <span class="kw-2">&amp;</span>Instant,
+        ts_date: DateTime&lt;Utc&gt;,
         fwd: bool,
     ) -&gt; <span class="prelude-ty">Option</span>&lt;String&gt; {
         <span class="kw">if </span>fwd {
-            <span class="self">self</span>.fwd_last_timestamp = SystemTime::now();
+            <span class="self">self</span>.fwd_last_timestamp = ts_date.into();
         } <span class="kw">else </span>{
-            <span class="self">self</span>.bwd_last_timestamp = SystemTime::now();
+            <span class="self">self</span>.bwd_last_timestamp = ts_date.into();
         }
 
-        <span class="kw">let </span>end = <span class="self">self</span>.cic_flow.update_flow(packet, timestamp, fwd);
+        <span class="kw">let </span>end = <span class="self">self</span>.cic_flow.update_flow(packet, timestamp, ts_date, fwd);
         <span class="kw">if </span>end.is_some() {
             <span class="kw">if </span><span class="kw-2">*</span>NO_CONTAMINANT_FEATURES.lock().unwrap().deref() {
                 <span class="kw">return </span><span class="prelude-val">Some</span>(<span class="self">self</span>.dump_without_contamination());

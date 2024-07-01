@@ -812,6 +812,10 @@
 <a href="#812" id="812">812</a>
 <a href="#813" id="813">813</a>
 <a href="#814" id="814">814</a>
+<a href="#815" id="815">815</a>
+<a href="#816" id="816">816</a>
+<a href="#817" id="817">817</a>
+<a href="#818" id="818">818</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span>chrono::{DateTime, Utc};
 <span class="kw">use </span>std::ops::Deref;
 <span class="kw">use </span>std::{net::IpAddr, time::Instant};
@@ -1049,6 +1053,7 @@
         ipv4_destination: IpAddr,
         port_destination: u16,
         protocol: u8,
+        ts_date: DateTime&lt;Utc&gt;,
     ) -&gt; <span class="self">Self </span>{
         NTLFlow {
             basic_flow: CicFlow::new(
@@ -1058,6 +1063,7 @@
                 ipv4_destination,
                 port_destination,
                 protocol,
+                ts_date,
             ),
             fwd_header_len_min: u32::MAX,
             fwd_header_len_max: <span class="number">0</span>,
@@ -1074,9 +1080,10 @@
         <span class="kw-2">&amp;mut </span><span class="self">self</span>,
         packet: <span class="kw-2">&amp;</span>BasicFeatures,
         timestamp: <span class="kw-2">&amp;</span>Instant,
+        ts_date: DateTime&lt;Utc&gt;,
         fwd: bool,
     ) -&gt; <span class="prelude-ty">Option</span>&lt;String&gt; {
-        <span class="kw">let </span>end = <span class="self">self</span>.basic_flow.update_flow(packet, timestamp, fwd);
+        <span class="kw">let </span>end = <span class="self">self</span>.basic_flow.update_flow(packet, timestamp, ts_date, fwd);
 
         <span class="kw">if </span>fwd {
             <span class="self">self</span>.update_fwd_header_len_stats(packet.header_length <span class="kw">as </span>u32);
@@ -1459,6 +1466,7 @@
             IpAddr::V4(Ipv4Addr::from(<span class="number">2</span>)),
             <span class="number">8080</span>,
             <span class="number">6</span>,
+            chrono::Utc::now(),
         )
     }
 
