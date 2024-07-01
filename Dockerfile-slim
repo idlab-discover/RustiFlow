@@ -5,7 +5,6 @@ FROM rust:latest AS builder
 RUN apt-get update && apt-get install -y \
     libpcap-dev \
     iproute2 \
-    # linux-headers \
     && rustup toolchain install stable \
     && rustup toolchain install nightly --component rust-src \
     && cargo install bpf-linker \
@@ -37,7 +36,6 @@ FROM debian:bookworm-slim
 RUN apt-get update && apt-get install -y \
     libpcap0.8 \
     iproute2 \
-    # linux-tools-$(uname -r) \
     --no-install-recommends && \
     rm -rf /var/lib/apt/lists/*
 
