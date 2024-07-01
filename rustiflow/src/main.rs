@@ -605,6 +605,13 @@ where
     });
 
     info!("Waiting for Ctrl-C...");
+
+    if *NO_CONTAMINANT_FEATURES.lock().unwrap().deref() {
+        export(&T::get_features_without_contamination());
+    } else {
+        export(&T::get_features());
+    }
+
     signal::ctrl_c().await?;
 
     for entry in flow_map_ipv4.iter() {
@@ -625,7 +632,6 @@ where
         }
     }
 
-    // Making sure everything is flushed
     if let Some(export_file) = EXPORT_FILE.lock().unwrap().deref_mut() {
         export_file.flush()?;
     }
@@ -667,6 +673,12 @@ where
             return;
         }
     };
+
+    if *NO_CONTAMINANT_FEATURES.lock().unwrap().deref() {
+        export(&T::get_features_without_contamination());
+    } else {
+        export(&T::get_features());
+    }
 
     while let Ok(packet) = cap.next_packet() {
         let ts = packet.header.ts;
@@ -829,6 +841,10 @@ where
         } else {
             export(&flow.dump());
         }
+    }
+
+    if let Some(export_file) = EXPORT_FILE.lock().unwrap().deref_mut() {
+        let _ = export_file.flush();
     }
 
     info!("{UNDERLINE}");

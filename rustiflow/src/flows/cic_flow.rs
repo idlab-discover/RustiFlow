@@ -1341,7 +1341,7 @@ impl Flow for CicFlow {
         )
     }
 
-    fn get_features(&self) -> String {
+    fn get_features() -> String {
         format!(
             "FLOW_ID,IP_SOURCE,PORT_SOURCE,IP_DESTINATION,PORT_DESTINATION,PROTOCOL,\
             FIRST_TIMESTAMP,LAST_TIMESTAMP,DURATION,FWD_PACKET_COUNT,BWD_PACKET_COUNT,\
@@ -1438,7 +1438,7 @@ impl Flow for CicFlow {
         )
     }
 
-    fn get_features_without_contamination(&self) -> String {
+    fn get_features_without_contamination() -> String {
         format!(
             "DURATION,FWD_PACKET_COUNT,BWD_PACKET_COUNT,FWD_PKT_LEN_TOT,BWD_PKT_LEN_TOT,\
             FWD_PKT_LEN_MAX,FWD_PKT_LEN_MEAN,FWD_PKT_LEN_STD,BWD_PKT_LEN_MAX,BWD_PKT_LEN_MEAN,\

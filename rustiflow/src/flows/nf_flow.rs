@@ -151,7 +151,7 @@ impl Flow for NfFlow {
         )
     }
 
-    fn get_features(&self) -> String {
+    fn get_features() -> String {
         format!(
             "FLOW_ID,IP_SRC,PORT_SRC,IP_DST,PORT_DST,PROTOCOL,FIRST_TS,LAST_TS,\
             DURATION,FLOW_PKTS,FLOW_BYTES,FWD_FIRST_TS,FWD_LAST_TS,FWD_DURATION,FWD_PKTS,\
@@ -264,7 +264,7 @@ impl Flow for NfFlow {
         )
     }
 
-    fn get_features_without_contamination(&self) -> String {
+    fn get_features_without_contamination() -> String {
         format!(
             "PROTOCOL,DURATION,FLOW_PKTS,FLOW_BYTES,FWD_DURATION,FWD_PKTS,FWD_BYTES,\
             BWD_DURATION,BWD_PKTS,BWD_BYTES,FLOW_PKT_LEN_MIN,FLOW_PKT_LEN_MEAN,FLOW_PKT_LEN_STD,\

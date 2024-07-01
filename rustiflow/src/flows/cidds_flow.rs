@@ -138,7 +138,7 @@ impl Flow for CiddsFlow {
         )
     }
 
-    fn get_features(&self) -> String {
+    fn get_features() -> String {
         format!(
             "FIRST_TIMESTAMP,LAST_TIMESTAMP,PROTOCOL,SOURCE_IP,SOURCE_PORT,DESTINATION_IP,\
             DESTINATION_PORT,PACKET_COUNT,BYTES,FLAGS"
@@ -167,7 +167,7 @@ impl Flow for CiddsFlow {
         )
     }
 
-    fn get_features_without_contamination(&self) -> String {
+    fn get_features_without_contamination() -> String {
         format!("DURATION,PROTOCOL,PACKET_COUNT,BYTES,FLAGS")
     }
 

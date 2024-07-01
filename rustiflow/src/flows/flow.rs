@@ -93,7 +93,7 @@ pub trait Flow {
     /// ### Returns
     ///
     /// Returns a `String` that represents the features of the flow.
-    fn get_features(&self) -> String;
+    fn get_features() -> String;
 
     /// Returns a first record with the features of the flow without contaminant features.
     ///
@@ -102,5 +102,5 @@ pub trait Flow {
     /// ### Returns
     ///
     /// Returns a `String` that represents the features of the flow without contaminant features.
-    fn get_features_without_contamination(&self) -> String;
+    fn get_features_without_contamination() -> String;
 }
