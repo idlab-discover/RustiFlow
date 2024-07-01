@@ -235,6 +235,7 @@ impl Flow for NTLFlow {
         ipv4_destination: IpAddr,
         port_destination: u16,
         protocol: u8,
+        ts_date: DateTime<Utc>,
     ) -> Self {
         NTLFlow {
             basic_flow: CicFlow::new(
@@ -244,6 +245,7 @@ impl Flow for NTLFlow {
                 ipv4_destination,
                 port_destination,
                 protocol,
+                ts_date,
             ),
             fwd_header_len_min: u32::MAX,
             fwd_header_len_max: 0,
@@ -260,9 +262,10 @@ impl Flow for NTLFlow {
         &mut self,
         packet: &BasicFeatures,
         timestamp: &Instant,
+        ts_date: DateTime<Utc>,
         fwd: bool,
     ) -> Option<String> {
-        let end = self.basic_flow.update_flow(packet, timestamp, fwd);
+        let end = self.basic_flow.update_flow(packet, timestamp, ts_date, fwd);
 
         if fwd {
             self.update_fwd_header_len_stats(packet.header_length as u32);
@@ -645,6 +648,7 @@ mod tests {
             IpAddr::V4(Ipv4Addr::from(2)),
             8080,
             6,
+            chrono::Utc::now(),
         )
     }
 
