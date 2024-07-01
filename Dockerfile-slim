@@ -13,7 +13,6 @@ RUN apt-get update && apt-get install -y \
 
 # Set environment variables
 ENV PATH="/root/.cargo/bin:${PATH}"
-ENV RUST_LOG=info
 
 # Copy source code
 WORKDIR /usr/src/app
