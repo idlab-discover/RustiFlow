@@ -25,6 +25,7 @@ impl Flow for CustomFlow {
         ipv4_destination: IpAddr,
         port_destination: u16,
         protocol: u8,
+        ts_date: DateTime<Utc>,
     ) -> Self {
         CustomFlow {
             basic_flow: BasicFlow::new(
@@ -34,6 +35,7 @@ impl Flow for CustomFlow {
                 ipv4_destination,
                 port_destination,
                 protocol,
+                ts_date
             ),
             // Add here the initialization of the additional features.
         }
@@ -43,9 +45,10 @@ impl Flow for CustomFlow {
         &mut self,
         packet: &BasicFeatures,
         timestamp: &Instant,
+        ts_date: DateTime<Utc>,
         fwd: bool,
     ) -> Option<String> {
-        self.basic_flow.update_flow(packet, timestamp, fwd);
+        self.basic_flow.update_flow(packet, timestamp, ts_date, fwd);
 
         // Add here the update of the additional features.
 

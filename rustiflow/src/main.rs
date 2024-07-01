@@ -17,7 +17,7 @@ use aya::{
     Ebpf,
 };
 use bytes::BytesMut;
-use chrono::Utc;
+use chrono::{DateTime, Utc};
 use clap::Parser;
 use common::{BasicFeaturesIpv4, BasicFeaturesIpv6};
 use core::panic;
@@ -41,6 +41,7 @@ use std::{
     io::{BufWriter, Read, Write},
     ops::{Deref, DerefMut},
     sync::atomic::{AtomicUsize, Ordering},
+    time::{SystemTime, UNIX_EPOCH},
 };
 use std::{
     net::{Ipv4Addr, Ipv6Addr},
@@ -451,7 +452,7 @@ where
                     let ptr = buf.as_ptr() as *const BasicFeaturesIpv4;
                     let data = unsafe { ptr.read_unaligned() };
 
-                    process_packet_ipv4(&data, &flow_map_clone_egress_ipv4, false);
+                    process_packet_ipv4(&data, &flow_map_clone_egress_ipv4, false, None, None);
                 }
             }
         });
@@ -473,7 +474,7 @@ where
                     let ptr = buf.as_ptr() as *const BasicFeaturesIpv4;
                     let data = unsafe { ptr.read_unaligned() };
 
-                    process_packet_ipv4(&data, &flow_map_clone_ingress_ipv4, true);
+                    process_packet_ipv4(&data, &flow_map_clone_ingress_ipv4, true, None, None);
                 }
             }
         });
@@ -496,7 +497,7 @@ where
                     let ptr = buf.as_ptr() as *const BasicFeaturesIpv6;
                     let data = unsafe { ptr.read_unaligned() };
 
-                    process_packet_ipv6(&data, &flow_map_clone_egress_ipv6, false);
+                    process_packet_ipv6(&data, &flow_map_clone_egress_ipv6, false, None, None);
                 }
             }
         });
@@ -518,7 +519,7 @@ where
                     let ptr = buf.as_ptr() as *const BasicFeaturesIpv6;
                     let data = unsafe { ptr.read_unaligned() };
 
-                    process_packet_ipv6(&data, &flow_map_clone_ingress_ipv6, true);
+                    process_packet_ipv6(&data, &flow_map_clone_ingress_ipv6, true, None, None);
                 }
             }
         });
@@ -668,6 +669,22 @@ where
     };
 
     while let Ok(packet) = cap.next_packet() {
+        let ts = packet.header.ts;
+
+        let system_time = timeval_to_system_time(ts.tv_sec, ts.tv_usec);
+        let now = SystemTime::now();
+
+        let elapsed_duration = match now.duration_since(system_time) {
+            Ok(duration) => duration,
+            Err(e) => {
+                error!("Error calculating duration: {:?}", e);
+                Duration::new(0, 0)
+            }
+        };
+
+        let ts_instant = Instant::now() - elapsed_duration;
+        let ts_datetime = system_time_to_datetime(system_time);
+
         if let Some(ethernet) = EthernetPacket::new(packet.data) {
             match ethernet.get_ethertype() {
                 EtherTypes::Ipv4 => {
@@ -677,7 +694,7 @@ where
                             if amount_of_packets % 10_000 == 0 {
                                 info!("{} packets have been processed...", amount_of_packets);
                             }
-                            redirect_packet_ipv4(&features_ipv4, &flow_map_ipv4);
+                            redirect_packet_ipv4(&features_ipv4, &flow_map_ipv4, ts_instant, ts_datetime);
                         }
                     }
                 }
@@ -688,7 +705,7 @@ where
                             if amount_of_packets % 10_000 == 0 {
                                 info!("{} packets have been processed...", amount_of_packets);
                             }
-                            redirect_packet_ipv6(&features_ipv6, &flow_map_ipv6);
+                            redirect_packet_ipv6(&features_ipv6, &flow_map_ipv6, ts_instant, ts_datetime);
                         }
                     }
                 }
@@ -705,7 +722,12 @@ where
                                             amount_of_packets
                                         );
                                     }
-                                    redirect_packet_ipv4(&features_ipv4, &flow_map_ipv4);
+                                    redirect_packet_ipv4(
+                                        &features_ipv4,
+                                        &flow_map_ipv4,
+                                        ts_instant,
+                                        ts_datetime,
+                                    );
                                 }
                             }
                         }
@@ -719,7 +741,12 @@ where
                                             amount_of_packets
                                         );
                                     }
-                                    redirect_packet_ipv6(&features_ipv6, &flow_map_ipv6);
+                                    redirect_packet_ipv6(
+                                        &features_ipv6,
+                                        &flow_map_ipv6,
+                                        ts_instant,
+                                        ts_datetime,
+                                    );
                                 }
                             }
                         }
@@ -873,11 +900,29 @@ fn export(output: &String) {
 /// * `data` - Basic features of the packet.
 /// * `flow_map` - Map of flows.
 /// * `fwd` - Direction of the packet.
-fn process_packet_ipv4<T>(data: &BasicFeaturesIpv4, flow_map: &Arc<DashMap<String, T>>, fwd: bool)
-where
+/// * `timestamp` - Timestamp of the packet.
+fn process_packet_ipv4<T>(
+    data: &BasicFeaturesIpv4,
+    flow_map: &Arc<DashMap<String, T>>,
+    fwd: bool,
+    timestamp: Option<Instant>,
+    ts_datetime: Option<DateTime<Utc>>,
+) where
     T: Flow,
 {
-    let timestamp = Instant::now();
+    let ts;
+    let ts_date;
+    if let Some(timestamp) = timestamp {
+        ts = timestamp;
+    } else {
+        ts = Instant::now();
+    }
+
+    if let Some(ts_datetime) = ts_datetime {
+        ts_date = ts_datetime;
+    } else {
+        ts_date = Utc::now();
+    }
     let destination = std::net::IpAddr::V4(Ipv4Addr::from(u32::from_le_bytes(
         data.ipv4_source
             .to_be_bytes()
@@ -934,6 +979,7 @@ where
                 destination,
                 data.port_destination,
                 data.protocol,
+                ts_date,
             )
         } else {
             T::new(
@@ -943,11 +989,12 @@ where
                 source,
                 data.port_source,
                 data.protocol,
+                ts_date,
             )
         }
     });
 
-    let end = entry.update_flow(&features, &timestamp, fwd);
+    let end = entry.update_flow(&features, &ts, ts_date, fwd);
     if end.is_some() {
         export(&end.unwrap());
         drop(entry);
@@ -962,11 +1009,28 @@ where
 /// * `data` - Basic features of the packet.
 /// * `flow_map` - Map of flows.
 /// * `fwd` - Direction of the packet.
-fn process_packet_ipv6<T>(data: &BasicFeaturesIpv6, flow_map: &Arc<DashMap<String, T>>, fwd: bool)
-where
+/// * `timestamp` - Timestamp of the packet.
+fn process_packet_ipv6<T>(
+    data: &BasicFeaturesIpv6,
+    flow_map: &Arc<DashMap<String, T>>,
+    fwd: bool,
+    timestamp: Option<Instant>,
+    ts_datetime: Option<DateTime<Utc>>,
+) where
     T: Flow,
 {
-    let timestamp = Instant::now();
+    let ts;
+    let ts_date;
+    if let Some(timestamp) = timestamp {
+        ts = timestamp;
+    } else {
+        ts = Instant::now();
+    }
+    if let Some(ts_datetime) = ts_datetime {
+        ts_date = ts_datetime;
+    } else {
+        ts_date = Utc::now();
+    }
     let destination = std::net::IpAddr::V6(Ipv6Addr::from(data.ipv6_destination));
     let source = std::net::IpAddr::V6(Ipv6Addr::from(data.ipv6_source));
     let combined_flags = data.combined_flags;
@@ -1014,6 +1078,7 @@ where
                 destination,
                 data.port_destination,
                 data.protocol,
+                ts_date,
             )
         } else {
             T::new(
@@ -1023,11 +1088,12 @@ where
                 source,
                 data.port_source,
                 data.protocol,
+                ts_date,
             )
         }
     });
 
-    let end = entry.update_flow(&features, &timestamp, fwd);
+    let end = entry.update_flow(&features, &ts, ts_date, fwd);
     if end.is_some() {
         export(&end.unwrap());
         drop(entry);
@@ -1041,8 +1107,13 @@ where
 ///
 /// * `features_ipv4` - Basic features of the packet.
 /// * `flow_map` - Map of flows.
-fn redirect_packet_ipv4<T>(features_ipv4: &BasicFeaturesIpv4, flow_map: &Arc<DashMap<String, T>>)
-where
+/// * `timestamp` - Timestamp of the packet.
+fn redirect_packet_ipv4<T>(
+    features_ipv4: &BasicFeaturesIpv4,
+    flow_map: &Arc<DashMap<String, T>>,
+    timestamp: Instant,
+    ts_datetime: DateTime<Utc>,
+) where
     T: Flow,
 {
     let fwd_flow_id = create_flow_id(
@@ -1061,11 +1132,11 @@ where
     );
 
     if flow_map.contains_key(&fwd_flow_id) {
-        process_packet_ipv4(&features_ipv4, &flow_map, true);
+        process_packet_ipv4(&features_ipv4, &flow_map, true, Some(timestamp), Some(ts_datetime));
     } else if flow_map.contains_key(&bwd_flow_id) {
-        process_packet_ipv4(&features_ipv4, &flow_map, false);
+        process_packet_ipv4(&features_ipv4, &flow_map, false, Some(timestamp), Some(ts_datetime));
     } else {
-        process_packet_ipv4(&features_ipv4, &flow_map, true);
+        process_packet_ipv4(&features_ipv4, &flow_map, true, Some(timestamp), Some(ts_datetime));
     }
 }
 
@@ -1075,8 +1146,13 @@ where
 ///
 /// * `features_ipv6` - Basic features of the packet.
 /// * `flow_map` - Map of flows.
-fn redirect_packet_ipv6<T>(features_ipv6: &BasicFeaturesIpv6, flow_map: &Arc<DashMap<String, T>>)
-where
+/// * `timestamp` - Timestamp of the packet.
+fn redirect_packet_ipv6<T>(
+    features_ipv6: &BasicFeaturesIpv6,
+    flow_map: &Arc<DashMap<String, T>>,
+    timestamp: Instant,
+    ts_datetime: DateTime<Utc>,
+) where
     T: Flow,
 {
     let fwd_flow_id = create_flow_id(
@@ -1095,11 +1171,11 @@ where
     );
 
     if flow_map.contains_key(&fwd_flow_id) {
-        process_packet_ipv6(&features_ipv6, &flow_map, true);
+        process_packet_ipv6(&features_ipv6, &flow_map, true, Some(timestamp), Some(ts_datetime));
     } else if flow_map.contains_key(&bwd_flow_id) {
-        process_packet_ipv6(&features_ipv6, &flow_map, false);
+        process_packet_ipv6(&features_ipv6, &flow_map, false, Some(timestamp), Some(ts_datetime));
     } else {
-        process_packet_ipv6(&features_ipv6, &flow_map, true);
+        process_packet_ipv6(&features_ipv6, &flow_map, true, Some(timestamp), Some(ts_datetime));
     }
 }
 
@@ -1241,6 +1317,17 @@ fn extract_ipv6_features(ipv6_packet: &Ipv6Packet) -> Option<BasicFeaturesIpv6> 
     ))
 }
 
+fn timeval_to_system_time(tv_sec: i64, tv_usec: i64) -> SystemTime {
+    UNIX_EPOCH + Duration::new(tv_sec as u64, (tv_usec * 1000) as u32)
+}
+
+fn system_time_to_datetime(system_time: SystemTime) -> DateTime<Utc> {
+    let duration_since_epoch = system_time.duration_since(UNIX_EPOCH)
+        .expect("Time went backwards");
+    let datetime = DateTime::<Utc>::from(UNIX_EPOCH + duration_since_epoch);
+    datetime
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1263,7 +1350,7 @@ mod tests {
             _padding: [0; 3],
         };
 
-        process_packet_ipv4::<CicFlow>(&data_1, &flow_map, true);
+        process_packet_ipv4::<CicFlow>(&data_1, &flow_map, true, None, None);
 
         assert_eq!(flow_map.len(), 1);
 
@@ -1280,7 +1367,7 @@ mod tests {
             window_size: 1000,
             _padding: [0; 3],
         };
-        process_packet_ipv4(&data_2, &flow_map, false);
+        process_packet_ipv4(&data_2, &flow_map, false, None, None);
 
         assert_eq!(flow_map.len(), 1);
         // 17 is for udp, here we just use it to create a new flow
@@ -1297,7 +1384,7 @@ mod tests {
             window_size: 1000,
             _padding: [0; 3],
         };
-        process_packet_ipv4(&data_3, &flow_map, true);
+        process_packet_ipv4(&data_3, &flow_map, true, None, None);
 
         assert_eq!(flow_map.len(), 2);
 
@@ -1314,7 +1401,7 @@ mod tests {
             window_size: 1000,
             _padding: [0; 3],
         };
-        process_packet_ipv4(&data_4, &flow_map, true);
+        process_packet_ipv4(&data_4, &flow_map, true, None, None);
 
         assert_eq!(flow_map.len(), 2);
 
@@ -1331,7 +1418,7 @@ mod tests {
             window_size: 1000,
             _padding: [0; 3],
         };
-        process_packet_ipv4(&data_5, &flow_map, false);
+        process_packet_ipv4(&data_5, &flow_map, false, None ,None);
 
         assert_eq!(flow_map.len(), 2);
 
@@ -1348,7 +1435,7 @@ mod tests {
             window_size: 1000,
             _padding: [0; 3],
         };
-        process_packet_ipv4(&data_6, &flow_map, true);
+        process_packet_ipv4(&data_6, &flow_map, true, None ,None);
 
         assert_eq!(flow_map.len(), 1);
 
@@ -1365,7 +1452,7 @@ mod tests {
             window_size: 1000,
             _padding: [0; 3],
         };
-        process_packet_ipv4(&data_7, &flow_map, false);
+        process_packet_ipv4(&data_7, &flow_map, false, None ,None);
 
         assert_eq!(flow_map.len(), 0);
 
@@ -1382,7 +1469,7 @@ mod tests {
             window_size: 1000,
             _padding: [0; 3],
         };
-        process_packet_ipv4(&data_8, &flow_map, true);
+        process_packet_ipv4(&data_8, &flow_map, true, None ,None);
 
         assert_eq!(flow_map.len(), 1);
 
@@ -1399,7 +1486,7 @@ mod tests {
             window_size: 1000,
             _padding: [0; 3],
         };
-        process_packet_ipv4(&data_9, &flow_map, true);
+        process_packet_ipv4(&data_9, &flow_map, true, None ,None);
 
         assert_eq!(flow_map.len(), 1);
 
@@ -1417,7 +1504,7 @@ mod tests {
             _padding: [0; 3],
         };
 
-        process_packet_ipv4(&data_10, &flow_map, true);
+        process_packet_ipv4(&data_10, &flow_map, true, None ,None);
 
         assert_eq!(flow_map.len(), 1);
 
@@ -1434,7 +1521,7 @@ mod tests {
             window_size: 1000,
             _padding: [0; 3],
         };
-        process_packet_ipv4(&data_11, &flow_map, false);
+        process_packet_ipv4(&data_11, &flow_map, false, None ,None);
 
         assert_eq!(flow_map.len(), 1);
 
@@ -1451,7 +1538,7 @@ mod tests {
             window_size: 1000,
             _padding: [0; 3],
         };
-        process_packet_ipv4(&data_12, &flow_map, false);
+        process_packet_ipv4(&data_12, &flow_map, false, None ,None);
 
         assert_eq!(flow_map.len(), 0);
     }

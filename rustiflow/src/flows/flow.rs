@@ -33,6 +33,7 @@ pub trait Flow {
         ipv4_destination: IpAddr,
         port_destination: u16,
         protocol: u8,
+        ts_date: DateTime<Utc>,
     ) -> Self;
 
     /// Updates the flow with a new packet.
@@ -54,6 +55,7 @@ pub trait Flow {
         &mut self,
         packet: &BasicFeatures,
         timestamp: &Instant,
+        ts_date: DateTime<Utc>,
         fwd: bool,
     ) -> Option<String>;
 

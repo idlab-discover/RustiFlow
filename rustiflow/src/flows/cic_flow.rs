@@ -1098,6 +1098,7 @@ impl Flow for CicFlow {
         ipv4_destination: IpAddr,
         port_destination: u16,
         protocol: u8,
+        ts_date: DateTime<Utc>,
     ) -> Self {
         CicFlow {
             basic_flow: BasicFlow::new(
@@ -1107,6 +1108,7 @@ impl Flow for CicFlow {
                 ipv4_destination,
                 port_destination,
                 protocol,
+                ts_date,
             ),
             sf_last_packet_timestamp: None,
             sf_count: 0,
@@ -1175,9 +1177,10 @@ impl Flow for CicFlow {
         &mut self,
         packet: &BasicFeatures,
         timestamp: &Instant,
+        ts_date: DateTime<Utc>,
         fwd: bool,
     ) -> Option<String> {
-        self.basic_flow.update_flow(packet, timestamp, fwd);
+        self.basic_flow.update_flow(packet, timestamp, ts_date, fwd);
         self.update_subflows(timestamp);
 
         if fwd {
@@ -1439,6 +1442,7 @@ mod tests {
             IpAddr::V4(Ipv4Addr::from(2)),
             8080,
             6,
+            chrono::Utc::now(),
         )
     }
 
@@ -2235,6 +2239,7 @@ mod tests {
             IpAddr::V4(Ipv4Addr::from(2)),
             8080,
             6,
+            chrono::Utc::now(),
         );
         let packet = BasicFeatures {
             fin_flag: 1,
@@ -2252,7 +2257,7 @@ mod tests {
         };
         let timestamp = Instant::now();
 
-        cic_flow.update_flow(&packet, &timestamp, true);
+        cic_flow.update_flow(&packet, &timestamp, chrono::Utc::now() , true);
 
         assert_eq!(cic_flow.basic_flow.fwd_packet_count, 1);
         assert_eq!(cic_flow.basic_flow.bwd_packet_count, 0);
@@ -2309,6 +2314,7 @@ mod tests {
             IpAddr::V4(Ipv4Addr::from(2)),
             8080,
             6,
+            chrono::Utc::now(),
         );
         let packet = BasicFeatures {
             fin_flag: 1,
@@ -2326,7 +2332,7 @@ mod tests {
         };
         let timestamp = Instant::now();
 
-        cic_flow.update_flow(&packet, &timestamp, false);
+        cic_flow.update_flow(&packet, &timestamp, chrono::Utc::now(), false);
 
         assert_eq!(cic_flow.basic_flow.fwd_packet_count, 0);
         assert_eq!(cic_flow.basic_flow.bwd_packet_count, 1);
@@ -2383,6 +2389,7 @@ mod tests {
             IpAddr::V4(Ipv4Addr::from(2)),
             8080,
             6,
+            chrono::Utc::now(),
         );
         let packet_1 = BasicFeatures {
             fin_flag: 1,
@@ -2400,7 +2407,7 @@ mod tests {
         };
         let timestamp_1 = Instant::now();
 
-        cic_flow.update_flow(&packet_1, &timestamp_1, true);
+        cic_flow.update_flow(&packet_1, &timestamp_1, chrono::Utc::now(), true);
 
         std::thread::sleep(std::time::Duration::from_secs(1));
 
@@ -2420,7 +2427,7 @@ mod tests {
         };
         let timestamp_2 = Instant::now();
 
-        cic_flow.update_flow(&packet_2, &timestamp_2, true);
+        cic_flow.update_flow(&packet_2, &timestamp_2, chrono::Utc::now(), true);
 
         assert_eq!(cic_flow.basic_flow.fwd_packet_count, 2);
         assert_eq!(cic_flow.basic_flow.bwd_packet_count, 0);
@@ -2489,6 +2496,7 @@ mod tests {
             IpAddr::V4(Ipv4Addr::from(2)),
             8080,
             6,
+            chrono::Utc::now(),
         );
         let packet_1 = BasicFeatures {
             fin_flag: 1,
@@ -2506,7 +2514,7 @@ mod tests {
         };
         let timestamp_1 = Instant::now();
 
-        cic_flow.update_flow(&packet_1, &timestamp_1, false);
+        cic_flow.update_flow(&packet_1, &timestamp_1, chrono::Utc::now(), false);
 
         std::thread::sleep(std::time::Duration::from_secs(1));
 
@@ -2526,7 +2534,7 @@ mod tests {
         };
         let timestamp_2 = Instant::now();
 
-        cic_flow.update_flow(&packet_2, &timestamp_2, false);
+        cic_flow.update_flow(&packet_2, &timestamp_2, chrono::Utc::now(), false);
 
         assert_eq!(cic_flow.basic_flow.fwd_packet_count, 0);
         assert_eq!(cic_flow.basic_flow.bwd_packet_count, 2);
