@@ -455,7 +455,7 @@ impl Flow for NTLFlow {
         )
     }
 
-    fn get_features(&self) -> String {
+    fn get_features() -> String {
         format!(
             "FLOW_ID,IP_SOURCE,PORT_SOURCE,IP_DESTINATION,PORT_DESTINATION,PROTOCOL,\
             DURATION,TOTAL_PACKETS,FWD_PACKETS,BWD_PACKETS,TOTAL_BYTES,FWD_BYTES,BWD_BYTES,\
@@ -655,7 +655,7 @@ impl Flow for NTLFlow {
         )
     }
 
-    fn get_features_without_contamination(&self) -> String {
+    fn get_features_without_contamination() -> String {
         format!(
             "DURATION,TOTAL_PACKETS,FWD_PACKETS,BWD_PACKETS,TOTAL_BYTES,FWD_BYTES,BWD_BYTES,\
             PACKET_LENGTH_MAX,PACKET_LENGTH_MIN,PACKET_LENGTH_MEAN,PACKET_LENGTH_STD,\

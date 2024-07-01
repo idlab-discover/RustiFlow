@@ -191,7 +191,7 @@ impl Flow for BasicFlow {
         )
     }
 
-    fn get_features(&self) -> String {
+    fn get_features() -> String {
         format!(
             "FLOW_ID,IP_SOURCE,PORT_SOURCE,IP_DESTINATION,PORT_DESTINATION,PROTOCOL,\
             FIRST_TIMESTAMP,LAST_TIMESTAMP,DURATION,FLOW_END_OF_FLOW_ACK,\
@@ -231,7 +231,7 @@ impl Flow for BasicFlow {
         )
     }
 
-    fn get_features_without_contamination(&self) -> String {
+    fn get_features_without_contamination() -> String {
         format!(
             "PROTOCOL,DURATION,FLOW_END_OF_FLOW_ACK,\
             FWD_FIN_FLAG_COUNT,FWD_SYN_FLAG_COUNT,FWD_RST_FLAG_COUNT,FWD_PSH_FLAG_COUNT,\
