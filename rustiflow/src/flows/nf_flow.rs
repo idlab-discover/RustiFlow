@@ -31,6 +31,7 @@ impl Flow for NfFlow {
         ipv4_destination: IpAddr,
         port_destination: u16,
         protocol: u8,
+        ts_date: DateTime<Utc>,
     ) -> Self {
         NfFlow {
             cic_flow: CicFlow::new(
@@ -40,13 +41,14 @@ impl Flow for NfFlow {
                 ipv4_destination,
                 port_destination,
                 protocol,
+                ts_date,
             ),
-            first_timestamp: SystemTime::now(),
-            last_timestamp: SystemTime::now(),
-            fwd_first_timestamp: SystemTime::now(),
-            fwd_last_timestamp: SystemTime::now(),
-            bwd_first_timestamp: SystemTime::now(),
-            bwd_last_timestamp: SystemTime::now(),
+            first_timestamp: ts_date.into(),
+            last_timestamp: ts_date.into(),
+            fwd_first_timestamp: ts_date.into(),
+            fwd_last_timestamp: ts_date.into(),
+            bwd_first_timestamp: ts_date.into(),
+            bwd_last_timestamp: ts_date.into(),
         }
     }
 
@@ -54,15 +56,16 @@ impl Flow for NfFlow {
         &mut self,
         packet: &BasicFeatures,
         timestamp: &Instant,
+        ts_date: DateTime<Utc>,
         fwd: bool,
     ) -> Option<String> {
         if fwd {
-            self.fwd_last_timestamp = SystemTime::now();
+            self.fwd_last_timestamp = ts_date.into();
         } else {
-            self.bwd_last_timestamp = SystemTime::now();
+            self.bwd_last_timestamp = ts_date.into();
         }
 
-        let end = self.cic_flow.update_flow(packet, timestamp, fwd);
+        let end = self.cic_flow.update_flow(packet, timestamp, ts_date, fwd);
         if end.is_some() {
             if *NO_CONTAMINANT_FEATURES.lock().unwrap().deref() {
                 return Some(self.dump_without_contamination());

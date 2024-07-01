@@ -70,6 +70,7 @@ impl Flow for CiddsFlow {
         ipv4_destination: IpAddr,
         port_destination: u16,
         protocol: u8,
+        ts_date: DateTime<Utc>,
     ) -> Self {
         CiddsFlow {
             basic_flow: BasicFlow::new(
@@ -79,6 +80,7 @@ impl Flow for CiddsFlow {
                 ipv4_destination,
                 port_destination,
                 protocol,
+                ts_date,
             ),
             bytes: 0,
         }
@@ -88,9 +90,10 @@ impl Flow for CiddsFlow {
         &mut self,
         packet: &BasicFeatures,
         timestamp: &Instant,
+        ts_date: DateTime<Utc>,
         fwd: bool,
     ) -> Option<String> {
-        self.basic_flow.update_flow(packet, timestamp, fwd);
+        self.basic_flow.update_flow(packet, timestamp, ts_date, fwd);
 
         self.bytes += packet.length as u32;
 
@@ -189,6 +192,7 @@ mod tests {
             IpAddr::V4(Ipv4Addr::from(2)),
             8080,
             6,
+            chrono::Utc::now(),
         )
     }
 

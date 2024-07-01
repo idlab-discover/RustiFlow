@@ -75,6 +75,7 @@ impl Flow for BasicFlow {
         ip_destination: IpAddr,
         port_destination: u16,
         protocol: u8,
+        ts_date: DateTime<Utc>,
     ) -> Self {
         BasicFlow {
             flow_id,
@@ -83,8 +84,8 @@ impl Flow for BasicFlow {
             port_destination,
             port_source,
             protocol,
-            first_timestamp: Utc::now(),
-            last_timestamp: Utc::now(),
+            first_timestamp: ts_date,
+            last_timestamp: ts_date,
             flow_end_of_flow_ack: 0,
             fwd_fin_flag_count: 0,
             fwd_syn_flag_count: 0,
@@ -111,9 +112,10 @@ impl Flow for BasicFlow {
         &mut self,
         packet: &BasicFeatures,
         _timestamp: &Instant,
+        ts_date: DateTime<Utc>,
         fwd: bool,
     ) -> Option<String> {
-        self.last_timestamp = Utc::now();
+        self.last_timestamp = ts_date;
 
         // when both FIN flags are set, the flow can be finished when the last ACK is received
         if self.fwd_fin_flag_count > 0 && self.bwd_fin_flag_count > 0 {
