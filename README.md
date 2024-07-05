@@ -6,7 +6,7 @@
 
 This tool is designed for robust and efficient feature extraction in network intrusion detection systems. Leveraging Rust language and eBPF, it excels in processing high volumes of network traffic with remarkable speed and throughput. (When your traffic is already captured, don't worry! It also has a build in pcap reader.) With various pre-defined feature sets and the ability to create custom feature sets, RustiFlow offers a versatile solution for network security applications.
 
-![Badge displaying GitHub Actions Workflow Status](https://img.shields.io/github/actions/workflow/status/matissecallewaert/RustiFlow/rust.yml?logo=github) ![Badge linking to the project documentation website](https://img.shields.io/website?url=https%3A%2F%2Fmatissecallewaert.github.io%2FRustiFlow&label=Documentation) ![GitHub license](https://img.shields.io/github/license/matissecallewaert/RustiFlow) ![Ubuntu 22](https://img.shields.io/badge/Tested%20on%20ubuntu%2022-purple?logo=ubuntu) ![Ubuntu 20](https://img.shields.io/badge/Tested%20on%20ubuntu%2020-purple?logo=ubuntu)
+![Badge displaying GitHub Actions Workflow Status](https://img.shields.io/github/actions/workflow/status/idlab-discover/RustiFlow/rust.yml?logo=github) ![Badge linking to the project documentation website](https://img.shields.io/website?url=https%3A%2F%2Fidlab-discover.github.io%2FRustiFlow&label=Documentation) ![GitHub license](https://img.shields.io/github/license/idlab-discover/RustiFlow) ![Ubuntu 22](https://img.shields.io/badge/Tested%20on%20ubuntu%2022-purple?logo=ubuntu) ![Ubuntu 20](https://img.shields.io/badge/Tested%20on%20ubuntu%2020-purple?logo=ubuntu)
 
 ![Animated image showing network flows](flows.gif)
 
