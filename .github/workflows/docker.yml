@@ -1,0 +1,23 @@
+name: Docker Image CI
+
+on:
+  push:
+    branches: ["main"]
+
+jobs:
+
+    build:
+
+        name: Publish Docker image
+        runs-on: ubuntu-latest
+
+        steps:
+        - uses: actions/checkout@v4
+        - name: Build and push the slim Docker image
+          run: |
+            docker build . --file Dockerfile-slim --tag ghcr.io/idlab-discover/rustiflow:slim
+            docker push ghcr.io/idlab-discover/rustiflow:slim
+        - name: Build and push the Docker image
+          run: |
+            docker build . --file Dockerfile --tag ghcr.io/idlab-discover/rustiflow:latest
+            docker push ghcr.io/idlab-discover/rustiflow:latest
