@@ -24,7 +24,7 @@ ENV RUST_LOG=info
 
 # Copy
 WORKDIR /usr/src/app
-COPY Cargo.toml Cargo.lock ./
+COPY Cargo.toml ./
 COPY .cargo ./.cargo
 COPY common ./common
 COPY rustiflow ./rustiflow
