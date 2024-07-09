@@ -15,7 +15,7 @@ ENV PATH="/root/.cargo/bin:${PATH}"
 
 # Copy source code
 WORKDIR /usr/src/app
-COPY Cargo.toml Cargo.lock ./
+COPY Cargo.toml ./
 COPY .cargo ./.cargo
 COPY common ./common
 COPY rustiflow ./rustiflow
