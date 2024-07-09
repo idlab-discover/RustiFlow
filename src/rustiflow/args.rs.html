@@ -98,6 +98,14 @@
 <a href="#98" id="98">98</a>
 <a href="#99" id="99">99</a>
 <a href="#100" id="100">100</a>
+<a href="#101" id="101">101</a>
+<a href="#102" id="102">102</a>
+<a href="#103" id="103">103</a>
+<a href="#104" id="104">104</a>
+<a href="#105" id="105">105</a>
+<a href="#106" id="106">106</a>
+<a href="#107" id="107">107</a>
+<a href="#108" id="108">108</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span>clap::{Args, Parser, Subcommand};
 
 <span class="attr">#[derive(Debug, Parser)]
@@ -123,6 +131,10 @@
         <span class="doccomment">/// Whether not to include contaminant features
         </span><span class="attr">#[clap(short, long, action = clap::ArgAction::SetTrue)]
         </span>no_contaminant_features: bool,
+
+        <span class="doccomment">/// Whether to add the header
+        </span><span class="attr">#[clap(short, long, action = clap::ArgAction::SetTrue)]
+        </span>feature_header: bool,
 
         <span class="doccomment">/// Only ingress traffic will be captured
         </span><span class="attr">#[clap(short, long, action = clap::ArgAction::SetTrue)]
@@ -151,6 +163,10 @@
         <span class="doccomment">/// Whether not to include contaminant features
         </span><span class="attr">#[clap(short, long, action = clap::ArgAction::SetTrue)]
         </span>no_contaminant_features: bool,
+
+        <span class="doccomment">/// Whether to add the header
+        </span><span class="attr">#[clap(short, long, action = clap::ArgAction::SetTrue)]
+        </span>feature_header: bool,
 
         <span class="doccomment">/// Output method
         </span><span class="attr">#[clap(flatten)]

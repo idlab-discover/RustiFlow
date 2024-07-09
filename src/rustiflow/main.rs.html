@@ -1543,6 +1543,59 @@
 <a href="#1543" id="1543">1543</a>
 <a href="#1544" id="1544">1544</a>
 <a href="#1545" id="1545">1545</a>
+<a href="#1546" id="1546">1546</a>
+<a href="#1547" id="1547">1547</a>
+<a href="#1548" id="1548">1548</a>
+<a href="#1549" id="1549">1549</a>
+<a href="#1550" id="1550">1550</a>
+<a href="#1551" id="1551">1551</a>
+<a href="#1552" id="1552">1552</a>
+<a href="#1553" id="1553">1553</a>
+<a href="#1554" id="1554">1554</a>
+<a href="#1555" id="1555">1555</a>
+<a href="#1556" id="1556">1556</a>
+<a href="#1557" id="1557">1557</a>
+<a href="#1558" id="1558">1558</a>
+<a href="#1559" id="1559">1559</a>
+<a href="#1560" id="1560">1560</a>
+<a href="#1561" id="1561">1561</a>
+<a href="#1562" id="1562">1562</a>
+<a href="#1563" id="1563">1563</a>
+<a href="#1564" id="1564">1564</a>
+<a href="#1565" id="1565">1565</a>
+<a href="#1566" id="1566">1566</a>
+<a href="#1567" id="1567">1567</a>
+<a href="#1568" id="1568">1568</a>
+<a href="#1569" id="1569">1569</a>
+<a href="#1570" id="1570">1570</a>
+<a href="#1571" id="1571">1571</a>
+<a href="#1572" id="1572">1572</a>
+<a href="#1573" id="1573">1573</a>
+<a href="#1574" id="1574">1574</a>
+<a href="#1575" id="1575">1575</a>
+<a href="#1576" id="1576">1576</a>
+<a href="#1577" id="1577">1577</a>
+<a href="#1578" id="1578">1578</a>
+<a href="#1579" id="1579">1579</a>
+<a href="#1580" id="1580">1580</a>
+<a href="#1581" id="1581">1581</a>
+<a href="#1582" id="1582">1582</a>
+<a href="#1583" id="1583">1583</a>
+<a href="#1584" id="1584">1584</a>
+<a href="#1585" id="1585">1585</a>
+<a href="#1586" id="1586">1586</a>
+<a href="#1587" id="1587">1587</a>
+<a href="#1588" id="1588">1588</a>
+<a href="#1589" id="1589">1589</a>
+<a href="#1590" id="1590">1590</a>
+<a href="#1591" id="1591">1591</a>
+<a href="#1592" id="1592">1592</a>
+<a href="#1593" id="1593">1593</a>
+<a href="#1594" id="1594">1594</a>
+<a href="#1595" id="1595">1595</a>
+<a href="#1596" id="1596">1596</a>
+<a href="#1597" id="1597">1597</a>
+<a href="#1598" id="1598">1598</a>
 </pre></div><pre class="rust"><code><span class="kw">mod </span>args;
 <span class="kw">mod </span>flows;
 <span class="kw">mod </span>output;
@@ -1622,6 +1675,7 @@
             export_method,
             lifespan,
             no_contaminant_features,
+            feature_header,
             only_ingress,
             interval,
         } =&gt; {
@@ -1686,9 +1740,14 @@
                     <span class="macro">info!</span>(<span class="string">"Starting!"</span>);
                     <span class="macro">info!</span>(<span class="string">"{UNDERLINE}"</span>);
 
-                    <span class="kw">if let </span><span class="prelude-val">Err</span>(err) =
-                        handle_realtime::&lt;BasicFlow&gt;(interface, interval, lifespan, only_ingress)
-                            .<span class="kw">await
+                    <span class="kw">if let </span><span class="prelude-val">Err</span>(err) = handle_realtime::&lt;BasicFlow&gt;(
+                        interface,
+                        interval,
+                        lifespan,
+                        only_ingress,
+                        feature_header,
+                    )
+                    .<span class="kw">await
                     </span>{
                         <span class="macro">error!</span>(<span class="string">"Error: {:?}"</span>, err);
                     }
@@ -1699,9 +1758,14 @@
                     <span class="macro">info!</span>(<span class="string">"Starting!"</span>);
                     <span class="macro">info!</span>(<span class="string">"{UNDERLINE}"</span>);
 
-                    <span class="kw">if let </span><span class="prelude-val">Err</span>(err) =
-                        handle_realtime::&lt;CicFlow&gt;(interface, interval, lifespan, only_ingress)
-                            .<span class="kw">await
+                    <span class="kw">if let </span><span class="prelude-val">Err</span>(err) = handle_realtime::&lt;CicFlow&gt;(
+                        interface,
+                        interval,
+                        lifespan,
+                        only_ingress,
+                        feature_header,
+                    )
+                    .<span class="kw">await
                     </span>{
                         <span class="macro">error!</span>(<span class="string">"Error: {:?}"</span>, err);
                     }
@@ -1712,9 +1776,14 @@
                     <span class="macro">info!</span>(<span class="string">"Starting!"</span>);
                     <span class="macro">info!</span>(<span class="string">"{UNDERLINE}"</span>);
 
-                    <span class="kw">if let </span><span class="prelude-val">Err</span>(err) =
-                        handle_realtime::&lt;CiddsFlow&gt;(interface, interval, lifespan, only_ingress)
-                            .<span class="kw">await
+                    <span class="kw">if let </span><span class="prelude-val">Err</span>(err) = handle_realtime::&lt;CiddsFlow&gt;(
+                        interface,
+                        interval,
+                        lifespan,
+                        only_ingress,
+                        feature_header,
+                    )
+                    .<span class="kw">await
                     </span>{
                         <span class="macro">error!</span>(<span class="string">"Error: {:?}"</span>, err);
                     }
@@ -1725,8 +1794,14 @@
                     <span class="macro">info!</span>(<span class="string">"Starting!"</span>);
                     <span class="macro">info!</span>(<span class="string">"{UNDERLINE}"</span>);
 
-                    <span class="kw">if let </span><span class="prelude-val">Err</span>(err) =
-                        handle_realtime::&lt;NfFlow&gt;(interface, interval, lifespan, only_ingress).<span class="kw">await
+                    <span class="kw">if let </span><span class="prelude-val">Err</span>(err) = handle_realtime::&lt;NfFlow&gt;(
+                        interface,
+                        interval,
+                        lifespan,
+                        only_ingress,
+                        feature_header,
+                    )
+                    .<span class="kw">await
                     </span>{
                         <span class="macro">error!</span>(<span class="string">"Error: {:?}"</span>, err);
                     }
@@ -1737,9 +1812,14 @@
                     <span class="macro">info!</span>(<span class="string">"Starting!"</span>);
                     <span class="macro">info!</span>(<span class="string">"{UNDERLINE}"</span>);
 
-                    <span class="kw">if let </span><span class="prelude-val">Err</span>(err) =
-                        handle_realtime::&lt;NTLFlow&gt;(interface, interval, lifespan, only_ingress)
-                            .<span class="kw">await
+                    <span class="kw">if let </span><span class="prelude-val">Err</span>(err) = handle_realtime::&lt;NTLFlow&gt;(
+                        interface,
+                        interval,
+                        lifespan,
+                        only_ingress,
+                        feature_header,
+                    )
+                    .<span class="kw">await
                     </span>{
                         <span class="macro">error!</span>(<span class="string">"Error: {:?}"</span>, err);
                     }
@@ -1750,9 +1830,14 @@
                     <span class="macro">info!</span>(<span class="string">"Starting!"</span>);
                     <span class="macro">info!</span>(<span class="string">"{UNDERLINE}"</span>);
 
-                    <span class="kw">if let </span><span class="prelude-val">Err</span>(err) =
-                        handle_realtime::&lt;CustomFlow&gt;(interface, interval, lifespan, only_ingress)
-                            .<span class="kw">await
+                    <span class="kw">if let </span><span class="prelude-val">Err</span>(err) = handle_realtime::&lt;CustomFlow&gt;(
+                        interface,
+                        interval,
+                        lifespan,
+                        only_ingress,
+                        feature_header,
+                    )
+                    .<span class="kw">await
                     </span>{
                         <span class="macro">error!</span>(<span class="string">"Error: {:?}"</span>, err);
                     }
@@ -1764,6 +1849,7 @@
             flow_type,
             lifespan,
             no_contaminant_features,
+            feature_header,
             export_method,
         } =&gt; {
             <span class="kw">let </span><span class="kw-2">mut </span>ncf = NO_CONTAMINANT_FEATURES.lock().unwrap();
@@ -1817,7 +1903,7 @@
                     <span class="macro">info!</span>(<span class="string">"Starting!"</span>);
                     <span class="macro">info!</span>(<span class="string">"{UNDERLINE}"</span>);
 
-                    read_pcap_file::&lt;BasicFlow&gt;(<span class="kw-2">&amp;</span>path, lifespan).<span class="kw">await
+                    read_pcap_file::&lt;BasicFlow&gt;(<span class="kw-2">&amp;</span>path, lifespan, feature_header).<span class="kw">await
                 </span>}
                 FlowType::CicFlow =&gt; {
                     <span class="macro">info!</span>(<span class="string">"Selecting the CIC flow type..."</span>);
@@ -1825,7 +1911,7 @@
                     <span class="macro">info!</span>(<span class="string">"Starting!"</span>);
                     <span class="macro">info!</span>(<span class="string">"{UNDERLINE}"</span>);
 
-                    read_pcap_file::&lt;CicFlow&gt;(<span class="kw-2">&amp;</span>path, lifespan).<span class="kw">await
+                    read_pcap_file::&lt;CicFlow&gt;(<span class="kw-2">&amp;</span>path, lifespan, feature_header).<span class="kw">await
                 </span>}
                 FlowType::CiddsFlow =&gt; {
                     <span class="macro">info!</span>(<span class="string">"Selecting the CIDDS flow type..."</span>);
@@ -1833,7 +1919,7 @@
                     <span class="macro">info!</span>(<span class="string">"Starting!"</span>);
                     <span class="macro">info!</span>(<span class="string">"{UNDERLINE}"</span>);
 
-                    read_pcap_file::&lt;CiddsFlow&gt;(<span class="kw-2">&amp;</span>path, lifespan).<span class="kw">await
+                    read_pcap_file::&lt;CiddsFlow&gt;(<span class="kw-2">&amp;</span>path, lifespan, feature_header).<span class="kw">await
                 </span>}
                 FlowType::NfFlow =&gt; {
                     <span class="macro">info!</span>(<span class="string">"Selecting the NF flow type..."</span>);
@@ -1841,7 +1927,7 @@
                     <span class="macro">info!</span>(<span class="string">"Starting!"</span>);
                     <span class="macro">info!</span>(<span class="string">"{UNDERLINE}"</span>);
 
-                    read_pcap_file::&lt;NfFlow&gt;(<span class="kw-2">&amp;</span>path, lifespan).<span class="kw">await
+                    read_pcap_file::&lt;NfFlow&gt;(<span class="kw-2">&amp;</span>path, lifespan, feature_header).<span class="kw">await
                 </span>}
                 FlowType::NtlFlow =&gt; {
                     <span class="macro">info!</span>(<span class="string">"Selecting the Ntl flow type..."</span>);
@@ -1849,7 +1935,7 @@
                     <span class="macro">info!</span>(<span class="string">"Starting!"</span>);
                     <span class="macro">info!</span>(<span class="string">"{UNDERLINE}"</span>);
 
-                    read_pcap_file::&lt;NTLFlow&gt;(<span class="kw-2">&amp;</span>path, lifespan).<span class="kw">await
+                    read_pcap_file::&lt;NTLFlow&gt;(<span class="kw-2">&amp;</span>path, lifespan, feature_header).<span class="kw">await
                 </span>}
                 FlowType::CustomFlow =&gt; {
                     <span class="macro">info!</span>(<span class="string">"Selecting the custom flow type..."</span>);
@@ -1857,7 +1943,7 @@
                     <span class="macro">info!</span>(<span class="string">"Starting!"</span>);
                     <span class="macro">info!</span>(<span class="string">"{UNDERLINE}"</span>);
 
-                    read_pcap_file::&lt;CustomFlow&gt;(<span class="kw-2">&amp;</span>path, lifespan).<span class="kw">await
+                    read_pcap_file::&lt;CustomFlow&gt;(<span class="kw-2">&amp;</span>path, lifespan, feature_header).<span class="kw">await
                 </span>}
             }
         }
@@ -1869,6 +1955,7 @@
     interval: <span class="prelude-ty">Option</span>&lt;u64&gt;,
     lifespan: u64,
     only_ingress: bool,
+    header: bool,
 ) -&gt; <span class="prelude-ty">Result</span>&lt;(), anyhow::Error&gt;
 <span class="kw">where
     </span>T: Flow + Send + Sync + <span class="lifetime">'static</span>,
@@ -2150,6 +2237,15 @@
     });
 
     <span class="macro">info!</span>(<span class="string">"Waiting for Ctrl-C..."</span>);
+
+    <span class="kw">if </span>header {
+        <span class="kw">if </span><span class="kw-2">*</span>NO_CONTAMINANT_FEATURES.lock().unwrap().deref() {
+            export(<span class="kw-2">&amp;</span>T::get_features_without_contamination());
+        } <span class="kw">else </span>{
+            export(<span class="kw-2">&amp;</span>T::get_features());
+        }
+    }
+
     signal::ctrl_c().<span class="kw">await</span><span class="question-mark">?</span>;
 
     <span class="kw">for </span>entry <span class="kw">in </span>flow_map_ipv4.iter() {
@@ -2170,8 +2266,7 @@
         }
     }
 
-    <span class="comment">// Making sure everything is flushed
-    </span><span class="kw">if let </span><span class="prelude-val">Some</span>(export_file) = EXPORT_FILE.lock().unwrap().deref_mut() {
+    <span class="kw">if let </span><span class="prelude-val">Some</span>(export_file) = EXPORT_FILE.lock().unwrap().deref_mut() {
         export_file.flush()<span class="question-mark">?</span>;
     }
 
@@ -2189,7 +2284,7 @@
     <span class="prelude-val">Ok</span>(())
 }
 
-<span class="kw">async fn </span>read_pcap_file&lt;T&gt;(path: <span class="kw-2">&amp;</span>str, lifespan: u64)
+<span class="kw">async fn </span>read_pcap_file&lt;T&gt;(path: <span class="kw-2">&amp;</span>str, lifespan: u64, header: bool)
 <span class="kw">where
     </span>T: Flow + Send + Sync + <span class="lifetime">'static</span>,
 {
@@ -2213,6 +2308,13 @@
         }
     };
 
+    <span class="kw">if </span>header {
+        <span class="kw">if </span><span class="kw-2">*</span>NO_CONTAMINANT_FEATURES.lock().unwrap().deref() {
+            export(<span class="kw-2">&amp;</span>T::get_features_without_contamination());
+        } <span class="kw">else </span>{
+            export(<span class="kw-2">&amp;</span>T::get_features());
+        }
+    }
     <span class="kw">while let </span><span class="prelude-val">Ok</span>(packet) = cap.next_packet() {
         <span class="kw">let </span>ts = packet.header.ts;
 
@@ -2374,6 +2476,10 @@
         } <span class="kw">else </span>{
             export(<span class="kw-2">&amp;</span>flow.dump());
         }
+    }
+
+    <span class="kw">if let </span><span class="prelude-val">Some</span>(export_file) = EXPORT_FILE.lock().unwrap().deref_mut() {
+        <span class="kw">let _ </span>= export_file.flush();
     }
 
     <span class="macro">info!</span>(<span class="string">"{UNDERLINE}"</span>);

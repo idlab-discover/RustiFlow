@@ -2594,6 +2594,44 @@
 <a href="#2594" id="2594">2594</a>
 <a href="#2595" id="2595">2595</a>
 <a href="#2596" id="2596">2596</a>
+<a href="#2597" id="2597">2597</a>
+<a href="#2598" id="2598">2598</a>
+<a href="#2599" id="2599">2599</a>
+<a href="#2600" id="2600">2600</a>
+<a href="#2601" id="2601">2601</a>
+<a href="#2602" id="2602">2602</a>
+<a href="#2603" id="2603">2603</a>
+<a href="#2604" id="2604">2604</a>
+<a href="#2605" id="2605">2605</a>
+<a href="#2606" id="2606">2606</a>
+<a href="#2607" id="2607">2607</a>
+<a href="#2608" id="2608">2608</a>
+<a href="#2609" id="2609">2609</a>
+<a href="#2610" id="2610">2610</a>
+<a href="#2611" id="2611">2611</a>
+<a href="#2612" id="2612">2612</a>
+<a href="#2613" id="2613">2613</a>
+<a href="#2614" id="2614">2614</a>
+<a href="#2615" id="2615">2615</a>
+<a href="#2616" id="2616">2616</a>
+<a href="#2617" id="2617">2617</a>
+<a href="#2618" id="2618">2618</a>
+<a href="#2619" id="2619">2619</a>
+<a href="#2620" id="2620">2620</a>
+<a href="#2621" id="2621">2621</a>
+<a href="#2622" id="2622">2622</a>
+<a href="#2623" id="2623">2623</a>
+<a href="#2624" id="2624">2624</a>
+<a href="#2625" id="2625">2625</a>
+<a href="#2626" id="2626">2626</a>
+<a href="#2627" id="2627">2627</a>
+<a href="#2628" id="2628">2628</a>
+<a href="#2629" id="2629">2629</a>
+<a href="#2630" id="2630">2630</a>
+<a href="#2631" id="2631">2631</a>
+<a href="#2632" id="2632">2632</a>
+<a href="#2633" id="2633">2633</a>
+<a href="#2634" id="2634">2634</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span>chrono::{DateTime, Utc};
 <span class="kw">use </span>std::{net::IpAddr, ops::Deref, time::Instant};
 
@@ -3846,7 +3884,7 @@
             {},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},\
             {},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},\
             {},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},\
-            {},{},{},{}"</span>,
+            {},{},{},{},{}"</span>,
             <span class="self">self</span>.basic_flow.flow_id,
             <span class="self">self</span>.basic_flow.ip_source,
             <span class="self">self</span>.basic_flow.port_source,
@@ -3854,6 +3892,7 @@
             <span class="self">self</span>.basic_flow.port_destination,
             <span class="self">self</span>.basic_flow.protocol,
             <span class="self">self</span>.basic_flow.first_timestamp,
+            <span class="self">self</span>.basic_flow.last_timestamp,
             get_duration(
                 <span class="self">self</span>.basic_flow.first_timestamp,
                 <span class="self">self</span>.basic_flow.last_timestamp
@@ -3937,6 +3976,26 @@
         )
     }
 
+    <span class="kw">fn </span>get_features() -&gt; String {
+        <span class="macro">format!</span>(
+            <span class="string">"FLOW_ID,IP_SOURCE,PORT_SOURCE,IP_DESTINATION,PORT_DESTINATION,PROTOCOL,\
+            FIRST_TIMESTAMP,LAST_TIMESTAMP,DURATION,FWD_PACKET_COUNT,BWD_PACKET_COUNT,\
+            FWD_PKT_LEN_TOT,BWD_PKT_LEN_TOT,FWD_PKT_LEN_MAX,FWD_PKT_LEN_MIN,FWD_PKT_LEN_MEAN,\
+            FWD_PKT_LEN_STD,BWD_PKT_LEN_MAX,BWD_PKT_LEN_MIN,BWD_PKT_LEN_MEAN,BWD_PKT_LEN_STD,\
+            FLOW_BYTES_S,FLOW_PACKETS_S,FLOW_IAT_MEAN,FLOW_IAT_STD,FLOW_IAT_MAX,FLOW_IAT_MIN,\
+            FWD_IAT_TOTAL,FWD_IAT_MEAN,FWD_IAT_STD,FWD_IAT_MAX,FWD_IAT_MIN,BWD_IAT_TOTAL,\
+            BWD_IAT_MEAN,BWD_IAT_STD,BWD_IAT_MAX,BWD_IAT_MIN,FWD_PSH_FLAG_COUNT,BWD_PSH_FLAG_COUNT,\
+            FWD_URG_FLAG_COUNT,BWD_URG_FLAG_COUNT,FWD_HEADER_LENGTH,BWD_HEADER_LENGTH,FWD_PACKETS_S,\
+            BWD_PACKETS_S,FLOW_PACKET_LENGTH_MIN,FLOW_PACKET_LENGTH_MAX,FLOW_PACKET_LENGTH_MEAN,\
+            FLOW_PACKET_LENGTH_STD,FLOW_PACKET_LENGTH_VARIANCE,FLOW_FIN_COUNT,FLOW_SYN_COUNT,\
+            FLOW_RST_COUNT,FLOW_PSH_COUNT,FLOW_ACK_COUNT,FLOW_URG_COUNT,FLOW_CWE_COUNT,FLOW_ECE_COUNT,\
+            DOWN_UP_RATIO,FLOW_SEGMENT_LENGTH_MEAN,FWD_SEGMENT_LENGTH_MEAN,BWD_SEGMENT_LENGTH_MEAN,\
+            FWD_HEADER_LENGTH,FWD_BYTES_BULK,FWD_PACKETS_BULK,FWD_BULK_RATE,BWD_BYTES_BULK,\
+            BWD_PACKETS_BULK,BWD_BULK_RATE,SF_FWD_PACKETS,SF_FWD_BYTES,SF_BWD_PACKETS,SF_BWD_BYTES,\
+            FWD_INIT_WIN_BYTES,BWD_INIT_WIN_BYTES,FWD_ACT_DATA_PKT,FWD_HEADER_LEN_MIN,ACTIVE_MEAN,\
+            ACTIVE_STD,ACTIVE_MAX,ACTIVE_MIN,IDLE_MEAN,IDLE_STD,IDLE_MAX,IDLE_MIN"</span>)
+    }
+
     <span class="kw">fn </span>dump_without_contamination(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; String {
         <span class="macro">format!</span>(
             <span class="string">"{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},\
@@ -4012,6 +4071,23 @@
             <span class="self">self</span>.idle_max,
             <span class="self">self</span>.get_idle_min(),
         )
+    }
+
+    <span class="kw">fn </span>get_features_without_contamination() -&gt; String {
+        <span class="macro">format!</span>(
+            <span class="string">"DURATION,FWD_PACKET_COUNT,BWD_PACKET_COUNT,FWD_PKT_LEN_TOT,BWD_PKT_LEN_TOT,\
+            FWD_PKT_LEN_MAX,FWD_PKT_LEN_MEAN,FWD_PKT_LEN_STD,BWD_PKT_LEN_MAX,BWD_PKT_LEN_MEAN,\
+            BWD_PKT_LEN_STD,FLOW_BYTES_S,FLOW_PACKETS_S,FLOW_IAT_MEAN,FLOW_IAT_STD,FLOW_IAT_MAX,\
+            FLOW_IAT_MIN,FWD_IAT_TOTAL,FWD_IAT_MEAN,FWD_IAT_STD,FWD_IAT_MAX,FWD_IAT_MIN,BWD_IAT_TOTAL,\
+            BWD_IAT_MEAN,BWD_IAT_STD,BWD_IAT_MAX,BWD_IAT_MIN,FWD_PSH_FLAG_COUNT,BWD_PSH_FLAG_COUNT,\
+            FWD_URG_FLAG_COUNT,BWD_URG_FLAG_COUNT,FWD_HEADER_LENGTH,BWD_HEADER_LENGTH,FWD_PACKETS_S,\
+            BWD_PACKETS_S,FLOW_PACKET_LENGTH_MAX,FLOW_PACKET_LENGTH_MEAN,FLOW_PACKET_LENGTH_STD,\
+            FLOW_PACKET_LENGTH_VARIANCE,FLOW_FIN_COUNT,FLOW_SYN_COUNT,FLOW_URG_COUNT,FLOW_CWE_COUNT,\
+            FWD_SEGMENT_LENGTH_MEAN,BWD_SEGMENT_LENGTH_MEAN,FWD_BYTES_BULK,FWD_PACKETS_BULK,FWD_BULK_RATE,\
+            BWD_BYTES_BULK,BWD_PACKETS_BULK,BWD_BULK_RATE,SF_FWD_PACKETS,SF_FWD_BYTES,SF_BWD_PACKETS,\
+            SF_BWD_BYTES,FWD_INIT_WIN_BYTES,BWD_INIT_WIN_BYTES,FWD_ACT_DATA_PKT,FWD_HEADER_LEN_MIN,\
+            ACTIVE_MEAN,ACTIVE_MAX,ACTIVE_MIN,IDLE_MEAN,IDLE_MAX,IDLE_MIN"
+        </span>)
     }
 
     <span class="kw">fn </span>get_first_timestamp(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; DateTime&lt;Utc&gt; {

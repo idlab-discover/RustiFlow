@@ -254,6 +254,35 @@
 <a href="#254" id="254">254</a>
 <a href="#255" id="255">255</a>
 <a href="#256" id="256">256</a>
+<a href="#257" id="257">257</a>
+<a href="#258" id="258">258</a>
+<a href="#259" id="259">259</a>
+<a href="#260" id="260">260</a>
+<a href="#261" id="261">261</a>
+<a href="#262" id="262">262</a>
+<a href="#263" id="263">263</a>
+<a href="#264" id="264">264</a>
+<a href="#265" id="265">265</a>
+<a href="#266" id="266">266</a>
+<a href="#267" id="267">267</a>
+<a href="#268" id="268">268</a>
+<a href="#269" id="269">269</a>
+<a href="#270" id="270">270</a>
+<a href="#271" id="271">271</a>
+<a href="#272" id="272">272</a>
+<a href="#273" id="273">273</a>
+<a href="#274" id="274">274</a>
+<a href="#275" id="275">275</a>
+<a href="#276" id="276">276</a>
+<a href="#277" id="277">277</a>
+<a href="#278" id="278">278</a>
+<a href="#279" id="279">279</a>
+<a href="#280" id="280">280</a>
+<a href="#281" id="281">281</a>
+<a href="#282" id="282">282</a>
+<a href="#283" id="283">283</a>
+<a href="#284" id="284">284</a>
+<a href="#285" id="285">285</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span>std::{
     net::IpAddr,
     ops::Deref,
@@ -407,6 +436,21 @@
         )
     }
 
+    <span class="kw">fn </span>get_features() -&gt; String {
+        <span class="macro">format!</span>(
+            <span class="string">"FLOW_ID,IP_SRC,PORT_SRC,IP_DST,PORT_DST,PROTOCOL,FIRST_TS,LAST_TS,\
+            DURATION,FLOW_PKTS,FLOW_BYTES,FWD_FIRST_TS,FWD_LAST_TS,FWD_DURATION,FWD_PKTS,\
+            FWD_BYTES,BWD_FIRST_TS,BWD_LAST_TS,BWD_DURATION,BWD_PKTS,BWD_BYTES,FLOW_PKT_LEN_MIN,\
+            FLOW_PKT_LEN_MEAN,FLOW_PKT_LEN_STD,FLOW_PKT_LEN_MAX,FWD_PKT_LEN_MIN,FWD_PKT_LEN_MEAN,\
+            FWD_PKT_LEN_STD,FWD_PKT_LEN_MAX,BWD_PKT_LEN_MIN,BWD_PKT_LEN_MEAN,BWD_PKT_LEN_STD,\
+            BWD_PKT_LEN_MAX,FLOW_IAT_MIN,FLOW_IAT_MEAN,FLOW_IAT_STD,FLOW_IAT_MAX,FWD_IAT_MIN,\
+            FWD_IAT_MEAN,FWD_IAT_STD,FWD_IAT_MAX,BWD_IAT_MIN,BWD_IAT_MEAN,BWD_IAT_STD,\
+            BWD_IAT_MAX,FLOW_SYN,FLOW_CWE,FLOW_ECE,FLOW_URG,FLOW_ACK,FLOW_PSH,FLOW_RST,\
+            FLOW_FIN,FWD_SYN,FWD_CWE,FWD_ECE,FWD_URG,FWD_ACK,FWD_PSH,FWD_RST,FWD_FIN,\
+            BWD_SYN,BWD_CWE,BWD_ECE,BWD_URG,BWD_ACK,BWD_PSH,BWD_RST,BWD_FIN"
+        </span>)
+    }
+
     <span class="kw">fn </span>dump_without_contamination(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; String {
         <span class="macro">format!</span>(
             <span class="string">"{},{},{},{},{},{},{},{},{},{},{},{},{},\
@@ -504,6 +548,20 @@
             <span class="self">self</span>.cic_flow.basic_flow.bwd_rst_flag_count,
             <span class="self">self</span>.cic_flow.basic_flow.bwd_fin_flag_count,
         )
+    }
+
+    <span class="kw">fn </span>get_features_without_contamination() -&gt; String {
+        <span class="macro">format!</span>(
+            <span class="string">"PROTOCOL,DURATION,FLOW_PKTS,FLOW_BYTES,FWD_DURATION,FWD_PKTS,FWD_BYTES,\
+            BWD_DURATION,BWD_PKTS,BWD_BYTES,FLOW_PKT_LEN_MIN,FLOW_PKT_LEN_MEAN,FLOW_PKT_LEN_STD,\
+            FLOW_PKT_LEN_MAX,FWD_PKT_LEN_MIN,FWD_PKT_LEN_MEAN,FWD_PKT_LEN_STD,FWD_PKT_LEN_MAX,\
+            BWD_PKT_LEN_MIN,BWD_PKT_LEN_MEAN,BWD_PKT_LEN_STD,BWD_PKT_LEN_MAX,FLOW_IAT_MIN,\
+            FLOW_IAT_MEAN,FLOW_IAT_STD,FLOW_IAT_MAX,FWD_IAT_MIN,FWD_IAT_MEAN,FWD_IAT_STD,\
+            FWD_IAT_MAX,BWD_IAT_MIN,BWD_IAT_MEAN,BWD_IAT_STD,BWD_IAT_MAX,FLOW_SYN,FLOW_CWE,\
+            FLOW_ECE,FLOW_URG,FLOW_ACK,FLOW_PSH,FLOW_RST,FLOW_FIN,FWD_SYN,FWD_CWE,FWD_ECE,\
+            FWD_URG,FWD_ACK,FWD_PSH,FWD_RST,FWD_FIN,BWD_SYN,BWD_CWE,BWD_ECE,BWD_URG,BWD_ACK,\
+            BWD_PSH,BWD_RST,BWD_FIN"
+        </span>)
     }
 
     <span class="kw">fn </span>get_first_timestamp(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; DateTime&lt;Utc&gt; {
