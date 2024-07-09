@@ -11,6 +11,10 @@ jobs:
         name: Publish Docker image
         runs-on: ubuntu-latest
 
+        permissions:
+          contents: read
+          packages: write
+
         steps:
         - name: Checkout repository
           uses: actions/checkout@v4
