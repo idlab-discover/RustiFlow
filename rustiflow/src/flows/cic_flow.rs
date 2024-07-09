@@ -1250,7 +1250,7 @@ impl Flow for CicFlow {
             {},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},\
             {},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},\
             {},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},\
-            {},{},{},{}",
+            {},{},{},{},{}",
             self.basic_flow.flow_id,
             self.basic_flow.ip_source,
             self.basic_flow.port_source,
@@ -1258,6 +1258,7 @@ impl Flow for CicFlow {
             self.basic_flow.port_destination,
             self.basic_flow.protocol,
             self.basic_flow.first_timestamp,
+            self.basic_flow.last_timestamp,
             get_duration(
                 self.basic_flow.first_timestamp,
                 self.basic_flow.last_timestamp
