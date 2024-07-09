@@ -3,8 +3,6 @@ name: Rust Aya eBPF CI
 on:
   push:
     branches: [ "main" ]
-  pull_request:
-    branches: [ "main" ]
 
 env:
   CARGO_TERM_COLOR: always
@@ -40,11 +38,9 @@ jobs:
       run: cargo build --verbose
 
     - name: Fetch gh-pages branch
-      if: github.event_name == 'push' && github.ref == 'refs/heads/main'
       run: git fetch origin gh-pages:gh-pages
 
     - name: Backup custom index.html
-      if: github.event_name == 'push' && github.ref == 'refs/heads/main'
       run: |
         git checkout gh-pages
         mv index.html index.html.backup
@@ -54,15 +50,12 @@ jobs:
       run: cargo test --verbose
       
     - name: Generate documentation
-      if: github.event_name == 'push' && github.ref == 'refs/heads/main'
       run: cargo doc --no-deps
 
     - name: Restore custom index.html
-      if: github.event_name == 'push' && github.ref == 'refs/heads/main'
       run: mv index.html.backup target/doc/index.html
 
     - name: Push docs to gh-pages
-      if: github.event_name == 'push' && github.ref == 'refs/heads/main'
       uses: peaceiris/actions-gh-pages@v3
       with:
         github_token: ${{ secrets.GITHUB_TOKEN }}
