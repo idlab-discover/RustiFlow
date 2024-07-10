@@ -752,7 +752,6 @@ where
                             if amount_of_packets % 10_000 == 0 {
                                 info!("{} packets have been processed...", amount_of_packets);
                             }
-                            check_flows_to_expire(&flow_map_ipv4, lifespan, ts_datetime);
                             redirect_packet_ipv4(&features_ipv4, &flow_map_ipv4, &expirations_ipv4, lifespan, ts_instant, ts_datetime);
                         }
                     }
@@ -764,7 +763,6 @@ where
                             if amount_of_packets % 10_000 == 0 {
                                 info!("{} packets have been processed...", amount_of_packets);
                             }
-                            check_flows_to_expire(&flow_map_ipv6, lifespan, ts_datetime);
                             redirect_packet_ipv6(&features_ipv6, &flow_map_ipv6, &expirations_ipv6, lifespan, ts_instant, ts_datetime);
                         }
                     }
@@ -782,7 +780,6 @@ where
                                             amount_of_packets
                                         );
                                     }
-                                    check_flows_to_expire(&flow_map_ipv4, lifespan, ts_datetime);
                                     redirect_packet_ipv4(&features_ipv4, &flow_map_ipv4, &expirations_ipv4, lifespan, ts_instant, ts_datetime);
                                 }
                             }
@@ -797,7 +794,6 @@ where
                                             amount_of_packets
                                         );
                                     }
-                                    check_flows_to_expire(&flow_map_ipv6, lifespan, ts_datetime);
                                     redirect_packet_ipv6(&features_ipv6, &flow_map_ipv6, &expirations_ipv6, lifespan, ts_instant, ts_datetime);
                                 }
                             }
@@ -845,33 +841,6 @@ where
         "Duration: {:?} milliseconds",
         end.duration_since(start).as_millis()
     );
-}
-
-fn check_flows_to_expire<T>(
-    flow_map: &Arc<DashMap<String, T>>,
-    lifespan: u64,
-    ts_datetime: DateTime<Utc>,
-) where
-    T: Flow,
-{
-    let mut keys_to_remove = Vec::new();
-    for entry in flow_map.iter() {
-        let flow = entry.value();
-        let duration = get_duration(flow.get_first_timestamp(), ts_datetime) / 1_000_000.0;
-
-        if duration >= lifespan as f64 {
-            if *NO_CONTAMINANT_FEATURES.lock().unwrap().deref() {
-                export(&flow.dump_without_contamination());
-            } else {
-                export(&flow.dump());
-            }
-            keys_to_remove.push(entry.key().clone());
-        }
-    }
-
-    for key in keys_to_remove {
-        flow_map.remove(&key);
-    }
 }
 
 /// Export the flow to the set export function.
