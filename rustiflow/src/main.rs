@@ -1069,8 +1069,13 @@ where
     }
 
     let end = entry.update_flow(&features, &ts, ts_date, fwd);
-    if let Some(flow) = end {
-        export(&flow);
+    if end.is_some() {
+        let flow = entry.value();
+        if *NO_CONTAMINANT_FEATURES.lock().unwrap().deref() {
+            export(&flow.dump_without_contamination());
+        } else {
+            export(&flow.dump());
+        }
         drop(entry);
         flow_map.remove(&flow_id);
     }
