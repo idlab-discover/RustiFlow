@@ -717,6 +717,7 @@ where
             export(&T::get_features());
         }
     }
+    
     while let Ok(packet) = cap.next_packet() {
         let ts = packet.header.ts;
 
@@ -743,6 +744,7 @@ where
                             if amount_of_packets % 10_000 == 0 {
                                 info!("{} packets have been processed...", amount_of_packets);
                             }
+                            check_flows_to_expire(&flow_map_ipv4, lifespan, ts_datetime);
                             redirect_packet_ipv4(&features_ipv4, &flow_map_ipv4, ts_instant, ts_datetime);
                         }
                     }
@@ -754,6 +756,7 @@ where
                             if amount_of_packets % 10_000 == 0 {
                                 info!("{} packets have been processed...", amount_of_packets);
                             }
+                            check_flows_to_expire(&flow_map_ipv6, lifespan, ts_datetime);
                             redirect_packet_ipv6(&features_ipv6, &flow_map_ipv6, ts_instant, ts_datetime);
                         }
                     }
@@ -771,12 +774,8 @@ where
                                             amount_of_packets
                                         );
                                     }
-                                    redirect_packet_ipv4(
-                                        &features_ipv4,
-                                        &flow_map_ipv4,
-                                        ts_instant,
-                                        ts_datetime,
-                                    );
+                                    check_flows_to_expire(&flow_map_ipv4, lifespan, ts_datetime);
+                                    redirect_packet_ipv4(&features_ipv4, &flow_map_ipv4, ts_instant, ts_datetime,);
                                 }
                             }
                         }
@@ -790,12 +789,8 @@ where
                                             amount_of_packets
                                         );
                                     }
-                                    redirect_packet_ipv6(
-                                        &features_ipv6,
-                                        &flow_map_ipv6,
-                                        ts_instant,
-                                        ts_datetime,
-                                    );
+                                    check_flows_to_expire(&flow_map_ipv6, lifespan, ts_datetime);
+                                    redirect_packet_ipv6(&features_ipv6, &flow_map_ipv6, ts_instant, ts_datetime);
                                 }
                             }
                         }
@@ -809,58 +804,6 @@ where
             error!("Error parsing packet...");
         }
     }
-
-    let flow_map_end_ipv4 = flow_map_ipv4.clone();
-    let flow_map_end_ipv6 = flow_map_ipv6.clone();
-    task::spawn(async move {
-        let mut interval = time::interval(Duration::from_secs(2));
-        loop {
-            interval.tick().await;
-            let timestamp = Utc::now();
-
-            // Collect keys to remove
-            let mut keys_to_remove_ipv4 = Vec::new();
-            for entry in flow_map_end_ipv4.iter() {
-                let flow = entry.value();
-                let end = get_duration(flow.get_first_timestamp(), timestamp) / 1_000_000.0;
-
-                if end >= lifespan as f64 {
-                    if *NO_CONTAMINANT_FEATURES.lock().unwrap().deref() {
-                        export(&flow.dump_without_contamination());
-                    } else {
-                        export(&flow.dump());
-                    }
-                    keys_to_remove_ipv4.push(entry.key().clone());
-                }
-            }
-
-            // Collect keys to remove
-            let mut keys_to_remove_ipv6 = Vec::new();
-            for entry in flow_map_end_ipv6.iter() {
-                let flow = entry.value();
-                let end = get_duration(flow.get_first_timestamp(), timestamp) / 1_000_000.0;
-
-                if end >= lifespan as f64 {
-                    if *NO_CONTAMINANT_FEATURES.lock().unwrap().deref() {
-                        export(&flow.dump_without_contamination());
-                    } else {
-                        export(&flow.dump());
-                    }
-                    keys_to_remove_ipv6.push(entry.key().clone());
-                }
-            }
-
-            // Remove entries outside of the iteration
-            for key in keys_to_remove_ipv4 {
-                flow_map_end_ipv4.remove(&key);
-            }
-
-            // Remove entries outside of the iteration
-            for key in keys_to_remove_ipv6 {
-                flow_map_end_ipv6.remove(&key);
-            }
-        }
-    });
 
     for entry in flow_map_ipv4.iter() {
         let flow = entry.value();
@@ -894,6 +837,33 @@ where
         "Duration: {:?} milliseconds",
         end.duration_since(start).as_millis()
     );
+}
+
+fn check_flows_to_expire<T>(
+    flow_map: &Arc<DashMap<String, T>>,
+    lifespan: u64,
+    ts_datetime: DateTime<Utc>,
+) where
+    T: Flow,
+{
+    let mut keys_to_remove = Vec::new();
+    for entry in flow_map.iter() {
+        let flow = entry.value();
+        let duration = get_duration(flow.get_first_timestamp(), ts_datetime) / 1_000_000.0;
+
+        if duration >= lifespan as f64 {
+            if *NO_CONTAMINANT_FEATURES.lock().unwrap().deref() {
+                export(&flow.dump_without_contamination());
+            } else {
+                export(&flow.dump());
+            }
+            keys_to_remove.push(entry.key().clone());
+        }
+    }
+
+    for key in keys_to_remove {
+        flow_map.remove(&key);
+    }
 }
 
 /// Export the flow to the set export function.
@@ -963,31 +933,11 @@ fn process_packet_ipv4<T>(
 ) where
     T: Flow,
 {
-    let ts;
-    let ts_date;
-    if let Some(timestamp) = timestamp {
-        ts = timestamp;
-    } else {
-        ts = Instant::now();
-    }
-
-    if let Some(ts_datetime) = ts_datetime {
-        ts_date = ts_datetime;
-    } else {
-        ts_date = Utc::now();
-    }
-    let destination = std::net::IpAddr::V4(Ipv4Addr::from(u32::from_le_bytes(
-        data.ipv4_source
-            .to_be_bytes()
-            .try_into()
-            .expect("Invalid IP length"),
-    )));
-    let source = std::net::IpAddr::V4(Ipv4Addr::from(u32::from_le_bytes(
-        data.ipv4_destination
-            .to_be_bytes()
-            .try_into()
-            .expect("Invalid IP length"),
-    )));
+    let ts = timestamp.unwrap_or_else(Instant::now);
+    let ts_date = ts_datetime.unwrap_or_else(Utc::now);
+    let destination = std::net::IpAddr::V4(Ipv4Addr::from(data.ipv4_destination));
+    let source = std::net::IpAddr::V4(Ipv4Addr::from(data.ipv4_source));
+    
     let combined_flags = data.combined_flags;
     let features = BasicFeatures {
         fin_flag: ((combined_flags & 0b00000001) != 0) as u8,
@@ -1004,54 +954,24 @@ fn process_packet_ipv4<T>(
         window_size: data.window_size,
     };
     let flow_id = if fwd {
-        create_flow_id(
-            &source,
-            data.port_source,
-            &destination,
-            data.port_destination,
-            data.protocol,
-        )
+        create_flow_id(&source, data.port_source, &destination, data.port_destination, data.protocol)
     } else {
-        create_flow_id(
-            &destination,
-            data.port_destination,
-            &source,
-            data.port_source,
-            data.protocol,
-        )
+        create_flow_id(&destination, data.port_destination, &source, data.port_source, data.protocol)
     };
 
-    let flow_id_clone = flow_id.clone();
-    let flow_id_remove = flow_id.clone();
-    let mut entry = flow_map.entry(flow_id).or_insert_with(|| {
+    let mut entry = flow_map.entry(flow_id.clone()).or_insert_with(|| {
         if fwd {
-            T::new(
-                flow_id_clone,
-                source,
-                data.port_source,
-                destination,
-                data.port_destination,
-                data.protocol,
-                ts_date,
-            )
+            T::new(flow_id.clone(), source, data.port_source, destination, data.port_destination, data.protocol, ts_date)
         } else {
-            T::new(
-                flow_id_clone,
-                destination,
-                data.port_destination,
-                source,
-                data.port_source,
-                data.protocol,
-                ts_date,
-            )
+            T::new(flow_id.clone(), destination, data.port_destination, source, data.port_source, data.protocol, ts_date)
         }
     });
 
     let end = entry.update_flow(&features, &ts, ts_date, fwd);
-    if end.is_some() {
-        export(&end.unwrap());
+    if let Some(flow) = end {
+        export(&flow);
         drop(entry);
-        flow_map.remove(&flow_id_remove);
+        flow_map.remove(&flow_id);
     }
 }
 
@@ -1072,18 +992,8 @@ fn process_packet_ipv6<T>(
 ) where
     T: Flow,
 {
-    let ts;
-    let ts_date;
-    if let Some(timestamp) = timestamp {
-        ts = timestamp;
-    } else {
-        ts = Instant::now();
-    }
-    if let Some(ts_datetime) = ts_datetime {
-        ts_date = ts_datetime;
-    } else {
-        ts_date = Utc::now();
-    }
+    let ts = timestamp.unwrap_or_else(Instant::now);
+    let ts_date = ts_datetime.unwrap_or_else(Utc::now);
     let destination = std::net::IpAddr::V6(Ipv6Addr::from(data.ipv6_destination));
     let source = std::net::IpAddr::V6(Ipv6Addr::from(data.ipv6_source));
     let combined_flags = data.combined_flags;
@@ -1103,54 +1013,24 @@ fn process_packet_ipv6<T>(
     };
 
     let flow_id = if fwd {
-        create_flow_id(
-            &source,
-            data.port_source,
-            &destination,
-            data.port_destination,
-            data.protocol,
-        )
+        create_flow_id(&source, data.port_source, &destination, data.port_destination, data.protocol)
     } else {
-        create_flow_id(
-            &destination,
-            data.port_destination,
-            &source,
-            data.port_source,
-            data.protocol,
-        )
+        create_flow_id(&destination, data.port_destination, &source, data.port_source, data.protocol)
     };
 
-    let flow_id_clone = flow_id.clone();
-    let flow_id_remove = flow_id.clone();
-    let mut entry = flow_map.entry(flow_id).or_insert_with(|| {
+    let mut entry = flow_map.entry(flow_id.clone()).or_insert_with(|| {
         if fwd {
-            T::new(
-                flow_id_clone,
-                source,
-                data.port_source,
-                destination,
-                data.port_destination,
-                data.protocol,
-                ts_date,
-            )
+            T::new(flow_id.clone(), source, data.port_source, destination, data.port_destination, data.protocol, ts_date)
         } else {
-            T::new(
-                flow_id_clone,
-                destination,
-                data.port_destination,
-                source,
-                data.port_source,
-                data.protocol,
-                ts_date,
-            )
+            T::new(flow_id.clone(), destination, data.port_destination, source, data.port_source, data.protocol, ts_date)
         }
     });
 
     let end = entry.update_flow(&features, &ts, ts_date, fwd);
-    if end.is_some() {
-        export(&end.unwrap());
+    if let Some(flow) = end {
+        export(&flow);
         drop(entry);
-        flow_map.remove(&flow_id_remove);
+        flow_map.remove(&flow_id);
     }
 }
 
@@ -1169,13 +1049,6 @@ fn redirect_packet_ipv4<T>(
 ) where
     T: Flow,
 {
-    let fwd_flow_id = create_flow_id(
-        &std::net::IpAddr::V4(Ipv4Addr::from(features_ipv4.ipv4_source)),
-        features_ipv4.port_source,
-        &std::net::IpAddr::V4(Ipv4Addr::from(features_ipv4.ipv4_destination)),
-        features_ipv4.port_destination,
-        features_ipv4.protocol,
-    );
     let bwd_flow_id = create_flow_id(
         &std::net::IpAddr::V4(Ipv4Addr::from(features_ipv4.ipv4_destination)),
         features_ipv4.port_destination,
@@ -1184,13 +1057,8 @@ fn redirect_packet_ipv4<T>(
         features_ipv4.protocol,
     );
 
-    if flow_map.contains_key(&fwd_flow_id) {
-        process_packet_ipv4(&features_ipv4, &flow_map, true, Some(timestamp), Some(ts_datetime));
-    } else if flow_map.contains_key(&bwd_flow_id) {
-        process_packet_ipv4(&features_ipv4, &flow_map, false, Some(timestamp), Some(ts_datetime));
-    } else {
-        process_packet_ipv4(&features_ipv4, &flow_map, true, Some(timestamp), Some(ts_datetime));
-    }
+    let add_fwd_direction = !flow_map.contains_key(&bwd_flow_id); // If not exists, create a new flow in the forward direction or add to existing fwd flow
+    process_packet_ipv4(&features_ipv4, &flow_map, add_fwd_direction, Some(timestamp), Some(ts_datetime));
 }
 
 /// Redirects an ipv6 packet to the correct flow.
@@ -1208,13 +1076,6 @@ fn redirect_packet_ipv6<T>(
 ) where
     T: Flow,
 {
-    let fwd_flow_id = create_flow_id(
-        &std::net::IpAddr::V6(Ipv6Addr::from(features_ipv6.ipv6_source)),
-        features_ipv6.port_source,
-        &std::net::IpAddr::V6(Ipv6Addr::from(features_ipv6.ipv6_destination)),
-        features_ipv6.port_destination,
-        features_ipv6.protocol,
-    );
     let bwd_flow_id = create_flow_id(
         &std::net::IpAddr::V6(Ipv6Addr::from(features_ipv6.ipv6_destination)),
         features_ipv6.port_destination,
@@ -1223,13 +1084,8 @@ fn redirect_packet_ipv6<T>(
         features_ipv6.protocol,
     );
 
-    if flow_map.contains_key(&fwd_flow_id) {
-        process_packet_ipv6(&features_ipv6, &flow_map, true, Some(timestamp), Some(ts_datetime));
-    } else if flow_map.contains_key(&bwd_flow_id) {
-        process_packet_ipv6(&features_ipv6, &flow_map, false, Some(timestamp), Some(ts_datetime));
-    } else {
-        process_packet_ipv6(&features_ipv6, &flow_map, true, Some(timestamp), Some(ts_datetime));
-    }
+    let add_fwd_direction = !flow_map.contains_key(&bwd_flow_id); // If not exists, create a new flow in the forward direction or add to existing fwd flow
+    process_packet_ipv6(&features_ipv6, &flow_map, add_fwd_direction, Some(timestamp), Some(ts_datetime));
 }
 
 /// Extracts the basic features of an ipv4 packet pnet struct.
