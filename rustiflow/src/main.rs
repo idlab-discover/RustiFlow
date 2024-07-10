@@ -29,7 +29,7 @@ use flows::{
 use lazy_static::lazy_static;
 use log::{debug, error, info};
 use pnet::packet::{
-    ethernet::{EtherTypes, EthernetPacket}, icmp::{IcmpPacket, IcmpTypes}, icmpv6::{Icmpv6Packet, Icmpv6Types}, ip::IpNextHeaderProtocols, ipv4::Ipv4Packet, ipv6::Ipv6Packet, tcp::TcpPacket, Packet
+    ethernet::{EtherTypes, EthernetPacket}, icmp::IcmpPacket, icmpv6::Icmpv6Packet, ip::IpNextHeaderProtocols, ipv4::Ipv4Packet, ipv6::Ipv6Packet, tcp::TcpPacket, Packet
 };
 use std::{
     fs::{File, OpenOptions},
@@ -1102,8 +1102,8 @@ fn extract_ipv4_features(ipv4_packet: &Ipv4Packet) -> Option<BasicFeaturesIpv4> 
 
     let mut combined_flags: u8 = 0;
 
-    let mut data_length: u16 = 0;
-    let mut header_length: u8 = 0;
+    let data_length: u16;
+    let header_length: u8;
     let length: u16;
 
     let mut window_size: u16 = 0;
