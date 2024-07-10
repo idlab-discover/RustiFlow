@@ -31,19 +31,19 @@ jobs:
             registry: ghcr.io
             username: ${{ github.actor }}
             password: ${{ secrets.GITHUB_TOKEN }}
-
-        - name: Build and push the slim Docker image
-          uses: docker/build-push-action@v6
-          with:
-            context: .
-            file: Dockerfile-slim
-            push: true
-            tags: ghcr.io/idlab-discover/rustiflow:slim
             
         - name: Build and push the Docker image
           uses: docker/build-push-action@v6
           with:
             context: .
             file: Dockerfile
+            push: true
+            tags: ghcr.io/idlab-discover/rustiflow:ubuntu-20
+
+        - name: Build and push the slim Docker image
+          uses: docker/build-push-action@v6
+          with:
+            context: .
+            file: Dockerfile-slim
             push: true
             tags: ghcr.io/idlab-discover/rustiflow:slim
