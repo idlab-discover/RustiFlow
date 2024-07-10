@@ -1108,7 +1108,7 @@ fn extract_ipv4_features(ipv4_packet: &Ipv4Packet) -> Option<BasicFeaturesIpv4> 
 
     let mut window_size: u16 = 0;
 
-    if protocol.0 == IpNextHeaderProtocols::Tcp.0 {
+    if protocol == IpNextHeaderProtocols::Tcp {
         if let Some(tcp_packet) = TcpPacket::new(ipv4_packet.payload()) {
             source_port = tcp_packet.get_source();
             destination_port = tcp_packet.get_destination();
@@ -1123,7 +1123,7 @@ fn extract_ipv4_features(ipv4_packet: &Ipv4Packet) -> Option<BasicFeaturesIpv4> 
         } else {
             return None;
         }
-    } else if protocol.0 == IpNextHeaderProtocols::Udp.0 {
+    } else if protocol == IpNextHeaderProtocols::Udp {
         if let Some(udp_packet) = pnet::packet::udp::UdpPacket::new(ipv4_packet.payload()) {
             source_port = udp_packet.get_source();
             destination_port = udp_packet.get_destination();
@@ -1134,28 +1134,19 @@ fn extract_ipv4_features(ipv4_packet: &Ipv4Packet) -> Option<BasicFeaturesIpv4> 
         } else {
             return None;
         }
-    } else if protocol.0 == IpNextHeaderProtocols::Icmp.0 {
+    } else if protocol == IpNextHeaderProtocols::Icmp {
         if let Some(icmp_packet) = IcmpPacket::new(ipv4_packet.payload()) {
-            destination_port = 0; // ICMP does not have ports
-            source_port = 0;
-            match icmp_packet.get_icmp_type() {
-                IcmpTypes::EchoRequest => {
-                    if let Some(echo_request) = pnet::packet::icmp::echo_request::EchoRequestPacket::new(icmp_packet.packet()) {
-                        data_length = echo_request.payload().len() as u16;
-                        header_length = 8;
-                    }
-                }
-                IcmpTypes::EchoReply => {
-                    if let Some(echo_reply) = pnet::packet::icmp::echo_reply::EchoReplyPacket::new(icmp_packet.packet()) {
-                        data_length = echo_reply.payload().len() as u16;
-                        header_length = 8;
-                    }
-                }
-                _ => {
-                    return None;
-                }
-            }
+            // For ICMP, we will extract the type and code, along with data length
+            let icmp_type = icmp_packet.get_icmp_type();
+            let icmp_code = icmp_packet.get_icmp_code();
+            source_port = 0; // ICMPv6 does not have ports
+            destination_port = 0;
+            data_length = icmp_packet.payload().len() as u16;
+            header_length = 8; // ICMP header length
             length = ipv4_packet.get_total_length();
+
+            // Log the ICMP type and code, you can handle specific types/codes if needed
+            println!("ICMP Type: {:?}, Code: {:?}", icmp_type, icmp_code);
         } else {
             return None;
         }
@@ -1230,30 +1221,17 @@ fn extract_ipv6_features(ipv6_packet: &Ipv6Packet) -> Option<BasicFeaturesIpv6> 
         }
     } else if protocol == IpNextHeaderProtocols::Icmpv6 {
         if let Some(icmpv6_packet) = Icmpv6Packet::new(ipv6_packet.payload()) {
-            source_port = 0; // ICMP does not have ports
+            // For ICMPv6, we will just extract the type and code for now, along with data length
+            let icmpv6_type = icmpv6_packet.get_icmpv6_type();
+            let icmpv6_code = icmpv6_packet.get_icmpv6_code();
+            source_port = 0; // ICMPv6 does not have ports
             destination_port = 0;
-            match icmpv6_packet.get_icmpv6_type() {
-                Icmpv6Types::EchoRequest => {
-                    if let Some(echo_request) = pnet::packet::icmpv6::echo_request::EchoRequestPacket::new(icmpv6_packet.packet()) {
-                        data_length = echo_request.payload().len() as u16;
-                        header_length = 8;
-                    } else {
-                        return None;
-                    }
-                }
-                Icmpv6Types::EchoReply => {
-                    if let Some(echo_reply) = pnet::packet::icmpv6::echo_reply::EchoReplyPacket::new(icmpv6_packet.packet()) {
-                        data_length = echo_reply.payload().len() as u16;
-                        header_length = 8;
-                    } else {
-                        return None;
-                    }
-                }
-                _ => {
-                    return None;
-                }
-            }
+            data_length = icmpv6_packet.payload().len() as u16;
+            header_length = 8; // ICMPv6 header length
             length = ipv6_packet.packet().len() as u16;
+
+            // Log the ICMPv6 type and code, you can handle specific types/codes if needed
+            println!("ICMPv6 Type: {:?}, Code: {:?}", icmpv6_type, icmpv6_code);
         } else {
             return None;
         }
