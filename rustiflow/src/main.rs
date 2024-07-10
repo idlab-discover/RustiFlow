@@ -1144,9 +1144,6 @@ fn extract_ipv4_features(ipv4_packet: &Ipv4Packet) -> Option<BasicFeaturesIpv4> 
             data_length = icmp_packet.payload().len() as u16;
             header_length = 8; // ICMP header length
             length = ipv4_packet.get_total_length();
-
-            // Log the ICMP type and code, you can handle specific types/codes if needed
-            println!("ICMP Type: {:?}, Code: {:?}", icmp_type, icmp_code);
         } else {
             return None;
         }
@@ -1229,9 +1226,6 @@ fn extract_ipv6_features(ipv6_packet: &Ipv6Packet) -> Option<BasicFeaturesIpv6> 
             data_length = icmpv6_packet.payload().len() as u16;
             header_length = 8; // ICMPv6 header length
             length = ipv6_packet.packet().len() as u16;
-
-            // Log the ICMPv6 type and code, you can handle specific types/codes if needed
-            println!("ICMPv6 Type: {:?}, Code: {:?}", icmpv6_type, icmpv6_code);
         } else {
             return None;
         }
