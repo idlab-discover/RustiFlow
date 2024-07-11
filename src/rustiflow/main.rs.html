@@ -1,4 +1,4 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `rustiflow/src/main.rs`."><title>main.rs - source</title><script>if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-46f98efaafac5295.ttf.woff2,FiraSans-Regular-018c141bf0843ffd.woff2,FiraSans-Medium-8f9a781e4970d388.woff2,SourceCodePro-Regular-562dcc5011b6de7d.ttf.woff2,SourceCodePro-Semibold-d899c5a5c4aeb14a.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2" crossorigin href="../../static.files/${f}">`).join(""))</script><link rel="stylesheet" href="../../static.files/normalize-76eba96aa4d2e634.css"><link rel="stylesheet" href="../../static.files/rustdoc-dd39b87e5fcfba68.css"><meta name="rustdoc-vars" data-root-path="../../" data-static-root-path="../../static.files/" data-current-crate="rustiflow" data-themes="" data-resource-suffix="" data-rustdoc-version="1.81.0-nightly (6be96e386 2024-07-09)" data-channel="nightly" data-search-js="search-d234aafac6c221dd.js" data-settings-js="settings-4313503d2e1961c2.js" ><script src="../../static.files/storage-118b08c4c78b968e.js"></script><script defer src="../../static.files/src-script-e66d777a5a92e9b2.js"></script><script defer src="../../src-files.js"></script><script defer src="../../static.files/main-20a3ad099b048cf2.js"></script><noscript><link rel="stylesheet" href="../../static.files/noscript-df360f571f6edeae.css"></noscript><link rel="alternate icon" type="image/png" href="../../static.files/favicon-32x32-422f7d1d52889060.png"><link rel="icon" type="image/svg+xml" href="../../static.files/favicon-2c020d218678b618.svg"></head><body class="rustdoc src"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="src-sidebar-title"><h2>Files</h2></div></nav><div class="sidebar-resizer"></div><main><rustdoc-search></rustdoc-search><section id="main-content" class="content"><div class="example-wrap"><div data-nosnippet><pre class="src-line-numbers"><a href="#1" id="1">1</a>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `rustiflow/src/main.rs`."><title>main.rs - source</title><script>if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-46f98efaafac5295.ttf.woff2,FiraSans-Regular-018c141bf0843ffd.woff2,FiraSans-Medium-8f9a781e4970d388.woff2,SourceCodePro-Regular-562dcc5011b6de7d.ttf.woff2,SourceCodePro-Semibold-d899c5a5c4aeb14a.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2" crossorigin href="../../static.files/${f}">`).join(""))</script><link rel="stylesheet" href="../../static.files/normalize-76eba96aa4d2e634.css"><link rel="stylesheet" href="../../static.files/rustdoc-dd39b87e5fcfba68.css"><meta name="rustdoc-vars" data-root-path="../../" data-static-root-path="../../static.files/" data-current-crate="rustiflow" data-themes="" data-resource-suffix="" data-rustdoc-version="1.81.0-nightly (0c81f94b9 2024-07-10)" data-channel="nightly" data-search-js="search-d234aafac6c221dd.js" data-settings-js="settings-4313503d2e1961c2.js" ><script src="../../static.files/storage-118b08c4c78b968e.js"></script><script defer src="../../static.files/src-script-e66d777a5a92e9b2.js"></script><script defer src="../../src-files.js"></script><script defer src="../../static.files/main-20a3ad099b048cf2.js"></script><noscript><link rel="stylesheet" href="../../static.files/noscript-df360f571f6edeae.css"></noscript><link rel="alternate icon" type="image/png" href="../../static.files/favicon-32x32-422f7d1d52889060.png"><link rel="icon" type="image/svg+xml" href="../../static.files/favicon-2c020d218678b618.svg"></head><body class="rustdoc src"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="src-sidebar-title"><h2>Files</h2></div></nav><div class="sidebar-resizer"></div><main><rustdoc-search></rustdoc-search><section id="main-content" class="content"><div class="example-wrap"><div data-nosnippet><pre class="src-line-numbers"><a href="#1" id="1">1</a>
 <a href="#2" id="2">2</a>
 <a href="#3" id="3">3</a>
 <a href="#4" id="4">4</a>
@@ -1462,140 +1462,6 @@
 <a href="#1462" id="1462">1462</a>
 <a href="#1463" id="1463">1463</a>
 <a href="#1464" id="1464">1464</a>
-<a href="#1465" id="1465">1465</a>
-<a href="#1466" id="1466">1466</a>
-<a href="#1467" id="1467">1467</a>
-<a href="#1468" id="1468">1468</a>
-<a href="#1469" id="1469">1469</a>
-<a href="#1470" id="1470">1470</a>
-<a href="#1471" id="1471">1471</a>
-<a href="#1472" id="1472">1472</a>
-<a href="#1473" id="1473">1473</a>
-<a href="#1474" id="1474">1474</a>
-<a href="#1475" id="1475">1475</a>
-<a href="#1476" id="1476">1476</a>
-<a href="#1477" id="1477">1477</a>
-<a href="#1478" id="1478">1478</a>
-<a href="#1479" id="1479">1479</a>
-<a href="#1480" id="1480">1480</a>
-<a href="#1481" id="1481">1481</a>
-<a href="#1482" id="1482">1482</a>
-<a href="#1483" id="1483">1483</a>
-<a href="#1484" id="1484">1484</a>
-<a href="#1485" id="1485">1485</a>
-<a href="#1486" id="1486">1486</a>
-<a href="#1487" id="1487">1487</a>
-<a href="#1488" id="1488">1488</a>
-<a href="#1489" id="1489">1489</a>
-<a href="#1490" id="1490">1490</a>
-<a href="#1491" id="1491">1491</a>
-<a href="#1492" id="1492">1492</a>
-<a href="#1493" id="1493">1493</a>
-<a href="#1494" id="1494">1494</a>
-<a href="#1495" id="1495">1495</a>
-<a href="#1496" id="1496">1496</a>
-<a href="#1497" id="1497">1497</a>
-<a href="#1498" id="1498">1498</a>
-<a href="#1499" id="1499">1499</a>
-<a href="#1500" id="1500">1500</a>
-<a href="#1501" id="1501">1501</a>
-<a href="#1502" id="1502">1502</a>
-<a href="#1503" id="1503">1503</a>
-<a href="#1504" id="1504">1504</a>
-<a href="#1505" id="1505">1505</a>
-<a href="#1506" id="1506">1506</a>
-<a href="#1507" id="1507">1507</a>
-<a href="#1508" id="1508">1508</a>
-<a href="#1509" id="1509">1509</a>
-<a href="#1510" id="1510">1510</a>
-<a href="#1511" id="1511">1511</a>
-<a href="#1512" id="1512">1512</a>
-<a href="#1513" id="1513">1513</a>
-<a href="#1514" id="1514">1514</a>
-<a href="#1515" id="1515">1515</a>
-<a href="#1516" id="1516">1516</a>
-<a href="#1517" id="1517">1517</a>
-<a href="#1518" id="1518">1518</a>
-<a href="#1519" id="1519">1519</a>
-<a href="#1520" id="1520">1520</a>
-<a href="#1521" id="1521">1521</a>
-<a href="#1522" id="1522">1522</a>
-<a href="#1523" id="1523">1523</a>
-<a href="#1524" id="1524">1524</a>
-<a href="#1525" id="1525">1525</a>
-<a href="#1526" id="1526">1526</a>
-<a href="#1527" id="1527">1527</a>
-<a href="#1528" id="1528">1528</a>
-<a href="#1529" id="1529">1529</a>
-<a href="#1530" id="1530">1530</a>
-<a href="#1531" id="1531">1531</a>
-<a href="#1532" id="1532">1532</a>
-<a href="#1533" id="1533">1533</a>
-<a href="#1534" id="1534">1534</a>
-<a href="#1535" id="1535">1535</a>
-<a href="#1536" id="1536">1536</a>
-<a href="#1537" id="1537">1537</a>
-<a href="#1538" id="1538">1538</a>
-<a href="#1539" id="1539">1539</a>
-<a href="#1540" id="1540">1540</a>
-<a href="#1541" id="1541">1541</a>
-<a href="#1542" id="1542">1542</a>
-<a href="#1543" id="1543">1543</a>
-<a href="#1544" id="1544">1544</a>
-<a href="#1545" id="1545">1545</a>
-<a href="#1546" id="1546">1546</a>
-<a href="#1547" id="1547">1547</a>
-<a href="#1548" id="1548">1548</a>
-<a href="#1549" id="1549">1549</a>
-<a href="#1550" id="1550">1550</a>
-<a href="#1551" id="1551">1551</a>
-<a href="#1552" id="1552">1552</a>
-<a href="#1553" id="1553">1553</a>
-<a href="#1554" id="1554">1554</a>
-<a href="#1555" id="1555">1555</a>
-<a href="#1556" id="1556">1556</a>
-<a href="#1557" id="1557">1557</a>
-<a href="#1558" id="1558">1558</a>
-<a href="#1559" id="1559">1559</a>
-<a href="#1560" id="1560">1560</a>
-<a href="#1561" id="1561">1561</a>
-<a href="#1562" id="1562">1562</a>
-<a href="#1563" id="1563">1563</a>
-<a href="#1564" id="1564">1564</a>
-<a href="#1565" id="1565">1565</a>
-<a href="#1566" id="1566">1566</a>
-<a href="#1567" id="1567">1567</a>
-<a href="#1568" id="1568">1568</a>
-<a href="#1569" id="1569">1569</a>
-<a href="#1570" id="1570">1570</a>
-<a href="#1571" id="1571">1571</a>
-<a href="#1572" id="1572">1572</a>
-<a href="#1573" id="1573">1573</a>
-<a href="#1574" id="1574">1574</a>
-<a href="#1575" id="1575">1575</a>
-<a href="#1576" id="1576">1576</a>
-<a href="#1577" id="1577">1577</a>
-<a href="#1578" id="1578">1578</a>
-<a href="#1579" id="1579">1579</a>
-<a href="#1580" id="1580">1580</a>
-<a href="#1581" id="1581">1581</a>
-<a href="#1582" id="1582">1582</a>
-<a href="#1583" id="1583">1583</a>
-<a href="#1584" id="1584">1584</a>
-<a href="#1585" id="1585">1585</a>
-<a href="#1586" id="1586">1586</a>
-<a href="#1587" id="1587">1587</a>
-<a href="#1588" id="1588">1588</a>
-<a href="#1589" id="1589">1589</a>
-<a href="#1590" id="1590">1590</a>
-<a href="#1591" id="1591">1591</a>
-<a href="#1592" id="1592">1592</a>
-<a href="#1593" id="1593">1593</a>
-<a href="#1594" id="1594">1594</a>
-<a href="#1595" id="1595">1595</a>
-<a href="#1596" id="1596">1596</a>
-<a href="#1597" id="1597">1597</a>
-<a href="#1598" id="1598">1598</a>
 </pre></div><pre class="rust"><code><span class="kw">mod </span>args;
 <span class="kw">mod </span>flows;
 <span class="kw">mod </span>output;
@@ -2315,6 +2181,7 @@
             export(<span class="kw-2">&amp;</span>T::get_features());
         }
     }
+    
     <span class="kw">while let </span><span class="prelude-val">Ok</span>(packet) = cap.next_packet() {
         <span class="kw">let </span>ts = packet.header.ts;
 
@@ -2341,6 +2208,7 @@
                             <span class="kw">if </span>amount_of_packets % <span class="number">10_000 </span>== <span class="number">0 </span>{
                                 <span class="macro">info!</span>(<span class="string">"{} packets have been processed..."</span>, amount_of_packets);
                             }
+                            check_flows_to_expire(<span class="kw-2">&amp;</span>flow_map_ipv4, lifespan, ts_datetime);
                             redirect_packet_ipv4(<span class="kw-2">&amp;</span>features_ipv4, <span class="kw-2">&amp;</span>flow_map_ipv4, ts_instant, ts_datetime);
                         }
                     }
@@ -2352,6 +2220,7 @@
                             <span class="kw">if </span>amount_of_packets % <span class="number">10_000 </span>== <span class="number">0 </span>{
                                 <span class="macro">info!</span>(<span class="string">"{} packets have been processed..."</span>, amount_of_packets);
                             }
+                            check_flows_to_expire(<span class="kw-2">&amp;</span>flow_map_ipv6, lifespan, ts_datetime);
                             redirect_packet_ipv6(<span class="kw-2">&amp;</span>features_ipv6, <span class="kw-2">&amp;</span>flow_map_ipv6, ts_instant, ts_datetime);
                         }
                     }
@@ -2369,12 +2238,8 @@
                                             amount_of_packets
                                         );
                                     }
-                                    redirect_packet_ipv4(
-                                        <span class="kw-2">&amp;</span>features_ipv4,
-                                        <span class="kw-2">&amp;</span>flow_map_ipv4,
-                                        ts_instant,
-                                        ts_datetime,
-                                    );
+                                    check_flows_to_expire(<span class="kw-2">&amp;</span>flow_map_ipv4, lifespan, ts_datetime);
+                                    redirect_packet_ipv4(<span class="kw-2">&amp;</span>features_ipv4, <span class="kw-2">&amp;</span>flow_map_ipv4, ts_instant, ts_datetime,);
                                 }
                             }
                         }
@@ -2388,12 +2253,8 @@
                                             amount_of_packets
                                         );
                                     }
-                                    redirect_packet_ipv6(
-                                        <span class="kw-2">&amp;</span>features_ipv6,
-                                        <span class="kw-2">&amp;</span>flow_map_ipv6,
-                                        ts_instant,
-                                        ts_datetime,
-                                    );
+                                    check_flows_to_expire(<span class="kw-2">&amp;</span>flow_map_ipv6, lifespan, ts_datetime);
+                                    redirect_packet_ipv6(<span class="kw-2">&amp;</span>features_ipv6, <span class="kw-2">&amp;</span>flow_map_ipv6, ts_instant, ts_datetime);
                                 }
                             }
                         }
@@ -2407,58 +2268,6 @@
             <span class="macro">error!</span>(<span class="string">"Error parsing packet..."</span>);
         }
     }
-
-    <span class="kw">let </span>flow_map_end_ipv4 = flow_map_ipv4.clone();
-    <span class="kw">let </span>flow_map_end_ipv6 = flow_map_ipv6.clone();
-    task::spawn(<span class="kw">async move </span>{
-        <span class="kw">let </span><span class="kw-2">mut </span>interval = time::interval(Duration::from_secs(<span class="number">2</span>));
-        <span class="kw">loop </span>{
-            interval.tick().<span class="kw">await</span>;
-            <span class="kw">let </span>timestamp = Utc::now();
-
-            <span class="comment">// Collect keys to remove
-            </span><span class="kw">let </span><span class="kw-2">mut </span>keys_to_remove_ipv4 = Vec::new();
-            <span class="kw">for </span>entry <span class="kw">in </span>flow_map_end_ipv4.iter() {
-                <span class="kw">let </span>flow = entry.value();
-                <span class="kw">let </span>end = get_duration(flow.get_first_timestamp(), timestamp) / <span class="number">1_000_000.0</span>;
-
-                <span class="kw">if </span>end &gt;= lifespan <span class="kw">as </span>f64 {
-                    <span class="kw">if </span><span class="kw-2">*</span>NO_CONTAMINANT_FEATURES.lock().unwrap().deref() {
-                        export(<span class="kw-2">&amp;</span>flow.dump_without_contamination());
-                    } <span class="kw">else </span>{
-                        export(<span class="kw-2">&amp;</span>flow.dump());
-                    }
-                    keys_to_remove_ipv4.push(entry.key().clone());
-                }
-            }
-
-            <span class="comment">// Collect keys to remove
-            </span><span class="kw">let </span><span class="kw-2">mut </span>keys_to_remove_ipv6 = Vec::new();
-            <span class="kw">for </span>entry <span class="kw">in </span>flow_map_end_ipv6.iter() {
-                <span class="kw">let </span>flow = entry.value();
-                <span class="kw">let </span>end = get_duration(flow.get_first_timestamp(), timestamp) / <span class="number">1_000_000.0</span>;
-
-                <span class="kw">if </span>end &gt;= lifespan <span class="kw">as </span>f64 {
-                    <span class="kw">if </span><span class="kw-2">*</span>NO_CONTAMINANT_FEATURES.lock().unwrap().deref() {
-                        export(<span class="kw-2">&amp;</span>flow.dump_without_contamination());
-                    } <span class="kw">else </span>{
-                        export(<span class="kw-2">&amp;</span>flow.dump());
-                    }
-                    keys_to_remove_ipv6.push(entry.key().clone());
-                }
-            }
-
-            <span class="comment">// Remove entries outside of the iteration
-            </span><span class="kw">for </span>key <span class="kw">in </span>keys_to_remove_ipv4 {
-                flow_map_end_ipv4.remove(<span class="kw-2">&amp;</span>key);
-            }
-
-            <span class="comment">// Remove entries outside of the iteration
-            </span><span class="kw">for </span>key <span class="kw">in </span>keys_to_remove_ipv6 {
-                flow_map_end_ipv6.remove(<span class="kw-2">&amp;</span>key);
-            }
-        }
-    });
 
     <span class="kw">for </span>entry <span class="kw">in </span>flow_map_ipv4.iter() {
         <span class="kw">let </span>flow = entry.value();
@@ -2492,6 +2301,33 @@
         <span class="string">"Duration: {:?} milliseconds"</span>,
         end.duration_since(start).as_millis()
     );
+}
+
+<span class="kw">fn </span>check_flows_to_expire&lt;T&gt;(
+    flow_map: <span class="kw-2">&amp;</span>Arc&lt;DashMap&lt;String, T&gt;&gt;,
+    lifespan: u64,
+    ts_datetime: DateTime&lt;Utc&gt;,
+) <span class="kw">where
+    </span>T: Flow,
+{
+    <span class="kw">let </span><span class="kw-2">mut </span>keys_to_remove = Vec::new();
+    <span class="kw">for </span>entry <span class="kw">in </span>flow_map.iter() {
+        <span class="kw">let </span>flow = entry.value();
+        <span class="kw">let </span>duration = get_duration(flow.get_first_timestamp(), ts_datetime) / <span class="number">1_000_000.0</span>;
+
+        <span class="kw">if </span>duration &gt;= lifespan <span class="kw">as </span>f64 {
+            <span class="kw">if </span><span class="kw-2">*</span>NO_CONTAMINANT_FEATURES.lock().unwrap().deref() {
+                export(<span class="kw-2">&amp;</span>flow.dump_without_contamination());
+            } <span class="kw">else </span>{
+                export(<span class="kw-2">&amp;</span>flow.dump());
+            }
+            keys_to_remove.push(entry.key().clone());
+        }
+    }
+
+    <span class="kw">for </span>key <span class="kw">in </span>keys_to_remove {
+        flow_map.remove(<span class="kw-2">&amp;</span>key);
+    }
 }
 
 <span class="doccomment">/// Export the flow to the set export function.
@@ -2561,31 +2397,11 @@
 ) <span class="kw">where
     </span>T: Flow,
 {
-    <span class="kw">let </span>ts;
-    <span class="kw">let </span>ts_date;
-    <span class="kw">if let </span><span class="prelude-val">Some</span>(timestamp) = timestamp {
-        ts = timestamp;
-    } <span class="kw">else </span>{
-        ts = Instant::now();
-    }
-
-    <span class="kw">if let </span><span class="prelude-val">Some</span>(ts_datetime) = ts_datetime {
-        ts_date = ts_datetime;
-    } <span class="kw">else </span>{
-        ts_date = Utc::now();
-    }
-    <span class="kw">let </span>destination = std::net::IpAddr::V4(Ipv4Addr::from(u32::from_le_bytes(
-        data.ipv4_source
-            .to_be_bytes()
-            .try_into()
-            .expect(<span class="string">"Invalid IP length"</span>),
-    )));
-    <span class="kw">let </span>source = std::net::IpAddr::V4(Ipv4Addr::from(u32::from_le_bytes(
-        data.ipv4_destination
-            .to_be_bytes()
-            .try_into()
-            .expect(<span class="string">"Invalid IP length"</span>),
-    )));
+    <span class="kw">let </span>ts = timestamp.unwrap_or_else(Instant::now);
+    <span class="kw">let </span>ts_date = ts_datetime.unwrap_or_else(Utc::now);
+    <span class="kw">let </span>destination = std::net::IpAddr::V4(Ipv4Addr::from(data.ipv4_destination));
+    <span class="kw">let </span>source = std::net::IpAddr::V4(Ipv4Addr::from(data.ipv4_source));
+    
     <span class="kw">let </span>combined_flags = data.combined_flags;
     <span class="kw">let </span>features = BasicFeatures {
         fin_flag: ((combined_flags &amp; <span class="number">0b00000001</span>) != <span class="number">0</span>) <span class="kw">as </span>u8,
@@ -2602,54 +2418,29 @@
         window_size: data.window_size,
     };
     <span class="kw">let </span>flow_id = <span class="kw">if </span>fwd {
-        create_flow_id(
-            <span class="kw-2">&amp;</span>source,
-            data.port_source,
-            <span class="kw-2">&amp;</span>destination,
-            data.port_destination,
-            data.protocol,
-        )
+        create_flow_id(<span class="kw-2">&amp;</span>source, data.port_source, <span class="kw-2">&amp;</span>destination, data.port_destination, data.protocol)
     } <span class="kw">else </span>{
-        create_flow_id(
-            <span class="kw-2">&amp;</span>destination,
-            data.port_destination,
-            <span class="kw-2">&amp;</span>source,
-            data.port_source,
-            data.protocol,
-        )
+        create_flow_id(<span class="kw-2">&amp;</span>destination, data.port_destination, <span class="kw-2">&amp;</span>source, data.port_source, data.protocol)
     };
 
-    <span class="kw">let </span>flow_id_clone = flow_id.clone();
-    <span class="kw">let </span>flow_id_remove = flow_id.clone();
-    <span class="kw">let </span><span class="kw-2">mut </span>entry = flow_map.entry(flow_id).or_insert_with(|| {
+    <span class="kw">let </span><span class="kw-2">mut </span>entry = flow_map.entry(flow_id.clone()).or_insert_with(|| {
         <span class="kw">if </span>fwd {
-            T::new(
-                flow_id_clone,
-                source,
-                data.port_source,
-                destination,
-                data.port_destination,
-                data.protocol,
-                ts_date,
-            )
+            T::new(flow_id.clone(), source, data.port_source, destination, data.port_destination, data.protocol, ts_date)
         } <span class="kw">else </span>{
-            T::new(
-                flow_id_clone,
-                destination,
-                data.port_destination,
-                source,
-                data.port_source,
-                data.protocol,
-                ts_date,
-            )
+            T::new(flow_id.clone(), destination, data.port_destination, source, data.port_source, data.protocol, ts_date)
         }
     });
 
     <span class="kw">let </span>end = entry.update_flow(<span class="kw-2">&amp;</span>features, <span class="kw-2">&amp;</span>ts, ts_date, fwd);
     <span class="kw">if </span>end.is_some() {
-        export(<span class="kw-2">&amp;</span>end.unwrap());
+        <span class="kw">let </span>flow = entry.value();
+        <span class="kw">if </span><span class="kw-2">*</span>NO_CONTAMINANT_FEATURES.lock().unwrap().deref() {
+            export(<span class="kw-2">&amp;</span>flow.dump_without_contamination());
+        } <span class="kw">else </span>{
+            export(<span class="kw-2">&amp;</span>flow.dump());
+        }
         drop(entry);
-        flow_map.remove(<span class="kw-2">&amp;</span>flow_id_remove);
+        flow_map.remove(<span class="kw-2">&amp;</span>flow_id);
     }
 }
 
@@ -2670,18 +2461,8 @@
 ) <span class="kw">where
     </span>T: Flow,
 {
-    <span class="kw">let </span>ts;
-    <span class="kw">let </span>ts_date;
-    <span class="kw">if let </span><span class="prelude-val">Some</span>(timestamp) = timestamp {
-        ts = timestamp;
-    } <span class="kw">else </span>{
-        ts = Instant::now();
-    }
-    <span class="kw">if let </span><span class="prelude-val">Some</span>(ts_datetime) = ts_datetime {
-        ts_date = ts_datetime;
-    } <span class="kw">else </span>{
-        ts_date = Utc::now();
-    }
+    <span class="kw">let </span>ts = timestamp.unwrap_or_else(Instant::now);
+    <span class="kw">let </span>ts_date = ts_datetime.unwrap_or_else(Utc::now);
     <span class="kw">let </span>destination = std::net::IpAddr::V6(Ipv6Addr::from(data.ipv6_destination));
     <span class="kw">let </span>source = std::net::IpAddr::V6(Ipv6Addr::from(data.ipv6_source));
     <span class="kw">let </span>combined_flags = data.combined_flags;
@@ -2701,54 +2482,29 @@
     };
 
     <span class="kw">let </span>flow_id = <span class="kw">if </span>fwd {
-        create_flow_id(
-            <span class="kw-2">&amp;</span>source,
-            data.port_source,
-            <span class="kw-2">&amp;</span>destination,
-            data.port_destination,
-            data.protocol,
-        )
+        create_flow_id(<span class="kw-2">&amp;</span>source, data.port_source, <span class="kw-2">&amp;</span>destination, data.port_destination, data.protocol)
     } <span class="kw">else </span>{
-        create_flow_id(
-            <span class="kw-2">&amp;</span>destination,
-            data.port_destination,
-            <span class="kw-2">&amp;</span>source,
-            data.port_source,
-            data.protocol,
-        )
+        create_flow_id(<span class="kw-2">&amp;</span>destination, data.port_destination, <span class="kw-2">&amp;</span>source, data.port_source, data.protocol)
     };
 
-    <span class="kw">let </span>flow_id_clone = flow_id.clone();
-    <span class="kw">let </span>flow_id_remove = flow_id.clone();
-    <span class="kw">let </span><span class="kw-2">mut </span>entry = flow_map.entry(flow_id).or_insert_with(|| {
+    <span class="kw">let </span><span class="kw-2">mut </span>entry = flow_map.entry(flow_id.clone()).or_insert_with(|| {
         <span class="kw">if </span>fwd {
-            T::new(
-                flow_id_clone,
-                source,
-                data.port_source,
-                destination,
-                data.port_destination,
-                data.protocol,
-                ts_date,
-            )
+            T::new(flow_id.clone(), source, data.port_source, destination, data.port_destination, data.protocol, ts_date)
         } <span class="kw">else </span>{
-            T::new(
-                flow_id_clone,
-                destination,
-                data.port_destination,
-                source,
-                data.port_source,
-                data.protocol,
-                ts_date,
-            )
+            T::new(flow_id.clone(), destination, data.port_destination, source, data.port_source, data.protocol, ts_date)
         }
     });
 
     <span class="kw">let </span>end = entry.update_flow(<span class="kw-2">&amp;</span>features, <span class="kw-2">&amp;</span>ts, ts_date, fwd);
     <span class="kw">if </span>end.is_some() {
-        export(<span class="kw-2">&amp;</span>end.unwrap());
+        <span class="kw">let </span>flow = entry.value();
+        <span class="kw">if </span><span class="kw-2">*</span>NO_CONTAMINANT_FEATURES.lock().unwrap().deref() {
+            export(<span class="kw-2">&amp;</span>flow.dump_without_contamination());
+        } <span class="kw">else </span>{
+            export(<span class="kw-2">&amp;</span>flow.dump());
+        }
         drop(entry);
-        flow_map.remove(<span class="kw-2">&amp;</span>flow_id_remove);
+        flow_map.remove(<span class="kw-2">&amp;</span>flow_id);
     }
 }
 
@@ -2767,13 +2523,6 @@
 ) <span class="kw">where
     </span>T: Flow,
 {
-    <span class="kw">let </span>fwd_flow_id = create_flow_id(
-        <span class="kw-2">&amp;</span>std::net::IpAddr::V4(Ipv4Addr::from(features_ipv4.ipv4_source)),
-        features_ipv4.port_source,
-        <span class="kw-2">&amp;</span>std::net::IpAddr::V4(Ipv4Addr::from(features_ipv4.ipv4_destination)),
-        features_ipv4.port_destination,
-        features_ipv4.protocol,
-    );
     <span class="kw">let </span>bwd_flow_id = create_flow_id(
         <span class="kw-2">&amp;</span>std::net::IpAddr::V4(Ipv4Addr::from(features_ipv4.ipv4_destination)),
         features_ipv4.port_destination,
@@ -2782,13 +2531,8 @@
         features_ipv4.protocol,
     );
 
-    <span class="kw">if </span>flow_map.contains_key(<span class="kw-2">&amp;</span>fwd_flow_id) {
-        process_packet_ipv4(<span class="kw-2">&amp;</span>features_ipv4, <span class="kw-2">&amp;</span>flow_map, <span class="bool-val">true</span>, <span class="prelude-val">Some</span>(timestamp), <span class="prelude-val">Some</span>(ts_datetime));
-    } <span class="kw">else if </span>flow_map.contains_key(<span class="kw-2">&amp;</span>bwd_flow_id) {
-        process_packet_ipv4(<span class="kw-2">&amp;</span>features_ipv4, <span class="kw-2">&amp;</span>flow_map, <span class="bool-val">false</span>, <span class="prelude-val">Some</span>(timestamp), <span class="prelude-val">Some</span>(ts_datetime));
-    } <span class="kw">else </span>{
-        process_packet_ipv4(<span class="kw-2">&amp;</span>features_ipv4, <span class="kw-2">&amp;</span>flow_map, <span class="bool-val">true</span>, <span class="prelude-val">Some</span>(timestamp), <span class="prelude-val">Some</span>(ts_datetime));
-    }
+    <span class="kw">let </span>add_fwd_direction = !flow_map.contains_key(<span class="kw-2">&amp;</span>bwd_flow_id); <span class="comment">// If not exists, create a new flow in the forward direction or add to existing fwd flow
+    </span>process_packet_ipv4(<span class="kw-2">&amp;</span>features_ipv4, <span class="kw-2">&amp;</span>flow_map, add_fwd_direction, <span class="prelude-val">Some</span>(timestamp), <span class="prelude-val">Some</span>(ts_datetime));
 }
 
 <span class="doccomment">/// Redirects an ipv6 packet to the correct flow.
@@ -2806,13 +2550,6 @@
 ) <span class="kw">where
     </span>T: Flow,
 {
-    <span class="kw">let </span>fwd_flow_id = create_flow_id(
-        <span class="kw-2">&amp;</span>std::net::IpAddr::V6(Ipv6Addr::from(features_ipv6.ipv6_source)),
-        features_ipv6.port_source,
-        <span class="kw-2">&amp;</span>std::net::IpAddr::V6(Ipv6Addr::from(features_ipv6.ipv6_destination)),
-        features_ipv6.port_destination,
-        features_ipv6.protocol,
-    );
     <span class="kw">let </span>bwd_flow_id = create_flow_id(
         <span class="kw-2">&amp;</span>std::net::IpAddr::V6(Ipv6Addr::from(features_ipv6.ipv6_destination)),
         features_ipv6.port_destination,
@@ -2821,13 +2558,8 @@
         features_ipv6.protocol,
     );
 
-    <span class="kw">if </span>flow_map.contains_key(<span class="kw-2">&amp;</span>fwd_flow_id) {
-        process_packet_ipv6(<span class="kw-2">&amp;</span>features_ipv6, <span class="kw-2">&amp;</span>flow_map, <span class="bool-val">true</span>, <span class="prelude-val">Some</span>(timestamp), <span class="prelude-val">Some</span>(ts_datetime));
-    } <span class="kw">else if </span>flow_map.contains_key(<span class="kw-2">&amp;</span>bwd_flow_id) {
-        process_packet_ipv6(<span class="kw-2">&amp;</span>features_ipv6, <span class="kw-2">&amp;</span>flow_map, <span class="bool-val">false</span>, <span class="prelude-val">Some</span>(timestamp), <span class="prelude-val">Some</span>(ts_datetime));
-    } <span class="kw">else </span>{
-        process_packet_ipv6(<span class="kw-2">&amp;</span>features_ipv6, <span class="kw-2">&amp;</span>flow_map, <span class="bool-val">true</span>, <span class="prelude-val">Some</span>(timestamp), <span class="prelude-val">Some</span>(ts_datetime));
-    }
+    <span class="kw">let </span>add_fwd_direction = !flow_map.contains_key(<span class="kw-2">&amp;</span>bwd_flow_id); <span class="comment">// If not exists, create a new flow in the forward direction or add to existing fwd flow
+    </span>process_packet_ipv6(<span class="kw-2">&amp;</span>features_ipv6, <span class="kw-2">&amp;</span>flow_map, add_fwd_direction, <span class="prelude-val">Some</span>(timestamp), <span class="prelude-val">Some</span>(ts_datetime));
 }
 
 <span class="doccomment">/// Extracts the basic features of an ipv4 packet pnet struct.
