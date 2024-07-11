@@ -1137,8 +1137,8 @@ fn extract_ipv4_features(ipv4_packet: &Ipv4Packet) -> Option<BasicFeaturesIpv4> 
     } else if protocol == IpNextHeaderProtocols::Icmp {
         if let Some(icmp_packet) = IcmpPacket::new(ipv4_packet.payload()) {
             // For ICMP, we will extract the type and code, along with data length
-            let icmp_type = icmp_packet.get_icmp_type();
-            let icmp_code = icmp_packet.get_icmp_code();
+            // let icmp_type = icmp_packet.get_icmp_type();
+            // let icmp_code = icmp_packet.get_icmp_code();
             source_port = 0; // ICMPv6 does not have ports
             destination_port = 0;
             data_length = icmp_packet.payload().len() as u16;
@@ -1219,8 +1219,8 @@ fn extract_ipv6_features(ipv6_packet: &Ipv6Packet) -> Option<BasicFeaturesIpv6> 
     } else if protocol == IpNextHeaderProtocols::Icmpv6 {
         if let Some(icmpv6_packet) = Icmpv6Packet::new(ipv6_packet.payload()) {
             // For ICMPv6, we will just extract the type and code for now, along with data length
-            let icmpv6_type = icmpv6_packet.get_icmpv6_type();
-            let icmpv6_code = icmpv6_packet.get_icmpv6_code();
+            // let icmpv6_type = icmpv6_packet.get_icmpv6_type();
+            // let icmpv6_code = icmpv6_packet.get_icmpv6_code();
             source_port = 0; // ICMPv6 does not have ports
             destination_port = 0;
             data_length = icmpv6_packet.payload().len() as u16;
