@@ -6,7 +6,7 @@ mod utils;
 use crate::{
     flows::{cic_flow::CicFlow, ntl_flow::NTLFlow},
     output::Export,
-    utils::utils::{create_flow_id, get_duration},
+    utils::utils::create_flow_id,
 };
 use args::{Cli, Commands, ExportMethodType, FlowType};
 use aya::{
@@ -591,58 +591,6 @@ where
         });
     }
 
-    let flow_map_end_ipv4 = flow_map_ipv4.clone();
-    let flow_map_end_ipv6 = flow_map_ipv6.clone();
-    task::spawn(async move {
-        let mut interval = time::interval(Duration::from_secs(2));
-        loop {
-            interval.tick().await;
-            let timestamp = Utc::now();
-
-            // Collect keys to remove
-            let mut keys_to_remove_ipv4 = Vec::new();
-            for entry in flow_map_end_ipv4.iter() {
-                let flow = entry.value();
-                let end = get_duration(flow.get_first_timestamp(), timestamp) / 1_000_000.0;
-
-                if end >= lifespan as f64 {
-                    if *NO_CONTAMINANT_FEATURES.lock().unwrap().deref() {
-                        export(&flow.dump_without_contamination());
-                    } else {
-                        export(&flow.dump());
-                    }
-                    keys_to_remove_ipv4.push(entry.key().clone());
-                }
-            }
-
-            // Collect keys to remove
-            let mut keys_to_remove_ipv6 = Vec::new();
-            for entry in flow_map_end_ipv6.iter() {
-                let flow = entry.value();
-                let end = get_duration(flow.get_first_timestamp(), timestamp) / 1_000_000.0;
-
-                if end >= lifespan as f64 {
-                    if *NO_CONTAMINANT_FEATURES.lock().unwrap().deref() {
-                        export(&flow.dump_without_contamination());
-                    } else {
-                        export(&flow.dump());
-                    }
-                    keys_to_remove_ipv6.push(entry.key().clone());
-                }
-            }
-
-            // Remove entries outside of the iteration
-            for key in keys_to_remove_ipv4 {
-                flow_map_end_ipv4.remove(&key);
-            }
-
-            // Remove entries outside of the iteration
-            for key in keys_to_remove_ipv6 {
-                flow_map_end_ipv6.remove(&key);
-            }
-        }
-    });
-
     info!("Waiting for Ctrl-C...");
 
     if header {
@@ -1002,8 +950,11 @@ where
     };
 
     let mut entry = flow_map.entry(flow_id.clone()).or_insert_with(|| {
-
-        expirations.lock().unwrap().push(flow_id.clone(), ts + Duration::from_secs(lifespan));
+        if let Ok(mut expirations) = expirations.lock() {
+            expirations.push(flow_id.clone(), ts + Duration::from_secs(lifespan));
+        } else {
+            error!("Failed to lock expirations for inserting new flow_id");
+        }
 
         if fwd {
             T::new(flow_id.clone(), source, source_port, destination, destination_port, protocol, ts_date)
@@ -1013,42 +964,67 @@ where
     });
 
     let flows_to_remove = {
-        let expirations_to_remove = expirations.lock().unwrap();
-        let mut flows_to_remove = Vec::new();
-
-        for (flow_id, &expiration) in expirations_to_remove.iter() {
-            if expiration <= ts {
-                flows_to_remove.push(flow_id.clone());
-            } else {
-                break;
+        match expirations.lock() {
+            Ok(expirations) => expirations.iter()
+                .take_while(|&(_, &expiration)| expiration <= ts)
+                .map(|(flow_id, _)| flow_id.clone())
+                .collect::<Vec<String>>(),
+            Err(e) => {
+                error!("Failed to lock expirations for collecting flows to remove: {:?}", e);
+                Vec::new()
             }
         }
-
-        flows_to_remove
     };
 
-    // Remove the expired flows
-    {
-        let mut expirations = expirations.lock().unwrap();
+    let mut dumps = Vec::new();
 
-        for flow_id in flows_to_remove {
-            expirations.remove(&flow_id);
-            flow_map.remove(&flow_id);
+    {
+        let mut expirations = expirations.lock().unwrap_or_else(|e| {
+            error!("Failed to lock expirations for removing expired flows: {:?}", e);
+            e.into_inner()
+        });
+
+        for flow_id in &flows_to_remove {
+            if let Some(flow) = flow_map.get(flow_id) {
+                let dump = if *NO_CONTAMINANT_FEATURES.lock().unwrap_or_else(|e| {
+                    error!("Failed to lock NO_CONTAMINANT_FEATURES for dumping flow: {:?}", e);
+                    e.into_inner()
+                }) {
+                    flow.dump_without_contamination()
+                } else {
+                    flow.dump()
+                };
+                dumps.push(dump);
+                drop(flow);
+            } else {
+                error!("Flow id {} not found in flow_map", flow_id);
+            }
+            expirations.remove(flow_id);
         }
     }
 
-    let end = entry.update_flow(&features, &ts, ts_date, fwd);
-    if end.is_some() {
-        let flow = entry.value();
-        if *NO_CONTAMINANT_FEATURES.lock().unwrap().deref() {
-            export(&flow.dump_without_contamination());
-        } else {
-            export(&flow.dump());
-        }
+    // Remove flows from flow_map outside of any locks
+    for flow_id in &flows_to_remove {
+        flow_map.remove(flow_id);
+    }
+
+    // Export the dumps outside of the lock scope
+    for dump in dumps {
+        export(&dump);
+    }
+
+    if let Some(end) = entry.update_flow(&features, &ts, ts_date, fwd) {
+        export(&end);
         drop(entry);
         flow_map.remove(&flow_id);
+        if let Ok(mut expirations) = expirations.lock() {
+            expirations.remove(&flow_id);
+        } else {
+            eprintln!("Failed to lock expirations for removing flow_id after update");
+        }
     }
 }
+
 
 /// Redirects an ipv4 packet to the correct flow.
 ///
