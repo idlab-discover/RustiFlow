@@ -29,12 +29,7 @@ use flows::{
 use lazy_static::lazy_static;
 use log::{debug, error, info};
 use pnet::packet::{
-    ethernet::{EtherTypes, EthernetPacket},
-    ip::IpNextHeaderProtocols,
-    ipv4::Ipv4Packet,
-    ipv6::Ipv6Packet,
-    tcp::TcpPacket,
-    Packet,
+    ethernet::{EtherTypes, EthernetPacket}, icmp::IcmpPacket, icmpv6::Icmpv6Packet, ip::IpNextHeaderProtocols, ipv4::Ipv4Packet, ipv6::Ipv6Packet, tcp::TcpPacket, Packet
 };
 use std::{
     fs::{File, OpenOptions},
@@ -1123,7 +1118,7 @@ fn extract_ipv4_features(ipv4_packet: &Ipv4Packet) -> Option<BasicFeaturesIpv4> 
 
     let mut window_size: u16 = 0;
 
-    if protocol.0 == IpNextHeaderProtocols::Tcp.0 {
+    if protocol == IpNextHeaderProtocols::Tcp {
         if let Some(tcp_packet) = TcpPacket::new(ipv4_packet.payload()) {
             source_port = tcp_packet.get_source();
             destination_port = tcp_packet.get_destination();
@@ -1138,7 +1133,7 @@ fn extract_ipv4_features(ipv4_packet: &Ipv4Packet) -> Option<BasicFeaturesIpv4> 
         } else {
             return None;
         }
-    } else if protocol.0 == IpNextHeaderProtocols::Udp.0 {
+    } else if protocol == IpNextHeaderProtocols::Udp {
         if let Some(udp_packet) = pnet::packet::udp::UdpPacket::new(ipv4_packet.payload()) {
             source_port = udp_packet.get_source();
             destination_port = udp_packet.get_destination();
@@ -1146,6 +1141,19 @@ fn extract_ipv4_features(ipv4_packet: &Ipv4Packet) -> Option<BasicFeaturesIpv4> 
             data_length = udp_packet.payload().len() as u16;
             header_length = 8;
             length = udp_packet.get_length();
+        } else {
+            return None;
+        }
+    } else if protocol == IpNextHeaderProtocols::Icmp {
+        if let Some(icmp_packet) = IcmpPacket::new(ipv4_packet.payload()) {
+            // For ICMP, we will extract the type and code, along with data length
+            // let icmp_type = icmp_packet.get_icmp_type();
+            // let icmp_code = icmp_packet.get_icmp_code();
+            source_port = 0; // ICMPv6 does not have ports
+            destination_port = 0;
+            data_length = icmp_packet.payload().len() as u16;
+            header_length = 8; // ICMP header length
+            length = ipv4_packet.get_total_length();
         } else {
             return None;
         }
@@ -1215,6 +1223,19 @@ fn extract_ipv6_features(ipv6_packet: &Ipv6Packet) -> Option<BasicFeaturesIpv6> 
             data_length = udp_packet.payload().len() as u16;
             header_length = 8;
             length = udp_packet.get_length();
+        } else {
+            return None;
+        }
+    } else if protocol == IpNextHeaderProtocols::Icmpv6 {
+        if let Some(icmpv6_packet) = Icmpv6Packet::new(ipv6_packet.payload()) {
+            // For ICMPv6, we will just extract the type and code for now, along with data length
+            // let icmpv6_type = icmpv6_packet.get_icmpv6_type();
+            // let icmpv6_code = icmpv6_packet.get_icmpv6_code();
+            source_port = 0; // ICMPv6 does not have ports
+            destination_port = 0;
+            data_length = icmpv6_packet.payload().len() as u16;
+            header_length = 8; // ICMPv6 header length
+            length = ipv6_packet.packet().len() as u16;
         } else {
             return None;
         }

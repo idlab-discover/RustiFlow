@@ -15,6 +15,7 @@ use network_types::{
     ip::{IpProto, Ipv6Hdr},
     tcp::TcpHdr,
     udp::UdpHdr,
+    icmp::IcmpHdr,
 };
 
 #[panic_handler]
@@ -49,6 +50,7 @@ fn process_ipv6_packet(ctx: &TcContext) -> Result<i32, ()> {
     match ipv6hdr.next_hdr {
         IpProto::Tcp => process_tcp_packet(ctx, packet_info),
         IpProto::Udp => process_udp_packet(ctx, packet_info),
+        IpProto::Icmp => process_icmp_packet(ctx, packet_info),
         _ => Ok(TC_ACT_PIPE),
     }
 }
@@ -67,6 +69,15 @@ fn process_udp_packet(ctx: &TcContext, packet_info: PacketInfo) -> Result<i32, (
         .load::<UdpHdr>(EthHdr::LEN + Ipv6Hdr::LEN)
         .map_err(|_| ())?;
     let packet_log = packet_info.to_packet_log(&udphdr);
+    EVENTS_IPV6.output(ctx, &packet_log, 0);
+    Ok(TC_ACT_PIPE)
+}
+
+fn process_icmp_packet(ctx: &TcContext, packet_info: PacketInfo) -> Result<i32, ()> {
+    let icmphdr = ctx
+        .load::<IcmpHdr>(EthHdr::LEN + Ipv6Hdr::LEN)
+        .map_err(|_| ())?;
+    let packet_log = packet_info.to_packet_log(&icmphdr);
     EVENTS_IPV6.output(ctx, &packet_log, 0);
     Ok(TC_ACT_PIPE)
 }
@@ -152,5 +163,23 @@ impl NetworkHeader for UdpHdr {
     }
     fn header_length(&self) -> u8 {
         UdpHdr::LEN as u8
+    }
+}
+
+impl NetworkHeader for IcmpHdr {
+    fn source_port(&self) -> u16 {
+        0
+    }
+    fn destination_port(&self) -> u16 {
+        0
+    }
+    fn window_size(&self) -> u16 {
+        0
+    }
+    fn combined_flags(&self) -> u8 {
+        0
+    }
+    fn header_length(&self) -> u8 {
+        IcmpHdr::LEN as u8
     }
 }
