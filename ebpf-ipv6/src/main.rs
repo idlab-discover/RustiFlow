@@ -1,6 +1,6 @@
 #![no_std]
 #![no_main]
-#![allow(nonstandard_style, dead_code)]
+#![allow(nonstandard_style)]
 
 use aya_ebpf::{
     bindings::TC_ACT_PIPE,
@@ -9,7 +9,7 @@ use aya_ebpf::{
     programs::TcContext,
 };
 
-use common::BasicFeaturesIpv6;
+use common::EbpfEventIpv6;
 use network_types::{
     eth::{EthHdr, EtherType},
     ip::{IpProto, Ipv6Hdr},
@@ -24,7 +24,7 @@ fn panic(_info: &core::panic::PanicInfo) -> ! {
 }
 
 #[map]
-static EVENTS_IPV6: PerfEventArray<BasicFeaturesIpv6> =
+static EVENTS_IPV6: PerfEventArray<EbpfEventIpv6> =
     PerfEventArray::with_max_entries(1024 * 1024, 0);
 
 #[classifier]
@@ -36,48 +36,30 @@ pub fn tc_flow_track(ctx: TcContext) -> i32 {
 }
 
 fn process_packet(ctx: &TcContext) -> Result<i32, ()> {
-    let ethhdr = ctx.load::<EthHdr>(0).map_err(|_| ())?;
-    match ethhdr.ether_type {
-        EtherType::Ipv6 => process_ipv6_packet(ctx),
-        _ => Ok(TC_ACT_PIPE),
+    let ether_type = ctx.load::<EthHdr>(0).map_err(|_| ())?.ether_type;
+    if ether_type != EtherType::Ipv6 {
+        return Ok(TC_ACT_PIPE);
     }
-}
-
-fn process_ipv6_packet(ctx: &TcContext) -> Result<i32, ()> {
+    
     let ipv6hdr = ctx.load::<Ipv6Hdr>(EthHdr::LEN).map_err(|_| ())?;
     let packet_info = PacketInfo::new(&ipv6hdr, ctx.data_end() - ctx.data())?;
 
     match ipv6hdr.next_hdr {
-        IpProto::Tcp => process_tcp_packet(ctx, packet_info),
-        IpProto::Udp => process_udp_packet(ctx, packet_info),
-        IpProto::Icmp => process_icmp_packet(ctx, packet_info),
+        IpProto::Tcp => process_transport_packet::<TcpHdr>(ctx, packet_info),
+        IpProto::Udp => process_transport_packet::<UdpHdr>(ctx, packet_info),
+        IpProto::Icmp => process_transport_packet::<IcmpHdr>(ctx, packet_info),
         _ => Ok(TC_ACT_PIPE),
     }
 }
 
-fn process_tcp_packet(ctx: &TcContext, packet_info: PacketInfo) -> Result<i32, ()> {
+fn process_transport_packet<T: NetworkHeader>(
+    ctx: &TcContext, 
+    packet_info: PacketInfo
+) -> Result<i32, ()> {
     let tcphdr = ctx
-        .load::<TcpHdr>(EthHdr::LEN + Ipv6Hdr::LEN)
+        .load::<T>(EthHdr::LEN + Ipv6Hdr::LEN)
         .map_err(|_| ())?;
     let packet_log = packet_info.to_packet_log(&tcphdr);
-    EVENTS_IPV6.output(ctx, &packet_log, 0);
-    Ok(TC_ACT_PIPE)
-}
-
-fn process_udp_packet(ctx: &TcContext, packet_info: PacketInfo) -> Result<i32, ()> {
-    let udphdr = ctx
-        .load::<UdpHdr>(EthHdr::LEN + Ipv6Hdr::LEN)
-        .map_err(|_| ())?;
-    let packet_log = packet_info.to_packet_log(&udphdr);
-    EVENTS_IPV6.output(ctx, &packet_log, 0);
-    Ok(TC_ACT_PIPE)
-}
-
-fn process_icmp_packet(ctx: &TcContext, packet_info: PacketInfo) -> Result<i32, ()> {
-    let icmphdr = ctx
-        .load::<IcmpHdr>(EthHdr::LEN + Ipv6Hdr::LEN)
-        .map_err(|_| ())?;
-    let packet_log = packet_info.to_packet_log(&icmphdr);
     EVENTS_IPV6.output(ctx, &packet_log, 0);
     Ok(TC_ACT_PIPE)
 }
@@ -99,8 +81,9 @@ impl PacketInfo {
         })
     }
 
-    fn to_packet_log<T: NetworkHeader>(&self, header: &T) -> BasicFeaturesIpv6 {
-        BasicFeaturesIpv6::new(
+    #[inline(always)]
+    fn to_packet_log<T: NetworkHeader>(&self, header: &T) -> EbpfEventIpv6 {
+        EbpfEventIpv6::new(
             self.ipv6_destination,
             self.ipv6_source,
             header.destination_port(),

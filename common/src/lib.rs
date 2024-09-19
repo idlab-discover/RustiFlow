@@ -2,7 +2,7 @@
 /// BasicFeaturesIpv4 is a struct collection all ipv4 traffic data and is 24 bytes in size.
 #[repr(C)]
 #[derive(Copy, Clone, Debug, Hash, Eq, PartialEq)]
-pub struct BasicFeaturesIpv4 {
+pub struct EbpfEventIpv4 {
     pub ipv4_destination: u32,
     pub ipv4_source: u32,
     pub port_destination: u16,
@@ -16,7 +16,7 @@ pub struct BasicFeaturesIpv4 {
     pub _padding: [u8; 3], // Explicit padding to match the size of the struct in the eBPF program
 }
 
-impl BasicFeaturesIpv4 {
+impl EbpfEventIpv4 {
     pub fn new(
         ipv4_destination: u32,
         ipv4_source: u32,
@@ -29,7 +29,7 @@ impl BasicFeaturesIpv4 {
         protocol: u8,
         header_length: u8,
     ) -> Self {
-        BasicFeaturesIpv4 {
+        EbpfEventIpv4 {
             ipv4_destination,
             ipv4_source,
             port_destination,
@@ -46,12 +46,12 @@ impl BasicFeaturesIpv4 {
 }
 
 #[cfg(feature = "user")]
-unsafe impl aya::Pod for BasicFeaturesIpv4 {}
+unsafe impl aya::Pod for EbpfEventIpv4 {}
 
 /// BasicFeaturesIpv6 is a struct collection all ipv6 traffic data and is 48 bytes in size.
 #[repr(C)]
 #[derive(Clone, Copy)]
-pub struct BasicFeaturesIpv6 {
+pub struct EbpfEventIpv6 {
     pub ipv6_destination: u128,
     pub ipv6_source: u128,
     pub port_destination: u16,
@@ -65,7 +65,7 @@ pub struct BasicFeaturesIpv6 {
     _padding: [u8; 3], // Explicit padding to match the size of the struct in the eBPF program
 }
 
-impl BasicFeaturesIpv6 {
+impl EbpfEventIpv6 {
     pub fn new(
         ipv6_destination: u128,
         ipv6_source: u128,
@@ -78,7 +78,7 @@ impl BasicFeaturesIpv6 {
         protocol: u8,
         header_length: u8,
     ) -> Self {
-        BasicFeaturesIpv6 {
+        EbpfEventIpv6 {
             ipv6_destination,
             ipv6_source,
             port_destination,
@@ -95,4 +95,4 @@ impl BasicFeaturesIpv6 {
 }
 
 #[cfg(feature = "user")]
-unsafe impl aya::Pod for BasicFeaturesIpv6 {}
+unsafe impl aya::Pod for EbpfEventIpv6 {}

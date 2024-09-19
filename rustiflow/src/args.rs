@@ -5,6 +5,14 @@ use clap::{Args, Parser, Subcommand};
 pub struct Cli {
     #[clap(subcommand)]
     pub command: Commands,
+
+    /// Configuration options common to both real-time and pcap modes
+    #[clap(flatten)]
+    pub config: ExportConfig,
+
+    /// Output method
+    #[clap(flatten)]
+    pub output: OutputConfig,
 }
 
 #[derive(Debug, Subcommand)]
@@ -13,68 +21,56 @@ pub enum Commands {
     Realtime {
         /// The network interface to capture packets from
         interface: String,
-
-        #[clap(value_enum)]
-        flow_type: FlowType,
-
-        /// The maximum lifespan of a flow in seconds
-        lifespan: u64,
-
-        /// Whether not to include contaminant features
-        #[clap(short, long, action = clap::ArgAction::SetTrue)]
-        no_contaminant_features: bool,
-
-        /// Whether to add the header
-        #[clap(short, long, action = clap::ArgAction::SetTrue)]
-        feature_header: bool,
-
-        /// Only ingress traffic will be captured
-        #[clap(short, long, action = clap::ArgAction::SetTrue)]
-        only_ingress: bool,
-
-        /// Output method
-        #[clap(flatten)]
-        export_method: Output,
-
-        /// The print interval for open flows in seconds, needs to be smaller than the flow maximum lifespan
-        #[clap(long)]
-        interval: Option<u64>,
     },
 
     /// Feature extraction from a pcap file
     Pcap {
-        #[clap(value_enum)]
-        flow_type: FlowType,
-
-        /// The maximum lifespan of a flow in seconds
-        lifespan: u64,
-
         /// The relative path to the pcap file
         path: String,
-
-        /// Whether not to include contaminant features
-        #[clap(short, long, action = clap::ArgAction::SetTrue)]
-        no_contaminant_features: bool,
-
-        /// Whether to add the header
-        #[clap(short, long, action = clap::ArgAction::SetTrue)]
-        feature_header: bool,
-
-        /// Output method
-        #[clap(flatten)]
-        export_method: Output,
     },
 }
 
 #[derive(Args, Debug, Clone)]
-pub struct Output {
+pub struct ExportConfig {
+    /// The feature set to use
+    #[clap(short, long, value_enum)]
+    pub features: FlowType,
+
+    /// The maximum time a flow is allowed to last in seconds (default: 3600)
+    #[clap(long, default_value_t = 3600)]
+    pub active_timeout: u64,
+
+    /// The maximum time with no packets for a flow in seconds (default: 120)
+    #[clap(long, default_value_t = 120)]
+    pub idle_timeout: u64,
+
+    /// The print interval for open flows in seconds, needs to be smaller than the flow maximum lifespan
+    #[clap(long)]
+    pub early_export: Option<u64>,
+
+    /// The numbers of threads to use for processing packets
+    /// (default: number of logical CPUs)
+    #[clap(short, long)]
+    pub threads: Option<u8>,
+}
+
+#[derive(Args, Debug, Clone)]
+pub struct OutputConfig {
     /// Output method
-    #[clap(value_enum)]
-    pub method: ExportMethodType,
+    #[clap(short, long, value_enum)]
+    pub output: ExportMethodType,
 
     /// File path for output (used if method is Csv)
-    #[clap(required_if_eq("method", "Csv"))]
+    #[clap(required_if_eq("output", "csv"))]
     pub export_path: Option<String>,
+
+    /// Whether to export the feature header
+    #[clap(long, action = clap::ArgAction::SetTrue)]
+    pub header: bool,
+
+    /// Whether to drop contaminant features
+    #[clap(long, action = clap::ArgAction::SetFalse)]
+    pub drop_contaminant_features: bool,
 }
 
 #[derive(clap::ValueEnum, Clone, Debug)]
@@ -89,20 +85,20 @@ pub enum ExportMethodType {
 #[derive(clap::ValueEnum, Clone, Debug)]
 pub enum FlowType {
     /// A basic flow that stores the basic features of a flow.
-    BasicFlow,
+    Basic,
 
     /// Represents the CIC Flow, giving 83 features.
-    CicFlow,
+    CIC,
 
     /// Represents the CIDDS Flow, giving 10 features.
-    CiddsFlow,
+    CIDDS,
 
     /// Represents a nfstream inspired flow, giving 69 features.
-    NfFlow,
+    Nfstream,
 
     /// Represents the NTL Flow, giving 120 features.
-    NtlFlow,
+    NTL,
 
     /// Represents a flow that you can implement yourself.
-    CustomFlow,
+    Custom,
 }
