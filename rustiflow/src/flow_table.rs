@@ -124,7 +124,9 @@ where
     }
 
     pub async fn export_flow(&self, flow: T) {
-        if let Err(e) = self.export_channel.send(flow).await {
+        if self.export_channel.is_closed() {
+            error!("Failed to send flow: export channel is closed");
+        } else if let Err(e) = self.export_channel.send(flow).await {
             error!("Failed to send flow: {}", e);
         }
     }

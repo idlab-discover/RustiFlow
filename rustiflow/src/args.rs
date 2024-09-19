@@ -69,7 +69,7 @@ pub struct OutputConfig {
     pub header: bool,
 
     /// Whether to drop contaminant features
-    #[clap(long, action = clap::ArgAction::SetFalse)]
+    #[clap(long, action = clap::ArgAction::SetTrue)]
     pub drop_contaminant_features: bool,
 }
 

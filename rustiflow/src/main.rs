@@ -38,18 +38,35 @@ async fn main() {
         Commands::Realtime { interface } => {
             macro_rules! execute_realtime {
                 ($flow_ty:ty) => {{
-                    // Create output writer and channel for exporting flows
-                    let (sender, receiver) = mpsc::channel::<$flow_ty>(1000);
-                    let output_writer = OutputWriter::new(
+                    // Create output writer and initialize it
+                    let mut output_writer = OutputWriter::<$flow_ty>::new(
                         cli.output.output,
                         cli.output.header,
                         cli.output.drop_contaminant_features,
-                        receiver,
                         cli.output.export_path,
                     );
 
-                    // Start the output writer in separate task
-                    let _output_writer_task = tokio::spawn(output_writer.run());
+                    // Synchronous initialization to ensure headers are written
+                    output_writer.init(); 
+
+                    // Create channel for exporting flows
+                    let (sender, mut receiver) = mpsc::channel::<$flow_ty>(1000);
+
+                    // Start the output writer in a separate task
+                    let output_task = tokio::spawn(async move {
+                        while let Some(flow) = receiver.recv().await {
+                            if let Err(e) = output_writer.write_flow(flow) {
+                                error!("Error writing flow: {:?}", e);
+                            }
+                        }
+
+                        // Ensure that all remaining flows are flushed properly before ending
+                        output_writer.flush_and_close().unwrap_or_else(|e| {
+                            error!("Error flushing and closing the writer: {:?}", e);
+                        });
+                        debug!("OutputWriter task finished");
+                    });
+                    
                     if let Err(err) = handle_realtime::<$flow_ty>(
                         &interface,
                         sender, 
@@ -60,6 +77,11 @@ async fn main() {
                     ).await {
                         error!("Error: {:?}", err);
                     }
+
+                    // Wait for the output task to finish
+                    output_task.await.unwrap_or_else(|e| {
+                        error!("Error waiting for output task: {:?}", e);
+                    });
                 }};
             }
 
@@ -75,18 +97,35 @@ async fn main() {
         Commands::Pcap { path } => {
             macro_rules! execute_offline {
                 ($flow_ty:ty) => {{
-                    // Create output writer and channel for exporting flows
-                    let (sender, receiver) = mpsc::channel::<$flow_ty>(1000);
-                    let output_writer = OutputWriter::new(
+                    // Create output writer and initialize it
+                    let mut output_writer = OutputWriter::<$flow_ty>::new(
                         cli.output.output,
                         cli.output.header,
                         cli.output.drop_contaminant_features,
-                        receiver,
                         cli.output.export_path,
                     );
 
-                    // Start the output writer in separate task
-                    let _output_writer_task = tokio::spawn(output_writer.run());
+                    output_writer.init(); // Synchronous initialization to ensure headers are written
+
+                    // Create channel for exporting flows
+                    let (sender, mut receiver) = mpsc::channel::<$flow_ty>(1000);
+
+                    // Start the output writer in a separate task
+                    let output_task = tokio::spawn(async move {
+                        while let Some(flow) = receiver.recv().await {
+                            debug!("Exporting flow");
+                            if let Err(e) = output_writer.write_flow(flow) {
+                                error!("Error writing flow: {:?}", e);
+                            }
+                        }
+
+                        // Ensure that all remaining flows are flushed properly before ending
+                        output_writer.flush_and_close().unwrap_or_else(|e| {
+                            error!("Error flushing and closing the writer: {:?}", e);
+                        });
+                        debug!("OutputWriter task finished");
+                    });
+
                     if let Err(err) = read_pcap_file::<$flow_ty>(
                         &path, 
                         sender,
@@ -97,6 +136,11 @@ async fn main() {
                      ).await {
                         error!("Error: {:?}", err);
                     }
+
+                    // Wait for the output task to finish
+                    output_task.await.unwrap_or_else(|e| {
+                        error!("Error waiting for output task: {:?}", e);
+                    });
                 }};
             }
 
