@@ -53,13 +53,18 @@ where
         // Update the flow if it exists, otherwise create a new flow
         if let Some(mut flow) = self.flow_map.remove(&flow_key) {
             if flow.is_expired(packet.timestamp, self.active_timeout, self.idle_timeout) {
+                debug!("Flow expired: {:?}, Creating new Flow", flow.flow_key());
                 self.export_flow(flow).await;
                 self.create_and_insert_flow(packet).await;
             } else {
-                self.update_flow_with_packet(&mut flow, packet).await;
-                self.flow_map.insert(flow_key, flow);
+                debug!("Updating flow: {:?}", flow.flow_key());
+                let is_terminated = self.update_flow_with_packet(&mut flow, packet).await;
+                if !is_terminated {
+                    self.flow_map.insert(flow_key, flow);
+                }
             }
         } else {
+            debug!("Creating new Flow: {:?}", packet.flow_key());
             self.create_and_insert_flow(packet).await;
         }
     }
@@ -77,14 +82,14 @@ where
         );
         self.update_flow_with_packet(&mut new_flow, packet).await;
         self.flow_map.insert(packet.flow_key(), new_flow);
-        debug!("New flow created: {:?}", packet.flow_key());
     }
     
     /// Updates a flow with a packet and exports flow if terminated.
-    async fn update_flow_with_packet(&mut self, flow: &mut T, packet: &PacketFeatures) {
+    /// 
+    /// Returns a boolean indicating if the flow is terminated.
+    async fn update_flow_with_packet(&mut self, flow: &mut T, packet: &PacketFeatures) -> bool {
         let is_forward = *flow.flow_key() == packet.flow_key();
         let flow_terminated = flow.update_flow(&packet, is_forward);
-        debug!("Flow updated: {:?}", flow.flow_key());
 
         if flow_terminated {
             // If terminated, export the flow
@@ -95,6 +100,7 @@ where
                 self.export_flow(flow.clone()).await;
             }
         }
+        flow_terminated
     }
 
     /// Export all flows in the flow map in order of first packet arrival.

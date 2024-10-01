@@ -1,7 +1,6 @@
 use std::net::IpAddr;
 
 use chrono::{DateTime, Utc};
-use log::debug;
 
 use crate::packet_features::PacketFeatures;
 
@@ -149,7 +148,6 @@ impl Flow for BasicFlow {
         }
 
         if fwd {
-            debug!("Incrementing forward packet count");
             self.fwd_packet_count += 1;
             self.fwd_fin_flag_count += u32::from(packet.fin_flag);
             self.fwd_syn_flag_count += u32::from(packet.syn_flag);
@@ -160,7 +158,6 @@ impl Flow for BasicFlow {
             self.fwd_cwe_flag_count += u32::from(packet.cwe_flag);
             self.fwd_ece_flag_count += u32::from(packet.ece_flag);
         } else {
-            debug!("Incrementing backward packet count");
             self.bwd_packet_count += 1;
             self.bwd_fin_flag_count += u32::from(packet.fin_flag);
             self.bwd_syn_flag_count += u32::from(packet.syn_flag);
