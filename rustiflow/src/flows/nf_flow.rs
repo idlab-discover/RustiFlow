@@ -68,7 +68,7 @@ impl Flow for NfFlow {
 
     fn dump(&self) -> String {
         format!("{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{}",
-            self.cic_flow.basic_flow.flow_id,
+            self.cic_flow.basic_flow.flow_key,
             self.cic_flow.basic_flow.ip_source,
             self.cic_flow.basic_flow.port_source,
             self.cic_flow.basic_flow.ip_destination,
@@ -250,5 +250,9 @@ impl Flow for NfFlow {
     
     fn is_expired(&self, timestamp: DateTime<Utc>, active_timeout: u64, idle_timeout: u64) -> bool {
         self.cic_flow.is_expired(timestamp, active_timeout, idle_timeout)
+    }
+    
+    fn flow_key(&self) -> &String {
+        &self.cic_flow.basic_flow.flow_key
     }
 }

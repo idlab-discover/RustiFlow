@@ -1,5 +1,5 @@
 use std::hash::{DefaultHasher, Hash, Hasher};
-use std::{net::IpAddr, time::Instant};
+use std::net::IpAddr;
 
 use crate::{flow_table::FlowTable, packet_features::PacketFeatures};
 use crate::Flow;
@@ -36,8 +36,7 @@ pub async fn read_pcap_file<T>(
 where
     T: Flow,
 {
-    let start = Instant::now();
-    debug!("Reading the pcap file: {:?} ...", path);
+    debug!("Opening the pcap file: {:?} ...", path);
 
     let mut pcap_capture = match pcap::Capture::from_file(path) {
         Ok(c) => c,
@@ -47,6 +46,7 @@ where
         }
     };
 
+    // Create sharded FlowTables each in their own task and returns channels to send packets to the shards
     let buffer_num_packets = 10_000;
     let shard_senders = create_shard_senders::<T>(
         num_threads, 
@@ -57,6 +57,7 @@ where
         early_export
     );
 
+    debug!("Reading the pcap file: {:?} ...", path);
     while let Ok(packet) = pcap_capture.next_packet() {
         // Convert TimeVal from packet capture to DateTime<Utc>
         let timestamp = DateTime::from_timestamp(packet.header.ts.tv_sec, (packet.header.ts.tv_usec * 1000) as u32).unwrap();
@@ -95,12 +96,7 @@ where
             error!("Error parsing packet...");
         }
     }
-
-    let end = Instant::now();
-    debug!(
-        "Duration: {:?} milliseconds",
-        end.duration_since(start).as_millis()
-    );
+    debug!("Finished reading the pcap file: {:?}", path);
     Ok(())
 }
 
@@ -280,6 +276,7 @@ fn create_shard_senders<T>(
 where
     T: Flow,
 {
+    debug!("Creating {} sharded FlowTables...", num_shards);
     let mut shard_senders = Vec::with_capacity(num_shards as usize);
     for _ in 0..num_shards {
         let (tx, mut rx) = mpsc::channel::<PacketFeatures>(buffer_num_packets);
@@ -294,6 +291,7 @@ where
         });
         shard_senders.push(tx);
     }
+    debug!("Sharded FlowTables created");
 
     shard_senders
 }

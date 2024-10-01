@@ -80,6 +80,10 @@ impl Flow for CustomFlow {
     fn is_expired(&self, timestamp: DateTime<Utc>, active_timeout: u64, idle_timeout: u64) -> bool {
         self.basic_flow.is_expired(timestamp, active_timeout, idle_timeout)
     }
+    
+    fn flow_key(&self) -> &String {
+        &self.basic_flow.flow_key
+    }
 }
 
 #[cfg(test)]

@@ -20,6 +20,7 @@ use flows::{
 use log::{debug, error};
 use output::OutputWriter;
 use tokio::sync::mpsc;
+use std::time::Instant;
 
 #[tokio::main]
 async fn main() {
@@ -67,6 +68,8 @@ async fn main() {
                         debug!("OutputWriter task finished");
                     });
                     
+                    
+                    let start = Instant::now();
                     if let Err(err) = handle_realtime::<$flow_ty>(
                         &interface,
                         sender, 
@@ -82,6 +85,12 @@ async fn main() {
                     output_task.await.unwrap_or_else(|e| {
                         error!("Error waiting for output task: {:?}", e);
                     });
+
+                    let end = Instant::now();
+                    debug!(
+                        "Duration: {:?} milliseconds",
+                        end.duration_since(start).as_millis()
+                    );
                 }};
             }
 
@@ -105,7 +114,8 @@ async fn main() {
                         cli.output.export_path,
                     );
 
-                    output_writer.init(); // Synchronous initialization to ensure headers are written
+                    // Synchronous initialization to ensure headers are written
+                    output_writer.init();
 
                     // Create channel for exporting flows
                     let (sender, mut receiver) = mpsc::channel::<$flow_ty>(1000);
@@ -113,7 +123,6 @@ async fn main() {
                     // Start the output writer in a separate task
                     let output_task = tokio::spawn(async move {
                         while let Some(flow) = receiver.recv().await {
-                            debug!("Exporting flow");
                             if let Err(e) = output_writer.write_flow(flow) {
                                 error!("Error writing flow: {:?}", e);
                             }
@@ -125,6 +134,8 @@ async fn main() {
                         });
                         debug!("OutputWriter task finished");
                     });
+
+                    let start = Instant::now();
 
                     if let Err(err) = read_pcap_file::<$flow_ty>(
                         &path, 
@@ -141,6 +152,12 @@ async fn main() {
                     output_task.await.unwrap_or_else(|e| {
                         error!("Error waiting for output task: {:?}", e);
                     });
+
+                    let end = Instant::now();
+                    debug!(
+                        "Duration: {:?} milliseconds",
+                        end.duration_since(start).as_millis()
+                    );
                 }};
             }
 

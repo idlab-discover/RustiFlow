@@ -1,6 +1,7 @@
 use std::net::IpAddr;
 
 use chrono::{DateTime, Utc};
+use log::debug;
 
 use crate::packet_features::PacketFeatures;
 
@@ -10,7 +11,7 @@ use super::flow::Flow;
 #[derive(Clone)]
 pub struct BasicFlow {
     /// The unique identifier of the flow.
-    pub flow_id: String,
+    pub flow_key: String,
     /// The destination IP address of the flow.
     pub ip_destination: IpAddr,
     /// The source IP address of the flow.
@@ -106,7 +107,7 @@ impl Flow for BasicFlow {
         first_timestamp: DateTime<Utc>,
     ) -> Self {
         BasicFlow {
-            flow_id,
+            flow_key: flow_id,
             ip_destination,
             ip_source,
             port_destination,
@@ -148,6 +149,7 @@ impl Flow for BasicFlow {
         }
 
         if fwd {
+            debug!("Incrementing forward packet count");
             self.fwd_packet_count += 1;
             self.fwd_fin_flag_count += u32::from(packet.fin_flag);
             self.fwd_syn_flag_count += u32::from(packet.syn_flag);
@@ -158,6 +160,7 @@ impl Flow for BasicFlow {
             self.fwd_cwe_flag_count += u32::from(packet.cwe_flag);
             self.fwd_ece_flag_count += u32::from(packet.ece_flag);
         } else {
+            debug!("Incrementing backward packet count");
             self.bwd_packet_count += 1;
             self.bwd_fin_flag_count += u32::from(packet.fin_flag);
             self.bwd_syn_flag_count += u32::from(packet.syn_flag);
@@ -183,7 +186,7 @@ impl Flow for BasicFlow {
         format!(
             "{},{},{},{},{},{},{},{},{},{},{},{},{},\
         {},{},{},{},{},{},{},{},{},{},{},{},{},{},{}",
-            self.flow_id,
+            self.flow_key,
             self.ip_source,
             self.port_source,
             self.ip_destination,
@@ -279,5 +282,9 @@ impl Flow for BasicFlow {
         }
 
         false
+    }
+    
+    fn flow_key(&self) -> &String {
+        &self.flow_key
     }
 }

@@ -26,11 +26,9 @@ where
             ExportMethodType::Csv => {
                 let path = file_path.clone().expect("File path required for CSV output");
                 let file = File::create(&path).expect("Failed to create file");
-                BufWriter::new(Box::new(file) as Box<dyn Write + Send>)
+                BufWriter::new(Box::new(file))
             }
-            ExportMethodType::Print => {
-                BufWriter::new(Box::new(std::io::stdout()) as Box<dyn Write + Send>)
-            }
+            ExportMethodType::Print => BufWriter::new(Box::new(std::io::stdout())),
         };
 
         OutputWriter {
@@ -46,8 +44,6 @@ where
         if self.write_header {
             if let Err(e) = self.write_header() {
                 error!("Error writing header: {}", e);
-            } else if let Err(e) = self.writer.flush() {
-                error!("Error flushing writer after writing header: {}", e);
             }
         }
         debug!("Output writer initialized");
@@ -61,14 +57,13 @@ where
             flow.dump()
         };
     
-        writeln!(self.writer, "{}", flow_str)?;
-        self.writer.flush()?;
-        Ok(())
+        writeln!(self.writer, "{}", flow_str)
     }
 
+    /// Flushes the writer and closes the output file
+    /// Explicitly called in the main function to ensure all data is written
     pub fn flush_and_close(&mut self) -> std::io::Result<()> {
-        self.writer.flush()?; // Ensure all data is written
-        Ok(())
+        self.writer.flush() // Ensure all data is written
     }
 
     // Private method for writing the header
