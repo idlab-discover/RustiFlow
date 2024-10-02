@@ -5,7 +5,7 @@ use bytes::BytesMut;
 use log::{error, info};
 use tokio::{signal, sync::mpsc::{self, Sender}};
 use crate::debug;
-use aya::{include_bytes_aligned, maps::AsyncPerfEventArray, programs::{tc, SchedClassifier, TcAttachType}, Ebpf};
+use aya::{include_bytes_aligned, maps::AsyncPerfEventArray, programs::{tc, SchedClassifier, TcAttachType}, Bpf};
 
 
 static TOTAL_LOST_EVENTS: AtomicU64 = AtomicU64::new(0);
@@ -119,14 +119,14 @@ fn bump_memlock_rlimit() {
     }
 }
 
-fn load_ebpf_ipv4(interface: &str, tc_attach_type: TcAttachType) -> Result<Ebpf, anyhow::Error> {
+fn load_ebpf_ipv4(interface: &str, tc_attach_type: TcAttachType) -> Result<Bpf, anyhow::Error> {
     // Loading the eBPF program, the macros make sure the correct file is loaded
     #[cfg(debug_assertions)]
-    let mut bpf_ipv4 = Ebpf::load(include_bytes_aligned!(
+    let mut bpf_ipv4 = Bpf::load(include_bytes_aligned!(
         "../../target/bpfel-unknown-none/debug/rustiflow-ebpf-ipv4"
     ))?;
     #[cfg(not(debug_assertions))]
-    let mut bpf_ipv4 = Ebpf::load(include_bytes_aligned!(
+    let mut bpf_ipv4 = Bpf::load(include_bytes_aligned!(
         "../../target/bpfel-unknown-none/release/rustiflow-ebpf-ipv4"
     ))?;
 
@@ -142,10 +142,10 @@ fn load_ebpf_ipv4(interface: &str, tc_attach_type: TcAttachType) -> Result<Ebpf,
     Ok(bpf_ipv4)
 }
 
-fn load_ebpf_ipv6(interface: &str, tc_attach_type: TcAttachType) -> Result<Ebpf, anyhow::Error> {
+fn load_ebpf_ipv6(interface: &str, tc_attach_type: TcAttachType) -> Result<Bpf, anyhow::Error> {
     // Loading the eBPF program, the macros make sure the correct file is loaded
     #[cfg(debug_assertions)]
-    let mut bpf_ipv6 = Ebpf::load(include_bytes_aligned!(
+    let mut bpf_ipv6 = Bpf::load(include_bytes_aligned!(
         "../../target/bpfel-unknown-none/debug/rustiflow-ebpf-ipv6"
     ))?;
     #[cfg(not(debug_assertions))]
