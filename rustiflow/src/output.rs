@@ -1,9 +1,9 @@
-use std::{
-    fs::File,
-    io::{BufWriter, Write}
-};
 use crate::{args::ExportMethodType, flows::flow::Flow};
 use log::{debug, error};
+use std::{
+    fs::File,
+    io::{BufWriter, Write},
+};
 
 pub struct OutputWriter<T> {
     write_header: bool,
@@ -24,7 +24,9 @@ where
     ) -> Self {
         let writer: BufWriter<Box<dyn Write + Send>> = match export_type {
             ExportMethodType::Csv => {
-                let path = file_path.clone().expect("File path required for CSV output");
+                let path = file_path
+                    .clone()
+                    .expect("File path required for CSV output");
                 let file = File::create(&path).expect("Failed to create file");
                 BufWriter::new(Box::new(file))
             }
@@ -56,7 +58,7 @@ where
         } else {
             flow.dump()
         };
-    
+
         writeln!(self.writer, "{}", flow_str)
     }
 

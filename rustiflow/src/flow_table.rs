@@ -8,7 +8,7 @@ use tokio::sync::mpsc;
 const EXPIRATION_CHECK_INTERVAL: TimeDelta = chrono::Duration::seconds(60); // Check for expired flows every 60 seconds
 
 pub struct FlowTable<T> {
-    flow_map: HashMap<String, T>,  // HashMap for fast flow access by key
+    flow_map: HashMap<String, T>, // HashMap for fast flow access by key
     active_timeout: u64,
     idle_timeout: u64,
     early_export: Option<u64>,
@@ -83,9 +83,9 @@ where
         self.update_flow_with_packet(&mut new_flow, packet).await;
         self.flow_map.insert(packet.flow_key(), new_flow);
     }
-    
+
     /// Updates a flow with a packet and exports flow if terminated.
-    /// 
+    ///
     /// Returns a boolean indicating if the flow is terminated.
     async fn update_flow_with_packet(&mut self, flow: &mut T, packet: &PacketFeatures) -> bool {
         let is_forward = *flow.flow_key() == packet.flow_key();
@@ -105,7 +105,8 @@ where
 
     /// Export all flows in the flow map in order of first packet arrival.
     pub async fn export_all_flows(&mut self) {
-        let mut flows_to_export: Vec<_> = self.flow_map
+        let mut flows_to_export: Vec<_> = self
+            .flow_map
             .drain() // Drain all entries from the map
             .map(|(_, flow)| flow) // Collect all flows
             .collect();
@@ -130,17 +131,24 @@ where
 
     /// Checks if enough time has passed to trigger flow expiration checks and exports expired flows.
     async fn check_and_export_expired_flows(&mut self, current_time: DateTime<Utc>) {
-        if self.next_check_time.map_or(true, |next_check| current_time >= next_check) {
+        if self
+            .next_check_time
+            .map_or(true, |next_check| current_time >= next_check)
+        {
             self.export_expired_flows(current_time).await;
             self.next_check_time = Some(current_time + EXPIRATION_CHECK_INTERVAL);
-            debug!("Next flow expiration check scheduled at: {:?}", self.next_check_time);
+            debug!(
+                "Next flow expiration check scheduled at: {:?}",
+                self.next_check_time
+            );
         }
     }
 
     /// Export all expired flows.
     pub async fn export_expired_flows(&mut self, timestamp: DateTime<Utc>) {
         // Export all expired flows
-        let expired_flows: Vec<_> = self.flow_map
+        let expired_flows: Vec<_> = self
+            .flow_map
             .iter()
             .filter_map(|(key, flow)| {
                 if flow.is_expired(timestamp, self.active_timeout, self.idle_timeout) {

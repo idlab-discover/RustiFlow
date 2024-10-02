@@ -67,31 +67,33 @@ pub struct BasicFlow {
 
 impl BasicFlow {
     /// Checks if the flow is finished.
-    /// 
+    ///
     /// A flow is considered finished when both FIN flags are set and the last ACK is received.
-    /// 
+    ///
     /// ### Arguments
-    /// 
+    ///
     /// * `packet` - The packet to be checked.
-    /// 
+    ///
     /// ### Returns
-    /// 
+    ///
     /// A boolean indicating if the flow is finished.
-    pub fn is_tcp_finished(&self, packet: &PacketFeatures,) -> bool {
+    pub fn is_tcp_finished(&self, packet: &PacketFeatures) -> bool {
         // when both FIN flags are set, the flow can be finished when the last ACK is received
         // TODO improve with sequence numbers
         self.fwd_fin_flag_count > 0 && self.bwd_fin_flag_count > 0 && packet.ack_flag > 0
     }
 
     /// Calculates the flow duration in microseconds.
-    /// 
+    ///
     /// Returns the difference between the last and first packet timestamps in microseconds.
-    /// 
+    ///
     /// ### Returns
-    /// 
+    ///
     /// The duration of the flow in microseconds.
     pub fn get_flow_duration_usec(&self) -> f64 {
-        (self.last_timestamp - self.first_timestamp).num_microseconds().unwrap() as f64
+        (self.last_timestamp - self.first_timestamp)
+            .num_microseconds()
+            .unwrap() as f64
     }
 }
 
@@ -136,11 +138,7 @@ impl Flow for BasicFlow {
         }
     }
 
-    fn update_flow(
-        &mut self,
-        packet: &PacketFeatures,
-        fwd: bool,
-    ) -> bool {
+    fn update_flow(&mut self, packet: &PacketFeatures, fwd: bool) -> bool {
         self.last_timestamp = packet.timestamp;
 
         if self.is_tcp_finished(packet) {
@@ -268,7 +266,7 @@ impl Flow for BasicFlow {
     fn get_first_timestamp(&self) -> DateTime<Utc> {
         self.first_timestamp
     }
-    
+
     fn is_expired(&self, timestamp: DateTime<Utc>, active_timeout: u64, idle_timeout: u64) -> bool {
         if (timestamp - self.first_timestamp).num_seconds() as u64 > active_timeout {
             return true;
@@ -280,7 +278,7 @@ impl Flow for BasicFlow {
 
         false
     }
-    
+
     fn flow_key(&self) -> &String {
         &self.flow_key
     }

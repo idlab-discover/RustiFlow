@@ -1,12 +1,22 @@
-use std::{hash::{DefaultHasher, Hash, Hasher}, sync::atomic::{AtomicU64, Ordering}};
+use std::{
+    hash::{DefaultHasher, Hash, Hasher},
+    sync::atomic::{AtomicU64, Ordering},
+};
 
+use crate::debug;
 use crate::{flow_table::FlowTable, flows::flow::Flow, packet_features::PacketFeatures};
+use aya::{
+    include_bytes_aligned,
+    maps::AsyncPerfEventArray,
+    programs::{tc, SchedClassifier, TcAttachType},
+    Bpf,
+};
 use bytes::BytesMut;
 use log::{error, info};
-use tokio::{signal, sync::mpsc::{self, Sender}};
-use crate::debug;
-use aya::{include_bytes_aligned, maps::AsyncPerfEventArray, programs::{tc, SchedClassifier, TcAttachType}, Bpf};
-
+use tokio::{
+    signal,
+    sync::mpsc::{self, Sender},
+};
 
 static TOTAL_LOST_EVENTS: AtomicU64 = AtomicU64::new(0);
 
@@ -31,18 +41,27 @@ where
     let mut bpf_ingress_ipv6 = load_ebpf_ipv6(interface, TcAttachType::Ingress)?;
 
     // Attach to the event arrays
-    let events_egress_ipv4 = AsyncPerfEventArray::try_from(bpf_egress_ipv4.take_map("EVENTS_IPV4").unwrap())?;
-    let events_egress_ipv6 = AsyncPerfEventArray::try_from(bpf_egress_ipv6.take_map("EVENTS_IPV6").unwrap())?;
-    let events_ingress_ipv4 = AsyncPerfEventArray::try_from(bpf_ingress_ipv4.take_map("EVENTS_IPV4").unwrap())?;
-    let events_ingress_ipv6 = AsyncPerfEventArray::try_from(bpf_ingress_ipv6.take_map("EVENTS_IPV6").unwrap())?;
+    let events_egress_ipv4 =
+        AsyncPerfEventArray::try_from(bpf_egress_ipv4.take_map("EVENTS_IPV4").unwrap())?;
+    let events_egress_ipv6 =
+        AsyncPerfEventArray::try_from(bpf_egress_ipv6.take_map("EVENTS_IPV6").unwrap())?;
+    let events_ingress_ipv4 =
+        AsyncPerfEventArray::try_from(bpf_ingress_ipv4.take_map("EVENTS_IPV4").unwrap())?;
+    let events_ingress_ipv6 =
+        AsyncPerfEventArray::try_from(bpf_ingress_ipv6.take_map("EVENTS_IPV6").unwrap())?;
 
     let buffer_num_packets = 10_000;
     let mut shard_senders = Vec::with_capacity(num_threads as usize);
-    
+
     for _ in 0..num_threads {
         let (tx, mut rx) = mpsc::channel::<PacketFeatures>(buffer_num_packets);
-        let mut flow_table = FlowTable::new(active_timeout, idle_timeout, early_export, output_channel.clone());
-        
+        let mut flow_table = FlowTable::new(
+            active_timeout,
+            idle_timeout,
+            early_export,
+            output_channel.clone(),
+        );
+
         // Spawn a task per shard
         tokio::spawn(async move {
             while let Some(packet_features) = rx.recv().await {
@@ -55,7 +74,12 @@ where
     }
 
     // Spawn a task per event source
-    for mut ebpf_event_source in [events_egress_ipv4, events_ingress_ipv4, events_egress_ipv6, events_ingress_ipv6] {
+    for mut ebpf_event_source in [
+        events_egress_ipv4,
+        events_ingress_ipv4,
+        events_egress_ipv6,
+        events_ingress_ipv6,
+    ] {
         let shard_senders_clone = shard_senders.clone();
         let mut event_buffer = ebpf_event_source.open(0, None)?;
 
@@ -73,13 +97,16 @@ where
                 for buf in buffers.iter_mut().take(events.read) {
                     let ptr = buf.as_ptr() as *const PacketFeatures;
                     let packet_features = unsafe { ptr.read_unaligned() };
-                    
+
                     let flow_key = packet_features.biflow_key();
                     let shard_index = compute_shard_index(&flow_key, num_threads);
-                        
+
                     // Send packet_features to the appropriate shard
                     if let Err(e) = shard_senders_clone[shard_index].send(packet_features).await {
-                        error!("Failed to send packet_features to shard {}: {}", shard_index, e);
+                        error!(
+                            "Failed to send packet_features to shard {}: {}",
+                            shard_index, e
+                        );
                     }
                 }
             }
@@ -132,13 +159,11 @@ fn load_ebpf_ipv4(interface: &str, tc_attach_type: TcAttachType) -> Result<Bpf, 
 
     // Attach the eBPF program function
     let _ = tc::qdisc_add_clsact(interface);
-    let program_egress_ipv4: &mut SchedClassifier = bpf_ipv4
-        .program_mut("tc_flow_track")
-        .unwrap()
-        .try_into()?;
+    let program_egress_ipv4: &mut SchedClassifier =
+        bpf_ipv4.program_mut("tc_flow_track").unwrap().try_into()?;
     program_egress_ipv4.load()?;
     program_egress_ipv4.attach(&interface, tc_attach_type)?;
-    
+
     Ok(bpf_ipv4)
 }
 
@@ -155,12 +180,10 @@ fn load_ebpf_ipv6(interface: &str, tc_attach_type: TcAttachType) -> Result<Bpf, 
 
     // Attach the eBPF program function
     let _ = tc::qdisc_add_clsact(interface);
-    let program_egress_ipv6: &mut SchedClassifier = bpf_ipv6
-        .program_mut("tc_flow_track")
-        .unwrap()
-        .try_into()?;
+    let program_egress_ipv6: &mut SchedClassifier =
+        bpf_ipv6.program_mut("tc_flow_track").unwrap().try_into()?;
     program_egress_ipv6.load()?;
     program_egress_ipv6.attach(&interface, tc_attach_type)?;
-    
+
     Ok(bpf_ipv6)
 }

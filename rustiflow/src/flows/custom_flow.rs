@@ -36,17 +36,13 @@ impl Flow for CustomFlow {
                 ipv4_destination,
                 port_destination,
                 protocol,
-                ts_date
+                ts_date,
             ),
             // Add here the initialization of the additional features.
         }
     }
 
-    fn update_flow(
-        &mut self,
-        packet: &PacketFeatures,
-        fwd: bool,
-    ) -> bool {
+    fn update_flow(&mut self, packet: &PacketFeatures, fwd: bool) -> bool {
         // Add here the update of the additional features.
 
         // Update the basic flow and returns true if the flow is terminated.
@@ -76,11 +72,12 @@ impl Flow for CustomFlow {
     fn get_first_timestamp(&self) -> DateTime<Utc> {
         self.basic_flow.get_first_timestamp()
     }
-    
+
     fn is_expired(&self, timestamp: DateTime<Utc>, active_timeout: u64, idle_timeout: u64) -> bool {
-        self.basic_flow.is_expired(timestamp, active_timeout, idle_timeout)
+        self.basic_flow
+            .is_expired(timestamp, active_timeout, idle_timeout)
     }
-    
+
     fn flow_key(&self) -> &String {
         &self.basic_flow.flow_key
     }

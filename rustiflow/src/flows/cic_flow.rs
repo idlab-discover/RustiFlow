@@ -3,7 +3,11 @@ use std::net::IpAddr;
 
 use crate::packet_features::PacketFeatures;
 
-use super::{basic_flow::BasicFlow, flow::Flow, util::{calculate_mean, calculate_std}};
+use super::{
+    basic_flow::BasicFlow,
+    flow::Flow,
+    util::{calculate_mean, calculate_std},
+};
 
 /// Represents a CIC Flow, encapsulating various metrics and states of a network flow.
 ///
@@ -407,7 +411,8 @@ impl CicFlow {
             // too much idle time -> new bulk
             if timestamp
                 .signed_duration_since(self.fwd_last_bulk_timestamp.unwrap())
-                .num_milliseconds() > 1000
+                .num_milliseconds()
+                > 1000
             {
                 self.fwd_bulk_start_help = Some(*timestamp);
                 self.fwd_last_bulk_timestamp = Some(*timestamp);
@@ -423,7 +428,8 @@ impl CicFlow {
                     self.fwd_bulk_size_total += self.fwd_bulk_size_help;
                     self.fwd_bulk_duration += timestamp
                         .signed_duration_since(self.fwd_bulk_start_help.unwrap())
-                        .num_microseconds().unwrap() as f64;
+                        .num_microseconds()
+                        .unwrap() as f64;
                 }
                 // continu bulk
                 else if self.fwd_bulk_packet_count_help > 4 {
@@ -431,7 +437,8 @@ impl CicFlow {
                     self.fwd_bulk_size_total += len;
                     self.fwd_bulk_duration += timestamp
                         .signed_duration_since(self.fwd_bulk_start_help.unwrap())
-                        .num_microseconds().unwrap() as f64;
+                        .num_microseconds()
+                        .unwrap() as f64;
                 }
             }
             self.fwd_last_bulk_timestamp = Some(*timestamp);
@@ -464,7 +471,8 @@ impl CicFlow {
             // too much idle time -> new bulk
             if timestamp
                 .signed_duration_since(self.bwd_last_bulk_timestamp.unwrap())
-                .num_milliseconds() > 1000
+                .num_milliseconds()
+                > 1000
             {
                 self.bwd_bulk_start_help = Some(*timestamp);
                 self.bwd_last_bulk_timestamp = Some(*timestamp);
@@ -480,7 +488,8 @@ impl CicFlow {
                     self.bwd_bulk_size_total += self.bwd_bulk_size_help;
                     self.bwd_bulk_duration += timestamp
                         .signed_duration_since(self.bwd_bulk_start_help.unwrap())
-                        .num_microseconds().unwrap() as f64;
+                        .num_microseconds()
+                        .unwrap() as f64;
                 }
                 // continu bulk
                 else if self.bwd_bulk_packet_count_help > 4 {
@@ -488,7 +497,8 @@ impl CicFlow {
                     self.bwd_bulk_size_total += len;
                     self.bwd_bulk_duration += timestamp
                         .signed_duration_since(self.bwd_bulk_start_help.unwrap())
-                        .num_microseconds().unwrap() as f64;
+                        .num_microseconds()
+                        .unwrap() as f64;
                 }
             }
             self.bwd_last_bulk_timestamp = Some(*timestamp);
@@ -510,7 +520,8 @@ impl CicFlow {
 
         if timestamp
             .signed_duration_since(self.sf_last_packet_timestamp.unwrap())
-            .num_milliseconds() > 1000
+            .num_milliseconds()
+            > 1000
         {
             self.sf_count += 1;
             self.update_active_idle_time(timestamp, 5_000_000.0);
@@ -529,12 +540,22 @@ impl CicFlow {
     /// * `timestamp` - The timestamp of the packet or event triggering the update.
     /// * `threshold` - The threshold in microseconds to determine state transitions between active and idle.
     fn update_active_idle_time(&mut self, timestamp: &DateTime<Utc>, threshold: f64) {
-        if timestamp.signed_duration_since(self.end_active).num_microseconds().unwrap() as f64 > threshold {
+        if timestamp
+            .signed_duration_since(self.end_active)
+            .num_microseconds()
+            .unwrap() as f64
+            > threshold
+        {
             let duration = self.end_active.signed_duration_since(self.start_active);
             if !duration.is_zero() {
                 self.update_active_flow(duration.num_microseconds().unwrap() as f64);
             }
-            self.update_idle_flow(timestamp.signed_duration_since(self.end_active).num_microseconds().unwrap() as f64);
+            self.update_idle_flow(
+                timestamp
+                    .signed_duration_since(self.end_active)
+                    .num_microseconds()
+                    .unwrap() as f64,
+            );
             self.start_active = *timestamp;
             self.end_active = *timestamp;
         } else {
@@ -845,7 +866,8 @@ impl CicFlow {
     /// Bytes per second rate of the flow.
     fn get_flow_bytes_s(&self) -> f64 {
         (self.fwd_pkt_len_tot + self.bwd_pkt_len_tot) as f64
-            / self.basic_flow.get_flow_duration_usec() / 1_000_000.0
+            / self.basic_flow.get_flow_duration_usec()
+            / 1_000_000.0
     }
 
     /// Calculates the packets per second rate of the flow.
@@ -858,7 +880,8 @@ impl CicFlow {
     /// Packets per second rate of the flow.
     fn get_flow_packets_s(&self) -> f64 {
         (self.basic_flow.fwd_packet_count + self.basic_flow.bwd_packet_count) as f64
-            / self.basic_flow.get_flow_duration_usec() / 1_000_000.0
+            / self.basic_flow.get_flow_duration_usec()
+            / 1_000_000.0
     }
 
     /// Calculates the forward packets per second rate of the flow.
@@ -871,7 +894,8 @@ impl CicFlow {
     /// Forward packets per second rate of the flow.
     pub fn get_fwd_packets_s(&self) -> f64 {
         self.basic_flow.fwd_packet_count as f64
-            / self.basic_flow.get_flow_duration_usec() / 1_000_000.0
+            / self.basic_flow.get_flow_duration_usec()
+            / 1_000_000.0
     }
 
     /// Calculates the backward packets per second rate of the flow.
@@ -884,7 +908,8 @@ impl CicFlow {
     /// Backward packets per second rate of the flow.
     pub fn get_bwd_packets_s(&self) -> f64 {
         self.basic_flow.bwd_packet_count as f64
-            / self.basic_flow.get_flow_duration_usec() / 1_000_000.0
+            / self.basic_flow.get_flow_duration_usec()
+            / 1_000_000.0
     }
 
     /// Retrieves the average size of bulk transfers in the forward direction.
@@ -1156,12 +1181,7 @@ impl Flow for CicFlow {
         }
     }
 
-    fn update_flow(
-        &mut self,
-        packet: &PacketFeatures,
-        fwd: bool,
-    ) -> bool {
-
+    fn update_flow(&mut self, packet: &PacketFeatures, fwd: bool) -> bool {
         self.basic_flow.update_flow(packet, fwd);
         self.update_subflows(&packet.timestamp);
 
@@ -1173,9 +1193,12 @@ impl Flow for CicFlow {
 
             if self.basic_flow.fwd_packet_count > 1 {
                 self.update_fwd_iat_stats(
-                    packet.timestamp
+                    packet
+                        .timestamp
                         .signed_duration_since(self.fwd_last_timestamp.unwrap())
-                        .num_nanoseconds().unwrap() as f64 / 1000.0
+                        .num_nanoseconds()
+                        .unwrap() as f64
+                        / 1000.0,
                 );
             }
 
@@ -1197,9 +1220,12 @@ impl Flow for CicFlow {
 
             if self.basic_flow.bwd_packet_count > 1 {
                 self.update_bwd_iat_stats(
-                    packet.timestamp
+                    packet
+                        .timestamp
                         .signed_duration_since(self.bwd_last_timestamp.unwrap())
-                        .num_nanoseconds().unwrap() as f64 / 1000.0
+                        .num_nanoseconds()
+                        .unwrap() as f64
+                        / 1000.0,
                 );
             }
 
@@ -1431,11 +1457,12 @@ impl Flow for CicFlow {
     fn get_first_timestamp(&self) -> DateTime<Utc> {
         self.basic_flow.get_first_timestamp()
     }
-    
+
     fn is_expired(&self, timestamp: DateTime<Utc>, active_timeout: u64, idle_timeout: u64) -> bool {
-        self.basic_flow.is_expired(timestamp, active_timeout, idle_timeout)
+        self.basic_flow
+            .is_expired(timestamp, active_timeout, idle_timeout)
     }
-    
+
     fn flow_key(&self) -> &String {
         &self.basic_flow.flow_key
     }

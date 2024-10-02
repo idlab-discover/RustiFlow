@@ -54,11 +54,7 @@ pub trait Flow: Send + Sync + 'static + Clone {
     /// ### Returns
     ///
     /// Returns an `boolean` indicating if the flow is terminated.
-    fn update_flow(
-        &mut self,
-        packet: &PacketFeatures,
-        fwd: bool,
-    ) -> bool;
+    fn update_flow(&mut self, packet: &PacketFeatures, fwd: bool) -> bool;
 
     /// Dumps the current state of the flow.
     ///
@@ -106,17 +102,17 @@ pub trait Flow: Send + Sync + 'static + Clone {
     fn get_features_without_contamination() -> String;
 
     /// Checks if the flow is expired.
-    /// 
+    ///
     /// This method checks if the flow is expired based on the provided timestamp, active timeout, and idle timeout.
-    /// 
+    ///
     /// ### Arguments
-    /// 
+    ///
     /// * `timestamp` - The current timestamp.
     /// * `active_timeout` - The active timeout value.
     /// * `idle_timeout` - The idle timeout value.
-    /// 
+    ///
     /// ### Returns
-    /// 
+    ///
     /// Returns a `boolean` indicating if the flow is expired.
     fn is_expired(&self, timestamp: DateTime<Utc>, active_timeout: u64, idle_timeout: u64) -> bool;
 }

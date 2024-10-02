@@ -1,15 +1,23 @@
 use std::hash::{DefaultHasher, Hash, Hasher};
 use std::net::IpAddr;
 
-use crate::{flow_table::FlowTable, packet_features::PacketFeatures};
 use crate::Flow;
+use crate::{flow_table::FlowTable, packet_features::PacketFeatures};
 use chrono::{DateTime, Utc};
+use log::{debug, error};
 use pnet::packet::{
-    ethernet::{EtherTypes, EthernetPacket}, icmp::IcmpPacket, icmpv6::Icmpv6Packet, ip::{IpNextHeaderProtocol, IpNextHeaderProtocols}, ipv4::Ipv4Packet, ipv6::Ipv6Packet, tcp::TcpPacket, udp::UdpPacket, Packet
+    ethernet::{EtherTypes, EthernetPacket},
+    icmp::IcmpPacket,
+    icmpv6::Icmpv6Packet,
+    ip::{IpNextHeaderProtocol, IpNextHeaderProtocols},
+    ipv4::Ipv4Packet,
+    ipv6::Ipv6Packet,
+    tcp::TcpPacket,
+    udp::UdpPacket,
+    Packet,
 };
 use tokio::sync::mpsc;
 use tokio::sync::mpsc::Sender;
-use log::{debug, error};
 
 // Define constants for Linux cooked capture EtherTypes
 const SLL_IPV4: u16 = 0x0800;
@@ -26,7 +34,7 @@ const ECE_FLAG: u8 = 0b01000000;
 const CWE_FLAG: u8 = 0b10000000;
 
 pub async fn read_pcap_file<T>(
-    path: &str, 
+    path: &str,
     output_channel: Sender<T>,
     num_threads: u8,
     active_timeout: u64,
@@ -49,43 +57,75 @@ where
     // Create sharded FlowTables each in their own task and returns channels to send packets to the shards
     let buffer_num_packets = 10_000;
     let shard_senders = create_shard_senders::<T>(
-        num_threads, 
-        buffer_num_packets, 
-        output_channel, 
-        active_timeout, 
-        idle_timeout, 
-        early_export
+        num_threads,
+        buffer_num_packets,
+        output_channel,
+        active_timeout,
+        idle_timeout,
+        early_export,
     );
 
     debug!("Reading the pcap file: {:?} ...", path);
     while let Ok(packet) = pcap_capture.next_packet() {
         // Convert TimeVal from packet capture to DateTime<Utc>
-        let timestamp = DateTime::from_timestamp(packet.header.ts.tv_sec, (packet.header.ts.tv_usec * 1000) as u32).unwrap();
-    
+        let timestamp = DateTime::from_timestamp(
+            packet.header.ts.tv_sec,
+            (packet.header.ts.tv_usec * 1000) as u32,
+        )
+        .unwrap();
+
         if let Some(ethernet) = EthernetPacket::new(packet.data) {
             match ethernet.get_ethertype() {
                 EtherTypes::Ipv4 => {
                     if let Some(packet) = Ipv4Packet::new(ethernet.payload()) {
-                        process_packet::<T, Ipv4Packet>(&packet, timestamp, &shard_senders, num_threads, extract_packet_features_ipv4::<T>).await;
-                    } 
-                },
+                        process_packet::<T, Ipv4Packet>(
+                            &packet,
+                            timestamp,
+                            &shard_senders,
+                            num_threads,
+                            extract_packet_features_ipv4::<T>,
+                        )
+                        .await;
+                    }
+                }
                 EtherTypes::Ipv6 => {
                     if let Some(packet) = Ipv6Packet::new(ethernet.payload()) {
-                        process_packet::<T, Ipv6Packet>(&packet, timestamp, &shard_senders, num_threads, extract_packet_features_ipv6::<T>).await;
-                    } 
-                },
+                        process_packet::<T, Ipv6Packet>(
+                            &packet,
+                            timestamp,
+                            &shard_senders,
+                            num_threads,
+                            extract_packet_features_ipv6::<T>,
+                        )
+                        .await;
+                    }
+                }
                 _ => {
                     // Check if it is a Linux cooked capture
                     let ethertype = u16::from_be_bytes([packet.data[14], packet.data[15]]);
                     match ethertype {
                         SLL_IPV4 => {
                             if let Some(packet) = Ipv4Packet::new(&packet.data[16..]) {
-                                process_packet::<T, Ipv4Packet>(&packet, timestamp, &shard_senders, num_threads, extract_packet_features_ipv4::<T>).await;
+                                process_packet::<T, Ipv4Packet>(
+                                    &packet,
+                                    timestamp,
+                                    &shard_senders,
+                                    num_threads,
+                                    extract_packet_features_ipv4::<T>,
+                                )
+                                .await;
                             }
                         }
                         SLL_IPV6 => {
                             if let Some(packet) = Ipv6Packet::new(&packet.data[16..]) {
-                                process_packet::<T, Ipv6Packet>(&packet, timestamp, &shard_senders, num_threads, extract_packet_features_ipv6::<T>).await;
+                                process_packet::<T, Ipv6Packet>(
+                                    &packet,
+                                    timestamp,
+                                    &shard_senders,
+                                    num_threads,
+                                    extract_packet_features_ipv6::<T>,
+                                )
+                                .await;
                             }
                         }
                         _ => debug!("Failed to parse packet as IPv4 or IPv6..."),
@@ -116,7 +156,10 @@ async fn process_packet<T, P>(
         let shard_index = compute_shard_index(&flow_key, num_shards);
 
         if let Err(e) = shard_senders[shard_index].send(packet_features).await {
-            error!("Failed to send packet_features to shard {}: {}", shard_index, e);
+            error!(
+                "Failed to send packet_features to shard {}: {}",
+                shard_index, e
+            );
         }
     }
 }
@@ -166,12 +209,12 @@ where
 }
 
 fn extract_packet_features_transport(
-    source_ip: IpAddr, 
-    destination_ip: IpAddr, 
-    protocol: IpNextHeaderProtocol, 
-    timestamp:DateTime<Utc>, 
+    source_ip: IpAddr,
+    destination_ip: IpAddr,
+    protocol: IpNextHeaderProtocol,
+    timestamp: DateTime<Utc>,
     total_length: u16,
-    packet: &[u8]
+    packet: &[u8],
 ) -> Option<PacketFeatures> {
     match protocol {
         IpNextHeaderProtocols::Tcp => {
@@ -194,9 +237,9 @@ fn extract_packet_features_transport(
                 tcp_packet.payload().len() as u16,
                 (tcp_packet.get_data_offset() * 4) as u8,
                 total_length,
-                tcp_packet.get_window()
+                tcp_packet.get_window(),
             ))
-        },
+        }
         IpNextHeaderProtocols::Udp => {
             let udp_packet = UdpPacket::new(packet)?;
             Some(PacketFeatures::new(
@@ -206,13 +249,20 @@ fn extract_packet_features_transport(
                 udp_packet.get_destination(),
                 protocol.0,
                 timestamp,
-                0, 0, 0, 0, 0, 0, 0, 0, // No flags for UDP
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0, // No flags for UDP
                 udp_packet.payload().len() as u16,
                 8,
                 total_length,
-                0
+                0,
             ))
-        },
+        }
         IpNextHeaderProtocols::Icmp => {
             let icmp_packet = IcmpPacket::new(packet)?;
             Some(PacketFeatures::new(
@@ -222,11 +272,18 @@ fn extract_packet_features_transport(
                 0,
                 protocol.0,
                 timestamp,
-                0, 0, 0, 0, 0, 0, 0, 0, // No flags for ICMP
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0, // No flags for ICMP
                 icmp_packet.payload().len() as u16,
                 8,
                 total_length,
-                0
+                0,
             ))
         }
         IpNextHeaderProtocols::Icmpv6 => {
@@ -238,13 +295,20 @@ fn extract_packet_features_transport(
                 0,
                 protocol.0,
                 timestamp,
-                0, 0, 0, 0, 0, 0, 0, 0, // No flags for ICMPv6
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0, // No flags for ICMPv6
                 icmpv6_packet.payload().len() as u16,
                 8,
                 total_length,
-                0
+                0,
             ))
-        },
+        }
         _ => {
             debug!("Unsupported protocol in packet!");
             return None;
@@ -280,8 +344,13 @@ where
     let mut shard_senders = Vec::with_capacity(num_shards as usize);
     for _ in 0..num_shards {
         let (tx, mut rx) = mpsc::channel::<PacketFeatures>(buffer_num_packets);
-        let mut flow_table = FlowTable::new(active_timeout, idle_timeout, early_export, output_channel.clone());
-        
+        let mut flow_table = FlowTable::new(
+            active_timeout,
+            idle_timeout,
+            early_export,
+            output_channel.clone(),
+        );
+
         tokio::spawn(async move {
             while let Some(packet_features) = rx.recv().await {
                 flow_table.process_packet(&packet_features).await;

@@ -49,11 +49,7 @@ impl Flow for NfFlow {
         }
     }
 
-    fn update_flow(
-        &mut self,
-        packet: &PacketFeatures,
-        fwd: bool,
-    ) -> bool {
+    fn update_flow(&mut self, packet: &PacketFeatures, fwd: bool) -> bool {
         if fwd {
             self.fwd_last_timestamp = packet.timestamp;
         } else {
@@ -168,7 +164,8 @@ impl Flow for NfFlow {
             (self.fwd_last_timestamp - self.fwd_first_timestamp).num_milliseconds(),
             self.cic_flow.basic_flow.fwd_packet_count,
             self.cic_flow.fwd_pkt_len_tot,
-            (self.bwd_last_timestamp.unwrap() - self.bwd_first_timestamp.unwrap()).num_milliseconds(),
+            (self.bwd_last_timestamp.unwrap() - self.bwd_first_timestamp.unwrap())
+                .num_milliseconds(),
             self.cic_flow.basic_flow.bwd_packet_count,
             self.cic_flow.bwd_pkt_len_tot,
             self.cic_flow.get_flow_packet_length_min(),
@@ -247,11 +244,12 @@ impl Flow for NfFlow {
     fn get_first_timestamp(&self) -> DateTime<Utc> {
         self.cic_flow.get_first_timestamp()
     }
-    
+
     fn is_expired(&self, timestamp: DateTime<Utc>, active_timeout: u64, idle_timeout: u64) -> bool {
-        self.cic_flow.is_expired(timestamp, active_timeout, idle_timeout)
+        self.cic_flow
+            .is_expired(timestamp, active_timeout, idle_timeout)
     }
-    
+
     fn flow_key(&self) -> &String {
         &self.cic_flow.basic_flow.flow_key
     }

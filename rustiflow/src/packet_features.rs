@@ -96,7 +96,7 @@ impl PacketFeatures {
         // Create tuples of (IP, port) for comparison
         let src = (&self.source_ip, self.source_port);
         let dst = (&self.destination_ip, self.destination_port);
-    
+
         // Determine the correct order (src < dst)
         if src < dst {
             format!(

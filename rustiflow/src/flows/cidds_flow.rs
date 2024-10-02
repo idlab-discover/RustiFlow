@@ -87,11 +87,7 @@ impl Flow for CiddsFlow {
         }
     }
 
-    fn update_flow(
-        &mut self,
-        packet: &PacketFeatures,
-        fwd: bool,
-    ) -> bool {
+    fn update_flow(&mut self, packet: &PacketFeatures, fwd: bool) -> bool {
         self.bytes += packet.length as u32;
         self.basic_flow.update_flow(packet, fwd)
     }
@@ -159,11 +155,12 @@ impl Flow for CiddsFlow {
     fn get_first_timestamp(&self) -> DateTime<Utc> {
         self.basic_flow.get_first_timestamp()
     }
-    
+
     fn is_expired(&self, timestamp: DateTime<Utc>, active_timeout: u64, idle_timeout: u64) -> bool {
-        self.basic_flow.is_expired(timestamp, active_timeout, idle_timeout)
+        self.basic_flow
+            .is_expired(timestamp, active_timeout, idle_timeout)
     }
-    
+
     fn flow_key(&self) -> &String {
         &self.basic_flow.flow_key
     }

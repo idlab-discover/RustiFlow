@@ -3,8 +3,11 @@ use std::net::IpAddr;
 
 use crate::packet_features::PacketFeatures;
 
-
-use super::{cic_flow::CicFlow, flow::Flow, util::{calculate_mean, calculate_std}};
+use super::{
+    cic_flow::CicFlow,
+    flow::Flow,
+    util::{calculate_mean, calculate_std},
+};
 
 /// Represents a NTL Flow, encapsulating various metrics and states of a network flow.
 ///
@@ -198,8 +201,7 @@ impl NTLFlow {
     pub fn get_flow_header_length_variance(&self) -> f64 {
         if self.cic_flow.basic_flow.fwd_packet_count < 1
             || self.cic_flow.basic_flow.bwd_packet_count < 1
-            || self.cic_flow.basic_flow.fwd_packet_count
-                + self.cic_flow.basic_flow.bwd_packet_count
+            || self.cic_flow.basic_flow.fwd_packet_count + self.cic_flow.basic_flow.bwd_packet_count
                 < 3
         {
             return 0.0;
@@ -258,11 +260,7 @@ impl Flow for NTLFlow {
         }
     }
 
-    fn update_flow(
-        &mut self,
-        packet: &PacketFeatures,
-        fwd: bool,
-    ) -> bool {
+    fn update_flow(&mut self, packet: &PacketFeatures, fwd: bool) -> bool {
         if fwd {
             self.update_fwd_header_len_stats(packet.header_length as u32);
         } else {
@@ -273,7 +271,8 @@ impl Flow for NTLFlow {
     }
 
     fn dump(&self) -> String {
-        let flow_duration = self.cic_flow.basic_flow.last_timestamp - self.cic_flow.basic_flow.first_timestamp;
+        let flow_duration =
+            self.cic_flow.basic_flow.last_timestamp - self.cic_flow.basic_flow.first_timestamp;
         format!(
             "{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},\
             {},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},\
@@ -288,8 +287,7 @@ impl Flow for NTLFlow {
             self.cic_flow.basic_flow.port_destination,
             self.cic_flow.basic_flow.protocol,
             flow_duration.num_microseconds().unwrap(),
-            self.cic_flow.basic_flow.fwd_packet_count
-                + self.cic_flow.basic_flow.bwd_packet_count,
+            self.cic_flow.basic_flow.fwd_packet_count + self.cic_flow.basic_flow.bwd_packet_count,
             self.cic_flow.basic_flow.fwd_packet_count,
             self.cic_flow.basic_flow.bwd_packet_count,
             self.cic_flow.fwd_pkt_len_tot + self.cic_flow.bwd_pkt_len_tot,
@@ -339,17 +337,20 @@ impl Flow for NTLFlow {
             self.cic_flow.idle_mean,
             self.cic_flow.idle_std,
             (self.cic_flow.fwd_pkt_len_tot + self.cic_flow.bwd_pkt_len_tot) as f64
-                / flow_duration.num_milliseconds() as f64 / 1000.0,
-            self.cic_flow.fwd_pkt_len_tot as f64
-                / flow_duration.num_milliseconds() as f64 / 1000.0,
-            self.cic_flow.bwd_pkt_len_tot as f64
-                / flow_duration.num_milliseconds() as f64 / 1000.0,
-            (self.cic_flow.basic_flow.fwd_packet_count + self.cic_flow.basic_flow.bwd_packet_count) as f64
-                / flow_duration.num_milliseconds() as f64 / 1000.0,
+                / flow_duration.num_milliseconds() as f64
+                / 1000.0,
+            self.cic_flow.fwd_pkt_len_tot as f64 / flow_duration.num_milliseconds() as f64 / 1000.0,
+            self.cic_flow.bwd_pkt_len_tot as f64 / flow_duration.num_milliseconds() as f64 / 1000.0,
+            (self.cic_flow.basic_flow.fwd_packet_count + self.cic_flow.basic_flow.bwd_packet_count)
+                as f64
+                / flow_duration.num_milliseconds() as f64
+                / 1000.0,
             self.cic_flow.basic_flow.bwd_packet_count as f64
-                / flow_duration.num_milliseconds() as f64 / 1000.0,
+                / flow_duration.num_milliseconds() as f64
+                / 1000.0,
             self.cic_flow.basic_flow.fwd_packet_count as f64
-                / flow_duration.num_milliseconds() as f64 / 1000.0,
+                / flow_duration.num_milliseconds() as f64
+                / 1000.0,
             self.cic_flow.get_down_up_ratio(),
             self.cic_flow.get_fwd_bytes_bulk(),
             self.cic_flow.get_fwd_packets_bulk(),
@@ -454,7 +455,8 @@ impl Flow for NTLFlow {
     }
 
     fn dump_without_contamination(&self) -> String {
-        let flow_duration = self.cic_flow.basic_flow.last_timestamp - self.cic_flow.basic_flow.first_timestamp;
+        let flow_duration =
+            self.cic_flow.basic_flow.last_timestamp - self.cic_flow.basic_flow.first_timestamp;
         // Can be further updated after more research
         format!(
             "{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},\
@@ -464,8 +466,7 @@ impl Flow for NTLFlow {
             {},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},\
             {},{},{},{},{},{},{},{},{},{},{},{}",
             flow_duration.num_microseconds().unwrap(),
-            self.cic_flow.basic_flow.fwd_packet_count
-                + self.cic_flow.basic_flow.bwd_packet_count,
+            self.cic_flow.basic_flow.fwd_packet_count + self.cic_flow.basic_flow.bwd_packet_count,
             self.cic_flow.basic_flow.fwd_packet_count,
             self.cic_flow.basic_flow.bwd_packet_count,
             self.cic_flow.fwd_pkt_len_tot + self.cic_flow.bwd_pkt_len_tot,
@@ -515,17 +516,20 @@ impl Flow for NTLFlow {
             self.cic_flow.idle_mean,
             self.cic_flow.idle_std,
             (self.cic_flow.fwd_pkt_len_tot + self.cic_flow.bwd_pkt_len_tot) as f64
-                / flow_duration.num_milliseconds() as f64 / 1000.0,
-            self.cic_flow.fwd_pkt_len_tot as f64
-                / flow_duration.num_milliseconds() as f64 / 1000.0,
-            self.cic_flow.bwd_pkt_len_tot as f64
-                / flow_duration.num_milliseconds() as f64 / 1000.0,
-            (self.cic_flow.basic_flow.fwd_packet_count + self.cic_flow.basic_flow.bwd_packet_count) as f64
-                / flow_duration.num_milliseconds() as f64 / 1000.0,
+                / flow_duration.num_milliseconds() as f64
+                / 1000.0,
+            self.cic_flow.fwd_pkt_len_tot as f64 / flow_duration.num_milliseconds() as f64 / 1000.0,
+            self.cic_flow.bwd_pkt_len_tot as f64 / flow_duration.num_milliseconds() as f64 / 1000.0,
+            (self.cic_flow.basic_flow.fwd_packet_count + self.cic_flow.basic_flow.bwd_packet_count)
+                as f64
+                / flow_duration.num_milliseconds() as f64
+                / 1000.0,
             self.cic_flow.basic_flow.bwd_packet_count as f64
-                / flow_duration.num_milliseconds() as f64 / 1000.0,
+                / flow_duration.num_milliseconds() as f64
+                / 1000.0,
             self.cic_flow.basic_flow.fwd_packet_count as f64
-                / flow_duration.num_milliseconds() as f64 / 1000.0,
+                / flow_duration.num_milliseconds() as f64
+                / 1000.0,
             self.cic_flow.get_down_up_ratio(),
             self.cic_flow.get_fwd_bytes_bulk(),
             self.cic_flow.get_fwd_packets_bulk(),
@@ -629,11 +633,12 @@ impl Flow for NTLFlow {
     fn get_first_timestamp(&self) -> DateTime<Utc> {
         self.cic_flow.get_first_timestamp()
     }
-    
+
     fn is_expired(&self, timestamp: DateTime<Utc>, active_timeout: u64, idle_timeout: u64) -> bool {
-        self.cic_flow.is_expired(timestamp, active_timeout, idle_timeout)
+        self.cic_flow
+            .is_expired(timestamp, active_timeout, idle_timeout)
     }
-    
+
     fn flow_key(&self) -> &String {
         &self.cic_flow.basic_flow.flow_key
     }
