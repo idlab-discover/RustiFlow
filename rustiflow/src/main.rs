@@ -10,9 +10,8 @@ use crate::pcap::read_pcap_file;
 use crate::realtime::handle_realtime;
 use crate::flows::{cic_flow::CicFlow, ntl_flow::NTLFlow};
 
-use args::{Cli, Commands, FlowType};
+use args::{Cli, Commands, ConfigFile, ExportConfig, FlowType, OutputConfig};
 use clap::Parser;
-use core::panic;
 use flows::{
     basic_flow::BasicFlow, cidds_flow::CiddsFlow, custom_flow::CustomFlow, flow::Flow,
     nf_flow::NfFlow,
@@ -27,12 +26,33 @@ async fn main() {
     env_logger::init();
     let cli = Cli::parse();
 
-    // Argument validation
-    if let Some(early_export) = cli.config.early_export {
-        if early_export >= cli.config.active_timeout {
-            panic!("The early export timeout needs to be smaller than the active timeout!");
+    // If a config file is provided, load it
+    let config: ConfigFile = if let Some(config_path) = cli.config_file {
+        match confy::load_path(config_path) {
+            Ok(cfg) => cfg,
+            Err(e) => {
+                error!("Error loading configuration file: {:?}", e);
+                return;
+            }
         }
-    }
+    } else {
+        // No config file: build config from CLI arguments
+        ConfigFile {
+            config: ExportConfig {
+                features: cli.features.unwrap(),
+                active_timeout: cli.active_timeout,
+                idle_timeout: cli.idle_timeout,
+                early_export: cli.early_export,
+                threads: cli.threads,
+            },
+            output: OutputConfig {
+                output: cli.output.unwrap(),
+                export_path: cli.export_path,
+                header: Some(cli.header).is_some(),
+                drop_contaminant_features: Some(cli.drop_contaminant_features).is_some(),
+            },
+        }
+    };
 
     // Start the selected command
     match cli.command {
@@ -41,10 +61,10 @@ async fn main() {
                 ($flow_ty:ty) => {{
                     // Create output writer and initialize it
                     let mut output_writer = OutputWriter::<$flow_ty>::new(
-                        cli.output.output,
-                        cli.output.header,
-                        cli.output.drop_contaminant_features,
-                        cli.output.export_path,
+                        config.output.output,
+                        config.output.header,
+                        config.output.drop_contaminant_features,
+                        config.output.export_path,
                     );
 
                     // Synchronous initialization to ensure headers are written
@@ -73,10 +93,10 @@ async fn main() {
                     if let Err(err) = handle_realtime::<$flow_ty>(
                         &interface,
                         sender, 
-                        cli.config.threads.unwrap_or(num_cpus::get() as u8), 
-                        cli.config.active_timeout,
-                        cli.config.idle_timeout,
-                        cli.config.early_export
+                        config.config.threads.unwrap_or(num_cpus::get() as u8), 
+                        config.config.active_timeout,
+                        config.config.idle_timeout,
+                        config.config.early_export
                     ).await {
                         error!("Error: {:?}", err);
                     }
@@ -94,7 +114,7 @@ async fn main() {
                 }};
             }
 
-            match cli.config.features {
+            match config.config.features {
                 FlowType::Basic => execute_realtime!(BasicFlow),
                 FlowType::CIC => execute_realtime!(CicFlow),
                 FlowType::CIDDS => execute_realtime!(CiddsFlow),
@@ -108,10 +128,10 @@ async fn main() {
                 ($flow_ty:ty) => {{
                     // Create output writer and initialize it
                     let mut output_writer = OutputWriter::<$flow_ty>::new(
-                        cli.output.output,
-                        cli.output.header,
-                        cli.output.drop_contaminant_features,
-                        cli.output.export_path,
+                        config.output.output,
+                        config.output.header,
+                        config.output.drop_contaminant_features,
+                        config.output.export_path,
                     );
 
                     // Synchronous initialization to ensure headers are written
@@ -140,10 +160,10 @@ async fn main() {
                     if let Err(err) = read_pcap_file::<$flow_ty>(
                         &path, 
                         sender,
-                        cli.config.threads.unwrap_or(num_cpus::get() as u8), 
-                        cli.config.active_timeout,
-                        cli.config.idle_timeout,
-                        cli.config.early_export
+                        config.config.threads.unwrap_or(num_cpus::get() as u8), 
+                        config.config.active_timeout,
+                        config.config.idle_timeout,
+                        config.config.early_export
                      ).await {
                         error!("Error: {:?}", err);
                     }
@@ -161,7 +181,7 @@ async fn main() {
                 }};
             }
 
-            match cli.config.features {
+            match config.config.features {
                 FlowType::Basic => execute_offline!(BasicFlow),
                 FlowType::CIC => execute_offline!(CicFlow),
                 FlowType::CIDDS => execute_offline!(CiddsFlow),

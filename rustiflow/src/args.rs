@@ -1,18 +1,53 @@
-use clap::{Args, Parser, Subcommand};
+use clap::{Args, Parser, Subcommand, ArgGroup};
+use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Parser)]
 #[clap(author, version, about)]
+#[clap(group(ArgGroup::new("config_group").args(&["config_file"])), group(ArgGroup::new("cli_group").args(&["features", "output", "active_timeout", "idle_timeout", "export_path"]).multiple(true)))]
 pub struct Cli {
+    /// Configuration file path
+    #[clap(long, short = 'c', group = "config_group")]
+    pub config_file: Option<String>,
+
+    /// The feature set to use (required if no config file is provided)
+    #[clap(long, short, group = "cli_group")]
+    pub features: Option<FlowType>,
+
+    /// The maximum time a flow is allowed to last in seconds (optional)
+    #[clap(long, default_value_t = 3600, group = "cli_group")]
+    pub active_timeout: u64, // This doesn't need to be optional, as it has a default value that only will be used when no config file is provided
+
+    /// The maximum time with no packets for a flow in seconds (optional)
+    #[clap(long, default_value_t = 120, group = "cli_group")]
+    pub idle_timeout: u64, // This doesn't need to be optional, as it has a default value that only will be used when no config file is provided
+
+    /// The print interval for open flows in seconds (optional)
+    #[clap(long, group = "cli_group")]
+    pub early_export: Option<u64>,
+
+    /// The numbers of threads to use for processing packets (optional)
+    #[clap(long, group = "cli_group")]
+    pub threads: Option<u8>,
+
+    /// Output method (required if no config file is provided)
+    #[clap(long, short, group = "cli_group")]
+    pub output: Option<ExportMethodType>,
+
+    /// File path for output (used if method is Csv)
+    #[clap(long, group = "cli_group", required_if_eq("output", "Csv"))]
+    pub export_path: Option<String>,
+
+    /// Whether to export the feature header
+    #[clap(long, group = "cli_group")]
+    pub header: bool,
+
+    /// Whether to drop contaminant features
+    #[clap(long, group = "cli_group")]
+    pub drop_contaminant_features: bool,
+
+    /// Subcommands (Real-time or Pcap)
     #[clap(subcommand)]
     pub command: Commands,
-
-    /// Configuration options common to both real-time and pcap modes
-    #[clap(flatten)]
-    pub config: ExportConfig,
-
-    /// Output method
-    #[clap(flatten)]
-    pub output: OutputConfig,
 }
 
 #[derive(Debug, Subcommand)]
@@ -30,7 +65,7 @@ pub enum Commands {
     },
 }
 
-#[derive(Args, Debug, Clone)]
+#[derive(Serialize, Deserialize, Args, Debug, Clone)]
 pub struct ExportConfig {
     /// The feature set to use
     #[clap(short, long, value_enum)]
@@ -54,7 +89,7 @@ pub struct ExportConfig {
     pub threads: Option<u8>,
 }
 
-#[derive(Args, Debug, Clone)]
+#[derive(Serialize, Deserialize, Args, Debug, Clone)]
 pub struct OutputConfig {
     /// Output method
     #[clap(short, long, value_enum)]
@@ -73,7 +108,7 @@ pub struct OutputConfig {
     pub drop_contaminant_features: bool,
 }
 
-#[derive(clap::ValueEnum, Clone, Debug)]
+#[derive(Serialize, Deserialize, clap::ValueEnum, Clone, Debug)]
 pub enum ExportMethodType {
     /// The output will be printed to the console
     Print,
@@ -82,7 +117,7 @@ pub enum ExportMethodType {
     Csv,
 }
 
-#[derive(clap::ValueEnum, Clone, Debug)]
+#[derive(Serialize, Deserialize, clap::ValueEnum, Clone, Debug)]
 pub enum FlowType {
     /// A basic flow that stores the basic features of a flow.
     Basic,
@@ -101,4 +136,30 @@ pub enum FlowType {
 
     /// Represents a flow that you can implement yourself.
     Custom,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct ConfigFile {
+    pub config: ExportConfig,
+    pub output: OutputConfig,
+}
+
+impl Default for ConfigFile {
+    fn default() -> Self {
+        ConfigFile {
+            config: ExportConfig {
+                features: FlowType::Basic,
+                active_timeout: 3600,
+                idle_timeout: 120,
+                early_export: None,
+                threads: None,
+            },
+            output: OutputConfig {
+                output: ExportMethodType::Print,
+                export_path: None,
+                header: false,
+                drop_contaminant_features: false,
+            },
+        }
+    }
 }
