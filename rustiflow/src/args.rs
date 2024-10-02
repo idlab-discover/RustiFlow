@@ -36,11 +36,11 @@ pub struct ExportConfig {
     #[clap(short, long, value_enum)]
     pub features: FlowType,
 
-    /// The maximum time a flow is allowed to last in seconds (default: 3600)
+    /// The maximum time a flow is allowed to last in seconds
     #[clap(long, default_value_t = 3600)]
     pub active_timeout: u64,
 
-    /// The maximum time with no packets for a flow in seconds (default: 120)
+    /// The maximum time with no packets for a flow in seconds
     #[clap(long, default_value_t = 120)]
     pub idle_timeout: u64,
 
