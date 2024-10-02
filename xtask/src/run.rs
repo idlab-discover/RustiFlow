@@ -62,12 +62,8 @@ pub fn run(opts: Options) -> Result<(), anyhow::Error> {
     let profile = if opts.release { "release" } else { "debug" };
     let bin_path = format!("target/{profile}/rustiflow");
 
-    // Determine if 'realtime' is the first argument in run_args
-    let use_sudo = opts
-        .run_args
-        .first()
-        .map(|arg| arg == "realtime")
-        .unwrap_or(false);
+    // Determine if 'realtime' is one of the arguments in run_args
+    let use_sudo = opts.run_args.iter().any(|arg| arg == "realtime");
 
     // configure args
     let runner = if use_sudo {
