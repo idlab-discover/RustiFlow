@@ -17,6 +17,7 @@ pub async fn handle_realtime<T>(
     active_timeout: u64,
     idle_timeout: u64,
     early_export: Option<u64>,
+    expiration_check_interval: u64,
 ) -> Result<(), anyhow::Error>
 where
     T: Flow,
@@ -42,7 +43,7 @@ where
     debug!("Creating {} sharded FlowTables...", num_threads);
     for _ in 0..num_threads {
         let (tx, mut rx) = mpsc::channel::<PacketFeatures>(buffer_num_packets);
-        let mut flow_table = FlowTable::new(active_timeout, idle_timeout, early_export, output_channel.clone());
+        let mut flow_table = FlowTable::new(active_timeout, idle_timeout, early_export, output_channel.clone(), expiration_check_interval);
         
         // Spawn a task per shard
         tokio::spawn(async move {

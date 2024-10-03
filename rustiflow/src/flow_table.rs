@@ -5,8 +5,6 @@ use chrono::{DateTime, TimeDelta, Utc};
 use log::{debug, error};
 use tokio::sync::mpsc;
 
-const EXPIRATION_CHECK_INTERVAL: TimeDelta = chrono::Duration::seconds(60); // Check for expired flows every 60 seconds
-
 pub struct FlowTable<T> {
     flow_map: HashMap<String, T>,  // HashMap for fast flow access by key
     active_timeout: u64,
@@ -14,6 +12,7 @@ pub struct FlowTable<T> {
     early_export: Option<u64>,
     export_channel: mpsc::Sender<T>,
     next_check_time: Option<DateTime<Utc>>, // Track the next time we check for flow expirations
+    expiration_check_interval: TimeDelta, // Check for expired flows every x seconds
 }
 
 impl<T> FlowTable<T>
@@ -25,6 +24,7 @@ where
         idle_timeout: u64,
         early_export: Option<u64>,
         export_channel: mpsc::Sender<T>,
+        expiration_check_interval: u64,
     ) -> Self {
         Self {
             flow_map: HashMap::new(),
@@ -33,6 +33,7 @@ where
             early_export,
             export_channel,
             next_check_time: None,
+            expiration_check_interval: TimeDelta::seconds(expiration_check_interval as i64),
         }
     }
 
@@ -132,7 +133,7 @@ where
     async fn check_and_export_expired_flows(&mut self, current_time: DateTime<Utc>) {
         if self.next_check_time.map_or(true, |next_check| current_time >= next_check) {
             self.export_expired_flows(current_time).await;
-            self.next_check_time = Some(current_time + EXPIRATION_CHECK_INTERVAL);
+            self.next_check_time = Some(current_time + self.expiration_check_interval);
             debug!("Next flow expiration check scheduled at: {:?}", self.next_check_time);
         }
     }

@@ -15,17 +15,23 @@ pub struct Cli {
 
     /// The maximum time a flow is allowed to last in seconds (optional)
     #[clap(long, default_value_t = 3600, group = "cli_group")]
-    pub active_timeout: u64, // This doesn't need to be optional, as it has a default value that only will be used when no config file is provided
+    pub active_timeout: u64,
 
     /// The maximum time with no packets for a flow in seconds (optional)
     #[clap(long, default_value_t = 120, group = "cli_group")]
-    pub idle_timeout: u64, // This doesn't need to be optional, as it has a default value that only will be used when no config file is provided
+    pub idle_timeout: u64,
 
     /// The print interval for open flows in seconds (optional)
     #[clap(long, group = "cli_group")]
     pub early_export: Option<u64>,
 
+    /// Interval (in seconds) for checking and expiring flows in the flowtable.
+    /// This represents how often the flowtable should be scanned to remove inactive flows.
+    #[clap(long, default_value_t = 60, group = "cli_group")]
+    pub expiration_check_interval: u64,
+
     /// The numbers of threads to use for processing packets (optional)
+    /// (default: number of logical CPUs)
     #[clap(long, group = "cli_group")]
     pub threads: Option<u8>,
 
@@ -82,6 +88,11 @@ pub struct ExportConfig {
     /// The print interval for open flows in seconds, needs to be smaller than the flow maximum lifespan
     #[clap(long)]
     pub early_export: Option<u64>,
+
+    /// Interval (in seconds) for checking and expiring flows in the flowtable.
+    /// This represents how often the flowtable should be scanned to remove inactive flows.
+    #[clap(long, default_value_t = 60, group = "cli_group")]
+    pub expiration_check_interval: u64,
 
     /// The numbers of threads to use for processing packets
     /// (default: number of logical CPUs)
@@ -151,6 +162,7 @@ impl Default for ConfigFile {
                 features: FlowType::Basic,
                 active_timeout: 3600,
                 idle_timeout: 120,
+                expiration_check_interval: 60,
                 early_export: None,
                 threads: None,
             },
