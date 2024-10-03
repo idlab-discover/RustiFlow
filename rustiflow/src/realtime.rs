@@ -5,7 +5,7 @@ use bytes::BytesMut;
 use log::{error, info};
 use tokio::{signal, sync::mpsc::{self, Sender}, task::JoinSet};
 use crate::debug;
-use aya::{include_bytes_aligned, maps::AsyncPerfEventArray, programs::{tc, SchedClassifier, TcAttachType}, Bpf};
+use aya::{include_bytes_aligned, maps::{AsyncPerfEventArray, MapData}, programs::{tc, SchedClassifier, TcAttachType}, Bpf};
 
 
 static TOTAL_LOST_EVENTS: AtomicU64 = AtomicU64::new(0);
@@ -18,6 +18,7 @@ pub async fn handle_realtime<T>(
     idle_timeout: u64,
     early_export: Option<u64>,
     expiration_check_interval: u64,
+    ingress_only: bool,
 ) -> Result<(), anyhow::Error>
 where
     T: Flow,
@@ -25,17 +26,22 @@ where
     // Needed for older kernels
     bump_memlock_rlimit();
 
-    // Load the eBPF programs
-    let mut bpf_egress_ipv4 = load_ebpf_ipv4(interface, TcAttachType::Egress)?;
-    let mut bpf_egress_ipv6 = load_ebpf_ipv6(interface, TcAttachType::Egress)?;
+    // Load the eBPF programs and attach to the event arrays
     let mut bpf_ingress_ipv4 = load_ebpf_ipv4(interface, TcAttachType::Ingress)?;
     let mut bpf_ingress_ipv6 = load_ebpf_ipv6(interface, TcAttachType::Ingress)?;
-
-    // Attach to the event arrays
-    let events_egress_ipv4 = AsyncPerfEventArray::try_from(bpf_egress_ipv4.take_map("EVENTS_IPV4").unwrap())?;
-    let events_egress_ipv6 = AsyncPerfEventArray::try_from(bpf_egress_ipv6.take_map("EVENTS_IPV6").unwrap())?;
     let events_ingress_ipv4 = AsyncPerfEventArray::try_from(bpf_ingress_ipv4.take_map("EVENTS_IPV4").unwrap())?;
     let events_ingress_ipv6 = AsyncPerfEventArray::try_from(bpf_ingress_ipv6.take_map("EVENTS_IPV6").unwrap())?;
+    let event_sources: Vec<AsyncPerfEventArray<MapData>>;
+
+    if !ingress_only {
+        let mut bpf_egress_ipv4 = load_ebpf_ipv4(interface, TcAttachType::Egress)?;
+        let mut bpf_egress_ipv6 = load_ebpf_ipv6(interface, TcAttachType::Egress)?;
+        let events_egress_ipv4 = AsyncPerfEventArray::try_from(bpf_egress_ipv4.take_map("EVENTS_IPV4").unwrap())?;
+        let events_egress_ipv6 = AsyncPerfEventArray::try_from(bpf_egress_ipv6.take_map("EVENTS_IPV6").unwrap())?;
+        event_sources = vec![events_egress_ipv4, events_ingress_ipv4, events_egress_ipv6, events_ingress_ipv6];
+    } else {
+        event_sources = vec![events_ingress_ipv4, events_ingress_ipv6];
+    }
 
     let buffer_num_packets = 10_000;
     let mut shard_senders = Vec::with_capacity(num_threads as usize);
@@ -61,7 +67,7 @@ where
     // Spawn a task per event source
     let mut handle_set = JoinSet::new();
 
-    for mut ebpf_event_source in [events_egress_ipv4, events_ingress_ipv4, events_egress_ipv6, events_ingress_ipv6] {
+    for mut ebpf_event_source in event_sources {
         let shard_senders_clone = shard_senders.clone();
         let mut event_buffer = ebpf_event_source.open(0, None)?;
         

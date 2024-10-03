@@ -57,7 +57,7 @@ async fn main() {
 
     // Start the selected command
     match cli.command {
-        Commands::Realtime { interface } => {
+        Commands::Realtime {interface, ingress_only } => {
             macro_rules! execute_realtime {
                 ($flow_ty:ty) => {{
                     // Create output writer and initialize it
@@ -98,7 +98,8 @@ async fn main() {
                         config.config.active_timeout,
                         config.config.idle_timeout,
                         config.config.early_export,
-                        config.config.expiration_check_interval
+                        config.config.expiration_check_interval,
+                        ingress_only
                     ).await {
                         error!("Error: {:?}", err);
                     }

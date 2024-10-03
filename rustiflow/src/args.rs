@@ -62,6 +62,9 @@ pub enum Commands {
     Realtime {
         /// The network interface to capture packets from
         interface: String,
+        /// Whether to capture only ingress packets
+        #[clap(long, action = clap::ArgAction::SetTrue)]
+        ingress_only: bool,
     },
 
     /// Feature extraction from a pcap file
