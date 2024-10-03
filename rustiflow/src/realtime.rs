@@ -3,7 +3,7 @@ use std::{hash::{DefaultHasher, Hash, Hasher}, sync::atomic::{AtomicU64, Orderin
 use crate::{flow_table::FlowTable, flows::flow::Flow, packet_features::PacketFeatures};
 use bytes::BytesMut;
 use log::{error, info};
-use tokio::{signal, sync::mpsc::{self, Sender}};
+use tokio::{signal, sync::mpsc::{self, Sender}, task::JoinSet};
 use crate::debug;
 use aya::{include_bytes_aligned, maps::AsyncPerfEventArray, programs::{tc, SchedClassifier, TcAttachType}, Bpf};
 
@@ -39,6 +39,7 @@ where
     let buffer_num_packets = 10_000;
     let mut shard_senders = Vec::with_capacity(num_threads as usize);
     
+    debug!("Creating {} sharded FlowTables...", num_threads);
     for _ in 0..num_threads {
         let (tx, mut rx) = mpsc::channel::<PacketFeatures>(buffer_num_packets);
         let mut flow_table = FlowTable::new(active_timeout, idle_timeout, early_export, output_channel.clone());
@@ -48,38 +49,47 @@ where
             while let Some(packet_features) = rx.recv().await {
                 flow_table.process_packet(&packet_features).await;
             }
+            debug!("Shard finished processing packets");
             // Handle flow exporting when the receiver is closed
             flow_table.export_all_flows().await;
         });
         shard_senders.push(tx);
     }
+    debug!("Sharded FlowTables created");
 
     // Spawn a task per event source
+    let mut handle_set = JoinSet::new();
+
     for mut ebpf_event_source in [events_egress_ipv4, events_ingress_ipv4, events_egress_ipv6, events_ingress_ipv6] {
         let shard_senders_clone = shard_senders.clone();
         let mut event_buffer = ebpf_event_source.open(0, None)?;
-
-        tokio::spawn(async move {
+        
+        handle_set.spawn(async move {
             // 10 buffers with 98_304 bytes each, meaning a capacity of 4096 packets per buffer (24 bytes per packet)
             let mut buffers = (0..10)
                 .map(|_| BytesMut::with_capacity(24 * 4096))
                 .collect::<Vec<_>>();
 
             loop {
-                let events = event_buffer.read_events(&mut buffers).await.unwrap();
+                match event_buffer.read_events(&mut buffers).await {
+                    Ok(events) => {
+                        TOTAL_LOST_EVENTS.fetch_add(events.lost as u64, Ordering::SeqCst);
 
-                TOTAL_LOST_EVENTS.fetch_add(events.lost as u64, Ordering::SeqCst);
+                        for buf in buffers.iter_mut().take(events.read) {
+                            let ptr = buf.as_ptr() as *const PacketFeatures;
+                            let packet_features = unsafe { ptr.read_unaligned() };
 
-                for buf in buffers.iter_mut().take(events.read) {
-                    let ptr = buf.as_ptr() as *const PacketFeatures;
-                    let packet_features = unsafe { ptr.read_unaligned() };
-                    
-                    let flow_key = packet_features.biflow_key();
-                    let shard_index = compute_shard_index(&flow_key, num_threads);
-                        
-                    // Send packet_features to the appropriate shard
-                    if let Err(e) = shard_senders_clone[shard_index].send(packet_features).await {
-                        error!("Failed to send packet_features to shard {}: {}", shard_index, e);
+                            let flow_key = packet_features.biflow_key();
+                            debug!("Received packet for flow: {}", flow_key);
+                            let shard_index = compute_shard_index(&flow_key, num_threads);
+
+                            if let Err(e) = shard_senders_clone[shard_index].send(packet_features).await {
+                                error!("Failed to send packet_features to shard {}: {}", shard_index, e);
+                            }
+                        }
+                    }
+                    Err(_) => {
+                        error!("Failed to read events from event_buffer");
                     }
                 }
             }
@@ -89,6 +99,27 @@ where
     info!("Waiting for Ctrl-C...");
 
     signal::ctrl_c().await?;
+
+    // Cancel the tasks reading ebpf events
+    handle_set.abort_all();
+    
+    // Wait for all tasks to finish
+    while let Some(res) = handle_set.join_next().await {
+        match res {
+            Ok(_) => {
+                // Task should never finish by itself
+                error!("Event source task finished unexpectedly");
+            }
+            Err(e) if e.is_cancelled() => {
+                // Task was successfully cancelled
+                debug!("Task was cancelled as part of graceful shutdown");
+            }
+            Err(e) => {
+                // Log other types of errors
+                error!("Task failed: {:?}", e);
+            }
+        }
+    }
 
     debug!(
         "{} events were lost",
