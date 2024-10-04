@@ -78,8 +78,14 @@ pub enum Commands {
 impl ToString for Commands {
     fn to_string(&self) -> String {
         match self {
-            Commands::Realtime { interface } => format!("Realtime\nInterface: {}", interface),
-            Commands::Pcap { path } => format!("Pcap\nPath: {}", path),
+            Commands::Realtime {
+                interface,
+                ingress_only,
+            } => format!(
+                "Realtime/Interface: {}/Ingress only: {}",
+                interface, ingress_only
+            ),
+            Commands::Pcap { path } => format!("Pcap/Path: {}", path),
         }
     }
 }
