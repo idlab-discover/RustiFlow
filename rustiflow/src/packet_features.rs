@@ -1,6 +1,19 @@
-use std::net::IpAddr;
+use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 
 use chrono::{DateTime, Utc};
+use common::{EbpfEventIpv4, EbpfEventIpv6};
+use log::debug;
+use pnet::packet::{icmp::IcmpPacket, ip::{IpNextHeaderProtocol, IpNextHeaderProtocols}, ipv4::Ipv4Packet, ipv6::Ipv6Packet, tcp::TcpPacket, udp::UdpPacket, Packet};
+
+// Define TCP flags
+const FIN_FLAG: u8 = 0b00000001;
+const SYN_FLAG: u8 = 0b00000010;
+const RST_FLAG: u8 = 0b00000100;
+const PSH_FLAG: u8 = 0b00001000;
+const ACK_FLAG: u8 = 0b00010000;
+const URG_FLAG: u8 = 0b00100000;
+const ECE_FLAG: u8 = 0b01000000;
+const CWE_FLAG: u8 = 0b10000000;
 
 pub struct PacketFeatures {
     pub source_ip: IpAddr,
@@ -24,47 +37,82 @@ pub struct PacketFeatures {
 }
 
 impl PacketFeatures {
-    /// Creates a new instance of PacketFeatures.
-    pub fn new(
-        source_ip: IpAddr,
-        destination_ip: IpAddr,
-        source_port: u16,
-        destination_port: u16,
-        protocol: u8,
-        timestamp: DateTime<Utc>,
-        fin_flag: u8,
-        syn_flag: u8,
-        rst_flag: u8,
-        psh_flag: u8,
-        ack_flag: u8,
-        urg_flag: u8,
-        cwe_flag: u8,
-        ece_flag: u8,
-        data_length: u16,
-        header_length: u8,
-        length: u16,
-        window_size: u16,
-    ) -> Self {
+    // Constructor to create PacketFeatures from EbpfEventIpv4
+    pub fn from_ebpf_event_ipv4(event: &EbpfEventIpv4) -> Self {
         PacketFeatures {
-            source_ip,
-            destination_ip,
-            source_port,
-            destination_port,
-            protocol,
-            timestamp,
-            fin_flag,
-            syn_flag,
-            rst_flag,
-            psh_flag,
-            ack_flag,
-            urg_flag,
-            cwe_flag,
-            ece_flag,
-            data_length,
-            header_length,
-            length,
-            window_size,
+            source_ip: IpAddr::V4(Ipv4Addr::from(event.ipv4_source.to_be())),
+            destination_ip: IpAddr::V4(Ipv4Addr::from(event.ipv4_destination.to_be())),
+            source_port: event.port_source,
+            destination_port: event.port_destination,
+            protocol: event.protocol,
+            timestamp: chrono::Utc::now(),
+            fin_flag: get_tcp_flag(event.combined_flags, FIN_FLAG),
+            syn_flag: get_tcp_flag(event.combined_flags, SYN_FLAG),
+            rst_flag: get_tcp_flag(event.combined_flags, RST_FLAG),
+            psh_flag: get_tcp_flag(event.combined_flags, PSH_FLAG),
+            ack_flag: get_tcp_flag(event.combined_flags, ACK_FLAG),
+            urg_flag: get_tcp_flag(event.combined_flags, URG_FLAG),
+            cwe_flag: get_tcp_flag(event.combined_flags, CWE_FLAG),
+            ece_flag: get_tcp_flag(event.combined_flags, ECE_FLAG),
+            data_length: event.data_length,
+            header_length: event.header_length,
+            length: event.length,
+            window_size: event.window_size,
         }
+    }
+
+    // Constructor to create PacketFeatures from EbpfEventIpv6
+    pub fn from_ebpf_event_ipv6(event: &EbpfEventIpv6) -> Self {
+        PacketFeatures {
+            source_ip: IpAddr::V6(Ipv6Addr::from(event.ipv6_source.to_be())),
+            destination_ip: IpAddr::V6(Ipv6Addr::from(event.ipv6_destination.to_be())),
+            source_port: event.port_source,
+            destination_port: event.port_destination,
+            protocol: event.protocol,
+            timestamp: chrono::Utc::now(),
+            fin_flag: get_tcp_flag(event.combined_flags, FIN_FLAG),
+            syn_flag: get_tcp_flag(event.combined_flags, SYN_FLAG),
+            rst_flag: get_tcp_flag(event.combined_flags, RST_FLAG),
+            psh_flag: get_tcp_flag(event.combined_flags, PSH_FLAG),
+            ack_flag: get_tcp_flag(event.combined_flags, ACK_FLAG),
+            urg_flag: get_tcp_flag(event.combined_flags, URG_FLAG),
+            cwe_flag: get_tcp_flag(event.combined_flags, CWE_FLAG),
+            ece_flag: get_tcp_flag(event.combined_flags, ECE_FLAG),
+            data_length: event.data_length,
+            header_length: event.header_length,
+            length: event.length,
+            window_size: event.window_size,
+        }
+    }
+
+    // Constructor to create PacketFeatures from an IPv4 packet
+    pub fn from_ipv4_packet(
+        packet: &Ipv4Packet,
+        timestamp: DateTime<Utc>,
+    ) -> Option<Self> {
+        extract_packet_features_transport(
+            packet.get_source().into(),
+            packet.get_destination().into(),
+            packet.get_next_level_protocol(),
+            timestamp,
+            packet.get_total_length(),
+            packet.payload(),
+        )
+    }
+
+    // Constructor to create PacketFeatures from an IPv6 packet
+    pub fn from_ipv6_packet(
+        packet: &Ipv6Packet,
+        timestamp: DateTime<Utc>,
+    ) -> Option<Self> {
+        extract_packet_features_transport(
+            packet.get_source().into(),
+            packet.get_destination().into(),
+            packet.get_next_header(),
+            timestamp,
+            packet.packet().len() as u16,
+            packet.payload(),
+        )
     }
 
     /// Generates a flow key based on IPs, ports, and protocol
@@ -117,6 +165,95 @@ impl PacketFeatures {
                 self.source_port,
                 self.protocol
             )
+        }
+    }
+}
+
+fn get_tcp_flag(value: u8, flag: u8) -> u8 {
+    ((value & flag) != 0) as u8
+}
+
+fn extract_packet_features_transport(
+    source_ip: IpAddr,
+    destination_ip: IpAddr,
+    protocol: IpNextHeaderProtocol,
+    timestamp: DateTime<Utc>,
+    total_length: u16,
+    packet: &[u8],
+) -> Option<PacketFeatures> {
+    match protocol {
+        IpNextHeaderProtocols::Tcp => {
+            let tcp_packet = TcpPacket::new(packet)?;
+            Some(PacketFeatures {
+                source_ip,
+                destination_ip,
+                source_port: tcp_packet.get_source(),
+                destination_port: tcp_packet.get_destination(),
+                protocol: protocol.0,
+                timestamp,
+                fin_flag: get_tcp_flag(tcp_packet.get_flags(), FIN_FLAG),
+                syn_flag: get_tcp_flag(tcp_packet.get_flags(), SYN_FLAG),
+                rst_flag: get_tcp_flag(tcp_packet.get_flags(), RST_FLAG),
+                psh_flag: get_tcp_flag(tcp_packet.get_flags(), PSH_FLAG),
+                ack_flag: get_tcp_flag(tcp_packet.get_flags(), ACK_FLAG),
+                urg_flag: get_tcp_flag(tcp_packet.get_flags(), URG_FLAG),
+                cwe_flag: get_tcp_flag(tcp_packet.get_flags(), CWE_FLAG),
+                ece_flag: get_tcp_flag(tcp_packet.get_flags(), ECE_FLAG),
+                data_length: tcp_packet.payload().len() as u16,
+                header_length: (tcp_packet.get_data_offset() * 4) as u8,
+                length: total_length,
+                window_size: tcp_packet.get_window(),
+            })
+        }
+        IpNextHeaderProtocols::Udp => {
+            let udp_packet = UdpPacket::new(packet)?;
+            Some(PacketFeatures {
+                source_ip,
+                destination_ip,
+                source_port: udp_packet.get_source(),
+                destination_port: udp_packet.get_destination(),
+                protocol: protocol.0,
+                timestamp,
+                fin_flag: 0,
+                syn_flag: 0,
+                rst_flag: 0,
+                psh_flag: 0,
+                ack_flag: 0,
+                urg_flag: 0,
+                cwe_flag: 0,
+                ece_flag: 0,
+                data_length: udp_packet.payload().len() as u16,
+                header_length: 8, // Fixed header size for UDP
+                length: total_length,
+                window_size: 0, // No window size for UDP
+            })
+        }
+        IpNextHeaderProtocols::Icmp | IpNextHeaderProtocols::Icmpv6 => {
+            let icmp_packet = IcmpPacket::new(packet)?;
+            Some(PacketFeatures {
+                source_ip,
+                destination_ip,
+                source_port: 0,
+                destination_port: 0,
+                protocol: protocol.0,
+                timestamp,
+                fin_flag: 0,
+                syn_flag: 0,
+                rst_flag: 0,
+                psh_flag: 0,
+                ack_flag: 0,
+                urg_flag: 0,
+                cwe_flag: 0,
+                ece_flag: 0,
+                data_length: icmp_packet.payload().len() as u16,
+                header_length: 8, // Fixed header size for ICMP
+                length: total_length,
+                window_size: 0, // No window size for ICMP
+            })
+        }
+        _ => {
+            debug!("Unsupported protocol in packet!");
+            None
         }
     }
 }
