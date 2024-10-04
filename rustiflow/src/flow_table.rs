@@ -12,7 +12,7 @@ pub struct FlowTable<T> {
     early_export: Option<u64>,
     export_channel: mpsc::Sender<T>,
     next_check_time: Option<DateTime<Utc>>, // Track the next time we check for flow expirations
-    expiration_check_interval: TimeDelta, // Check for expired flows every x seconds
+    expiration_check_interval: TimeDelta,   // Check for expired flows every x seconds
 }
 
 impl<T> FlowTable<T>
@@ -138,7 +138,10 @@ where
         {
             self.export_expired_flows(current_time).await;
             self.next_check_time = Some(current_time + self.expiration_check_interval);
-            debug!("Next flow expiration check scheduled at: {:?}", self.next_check_time);
+            debug!(
+                "Next flow expiration check scheduled at: {:?}",
+                self.next_check_time
+            );
         }
     }
 

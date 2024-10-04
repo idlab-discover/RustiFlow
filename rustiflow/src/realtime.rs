@@ -7,16 +7,17 @@ use crate::debug;
 use crate::{flow_table::FlowTable, flows::flow::Flow, packet_features::PacketFeatures};
 use aya::{
     include_bytes_aligned,
-    maps::AsyncPerfEventArray,
+    maps::{AsyncPerfEventArray, MapData},
     programs::{tc, SchedClassifier, TcAttachType},
     Bpf,
 };
 use bytes::BytesMut;
 use log::{error, info};
-use tokio::{signal, sync::mpsc::{self, Sender}, task::JoinSet};
-use crate::debug;
-use aya::{include_bytes_aligned, maps::{AsyncPerfEventArray, MapData}, programs::{tc, SchedClassifier, TcAttachType}, Bpf};
-
+use tokio::{
+    signal,
+    sync::mpsc::{self, Sender},
+    task::JoinSet,
+};
 
 static TOTAL_LOST_EVENTS: AtomicU64 = AtomicU64::new(0);
 
@@ -39,28 +40,43 @@ where
     // Load the eBPF programs and attach to the event arrays
     let mut bpf_ingress_ipv4 = load_ebpf_ipv4(interface, TcAttachType::Ingress)?;
     let mut bpf_ingress_ipv6 = load_ebpf_ipv6(interface, TcAttachType::Ingress)?;
-    let events_ingress_ipv4 = AsyncPerfEventArray::try_from(bpf_ingress_ipv4.take_map("EVENTS_IPV4").unwrap())?;
-    let events_ingress_ipv6 = AsyncPerfEventArray::try_from(bpf_ingress_ipv6.take_map("EVENTS_IPV6").unwrap())?;
+    let events_ingress_ipv4 =
+        AsyncPerfEventArray::try_from(bpf_ingress_ipv4.take_map("EVENTS_IPV4").unwrap())?;
+    let events_ingress_ipv6 =
+        AsyncPerfEventArray::try_from(bpf_ingress_ipv6.take_map("EVENTS_IPV6").unwrap())?;
     let event_sources: Vec<AsyncPerfEventArray<MapData>>;
 
     if !ingress_only {
         let mut bpf_egress_ipv4 = load_ebpf_ipv4(interface, TcAttachType::Egress)?;
         let mut bpf_egress_ipv6 = load_ebpf_ipv6(interface, TcAttachType::Egress)?;
-        let events_egress_ipv4 = AsyncPerfEventArray::try_from(bpf_egress_ipv4.take_map("EVENTS_IPV4").unwrap())?;
-        let events_egress_ipv6 = AsyncPerfEventArray::try_from(bpf_egress_ipv6.take_map("EVENTS_IPV6").unwrap())?;
-        event_sources = vec![events_egress_ipv4, events_ingress_ipv4, events_egress_ipv6, events_ingress_ipv6];
+        let events_egress_ipv4 =
+            AsyncPerfEventArray::try_from(bpf_egress_ipv4.take_map("EVENTS_IPV4").unwrap())?;
+        let events_egress_ipv6 =
+            AsyncPerfEventArray::try_from(bpf_egress_ipv6.take_map("EVENTS_IPV6").unwrap())?;
+        event_sources = vec![
+            events_egress_ipv4,
+            events_ingress_ipv4,
+            events_egress_ipv6,
+            events_ingress_ipv6,
+        ];
     } else {
         event_sources = vec![events_ingress_ipv4, events_ingress_ipv6];
     }
 
     let buffer_num_packets = 10_000;
     let mut shard_senders = Vec::with_capacity(num_threads as usize);
-    
+
     debug!("Creating {} sharded FlowTables...", num_threads);
     for _ in 0..num_threads {
         let (tx, mut rx) = mpsc::channel::<PacketFeatures>(buffer_num_packets);
-        let mut flow_table = FlowTable::new(active_timeout, idle_timeout, early_export, output_channel.clone(), expiration_check_interval);
-        
+        let mut flow_table = FlowTable::new(
+            active_timeout,
+            idle_timeout,
+            early_export,
+            output_channel.clone(),
+            expiration_check_interval,
+        );
+
         // Spawn a task per shard
         tokio::spawn(async move {
             while let Some(packet_features) = rx.recv().await {
@@ -80,7 +96,7 @@ where
     for mut ebpf_event_source in event_sources {
         let shard_senders_clone = shard_senders.clone();
         let mut event_buffer = ebpf_event_source.open(0, None)?;
-        
+
         handle_set.spawn(async move {
             // 10 buffers with 98_304 bytes each, meaning a capacity of 4096 packets per buffer (24 bytes per packet)
             let mut buffers = (0..10)
@@ -100,8 +116,13 @@ where
                             debug!("Received packet for flow: {}", flow_key);
                             let shard_index = compute_shard_index(&flow_key, num_threads);
 
-                            if let Err(e) = shard_senders_clone[shard_index].send(packet_features).await {
-                                error!("Failed to send packet_features to shard {}: {}", shard_index, e);
+                            if let Err(e) =
+                                shard_senders_clone[shard_index].send(packet_features).await
+                            {
+                                error!(
+                                    "Failed to send packet_features to shard {}: {}",
+                                    shard_index, e
+                                );
                             }
                         }
                     }
@@ -119,7 +140,7 @@ where
 
     // Cancel the tasks reading ebpf events
     handle_set.abort_all();
-    
+
     // Wait for all tasks to finish
     while let Some(res) = handle_set.join_next().await {
         match res {
