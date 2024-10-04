@@ -40,6 +40,7 @@ pub async fn read_pcap_file<T>(
     active_timeout: u64,
     idle_timeout: u64,
     early_export: Option<u64>,
+    expiration_check_interval: u64,
 ) -> Result<(), anyhow::Error>
 where
     T: Flow,
@@ -57,12 +58,13 @@ where
     // Create sharded FlowTables each in their own task and returns channels to send packets to the shards
     let buffer_num_packets = 10_000;
     let shard_senders = create_shard_senders::<T>(
-        num_threads,
-        buffer_num_packets,
-        output_channel,
-        active_timeout,
-        idle_timeout,
+        num_threads, 
+        buffer_num_packets, 
+        output_channel, 
+        active_timeout, 
+        idle_timeout, 
         early_export,
+        expiration_check_interval
     );
 
     debug!("Reading the pcap file: {:?} ...", path);
@@ -336,6 +338,7 @@ fn create_shard_senders<T>(
     active_timeout: u64,
     idle_timeout: u64,
     early_export: Option<u64>,
+    expiration_check_interval: u64,
 ) -> Vec<mpsc::Sender<PacketFeatures>>
 where
     T: Flow,
@@ -344,13 +347,8 @@ where
     let mut shard_senders = Vec::with_capacity(num_shards as usize);
     for _ in 0..num_shards {
         let (tx, mut rx) = mpsc::channel::<PacketFeatures>(buffer_num_packets);
-        let mut flow_table = FlowTable::new(
-            active_timeout,
-            idle_timeout,
-            early_export,
-            output_channel.clone(),
-        );
-
+        let mut flow_table = FlowTable::new(active_timeout, idle_timeout, early_export, output_channel.clone(), expiration_check_interval);
+        
         tokio::spawn(async move {
             while let Some(packet_features) = rx.recv().await {
                 flow_table.process_packet(&packet_features).await;
