@@ -13,3 +13,5 @@ Cargo.lock
 
 # testing files
 testing/
+
+rustiflow.toml
