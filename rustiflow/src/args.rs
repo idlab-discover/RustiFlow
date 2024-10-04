@@ -1,5 +1,6 @@
-use clap::{Args, Parser, Subcommand, ArgGroup};
+use clap::{ArgGroup, Args, Parser, Subcommand};
 use serde::{Deserialize, Serialize};
+use strum_macros::{EnumString, VariantNames};
 
 #[derive(Debug, Parser)]
 #[clap(author, version, about)]
@@ -56,7 +57,7 @@ pub struct Cli {
     pub command: Commands,
 }
 
-#[derive(Debug, Subcommand)]
+#[derive(Serialize, Deserialize, Debug, Subcommand, Clone)]
 pub enum Commands {
     /// Real-time feature extraction
     Realtime {
@@ -72,6 +73,15 @@ pub enum Commands {
         /// The relative path to the pcap file
         path: String,
     },
+}
+
+impl ToString for Commands {
+    fn to_string(&self) -> String {
+        match self {
+            Commands::Realtime { interface } => format!("Realtime\nInterface: {}", interface),
+            Commands::Pcap { path } => format!("Pcap\nPath: {}", path),
+        }
+    }
 }
 
 #[derive(Serialize, Deserialize, Args, Debug, Clone)]
@@ -131,7 +141,8 @@ pub enum ExportMethodType {
     Csv,
 }
 
-#[derive(Serialize, Deserialize, clap::ValueEnum, Clone, Debug)]
+#[derive(Serialize, Deserialize, clap::ValueEnum, Clone, Debug, EnumString, VariantNames)]
+#[strum(serialize_all = "kebab_case")]
 pub enum FlowType {
     /// A basic flow that stores the basic features of a flow.
     Basic,

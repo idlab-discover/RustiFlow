@@ -34,6 +34,10 @@ lazy_static = "1.4.0"
 libc = "0.2.153"
 num_cpus = "1.14"
 confy = "0.6.1"
+crossterm = "0.28.1"
+tui = "0.19"
+strum = "0.26.3"
+strum_macros = "0.26.4"
 
 [[bin]]
 name = "rustiflow"
