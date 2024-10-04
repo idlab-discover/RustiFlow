@@ -10,8 +10,6 @@ mod tui;
 use crate::flows::{cic_flow::CicFlow, ntl_flow::NTLFlow};
 use crate::pcap::read_pcap_file;
 use crate::realtime::handle_realtime;
-use std::time::Instant;
-use tokio::sync::mpsc;
 use args::{Cli, Commands, ConfigFile, ExportConfig, FlowType, OutputConfig};
 use clap::Parser;
 use flows::{
@@ -20,6 +18,8 @@ use flows::{
 };
 use log::{debug, error};
 use output::OutputWriter;
+use std::time::Instant;
+use tokio::sync::mpsc;
 use tui::{launch_tui, Config};
 
 #[tokio::main]

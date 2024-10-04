@@ -811,7 +811,7 @@ fn render_content<B: Backend>(f: &mut Frame<B>, app: &App, area: Rect) {
                 f,
                 area,
                 app.expiration_check_interval_input.as_ref(),
-                "Enter Expiration Check Interval (seconds, 0 to disable)",
+                "Enter Expiration Check Interval (seconds)",
                 matches!(app.focus, AppFocus::ExpirationCheckIntervalInput),
             );
         }
