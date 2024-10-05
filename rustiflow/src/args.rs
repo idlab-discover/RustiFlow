@@ -45,11 +45,11 @@ pub struct Cli {
     pub export_path: Option<String>,
 
     /// Whether to export the feature header
-    #[clap(long, group = "cli_group")]
+    #[clap(long, action = clap::ArgAction::SetTrue, group = "cli_group")]
     pub header: bool,
 
     /// Whether to drop contaminant features
-    #[clap(long, group = "cli_group")]
+    #[clap(long, action = clap::ArgAction::SetTrue, group = "cli_group")]
     pub drop_contaminant_features: bool,
 
     /// Subcommands (Real-time or Pcap)
