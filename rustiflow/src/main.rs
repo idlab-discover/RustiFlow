@@ -118,7 +118,8 @@ async fn run_with_config(config: Config) {
                         });
                         debug!("OutputWriter task finished");
                     });
-
+                    
+                    debug!("Starting realtime processing...");
                     let start = Instant::now();
                     if let Err(err) = handle_realtime::<$flow_ty>(
                         &interface,
