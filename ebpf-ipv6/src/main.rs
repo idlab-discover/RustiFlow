@@ -94,6 +94,7 @@ impl PacketInfo {
             header.combined_flags(),
             self.protocol,
             header.header_length(),
+            header.sequence_number(),
         )
     }
 }
@@ -104,6 +105,7 @@ trait NetworkHeader {
     fn window_size(&self) -> u16;
     fn combined_flags(&self) -> u8;
     fn header_length(&self) -> u8;
+    fn sequence_number(&self) -> u32;
 }
 
 impl NetworkHeader for TcpHdr {
@@ -129,6 +131,9 @@ impl NetworkHeader for TcpHdr {
     fn header_length(&self) -> u8 {
         TcpHdr::LEN as u8
     }
+    fn sequence_number(&self) -> u32 {
+        self.seq
+    }
 }
 
 impl NetworkHeader for UdpHdr {
@@ -147,6 +152,9 @@ impl NetworkHeader for UdpHdr {
     fn header_length(&self) -> u8 {
         UdpHdr::LEN as u8
     }
+    fn sequence_number(&self) -> u32 {
+        0
+    }
 }
 
 impl NetworkHeader for IcmpHdr {
@@ -164,5 +172,8 @@ impl NetworkHeader for IcmpHdr {
     }
     fn header_length(&self) -> u8 {
         IcmpHdr::LEN as u8
+    }
+    fn sequence_number(&self) -> u32 {
+        0
     }
 }

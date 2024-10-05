@@ -34,6 +34,7 @@ pub struct PacketFeatures {
     pub header_length: u8,
     pub length: u16,
     pub window_size: u16,
+    pub sequence_number: u32,
 }
 
 impl PacketFeatures {
@@ -58,6 +59,7 @@ impl PacketFeatures {
             header_length: event.header_length,
             length: event.length,
             window_size: event.window_size,
+            sequence_number: event.sequence_number,
         }
     }
 
@@ -82,6 +84,7 @@ impl PacketFeatures {
             header_length: event.header_length,
             length: event.length,
             window_size: event.window_size,
+            sequence_number: event.sequence_number,
         }
     }
 
@@ -203,6 +206,7 @@ fn extract_packet_features_transport(
                 header_length: (tcp_packet.get_data_offset() * 4) as u8,
                 length: total_length,
                 window_size: tcp_packet.get_window(),
+                sequence_number: tcp_packet.get_sequence(),
             })
         }
         IpNextHeaderProtocols::Udp => {
@@ -226,6 +230,7 @@ fn extract_packet_features_transport(
                 header_length: 8, // Fixed header size for UDP
                 length: total_length,
                 window_size: 0, // No window size for UDP
+                sequence_number: 0, // No sequence number for UDP
             })
         }
         IpNextHeaderProtocols::Icmp | IpNextHeaderProtocols::Icmpv6 => {
@@ -249,6 +254,7 @@ fn extract_packet_features_transport(
                 header_length: 8, // Fixed header size for ICMP
                 length: total_length,
                 window_size: 0, // No window size for ICMP
+                sequence_number: 0, // No sequence number for ICMP
             })
         }
         _ => {

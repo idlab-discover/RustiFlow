@@ -13,6 +13,7 @@ pub struct EbpfEventIpv4 {
     pub combined_flags: u8,
     pub protocol: u8,
     pub header_length: u8,
+    pub sequence_number: u32,
     pub _padding: [u8; 3], // Explicit padding to match the size of the struct in the eBPF program
 }
 
@@ -28,6 +29,7 @@ impl EbpfEventIpv4 {
         combined_flags: u8,
         protocol: u8,
         header_length: u8,
+        sequence_number: u32,
     ) -> Self {
         EbpfEventIpv4 {
             ipv4_destination,
@@ -40,6 +42,7 @@ impl EbpfEventIpv4 {
             combined_flags,
             protocol,
             header_length,
+            sequence_number,
             _padding: [0; 3],
         }
     }
@@ -62,7 +65,8 @@ pub struct EbpfEventIpv6 {
     pub combined_flags: u8,
     pub protocol: u8,
     pub header_length: u8,
-    _padding: [u8; 3], // Explicit padding to match the size of the struct in the eBPF program
+    pub sequence_number: u32,
+    _padding: [u8; 15], // Explicit padding to match the size of the struct in the eBPF program
 }
 
 impl EbpfEventIpv6 {
@@ -77,6 +81,7 @@ impl EbpfEventIpv6 {
         combined_flags: u8,
         protocol: u8,
         header_length: u8,
+        sequence_number: u32,
     ) -> Self {
         EbpfEventIpv6 {
             ipv6_destination,
@@ -89,7 +94,8 @@ impl EbpfEventIpv6 {
             combined_flags,
             protocol,
             header_length,
-            _padding: [0; 3],
+            sequence_number,
+            _padding: [0; 15],
         }
     }
 }
