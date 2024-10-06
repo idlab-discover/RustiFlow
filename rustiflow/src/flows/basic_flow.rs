@@ -63,12 +63,15 @@ pub struct BasicFlow {
     pub bwd_ece_flag_count: u32,
     /// The number of packets in the backward direction.
     pub bwd_packet_count: u32,
+    /// The expected acknowledgment sequence number.
+    pub expected_ack_seq: u32,
 }
 
 impl BasicFlow {
     /// Checks if the flow is finished.
     ///
-    /// A flow is considered finished when both FIN flags are set and the last ACK is received.
+    /// A flow is considered finished when both FIN flags are set and the last ACK is received,
+    /// and the sequence numbers have been acknowledged by both parties.
     ///
     /// ### Arguments
     ///
@@ -77,10 +80,26 @@ impl BasicFlow {
     /// ### Returns
     ///
     /// A boolean indicating if the flow is finished.
-    pub fn is_tcp_finished(&self, packet: &PacketFeatures) -> bool {
-        // when both FIN flags are set, the flow can be finished when the last ACK is received
-        // TODO improve with sequence numbers
-        self.fwd_fin_flag_count > 0 && self.bwd_fin_flag_count > 0 && packet.ack_flag > 0
+    pub fn is_tcp_finished(&mut self, packet: &PacketFeatures) -> bool {
+        // Check if both sides have sent FIN
+        let both_fin_flags_set = self.fwd_fin_flag_count > 0 && self.bwd_fin_flag_count > 0;
+
+        // Check if the last ACK has been received (acknowledgment of both FINs)
+        let last_ack_received = packet.ack_flag > 0 && packet.sequence_number_ack == self.expected_ack_seq;
+
+        // Add logic for updating the expected acknowledgment sequence after receiving a FIN
+        if self.fwd_fin_flag_count > 0 && self.bwd_fin_flag_count == 0 {
+            // Set the expected acknowledgment sequence based on the forward FIN
+            self.expected_ack_seq = packet.sequence_number + 1;  // FIN consumes one sequence number
+        }
+
+        if self.bwd_fin_flag_count > 0 && self.fwd_fin_flag_count == 0 {
+            // Set the expected acknowledgment sequence based on the backward FIN
+            self.expected_ack_seq = packet.sequence_number + 1;
+        }
+
+        // Check if the flow is finished based on FINs and ACKs
+        both_fin_flags_set && last_ack_received
     }
 
     /// Calculates the flow duration in microseconds.
@@ -135,6 +154,7 @@ impl Flow for BasicFlow {
             bwd_cwe_flag_count: 0,
             bwd_ece_flag_count: 0,
             bwd_packet_count: 0,
+            expected_ack_seq: 0,
         }
     }
 

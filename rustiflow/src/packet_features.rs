@@ -35,6 +35,7 @@ pub struct PacketFeatures {
     pub length: u16,
     pub window_size: u16,
     pub sequence_number: u32,
+    pub sequence_number_ack: u32,
 }
 
 impl PacketFeatures {
@@ -60,6 +61,7 @@ impl PacketFeatures {
             length: event.length,
             window_size: event.window_size,
             sequence_number: event.sequence_number,
+            sequence_number_ack: event.sequence_number_ack,
         }
     }
 
@@ -85,6 +87,7 @@ impl PacketFeatures {
             length: event.length,
             window_size: event.window_size,
             sequence_number: event.sequence_number,
+            sequence_number_ack: event.sequence_number_ack,
         }
     }
 
@@ -207,6 +210,7 @@ fn extract_packet_features_transport(
                 length: total_length,
                 window_size: tcp_packet.get_window(),
                 sequence_number: tcp_packet.get_sequence(),
+                sequence_number_ack: tcp_packet.get_acknowledgement(),
             })
         }
         IpNextHeaderProtocols::Udp => {
@@ -231,6 +235,7 @@ fn extract_packet_features_transport(
                 length: total_length,
                 window_size: 0, // No window size for UDP
                 sequence_number: 0, // No sequence number for UDP
+                sequence_number_ack: 0, // No sequence number ACK for UDP
             })
         }
         IpNextHeaderProtocols::Icmp | IpNextHeaderProtocols::Icmpv6 => {
@@ -255,6 +260,7 @@ fn extract_packet_features_transport(
                 length: total_length,
                 window_size: 0, // No window size for ICMP
                 sequence_number: 0, // No sequence number for ICMP
+                sequence_number_ack: 0, // No sequence number ACK for ICMP
             })
         }
         _ => {
