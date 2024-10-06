@@ -459,7 +459,7 @@
         <span class="string">"../../target/bpfel-unknown-none/debug/rustiflow-ebpf-ipv6"
     </span>))<span class="question-mark">?</span>;
     <span class="attr">#[cfg(not(debug_assertions))]
-    </span><span class="kw">let </span><span class="kw-2">mut </span>bpf_ipv6 = Ebpf::load(<span class="macro">include_bytes_aligned!</span>(
+    </span><span class="kw">let </span><span class="kw-2">mut </span>bpf_ipv6 = Bpf::load(<span class="macro">include_bytes_aligned!</span>(
         <span class="string">"../../target/bpfel-unknown-none/release/rustiflow-ebpf-ipv6"
     </span>))<span class="question-mark">?</span>;
 
