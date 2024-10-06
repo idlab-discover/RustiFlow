@@ -261,13 +261,13 @@ impl Flow for NTLFlow {
     }
 
     fn update_flow(&mut self, packet: &PacketFeatures, fwd: bool) -> bool {
+        let is_terminated = self.cic_flow.update_flow(packet, fwd);
         if fwd {
             self.update_fwd_header_len_stats(packet.header_length as u32);
         } else {
             self.update_bwd_header_len_stats(packet.header_length as u32);
         }
-
-        self.cic_flow.update_flow(packet, fwd)
+        is_terminated
     }
 
     fn dump(&self) -> String {
