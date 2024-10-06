@@ -5,11 +5,10 @@ use crate::debug;
 use crate::{flow_table::FlowTable, flows::flow::Flow, packet_features::PacketFeatures};
 use aya::{
     include_bytes_aligned,
-    maps::{AsyncPerfEventArray, MapData},
+    maps::RingBuf,
     programs::{tc, SchedClassifier, TcAttachType},
     Bpf,
 };
-use crate::debug;
 use aya_log::BpfLogger;
 use common::{EbpfEventIpv4, EbpfEventIpv6};
 use log::{error, info};
