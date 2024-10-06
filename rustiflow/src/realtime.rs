@@ -1,14 +1,12 @@
-use std::{hash::{DefaultHasher, Hash, Hasher}, sync::atomic::{AtomicU64, Ordering}};
+use std::hash::{DefaultHasher, Hash, Hasher};
 
 use crate::{flow_table::FlowTable, flows::flow::Flow, packet_features::PacketFeatures};
-use bytes::BytesMut;
+use aya_log::BpfLogger;
 use common::{EbpfEventIpv4, EbpfEventIpv6};
 use log::{error, info};
-use tokio::{signal, sync::mpsc::{self, Sender}, task::JoinSet};
+use tokio::{io::unix::AsyncFd, signal, sync::mpsc::{self, Sender}, task::JoinSet};
 use crate::debug;
-use aya::{include_bytes_aligned, maps::{AsyncPerfEventArray, MapData}, programs::{tc, SchedClassifier, TcAttachType}, Bpf};
-
-static TOTAL_LOST_EVENTS: AtomicU64 = AtomicU64::new(0);
+use aya::{include_bytes_aligned, maps::RingBuf, programs::{tc, SchedClassifier, TcAttachType}, Bpf};
 
 pub async fn handle_realtime<T>(
     interface: &str,
@@ -29,16 +27,16 @@ where
     // Load the eBPF programs and attach to the event arrays
     let mut bpf_ingress_ipv4 = load_ebpf_ipv4(interface, TcAttachType::Ingress)?;
     let mut bpf_ingress_ipv6 = load_ebpf_ipv6(interface, TcAttachType::Ingress)?;
-    let events_ingress_ipv4 = AsyncPerfEventArray::try_from(bpf_ingress_ipv4.take_map("EVENTS_IPV4").unwrap())?;
-    let events_ingress_ipv6 = AsyncPerfEventArray::try_from(bpf_ingress_ipv6.take_map("EVENTS_IPV6").unwrap())?;
-    let event_sources_v4: Vec<AsyncPerfEventArray<MapData>>;
-    let event_sources_v6: Vec<AsyncPerfEventArray<MapData>>;
+    let events_ingress_ipv4 = RingBuf::try_from(bpf_ingress_ipv4.take_map("EVENTS_IPV4").unwrap())?;
+    let events_ingress_ipv6 = RingBuf::try_from(bpf_ingress_ipv6.take_map("EVENTS_IPV6").unwrap())?;
+    let event_sources_v4;
+    let event_sources_v6;
 
     if !ingress_only {
         let mut bpf_egress_ipv4 = load_ebpf_ipv4(interface, TcAttachType::Egress)?;
         let mut bpf_egress_ipv6 = load_ebpf_ipv6(interface, TcAttachType::Egress)?;
-        let events_egress_ipv4 = AsyncPerfEventArray::try_from(bpf_egress_ipv4.take_map("EVENTS_IPV4").unwrap())?;
-        let events_egress_ipv6 = AsyncPerfEventArray::try_from(bpf_egress_ipv6.take_map("EVENTS_IPV6").unwrap())?;
+        let events_egress_ipv4 = RingBuf::try_from(bpf_egress_ipv4.take_map("EVENTS_IPV4").unwrap())?;
+        let events_egress_ipv6 = RingBuf::try_from(bpf_egress_ipv6.take_map("EVENTS_IPV6").unwrap())?;
         event_sources_v4 = vec![events_egress_ipv4, events_ingress_ipv4];
         event_sources_v6 = vec![events_egress_ipv6, events_ingress_ipv6];
     } else {
@@ -70,76 +68,60 @@ where
     // Spawn a task per event source
     let mut handle_set = JoinSet::new();
 
-    for mut ebpf_event_source in event_sources_v4 {
+    for ebpf_event_source in event_sources_v4 {
         let shard_senders_clone = shard_senders.clone();
-        let mut event_buffer = ebpf_event_source.open(0, None)?;
         
         handle_set.spawn(async move {
-            // 10 buffers with 98_304 bytes each, meaning a capacity of 4096 packets per buffer (24 bytes per packet)
-            let mut buffers = (0..10)
-                .map(|_| BytesMut::with_capacity(24 * 4096))
-                .collect::<Vec<_>>();
+            // Wrap the RingBuf in AsyncFd to poll it with tokio
+            let mut async_ring_buf = AsyncFd::new(ebpf_event_source).unwrap();
 
             loop {
-                match event_buffer.read_events(&mut buffers).await {
-                    Ok(events) => {
-                        TOTAL_LOST_EVENTS.fetch_add(events.lost as u64, Ordering::SeqCst);
-                        debug!("Processed {} events", events.read);
+                // Wait for data to be available in the ring buffer
+                let mut guard = async_ring_buf.readable_mut().await.unwrap();
 
-                        for buf in buffers.iter_mut().take(events.read) {
-                            let ptr = buf.as_ptr() as *const EbpfEventIpv4;
-                            let ebpf_event_ipv4 = unsafe { ptr.read_unaligned() };
-                            let packet_features = PacketFeatures::from_ebpf_event_ipv4(&ebpf_event_ipv4);
-                            let flow_key = packet_features.biflow_key();
-                            debug!("Received packet for flow: {}", flow_key);
-                            let shard_index = compute_shard_index(&flow_key, num_threads);
+                let ring_buf = guard.get_inner_mut();
+                while let Some(event) = ring_buf.next() {
+                    let ebpf_event_ipv4: EbpfEventIpv4 = unsafe { std::ptr::read(event.as_ptr() as *const _) };
+                    let packet_features = PacketFeatures::from_ebpf_event_ipv4(&ebpf_event_ipv4);
+                    let flow_key = packet_features.biflow_key();
+                    let shard_index = compute_shard_index(&flow_key, num_threads);
 
-                            if let Err(e) = shard_senders_clone[shard_index].send(packet_features).await {
-                                error!("Failed to send packet_features to shard {}: {}", shard_index, e);
-                            }
-                        }
-                    }
-                    Err(_) => {
-                        error!("Failed to read events from event_buffer");
+                    if let Err(e) = shard_senders_clone[shard_index].send(packet_features).await {
+                        error!("Failed to send packet_features to shard {}: {}", shard_index, e);
                     }
                 }
+
+                // Clear the readiness state for the next iteration
+                guard.clear_ready();
             }
         });
     }
 
-    for mut ebpf_event_source in event_sources_v6 {
+    for ebpf_event_source in event_sources_v6 {
         let shard_senders_clone = shard_senders.clone();
-        let mut event_buffer = ebpf_event_source.open(0, None)?;
         
         handle_set.spawn(async move {
-            // 10 buffers with 98_304 bytes each, meaning a capacity of 4096 packets per buffer (24 bytes per packet)
-            let mut buffers = (0..10)
-                .map(|_| BytesMut::with_capacity(24 * 4096))
-                .collect::<Vec<_>>();
+            // Wrap the RingBuf in AsyncFd to poll it with tokio
+            let mut async_ring_buf = AsyncFd::new(ebpf_event_source).unwrap();
 
             loop {
-                match event_buffer.read_events(&mut buffers).await {
-                    Ok(events) => {
-                        TOTAL_LOST_EVENTS.fetch_add(events.lost as u64, Ordering::SeqCst);
-                        debug!("Processed {} events", events.read);
+                // Wait for data to be available in the ring buffer
+                let mut guard = async_ring_buf.readable_mut().await.unwrap();
 
-                        for buf in buffers.iter_mut().take(events.read) {
-                            let ptr = buf.as_ptr() as *const EbpfEventIpv6;
-                            let ebpf_event_ipv6 = unsafe { ptr.read_unaligned() };
-                            let packet_features = PacketFeatures::from_ebpf_event_ipv6(&ebpf_event_ipv6);
-                            let flow_key = packet_features.biflow_key();
-                            debug!("Received packet for flow: {}", flow_key);
-                            let shard_index = compute_shard_index(&flow_key, num_threads);
+                let ring_buf = guard.get_inner_mut();
+                while let Some(event) = ring_buf.next() {
+                    let ebpf_event_ipv6: EbpfEventIpv6 = unsafe { std::ptr::read(event.as_ptr() as *const _) };
+                    let packet_features = PacketFeatures::from_ebpf_event_ipv6(&ebpf_event_ipv6);
+                    let flow_key = packet_features.biflow_key();
+                    let shard_index = compute_shard_index(&flow_key, num_threads);
 
-                            if let Err(e) = shard_senders_clone[shard_index].send(packet_features).await {
-                                error!("Failed to send packet_features to shard {}: {}", shard_index, e);
-                            }
-                        }
-                    }
-                    Err(_) => {
-                        error!("Failed to read events from event_buffer");
+                    if let Err(e) = shard_senders_clone[shard_index].send(packet_features).await {
+                        error!("Failed to send packet_features to shard {}: {}", shard_index, e);
                     }
                 }
+
+                // Clear the readiness state for the next iteration
+                guard.clear_ready();
             }
         });
     }
@@ -168,11 +150,6 @@ where
             }
         }
     }
-
-    debug!(
-        "{} events were lost",
-        TOTAL_LOST_EVENTS.load(Ordering::SeqCst)
-    );
 
     Ok(())
 }
@@ -210,13 +187,20 @@ fn load_ebpf_ipv4(interface: &str, tc_attach_type: TcAttachType) -> Result<Bpf, 
     ))?;
 
     // Attach the eBPF program function
+    let _ = BpfLogger::init(&mut bpf_ipv4);
     let _ = tc::qdisc_add_clsact(interface);
     let program_egress_ipv4: &mut SchedClassifier = bpf_ipv4
         .program_mut("tc_flow_track")
         .unwrap()
         .try_into()?;
-    program_egress_ipv4.load()?;
-    program_egress_ipv4.attach(&interface, tc_attach_type)?;
+    program_egress_ipv4.load().map_err(|e| {
+        error!("Failed to load eBPF program: {:?}", e);
+        e
+    })?;
+    program_egress_ipv4.attach(&interface, tc_attach_type).map_err(|e| {
+        error!("Failed to attach eBPF program: {:?}", e);
+        e
+    })?;
     
     Ok(bpf_ipv4)
 }

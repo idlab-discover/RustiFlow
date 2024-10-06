@@ -39,8 +39,6 @@ where
 
     /// Processes a packet (either IPv4 or IPv6) and updates the flow map.
     pub async fn process_packet(&mut self, packet: &PacketFeatures) {
-        debug!("Processing packet: {:?}", packet.flow_key());
-
         // Check if enough virtual time has passed to trigger flow expiration checks
         self.check_and_export_expired_flows(packet.timestamp).await;
 
@@ -54,18 +52,15 @@ where
         // Update the flow if it exists, otherwise create a new flow
         if let Some(mut flow) = self.flow_map.remove(&flow_key) {
             if flow.is_expired(packet.timestamp, self.active_timeout, self.idle_timeout) {
-                debug!("Flow expired: {:?}, Creating new Flow", flow.flow_key());
                 self.export_flow(flow).await;
                 self.create_and_insert_flow(packet).await;
             } else {
-                debug!("Updating flow: {:?}", flow.flow_key());
                 let is_terminated = self.update_flow_with_packet(&mut flow, packet).await;
                 if !is_terminated {
                     self.flow_map.insert(flow_key, flow);
                 }
             }
         } else {
-            debug!("Creating new Flow: {:?}", packet.flow_key());
             self.create_and_insert_flow(packet).await;
         }
     }
