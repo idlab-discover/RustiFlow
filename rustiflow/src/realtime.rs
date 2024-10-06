@@ -222,7 +222,7 @@ fn load_ebpf_ipv6(interface: &str, tc_attach_type: TcAttachType) -> Result<Bpf, 
         "../../target/bpfel-unknown-none/debug/rustiflow-ebpf-ipv6"
     ))?;
     #[cfg(not(debug_assertions))]
-    let mut bpf_ipv6 = Ebpf::load(include_bytes_aligned!(
+    let mut bpf_ipv6 = Bpf::load(include_bytes_aligned!(
         "../../target/bpfel-unknown-none/release/rustiflow-ebpf-ipv6"
     ))?;
 
