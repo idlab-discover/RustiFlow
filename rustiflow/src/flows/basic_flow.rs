@@ -1,7 +1,6 @@
 use std::net::IpAddr;
 
 use chrono::{DateTime, Utc};
-use log::debug;
 
 use crate::packet_features::PacketFeatures;
 
@@ -97,20 +96,16 @@ impl BasicFlow {
             if forward {
                 self.state_fwd = FlowState::FinSent;
                 self.expected_ack_seq_bwd = Some(packet.sequence_number + packet.data_length as u32 + 1);
-                debug!("Flow {} FIN sent in forward direction with sequence number {} and payload length {}", self.flow_key, packet.sequence_number, packet.data_length);
             } else {
                 self.state_bwd = FlowState::FinSent;
                 self.expected_ack_seq_fwd = Some(packet.sequence_number + packet.data_length as u32 + 1);
-                debug!("Flow {} FIN sent in backward direction with sequence number {} and payload length {}", self.flow_key, packet.sequence_number, packet.data_length);
             }
         }
 
         if self.state_bwd == FlowState::FinSent && forward && Some(packet.sequence_number_ack) == self.expected_ack_seq_fwd {
             self.state_bwd = FlowState::FinAcked;
-            debug!("Flow {} FIN acknowledged in backward direction with sequence number {}", self.flow_key, packet.sequence_number_ack);
         } else if self.state_fwd == FlowState::FinSent && !forward && Some(packet.sequence_number_ack) == self.expected_ack_seq_bwd {
             self.state_fwd = FlowState::FinAcked;
-            debug!("Flow {} FIN acknowledged in forward direction with sequence number {}", self.flow_key, packet.sequence_number_ack);
         }
 
         // Return true if both sides are finished and acknowledged the termination
@@ -181,7 +176,6 @@ impl Flow for BasicFlow {
 
         if self.is_tcp_finished(packet, fwd) {
             self.flow_end_of_flow_ack = 1;
-            debug!("Flow {} terminated", self.flow_key);
         }
 
         if fwd {

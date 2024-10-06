@@ -52,7 +52,6 @@ where
     }
 
     pub fn write_flow(&mut self, flow: T) -> std::io::Result<()> {
-        debug!("Writing flow to output");
         let flow_str = if self.skip_contaminant_features {
             flow.dump_without_contamination()
         } else {
