@@ -5,9 +5,10 @@
 use aya_ebpf::{
     bindings::TC_ACT_PIPE,
     macros::{classifier, map},
-    maps::PerfEventArray,
+    maps::RingBuf,
     programs::TcContext,
 };
+use aya_log_ebpf::error;
 
 use common::EbpfEventIpv6;
 use network_types::{
@@ -24,8 +25,7 @@ fn panic(_info: &core::panic::PanicInfo) -> ! {
 }
 
 #[map]
-static EVENTS_IPV6: PerfEventArray<EbpfEventIpv6> =
-    PerfEventArray::with_max_entries(1024 * 1024, 0);
+static EVENTS_IPV6: RingBuf = RingBuf::with_byte_size(1024 * 1024, 0); // 1 MB
 
 #[classifier]
 pub fn tc_flow_track(ctx: TcContext) -> i32 {
@@ -60,7 +60,18 @@ fn process_transport_packet<T: NetworkHeader>(
         .load::<T>(EthHdr::LEN + Ipv6Hdr::LEN)
         .map_err(|_| ())?;
     let packet_log = packet_info.to_packet_log(&tcphdr);
-    EVENTS_IPV6.output(ctx, &packet_log, 0);
+
+    // Reserve memory in the ring buffer for the event
+    if let Some(mut entry) = EVENTS_IPV6.reserve::<EbpfEventIpv6>(0) {
+        // Use MaybeUninit to write the packet_log data into the reserved memory
+        *entry = core::mem::MaybeUninit::new(packet_log);
+        // Submit the entry to make it visible to userspace
+        entry.submit(0);
+    } else {
+        // Handle the case where the ring buffer is full (optional logging)
+        error!(ctx, "Failed to reserve entry in ring buffer, buffer might be full.");
+    }
+
     Ok(TC_ACT_PIPE)
 }
 
