@@ -1,0 +1,13 @@
+[config]
+features = "CIC"         # FlowType can be one of: Basic, CIC, CIDDS, Nfstream, NTL, Custom
+active_timeout = 3600    # Maximum time a flow is allowed to last in seconds
+idle_timeout = 120       # Maximum time with no packets for a flow in seconds
+early_export = 300       # Optional, print interval for open flows in seconds
+threads = 4              # Number of threads to use for processing packets, optional
+
+[output]
+output = "Csv"                       # OutputMethodType can be one of: Print, Csv
+export_path = "output.csv"  # Path for output if method is Csv
+header = true                        # Whether to export the feature header
+drop_contaminant_features = false    # Whether to drop contaminant features
+

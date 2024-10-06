@@ -1,18 +1,23 @@
-use std::{net::IpAddr, ops::Deref, time::Instant};
+use std::net::IpAddr;
 
 use chrono::{DateTime, Utc};
 
-use crate::{
-    utils::utils::{get_duration, BasicFeatures},
-    NO_CONTAMINANT_FEATURES,
-};
+use crate::packet_features::PacketFeatures;
 
 use super::flow::Flow;
 
+#[derive(Clone, PartialEq)]
+enum FlowState {
+    Established,
+    FinSent,
+    FinAcked
+}
+
 /// A basic flow that stores the basic features of a flow.
+#[derive(Clone)]
 pub struct BasicFlow {
     /// The unique identifier of the flow.
-    pub flow_id: String,
+    pub flow_key: String,
     /// The destination IP address of the flow.
     pub ip_destination: IpAddr,
     /// The source IP address of the flow.
@@ -65,6 +70,60 @@ pub struct BasicFlow {
     pub bwd_ece_flag_count: u32,
     /// The number of packets in the backward direction.
     pub bwd_packet_count: u32,
+    // Tracking TCP Flow Termination
+    state_fwd: FlowState,
+    state_bwd: FlowState,
+    expected_ack_seq_fwd: Option<u32>,
+    expected_ack_seq_bwd: Option<u32>,
+}
+
+impl BasicFlow {
+    /// Checks if the flow is finished.
+    ///
+    /// A flow is considered finished when both FIN flags are set and the last ACK is received,
+    /// and the sequence numbers have been acknowledged by both parties.
+    ///
+    /// ### Arguments
+    ///
+    /// * `packet` - The packet to be checked.
+    ///
+    /// ### Returns
+    ///
+    /// A boolean indicating if the flow is finished.
+    pub fn is_tcp_finished(&mut self, packet: &PacketFeatures, forward: bool) -> bool {
+        // Update state when receiving FIN flag
+        if packet.fin_flag > 0 {
+            if forward {
+                self.state_fwd = FlowState::FinSent;
+                self.expected_ack_seq_bwd = Some(packet.sequence_number + packet.data_length as u32 + 1);
+            } else {
+                self.state_bwd = FlowState::FinSent;
+                self.expected_ack_seq_fwd = Some(packet.sequence_number + packet.data_length as u32 + 1);
+            }
+        }
+
+        if self.state_bwd == FlowState::FinSent && forward && Some(packet.sequence_number_ack) == self.expected_ack_seq_fwd {
+            self.state_bwd = FlowState::FinAcked;
+        } else if self.state_fwd == FlowState::FinSent && !forward && Some(packet.sequence_number_ack) == self.expected_ack_seq_bwd {
+            self.state_fwd = FlowState::FinAcked;
+        }
+
+        // Return true if both sides are finished and acknowledged the termination
+        self.state_fwd == FlowState::FinAcked && self.state_bwd == FlowState::FinAcked
+    }
+
+    /// Calculates the flow duration in microseconds.
+    ///
+    /// Returns the difference between the last and first packet timestamps in microseconds.
+    ///
+    /// ### Returns
+    ///
+    /// The duration of the flow in microseconds.
+    pub fn get_flow_duration_usec(&self) -> f64 {
+        (self.last_timestamp - self.first_timestamp)
+            .num_microseconds()
+            .unwrap() as f64
+    }
 }
 
 impl Flow for BasicFlow {
@@ -75,17 +134,17 @@ impl Flow for BasicFlow {
         ip_destination: IpAddr,
         port_destination: u16,
         protocol: u8,
-        ts_date: DateTime<Utc>,
+        first_timestamp: DateTime<Utc>,
     ) -> Self {
         BasicFlow {
-            flow_id,
+            flow_key: flow_id,
             ip_destination,
             ip_source,
             port_destination,
             port_source,
             protocol,
-            first_timestamp: ts_date,
-            last_timestamp: ts_date,
+            first_timestamp,
+            last_timestamp: first_timestamp,
             flow_end_of_flow_ack: 0,
             fwd_fin_flag_count: 0,
             fwd_syn_flag_count: 0,
@@ -105,21 +164,18 @@ impl Flow for BasicFlow {
             bwd_cwe_flag_count: 0,
             bwd_ece_flag_count: 0,
             bwd_packet_count: 0,
+            state_fwd: FlowState::Established,
+            state_bwd: FlowState::Established,
+            expected_ack_seq_fwd: None,
+            expected_ack_seq_bwd: None,
         }
     }
 
-    fn update_flow(
-        &mut self,
-        packet: &BasicFeatures,
-        _timestamp: &Instant,
-        ts_date: DateTime<Utc>,
-        fwd: bool,
-    ) -> Option<String> {
-        self.last_timestamp = ts_date;
+    fn update_flow(&mut self, packet: &PacketFeatures, fwd: bool) -> bool {
+        self.last_timestamp = packet.timestamp;
 
-        // when both FIN flags are set, the flow can be finished when the last ACK is received
-        if self.fwd_fin_flag_count > 0 && self.bwd_fin_flag_count > 0 {
-            self.flow_end_of_flow_ack = packet.ack_flag;
+        if self.is_tcp_finished(packet, fwd) {
+            self.flow_end_of_flow_ack = 1;
         }
 
         if fwd {
@@ -148,21 +204,17 @@ impl Flow for BasicFlow {
             || self.fwd_rst_flag_count > 0
             || self.bwd_rst_flag_count > 0
         {
-            if *NO_CONTAMINANT_FEATURES.lock().unwrap().deref() {
-                return Some(self.dump_without_contamination());
-            } else {
-                return Some(self.dump());
-            }
+            return true;
         }
 
-        None
+        false
     }
 
     fn dump(&self) -> String {
         format!(
             "{},{},{},{},{},{},{},{},{},{},{},{},{},\
         {},{},{},{},{},{},{},{},{},{},{},{},{},{},{}",
-            self.flow_id,
+            self.flow_key,
             self.ip_source,
             self.port_source,
             self.ip_destination,
@@ -170,7 +222,7 @@ impl Flow for BasicFlow {
             self.protocol,
             self.first_timestamp,
             self.last_timestamp,
-            get_duration(self.first_timestamp, self.last_timestamp),
+            self.get_flow_duration_usec(),
             self.flow_end_of_flow_ack,
             self.fwd_fin_flag_count,
             self.fwd_syn_flag_count,
@@ -210,7 +262,7 @@ impl Flow for BasicFlow {
             "{},{},{},{},{},{},{},{},{},{},{},{},{},\
             {},{},{},{},{},{},{},{}",
             self.protocol,
-            get_duration(self.first_timestamp, self.last_timestamp),
+            self.get_flow_duration_usec(),
             self.flow_end_of_flow_ack,
             self.fwd_fin_flag_count,
             self.fwd_syn_flag_count,
@@ -246,5 +298,21 @@ impl Flow for BasicFlow {
 
     fn get_first_timestamp(&self) -> DateTime<Utc> {
         self.first_timestamp
+    }
+
+    fn is_expired(&self, timestamp: DateTime<Utc>, active_timeout: u64, idle_timeout: u64) -> bool {
+        if (timestamp - self.first_timestamp).num_seconds() as u64 > active_timeout {
+            return true;
+        }
+
+        if (timestamp - self.last_timestamp).num_seconds() as u64 > idle_timeout {
+            return true;
+        }
+
+        false
+    }
+
+    fn flow_key(&self) -> &String {
+        &self.flow_key
     }
 }

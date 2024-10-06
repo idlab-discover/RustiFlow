@@ -1,18 +1,21 @@
 use chrono::{DateTime, Utc};
-use std::ops::Deref;
-use std::{net::IpAddr, time::Instant};
+use std::net::IpAddr;
 
-use crate::utils::utils::{calculate_mean, calculate_std, get_duration, BasicFeatures};
-use crate::NO_CONTAMINANT_FEATURES;
+use crate::packet_features::PacketFeatures;
 
-use super::{cic_flow::CicFlow, flow::Flow};
+use super::{
+    cic_flow::CicFlow,
+    flow::Flow,
+    util::{calculate_mean, calculate_std},
+};
 
 /// Represents a NTL Flow, encapsulating various metrics and states of a network flow.
 ///
 /// This flow represents the same flow as the NTLFlowLyzer does.
+#[derive(Clone)]
 pub struct NTLFlow {
     /// The cic flow information.
-    pub basic_flow: CicFlow,
+    pub cic_flow: CicFlow,
     /// The minimum header length of the forward flow.
     fwd_header_len_min: u32,
     /// The maximum header length of the forward flow.
@@ -51,16 +54,16 @@ impl NTLFlow {
         }
 
         // update total
-        self.basic_flow.fwd_header_length += len;
+        self.cic_flow.fwd_header_length += len;
 
         // update mean and std
         let new_fwd_header_len_mean = calculate_mean(
-            self.basic_flow.basic_flow.fwd_packet_count as u64,
+            self.cic_flow.basic_flow.fwd_packet_count as u64,
             self.fwd_header_len_mean as f64,
             len as f64,
         ) as f32;
         self.fwd_header_len_std = calculate_std(
-            self.basic_flow.basic_flow.fwd_packet_count as u64,
+            self.cic_flow.basic_flow.fwd_packet_count as u64,
             self.fwd_header_len_std as f64,
             self.fwd_header_len_mean as f64,
             new_fwd_header_len_mean as f64,
@@ -88,16 +91,16 @@ impl NTLFlow {
         }
 
         // update total
-        self.basic_flow.bwd_header_length += len;
+        self.cic_flow.bwd_header_length += len;
 
         // update mean and std
         let new_bwd_header_len_mean = calculate_mean(
-            self.basic_flow.basic_flow.bwd_packet_count as u64,
+            self.cic_flow.basic_flow.bwd_packet_count as u64,
             self.bwd_header_len_mean as f64,
             len as f64,
         ) as f32;
         self.bwd_header_len_std = calculate_std(
-            self.basic_flow.basic_flow.bwd_packet_count as u64,
+            self.cic_flow.basic_flow.bwd_packet_count as u64,
             self.bwd_header_len_std as f64,
             self.bwd_header_len_mean as f64,
             new_bwd_header_len_mean as f64,
@@ -180,11 +183,11 @@ impl NTLFlow {
     ///
     /// Mean packet header length of the flow.
     pub fn get_flow_header_length_mean(&self) -> f32 {
-        (self.fwd_header_len_mean * self.basic_flow.basic_flow.fwd_packet_count as f32
-            + self.bwd_header_len_mean * self.basic_flow.basic_flow.bwd_packet_count as f32)
+        (self.fwd_header_len_mean * self.cic_flow.basic_flow.fwd_packet_count as f32
+            + self.bwd_header_len_mean * self.cic_flow.basic_flow.bwd_packet_count as f32)
             as f32
-            / (self.basic_flow.basic_flow.fwd_packet_count
-                + self.basic_flow.basic_flow.bwd_packet_count) as f32
+            / (self.cic_flow.basic_flow.fwd_packet_count
+                + self.cic_flow.basic_flow.bwd_packet_count) as f32
     }
 
     /// Calculates the variance of the packet lengths in the flow.
@@ -196,10 +199,9 @@ impl NTLFlow {
     ///
     /// Variance of the flow's packet lengths, or 0 if not enough data.
     pub fn get_flow_header_length_variance(&self) -> f64 {
-        if self.basic_flow.basic_flow.fwd_packet_count < 1
-            || self.basic_flow.basic_flow.bwd_packet_count < 1
-            || self.basic_flow.basic_flow.fwd_packet_count
-                + self.basic_flow.basic_flow.bwd_packet_count
+        if self.cic_flow.basic_flow.fwd_packet_count < 1
+            || self.cic_flow.basic_flow.bwd_packet_count < 1
+            || self.cic_flow.basic_flow.fwd_packet_count + self.cic_flow.basic_flow.bwd_packet_count
                 < 3
         {
             return 0.0;
@@ -208,10 +210,10 @@ impl NTLFlow {
         let fwd_pkt_std_squared = self.fwd_header_len_std.powf(2.0);
         let bwd_pkt_std_squared = self.bwd_header_len_std.powf(2.0);
 
-        ((self.basic_flow.basic_flow.fwd_packet_count - 1) as f64 * fwd_pkt_std_squared as f64
-            + (self.basic_flow.basic_flow.bwd_packet_count - 1) as f64 * bwd_pkt_std_squared as f64)
-            / (self.basic_flow.basic_flow.fwd_packet_count
-                + self.basic_flow.basic_flow.bwd_packet_count
+        ((self.cic_flow.basic_flow.fwd_packet_count - 1) as f64 * fwd_pkt_std_squared as f64
+            + (self.cic_flow.basic_flow.bwd_packet_count - 1) as f64 * bwd_pkt_std_squared as f64)
+            / (self.cic_flow.basic_flow.fwd_packet_count
+                + self.cic_flow.basic_flow.bwd_packet_count
                 - 2) as f64
     }
 
@@ -235,17 +237,17 @@ impl Flow for NTLFlow {
         ipv4_destination: IpAddr,
         port_destination: u16,
         protocol: u8,
-        ts_date: DateTime<Utc>,
+        timestamp: DateTime<Utc>,
     ) -> Self {
         NTLFlow {
-            basic_flow: CicFlow::new(
+            cic_flow: CicFlow::new(
                 flow_id,
                 ipv4_source,
                 port_source,
                 ipv4_destination,
                 port_destination,
                 protocol,
-                ts_date,
+                timestamp,
             ),
             fwd_header_len_min: u32::MAX,
             fwd_header_len_max: 0,
@@ -258,33 +260,19 @@ impl Flow for NTLFlow {
         }
     }
 
-    fn update_flow(
-        &mut self,
-        packet: &BasicFeatures,
-        timestamp: &Instant,
-        ts_date: DateTime<Utc>,
-        fwd: bool,
-    ) -> Option<String> {
-        let end = self.basic_flow.update_flow(packet, timestamp, ts_date, fwd);
-
+    fn update_flow(&mut self, packet: &PacketFeatures, fwd: bool) -> bool {
+        let is_terminated = self.cic_flow.update_flow(packet, fwd);
         if fwd {
             self.update_fwd_header_len_stats(packet.header_length as u32);
         } else {
             self.update_bwd_header_len_stats(packet.header_length as u32);
         }
-
-        if end.is_some() {
-            if *NO_CONTAMINANT_FEATURES.lock().unwrap().deref() {
-                return Some(self.dump_without_contamination());
-            } else {
-                return Some(self.dump());
-            }
-        }
-
-        None
+        is_terminated
     }
 
     fn dump(&self) -> String {
+        let flow_duration =
+            self.cic_flow.basic_flow.last_timestamp - self.cic_flow.basic_flow.first_timestamp;
         format!(
             "{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},\
             {},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},\
@@ -292,170 +280,144 @@ impl Flow for NTLFlow {
             {},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},\
             {},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},\
             {},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{}",
-            self.basic_flow.basic_flow.flow_id,
-            self.basic_flow.basic_flow.ip_source,
-            self.basic_flow.basic_flow.port_source,
-            self.basic_flow.basic_flow.ip_destination,
-            self.basic_flow.basic_flow.port_destination,
-            self.basic_flow.basic_flow.protocol,
-            get_duration(
-                self.basic_flow.basic_flow.first_timestamp,
-                self.basic_flow.basic_flow.last_timestamp
-            ),
-            self.basic_flow.basic_flow.fwd_packet_count
-                + self.basic_flow.basic_flow.bwd_packet_count,
-            self.basic_flow.basic_flow.fwd_packet_count,
-            self.basic_flow.basic_flow.bwd_packet_count,
-            self.basic_flow.fwd_pkt_len_tot + self.basic_flow.bwd_pkt_len_tot,
-            self.basic_flow.fwd_pkt_len_tot,
-            self.basic_flow.bwd_pkt_len_tot,
-            self.basic_flow.get_flow_packet_length_max(),
-            self.basic_flow.get_flow_packet_length_min(),
-            self.basic_flow.get_flow_packet_length_mean(),
-            self.basic_flow.get_flow_packet_length_std(),
-            self.basic_flow.get_flow_packet_length_variance(),
-            self.basic_flow.fwd_pkt_len_max,
-            self.basic_flow.get_fwd_packet_length_min(),
-            self.basic_flow.fwd_pkt_len_mean,
-            self.basic_flow.fwd_pkt_len_std,
-            self.basic_flow.fwd_pkt_len_std.powf(2.0),
-            self.basic_flow.bwd_pkt_len_max,
-            self.basic_flow.get_bwd_packet_length_min(),
-            self.basic_flow.bwd_pkt_len_mean,
-            self.basic_flow.bwd_pkt_len_std,
-            self.basic_flow.bwd_pkt_len_std.powf(2.0),
-            self.basic_flow.fwd_header_length + self.basic_flow.bwd_header_length,
+            self.cic_flow.basic_flow.flow_key,
+            self.cic_flow.basic_flow.ip_source,
+            self.cic_flow.basic_flow.port_source,
+            self.cic_flow.basic_flow.ip_destination,
+            self.cic_flow.basic_flow.port_destination,
+            self.cic_flow.basic_flow.protocol,
+            flow_duration.num_microseconds().unwrap(),
+            self.cic_flow.basic_flow.fwd_packet_count + self.cic_flow.basic_flow.bwd_packet_count,
+            self.cic_flow.basic_flow.fwd_packet_count,
+            self.cic_flow.basic_flow.bwd_packet_count,
+            self.cic_flow.fwd_pkt_len_tot + self.cic_flow.bwd_pkt_len_tot,
+            self.cic_flow.fwd_pkt_len_tot,
+            self.cic_flow.bwd_pkt_len_tot,
+            self.cic_flow.get_flow_packet_length_max(),
+            self.cic_flow.get_flow_packet_length_min(),
+            self.cic_flow.get_flow_packet_length_mean(),
+            self.cic_flow.get_flow_packet_length_std(),
+            self.cic_flow.get_flow_packet_length_variance(),
+            self.cic_flow.fwd_pkt_len_max,
+            self.cic_flow.get_fwd_packet_length_min(),
+            self.cic_flow.fwd_pkt_len_mean,
+            self.cic_flow.fwd_pkt_len_std,
+            self.cic_flow.fwd_pkt_len_std.powf(2.0),
+            self.cic_flow.bwd_pkt_len_max,
+            self.cic_flow.get_bwd_packet_length_min(),
+            self.cic_flow.bwd_pkt_len_mean,
+            self.cic_flow.bwd_pkt_len_std,
+            self.cic_flow.bwd_pkt_len_std.powf(2.0),
+            self.cic_flow.fwd_header_length + self.cic_flow.bwd_header_length,
             self.get_flow_header_length_max(),
             self.get_flow_header_length_min(),
             self.get_flow_header_length_mean(),
             self.get_flow_header_length_std(),
-            self.basic_flow.fwd_header_length,
+            self.cic_flow.fwd_header_length,
             self.fwd_header_len_max,
             self.get_fwd_header_length_min(),
             self.fwd_header_len_mean,
             self.fwd_header_len_std,
-            self.basic_flow.bwd_header_length,
+            self.cic_flow.bwd_header_length,
             self.bwd_header_len_max,
             self.get_bwd_header_length_min(),
             self.bwd_header_len_mean,
             self.bwd_header_len_std,
-            self.basic_flow.get_fwd_segment_length_mean(),
-            self.basic_flow.get_bwd_segment_length_mean(),
-            self.basic_flow.get_flow_segment_length_mean(),
-            self.basic_flow.fwd_init_win_bytes,
-            self.basic_flow.bwd_init_win_bytes,
-            self.basic_flow.get_active_min(),
-            self.basic_flow.active_max,
-            self.basic_flow.active_mean,
-            self.basic_flow.active_std,
-            self.basic_flow.get_idle_min(),
-            self.basic_flow.idle_max,
-            self.basic_flow.idle_mean,
-            self.basic_flow.idle_std,
-            (self.basic_flow.fwd_pkt_len_tot + self.basic_flow.bwd_pkt_len_tot) as f64
-                / (get_duration(
-                    self.basic_flow.basic_flow.first_timestamp,
-                    self.basic_flow.basic_flow.last_timestamp
-                ))
-                / 1_000_000.0,
-            self.basic_flow.fwd_pkt_len_tot as f64
-                / (get_duration(
-                    self.basic_flow.basic_flow.first_timestamp,
-                    self.basic_flow.basic_flow.last_timestamp
-                ))
-                / 1_000_000.0,
-            self.basic_flow.bwd_pkt_len_tot as f64
-                / (get_duration(
-                    self.basic_flow.basic_flow.first_timestamp,
-                    self.basic_flow.basic_flow.last_timestamp
-                ))
-                / 1_000_000.0,
-            (self.basic_flow.basic_flow.fwd_packet_count
-                + self.basic_flow.basic_flow.bwd_packet_count) as f64
-                / (get_duration(
-                    self.basic_flow.basic_flow.first_timestamp,
-                    self.basic_flow.basic_flow.last_timestamp
-                ))
-                / 1_000_000.0,
-            self.basic_flow.basic_flow.bwd_packet_count as f64
-                / (get_duration(
-                    self.basic_flow.basic_flow.first_timestamp,
-                    self.basic_flow.basic_flow.last_timestamp
-                ))
-                / 1_000_000.0,
-            self.basic_flow.basic_flow.fwd_packet_count as f64
-                / (get_duration(
-                    self.basic_flow.basic_flow.first_timestamp,
-                    self.basic_flow.basic_flow.last_timestamp
-                ))
-                / 1_000_000.0,
-            self.basic_flow.get_down_up_ratio(),
-            self.basic_flow.get_fwd_bytes_bulk(),
-            self.basic_flow.get_fwd_packets_bulk(),
-            self.basic_flow.get_fwd_bulk_rate(),
-            self.basic_flow.get_bwd_bytes_bulk(),
-            self.basic_flow.get_bwd_packets_bulk(),
-            self.basic_flow.get_bwd_bulk_rate(),
-            self.basic_flow.fwd_bulk_state_count,
-            self.basic_flow.fwd_bulk_size_total,
-            self.basic_flow.fwd_bulk_packet_count,
-            self.basic_flow.fwd_bulk_duration,
-            self.basic_flow.bwd_bulk_state_count,
-            self.basic_flow.bwd_bulk_size_total,
-            self.basic_flow.bwd_bulk_packet_count,
-            self.basic_flow.bwd_bulk_duration,
-            self.basic_flow.basic_flow.fwd_fin_flag_count
-                + self.basic_flow.basic_flow.bwd_fin_flag_count,
-            self.basic_flow.basic_flow.fwd_psh_flag_count
-                + self.basic_flow.basic_flow.bwd_psh_flag_count,
-            self.basic_flow.basic_flow.fwd_urg_flag_count
-                + self.basic_flow.basic_flow.bwd_urg_flag_count,
-            self.basic_flow.basic_flow.fwd_ece_flag_count
-                + self.basic_flow.basic_flow.bwd_ece_flag_count,
-            self.basic_flow.basic_flow.fwd_syn_flag_count
-                + self.basic_flow.basic_flow.bwd_syn_flag_count,
-            self.basic_flow.basic_flow.fwd_ack_flag_count
-                + self.basic_flow.basic_flow.bwd_ack_flag_count,
-            self.basic_flow.basic_flow.fwd_cwe_flag_count
-                + self.basic_flow.basic_flow.bwd_cwe_flag_count,
-            self.basic_flow.basic_flow.fwd_rst_flag_count
-                + self.basic_flow.basic_flow.bwd_rst_flag_count,
-            self.basic_flow.basic_flow.fwd_fin_flag_count,
-            self.basic_flow.basic_flow.fwd_psh_flag_count,
-            self.basic_flow.basic_flow.fwd_urg_flag_count,
-            self.basic_flow.basic_flow.fwd_ece_flag_count,
-            self.basic_flow.basic_flow.fwd_syn_flag_count,
-            self.basic_flow.basic_flow.fwd_ack_flag_count,
-            self.basic_flow.basic_flow.fwd_cwe_flag_count,
-            self.basic_flow.basic_flow.fwd_rst_flag_count,
-            self.basic_flow.basic_flow.bwd_fin_flag_count,
-            self.basic_flow.basic_flow.bwd_psh_flag_count,
-            self.basic_flow.basic_flow.bwd_urg_flag_count,
-            self.basic_flow.basic_flow.bwd_ece_flag_count,
-            self.basic_flow.basic_flow.bwd_syn_flag_count,
-            self.basic_flow.basic_flow.bwd_ack_flag_count,
-            self.basic_flow.basic_flow.bwd_cwe_flag_count,
-            self.basic_flow.basic_flow.bwd_rst_flag_count,
-            self.basic_flow.get_flow_iat_mean(),
-            self.basic_flow.get_flow_iat_std(),
-            self.basic_flow.get_flow_iat_max(),
-            self.basic_flow.get_flow_iat_min(),
-            self.basic_flow.fwd_iat_total + self.basic_flow.bwd_iat_total,
-            self.basic_flow.fwd_iat_mean,
-            self.basic_flow.fwd_iat_std,
-            self.basic_flow.fwd_iat_max,
-            self.basic_flow.get_fwd_iat_min(),
-            self.basic_flow.fwd_iat_total,
-            self.basic_flow.fwd_iat_total,
-            self.basic_flow.bwd_iat_mean,
-            self.basic_flow.bwd_iat_std,
-            self.basic_flow.bwd_iat_max,
-            self.basic_flow.get_bwd_iat_min(),
-            self.basic_flow.bwd_iat_total,
-            self.basic_flow.get_sf_fwd_packets(),
-            self.basic_flow.get_sf_bwd_packets(),
-            self.basic_flow.get_sf_fwd_bytes(),
-            self.basic_flow.get_sf_bwd_bytes(),
+            self.cic_flow.get_fwd_segment_length_mean(),
+            self.cic_flow.get_bwd_segment_length_mean(),
+            self.cic_flow.get_flow_segment_length_mean(),
+            self.cic_flow.fwd_init_win_bytes,
+            self.cic_flow.bwd_init_win_bytes,
+            self.cic_flow.get_active_min(),
+            self.cic_flow.active_max,
+            self.cic_flow.active_mean,
+            self.cic_flow.active_std,
+            self.cic_flow.get_idle_min(),
+            self.cic_flow.idle_max,
+            self.cic_flow.idle_mean,
+            self.cic_flow.idle_std,
+            (self.cic_flow.fwd_pkt_len_tot + self.cic_flow.bwd_pkt_len_tot) as f64
+                / flow_duration.num_milliseconds() as f64
+                / 1000.0,
+            self.cic_flow.fwd_pkt_len_tot as f64 / flow_duration.num_milliseconds() as f64 / 1000.0,
+            self.cic_flow.bwd_pkt_len_tot as f64 / flow_duration.num_milliseconds() as f64 / 1000.0,
+            (self.cic_flow.basic_flow.fwd_packet_count + self.cic_flow.basic_flow.bwd_packet_count)
+                as f64
+                / flow_duration.num_milliseconds() as f64
+                / 1000.0,
+            self.cic_flow.basic_flow.bwd_packet_count as f64
+                / flow_duration.num_milliseconds() as f64
+                / 1000.0,
+            self.cic_flow.basic_flow.fwd_packet_count as f64
+                / flow_duration.num_milliseconds() as f64
+                / 1000.0,
+            self.cic_flow.get_down_up_ratio(),
+            self.cic_flow.get_fwd_bytes_bulk(),
+            self.cic_flow.get_fwd_packets_bulk(),
+            self.cic_flow.get_fwd_bulk_rate(),
+            self.cic_flow.get_bwd_bytes_bulk(),
+            self.cic_flow.get_bwd_packets_bulk(),
+            self.cic_flow.get_bwd_bulk_rate(),
+            self.cic_flow.fwd_bulk_state_count,
+            self.cic_flow.fwd_bulk_size_total,
+            self.cic_flow.fwd_bulk_packet_count,
+            self.cic_flow.fwd_bulk_duration,
+            self.cic_flow.bwd_bulk_state_count,
+            self.cic_flow.bwd_bulk_size_total,
+            self.cic_flow.bwd_bulk_packet_count,
+            self.cic_flow.bwd_bulk_duration,
+            self.cic_flow.basic_flow.fwd_fin_flag_count
+                + self.cic_flow.basic_flow.bwd_fin_flag_count,
+            self.cic_flow.basic_flow.fwd_psh_flag_count
+                + self.cic_flow.basic_flow.bwd_psh_flag_count,
+            self.cic_flow.basic_flow.fwd_urg_flag_count
+                + self.cic_flow.basic_flow.bwd_urg_flag_count,
+            self.cic_flow.basic_flow.fwd_ece_flag_count
+                + self.cic_flow.basic_flow.bwd_ece_flag_count,
+            self.cic_flow.basic_flow.fwd_syn_flag_count
+                + self.cic_flow.basic_flow.bwd_syn_flag_count,
+            self.cic_flow.basic_flow.fwd_ack_flag_count
+                + self.cic_flow.basic_flow.bwd_ack_flag_count,
+            self.cic_flow.basic_flow.fwd_cwe_flag_count
+                + self.cic_flow.basic_flow.bwd_cwe_flag_count,
+            self.cic_flow.basic_flow.fwd_rst_flag_count
+                + self.cic_flow.basic_flow.bwd_rst_flag_count,
+            self.cic_flow.basic_flow.fwd_fin_flag_count,
+            self.cic_flow.basic_flow.fwd_psh_flag_count,
+            self.cic_flow.basic_flow.fwd_urg_flag_count,
+            self.cic_flow.basic_flow.fwd_ece_flag_count,
+            self.cic_flow.basic_flow.fwd_syn_flag_count,
+            self.cic_flow.basic_flow.fwd_ack_flag_count,
+            self.cic_flow.basic_flow.fwd_cwe_flag_count,
+            self.cic_flow.basic_flow.fwd_rst_flag_count,
+            self.cic_flow.basic_flow.bwd_fin_flag_count,
+            self.cic_flow.basic_flow.bwd_psh_flag_count,
+            self.cic_flow.basic_flow.bwd_urg_flag_count,
+            self.cic_flow.basic_flow.bwd_ece_flag_count,
+            self.cic_flow.basic_flow.bwd_syn_flag_count,
+            self.cic_flow.basic_flow.bwd_ack_flag_count,
+            self.cic_flow.basic_flow.bwd_cwe_flag_count,
+            self.cic_flow.basic_flow.bwd_rst_flag_count,
+            self.cic_flow.get_flow_iat_mean(),
+            self.cic_flow.get_flow_iat_std(),
+            self.cic_flow.get_flow_iat_max(),
+            self.cic_flow.get_flow_iat_min(),
+            self.cic_flow.fwd_iat_total + self.cic_flow.bwd_iat_total,
+            self.cic_flow.fwd_iat_mean,
+            self.cic_flow.fwd_iat_std,
+            self.cic_flow.fwd_iat_max,
+            self.cic_flow.get_fwd_iat_min(),
+            self.cic_flow.fwd_iat_total,
+            self.cic_flow.fwd_iat_total,
+            self.cic_flow.bwd_iat_mean,
+            self.cic_flow.bwd_iat_std,
+            self.cic_flow.bwd_iat_max,
+            self.cic_flow.get_bwd_iat_min(),
+            self.cic_flow.bwd_iat_total,
+            self.cic_flow.get_sf_fwd_packets(),
+            self.cic_flow.get_sf_bwd_packets(),
+            self.cic_flow.get_sf_fwd_bytes(),
+            self.cic_flow.get_sf_bwd_bytes(),
         )
     }
 
@@ -493,6 +455,8 @@ impl Flow for NTLFlow {
     }
 
     fn dump_without_contamination(&self) -> String {
+        let flow_duration =
+            self.cic_flow.basic_flow.last_timestamp - self.cic_flow.basic_flow.first_timestamp;
         // Can be further updated after more research
         format!(
             "{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},\
@@ -501,163 +465,137 @@ impl Flow for NTLFlow {
             {},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},\
             {},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},\
             {},{},{},{},{},{},{},{},{},{},{},{}",
-            get_duration(
-                self.basic_flow.basic_flow.first_timestamp,
-                self.basic_flow.basic_flow.last_timestamp
-            ),
-            self.basic_flow.basic_flow.fwd_packet_count
-                + self.basic_flow.basic_flow.bwd_packet_count,
-            self.basic_flow.basic_flow.fwd_packet_count,
-            self.basic_flow.basic_flow.bwd_packet_count,
-            self.basic_flow.fwd_pkt_len_tot + self.basic_flow.bwd_pkt_len_tot,
-            self.basic_flow.fwd_pkt_len_tot,
-            self.basic_flow.bwd_pkt_len_tot,
-            self.basic_flow.get_flow_packet_length_max(),
-            self.basic_flow.get_flow_packet_length_min(),
-            self.basic_flow.get_flow_packet_length_mean(),
-            self.basic_flow.get_flow_packet_length_std(),
-            self.basic_flow.get_flow_packet_length_variance(),
-            self.basic_flow.fwd_pkt_len_max,
-            self.basic_flow.get_fwd_packet_length_min(),
-            self.basic_flow.fwd_pkt_len_mean,
-            self.basic_flow.fwd_pkt_len_std,
-            self.basic_flow.fwd_pkt_len_std.powf(2.0),
-            self.basic_flow.bwd_pkt_len_max,
-            self.basic_flow.get_bwd_packet_length_min(),
-            self.basic_flow.bwd_pkt_len_mean,
-            self.basic_flow.bwd_pkt_len_std,
-            self.basic_flow.bwd_pkt_len_std.powf(2.0),
-            self.basic_flow.fwd_header_length + self.basic_flow.bwd_header_length,
+            flow_duration.num_microseconds().unwrap(),
+            self.cic_flow.basic_flow.fwd_packet_count + self.cic_flow.basic_flow.bwd_packet_count,
+            self.cic_flow.basic_flow.fwd_packet_count,
+            self.cic_flow.basic_flow.bwd_packet_count,
+            self.cic_flow.fwd_pkt_len_tot + self.cic_flow.bwd_pkt_len_tot,
+            self.cic_flow.fwd_pkt_len_tot,
+            self.cic_flow.bwd_pkt_len_tot,
+            self.cic_flow.get_flow_packet_length_max(),
+            self.cic_flow.get_flow_packet_length_min(),
+            self.cic_flow.get_flow_packet_length_mean(),
+            self.cic_flow.get_flow_packet_length_std(),
+            self.cic_flow.get_flow_packet_length_variance(),
+            self.cic_flow.fwd_pkt_len_max,
+            self.cic_flow.get_fwd_packet_length_min(),
+            self.cic_flow.fwd_pkt_len_mean,
+            self.cic_flow.fwd_pkt_len_std,
+            self.cic_flow.fwd_pkt_len_std.powf(2.0),
+            self.cic_flow.bwd_pkt_len_max,
+            self.cic_flow.get_bwd_packet_length_min(),
+            self.cic_flow.bwd_pkt_len_mean,
+            self.cic_flow.bwd_pkt_len_std,
+            self.cic_flow.bwd_pkt_len_std.powf(2.0),
+            self.cic_flow.fwd_header_length + self.cic_flow.bwd_header_length,
             self.get_flow_header_length_max(),
             self.get_flow_header_length_min(),
             self.get_flow_header_length_mean(),
             self.get_flow_header_length_std(),
-            self.basic_flow.fwd_header_length,
+            self.cic_flow.fwd_header_length,
             self.fwd_header_len_max,
             self.get_fwd_header_length_min(),
             self.fwd_header_len_mean,
             self.fwd_header_len_std,
-            self.basic_flow.bwd_header_length,
+            self.cic_flow.bwd_header_length,
             self.bwd_header_len_max,
             self.get_bwd_header_length_min(),
             self.bwd_header_len_mean,
             self.bwd_header_len_std,
-            self.basic_flow.get_fwd_segment_length_mean(),
-            self.basic_flow.get_bwd_segment_length_mean(),
-            self.basic_flow.get_flow_segment_length_mean(),
-            self.basic_flow.fwd_init_win_bytes,
-            self.basic_flow.bwd_init_win_bytes,
-            self.basic_flow.get_active_min(),
-            self.basic_flow.active_max,
-            self.basic_flow.active_mean,
-            self.basic_flow.active_std,
-            self.basic_flow.get_idle_min(),
-            self.basic_flow.idle_max,
-            self.basic_flow.idle_mean,
-            self.basic_flow.idle_std,
-            (self.basic_flow.fwd_pkt_len_tot + self.basic_flow.bwd_pkt_len_tot) as f64
-                / (get_duration(
-                    self.basic_flow.basic_flow.first_timestamp,
-                    self.basic_flow.basic_flow.last_timestamp
-                ))
-                / 1_000_000.0,
-            self.basic_flow.fwd_pkt_len_tot as f64
-                / (get_duration(
-                    self.basic_flow.basic_flow.first_timestamp,
-                    self.basic_flow.basic_flow.last_timestamp
-                ))
-                / 1_000_000.0,
-            self.basic_flow.bwd_pkt_len_tot as f64
-                / (get_duration(
-                    self.basic_flow.basic_flow.first_timestamp,
-                    self.basic_flow.basic_flow.last_timestamp
-                ))
-                / 1_000_000.0,
-            (self.basic_flow.basic_flow.fwd_packet_count
-                + self.basic_flow.basic_flow.bwd_packet_count) as f64
-                / (get_duration(
-                    self.basic_flow.basic_flow.first_timestamp,
-                    self.basic_flow.basic_flow.last_timestamp
-                ))
-                / 1_000_000.0,
-            self.basic_flow.basic_flow.bwd_packet_count as f64
-                / (get_duration(
-                    self.basic_flow.basic_flow.first_timestamp,
-                    self.basic_flow.basic_flow.last_timestamp
-                ))
-                / 1_000_000.0,
-            self.basic_flow.basic_flow.fwd_packet_count as f64
-                / (get_duration(
-                    self.basic_flow.basic_flow.first_timestamp,
-                    self.basic_flow.basic_flow.last_timestamp
-                ))
-                / 1_000_000.0,
-            self.basic_flow.get_down_up_ratio(),
-            self.basic_flow.get_fwd_bytes_bulk(),
-            self.basic_flow.get_fwd_packets_bulk(),
-            self.basic_flow.get_fwd_bulk_rate(),
-            self.basic_flow.get_bwd_bytes_bulk(),
-            self.basic_flow.get_bwd_packets_bulk(),
-            self.basic_flow.get_bwd_bulk_rate(),
-            self.basic_flow.fwd_bulk_state_count,
-            self.basic_flow.fwd_bulk_size_total,
-            self.basic_flow.fwd_bulk_packet_count,
-            self.basic_flow.fwd_bulk_duration,
-            self.basic_flow.bwd_bulk_state_count,
-            self.basic_flow.bwd_bulk_size_total,
-            self.basic_flow.bwd_bulk_packet_count,
-            self.basic_flow.bwd_bulk_duration,
-            self.basic_flow.basic_flow.fwd_fin_flag_count
-                + self.basic_flow.basic_flow.bwd_fin_flag_count,
-            self.basic_flow.basic_flow.fwd_psh_flag_count
-                + self.basic_flow.basic_flow.bwd_psh_flag_count,
-            self.basic_flow.basic_flow.fwd_urg_flag_count
-                + self.basic_flow.basic_flow.bwd_urg_flag_count,
-            self.basic_flow.basic_flow.fwd_ece_flag_count
-                + self.basic_flow.basic_flow.bwd_ece_flag_count,
-            self.basic_flow.basic_flow.fwd_syn_flag_count
-                + self.basic_flow.basic_flow.bwd_syn_flag_count,
-            self.basic_flow.basic_flow.fwd_ack_flag_count
-                + self.basic_flow.basic_flow.bwd_ack_flag_count,
-            self.basic_flow.basic_flow.fwd_cwe_flag_count
-                + self.basic_flow.basic_flow.bwd_cwe_flag_count,
-            self.basic_flow.basic_flow.fwd_rst_flag_count
-                + self.basic_flow.basic_flow.bwd_rst_flag_count,
-            self.basic_flow.basic_flow.fwd_fin_flag_count,
-            self.basic_flow.basic_flow.fwd_psh_flag_count,
-            self.basic_flow.basic_flow.fwd_urg_flag_count,
-            self.basic_flow.basic_flow.fwd_ece_flag_count,
-            self.basic_flow.basic_flow.fwd_syn_flag_count,
-            self.basic_flow.basic_flow.fwd_ack_flag_count,
-            self.basic_flow.basic_flow.fwd_cwe_flag_count,
-            self.basic_flow.basic_flow.fwd_rst_flag_count,
-            self.basic_flow.basic_flow.bwd_fin_flag_count,
-            self.basic_flow.basic_flow.bwd_psh_flag_count,
-            self.basic_flow.basic_flow.bwd_urg_flag_count,
-            self.basic_flow.basic_flow.bwd_ece_flag_count,
-            self.basic_flow.basic_flow.bwd_syn_flag_count,
-            self.basic_flow.basic_flow.bwd_ack_flag_count,
-            self.basic_flow.basic_flow.bwd_cwe_flag_count,
-            self.basic_flow.basic_flow.bwd_rst_flag_count,
-            self.basic_flow.get_flow_iat_mean(),
-            self.basic_flow.get_flow_iat_std(),
-            self.basic_flow.get_flow_iat_max(),
-            self.basic_flow.get_flow_iat_min(),
-            self.basic_flow.fwd_iat_total + self.basic_flow.bwd_iat_total,
-            self.basic_flow.fwd_iat_mean,
-            self.basic_flow.fwd_iat_std,
-            self.basic_flow.fwd_iat_max,
-            self.basic_flow.get_fwd_iat_min(),
-            self.basic_flow.fwd_iat_total,
-            self.basic_flow.bwd_iat_mean,
-            self.basic_flow.bwd_iat_std,
-            self.basic_flow.bwd_iat_max,
-            self.basic_flow.get_bwd_iat_min(),
-            self.basic_flow.bwd_iat_total,
-            self.basic_flow.get_sf_fwd_packets(),
-            self.basic_flow.get_sf_bwd_packets(),
-            self.basic_flow.get_sf_fwd_bytes(),
-            self.basic_flow.get_sf_bwd_bytes(),
+            self.cic_flow.get_fwd_segment_length_mean(),
+            self.cic_flow.get_bwd_segment_length_mean(),
+            self.cic_flow.get_flow_segment_length_mean(),
+            self.cic_flow.fwd_init_win_bytes,
+            self.cic_flow.bwd_init_win_bytes,
+            self.cic_flow.get_active_min(),
+            self.cic_flow.active_max,
+            self.cic_flow.active_mean,
+            self.cic_flow.active_std,
+            self.cic_flow.get_idle_min(),
+            self.cic_flow.idle_max,
+            self.cic_flow.idle_mean,
+            self.cic_flow.idle_std,
+            (self.cic_flow.fwd_pkt_len_tot + self.cic_flow.bwd_pkt_len_tot) as f64
+                / flow_duration.num_milliseconds() as f64
+                / 1000.0,
+            self.cic_flow.fwd_pkt_len_tot as f64 / flow_duration.num_milliseconds() as f64 / 1000.0,
+            self.cic_flow.bwd_pkt_len_tot as f64 / flow_duration.num_milliseconds() as f64 / 1000.0,
+            (self.cic_flow.basic_flow.fwd_packet_count + self.cic_flow.basic_flow.bwd_packet_count)
+                as f64
+                / flow_duration.num_milliseconds() as f64
+                / 1000.0,
+            self.cic_flow.basic_flow.bwd_packet_count as f64
+                / flow_duration.num_milliseconds() as f64
+                / 1000.0,
+            self.cic_flow.basic_flow.fwd_packet_count as f64
+                / flow_duration.num_milliseconds() as f64
+                / 1000.0,
+            self.cic_flow.get_down_up_ratio(),
+            self.cic_flow.get_fwd_bytes_bulk(),
+            self.cic_flow.get_fwd_packets_bulk(),
+            self.cic_flow.get_fwd_bulk_rate(),
+            self.cic_flow.get_bwd_bytes_bulk(),
+            self.cic_flow.get_bwd_packets_bulk(),
+            self.cic_flow.get_bwd_bulk_rate(),
+            self.cic_flow.fwd_bulk_state_count,
+            self.cic_flow.fwd_bulk_size_total,
+            self.cic_flow.fwd_bulk_packet_count,
+            self.cic_flow.fwd_bulk_duration,
+            self.cic_flow.bwd_bulk_state_count,
+            self.cic_flow.bwd_bulk_size_total,
+            self.cic_flow.bwd_bulk_packet_count,
+            self.cic_flow.bwd_bulk_duration,
+            self.cic_flow.basic_flow.fwd_fin_flag_count
+                + self.cic_flow.basic_flow.bwd_fin_flag_count,
+            self.cic_flow.basic_flow.fwd_psh_flag_count
+                + self.cic_flow.basic_flow.bwd_psh_flag_count,
+            self.cic_flow.basic_flow.fwd_urg_flag_count
+                + self.cic_flow.basic_flow.bwd_urg_flag_count,
+            self.cic_flow.basic_flow.fwd_ece_flag_count
+                + self.cic_flow.basic_flow.bwd_ece_flag_count,
+            self.cic_flow.basic_flow.fwd_syn_flag_count
+                + self.cic_flow.basic_flow.bwd_syn_flag_count,
+            self.cic_flow.basic_flow.fwd_ack_flag_count
+                + self.cic_flow.basic_flow.bwd_ack_flag_count,
+            self.cic_flow.basic_flow.fwd_cwe_flag_count
+                + self.cic_flow.basic_flow.bwd_cwe_flag_count,
+            self.cic_flow.basic_flow.fwd_rst_flag_count
+                + self.cic_flow.basic_flow.bwd_rst_flag_count,
+            self.cic_flow.basic_flow.fwd_fin_flag_count,
+            self.cic_flow.basic_flow.fwd_psh_flag_count,
+            self.cic_flow.basic_flow.fwd_urg_flag_count,
+            self.cic_flow.basic_flow.fwd_ece_flag_count,
+            self.cic_flow.basic_flow.fwd_syn_flag_count,
+            self.cic_flow.basic_flow.fwd_ack_flag_count,
+            self.cic_flow.basic_flow.fwd_cwe_flag_count,
+            self.cic_flow.basic_flow.fwd_rst_flag_count,
+            self.cic_flow.basic_flow.bwd_fin_flag_count,
+            self.cic_flow.basic_flow.bwd_psh_flag_count,
+            self.cic_flow.basic_flow.bwd_urg_flag_count,
+            self.cic_flow.basic_flow.bwd_ece_flag_count,
+            self.cic_flow.basic_flow.bwd_syn_flag_count,
+            self.cic_flow.basic_flow.bwd_ack_flag_count,
+            self.cic_flow.basic_flow.bwd_cwe_flag_count,
+            self.cic_flow.basic_flow.bwd_rst_flag_count,
+            self.cic_flow.get_flow_iat_mean(),
+            self.cic_flow.get_flow_iat_std(),
+            self.cic_flow.get_flow_iat_max(),
+            self.cic_flow.get_flow_iat_min(),
+            self.cic_flow.fwd_iat_total + self.cic_flow.bwd_iat_total,
+            self.cic_flow.fwd_iat_mean,
+            self.cic_flow.fwd_iat_std,
+            self.cic_flow.fwd_iat_max,
+            self.cic_flow.get_fwd_iat_min(),
+            self.cic_flow.fwd_iat_total,
+            self.cic_flow.bwd_iat_mean,
+            self.cic_flow.bwd_iat_std,
+            self.cic_flow.bwd_iat_max,
+            self.cic_flow.get_bwd_iat_min(),
+            self.cic_flow.bwd_iat_total,
+            self.cic_flow.get_sf_fwd_packets(),
+            self.cic_flow.get_sf_bwd_packets(),
+            self.cic_flow.get_sf_fwd_bytes(),
+            self.cic_flow.get_sf_bwd_bytes(),
         )
     }
 
@@ -693,7 +631,16 @@ impl Flow for NTLFlow {
     }
 
     fn get_first_timestamp(&self) -> DateTime<Utc> {
-        self.basic_flow.get_first_timestamp()
+        self.cic_flow.get_first_timestamp()
+    }
+
+    fn is_expired(&self, timestamp: DateTime<Utc>, active_timeout: u64, idle_timeout: u64) -> bool {
+        self.cic_flow
+            .is_expired(timestamp, active_timeout, idle_timeout)
+    }
+
+    fn flow_key(&self) -> &String {
+        &self.cic_flow.basic_flow.flow_key
     }
 }
 
@@ -721,7 +668,7 @@ mod tests {
     fn test_update_fwd_pkt_len_stats() {
         let mut ntl_flow = setup_ntl_flow();
 
-        ntl_flow.basic_flow.basic_flow.fwd_packet_count = 1;
+        ntl_flow.cic_flow.basic_flow.fwd_packet_count = 1;
 
         ntl_flow.update_fwd_header_len_stats(100);
 
@@ -729,9 +676,9 @@ mod tests {
         assert_eq!(ntl_flow.fwd_header_len_min, 100);
         assert_eq!(ntl_flow.fwd_header_len_mean, 100.0);
         assert_eq!(ntl_flow.fwd_header_len_std, 0.0);
-        assert_eq!(ntl_flow.basic_flow.fwd_header_length, 100);
+        assert_eq!(ntl_flow.cic_flow.fwd_header_length, 100);
 
-        ntl_flow.basic_flow.basic_flow.fwd_packet_count = 2;
+        ntl_flow.cic_flow.basic_flow.fwd_packet_count = 2;
 
         ntl_flow.update_fwd_header_len_stats(50);
 
@@ -739,9 +686,9 @@ mod tests {
         assert_eq!(ntl_flow.fwd_header_len_min, 50);
         assert_eq!(ntl_flow.fwd_header_len_mean, 75.0);
         assert_eq!(ntl_flow.fwd_header_len_std, 25.0);
-        assert_eq!(ntl_flow.basic_flow.fwd_header_length, 150);
+        assert_eq!(ntl_flow.cic_flow.fwd_header_length, 150);
 
-        ntl_flow.basic_flow.basic_flow.fwd_packet_count = 3;
+        ntl_flow.cic_flow.basic_flow.fwd_packet_count = 3;
 
         ntl_flow.update_fwd_header_len_stats(0);
 
@@ -749,14 +696,14 @@ mod tests {
         assert_eq!(ntl_flow.fwd_header_len_min, 0);
         assert_eq!(ntl_flow.fwd_header_len_mean, 50.0);
         assert_eq!(ntl_flow.fwd_header_len_std, 40.824829046386306);
-        assert_eq!(ntl_flow.basic_flow.fwd_header_length, 150);
+        assert_eq!(ntl_flow.cic_flow.fwd_header_length, 150);
     }
 
     #[test]
     fn test_update_bwd_pkt_len_stats() {
         let mut ntl_flow = setup_ntl_flow();
 
-        ntl_flow.basic_flow.basic_flow.bwd_packet_count = 1;
+        ntl_flow.cic_flow.basic_flow.bwd_packet_count = 1;
 
         ntl_flow.update_bwd_header_len_stats(100);
 
@@ -764,9 +711,9 @@ mod tests {
         assert_eq!(ntl_flow.bwd_header_len_min, 100);
         assert_eq!(ntl_flow.bwd_header_len_mean, 100.0);
         assert_eq!(ntl_flow.bwd_header_len_std, 0.0);
-        assert_eq!(ntl_flow.basic_flow.bwd_header_length, 100);
+        assert_eq!(ntl_flow.cic_flow.bwd_header_length, 100);
 
-        ntl_flow.basic_flow.basic_flow.bwd_packet_count = 2;
+        ntl_flow.cic_flow.basic_flow.bwd_packet_count = 2;
 
         ntl_flow.update_bwd_header_len_stats(50);
 
@@ -774,9 +721,9 @@ mod tests {
         assert_eq!(ntl_flow.bwd_header_len_min, 50);
         assert_eq!(ntl_flow.bwd_header_len_mean, 75.0);
         assert_eq!(ntl_flow.bwd_header_len_std, 25.0);
-        assert_eq!(ntl_flow.basic_flow.bwd_header_length, 150);
+        assert_eq!(ntl_flow.cic_flow.bwd_header_length, 150);
 
-        ntl_flow.basic_flow.basic_flow.bwd_packet_count = 3;
+        ntl_flow.cic_flow.basic_flow.bwd_packet_count = 3;
 
         ntl_flow.update_bwd_header_len_stats(0);
 
@@ -784,7 +731,7 @@ mod tests {
         assert_eq!(ntl_flow.bwd_header_len_min, 0);
         assert_eq!(ntl_flow.bwd_header_len_mean, 50.0);
         assert_eq!(ntl_flow.bwd_header_len_std, 40.824829046386306);
-        assert_eq!(ntl_flow.basic_flow.bwd_header_length, 150);
+        assert_eq!(ntl_flow.cic_flow.bwd_header_length, 150);
     }
 
     #[test]
@@ -839,8 +786,8 @@ mod tests {
         cic_flow.fwd_header_len_mean = 30.0;
         cic_flow.bwd_header_len_mean = 25.0;
 
-        cic_flow.basic_flow.basic_flow.fwd_packet_count = 5;
-        cic_flow.basic_flow.basic_flow.bwd_packet_count = 3;
+        cic_flow.cic_flow.basic_flow.fwd_packet_count = 5;
+        cic_flow.cic_flow.basic_flow.bwd_packet_count = 3;
 
         assert_eq!(cic_flow.get_flow_header_length_mean(), 28.125);
     }
@@ -855,8 +802,8 @@ mod tests {
         cic_flow.fwd_header_len_std = 14.142135623731;
         cic_flow.bwd_header_len_std = 8.1649658092773;
 
-        cic_flow.basic_flow.basic_flow.fwd_packet_count = 5;
-        cic_flow.basic_flow.basic_flow.bwd_packet_count = 3;
+        cic_flow.cic_flow.basic_flow.fwd_packet_count = 5;
+        cic_flow.cic_flow.basic_flow.bwd_packet_count = 3;
 
         assert_eq!(cic_flow.get_flow_header_length_variance() as u32, 155); // removing everything behind the comma because of arithmetic errors
     }
@@ -872,8 +819,8 @@ mod tests {
         cic_flow.fwd_header_len_std = 14.142135623731;
         cic_flow.bwd_header_len_std = 8.1649658092773;
 
-        cic_flow.basic_flow.basic_flow.fwd_packet_count = 5;
-        cic_flow.basic_flow.basic_flow.bwd_packet_count = 3;
+        cic_flow.cic_flow.basic_flow.fwd_packet_count = 5;
+        cic_flow.cic_flow.basic_flow.bwd_packet_count = 3;
 
         assert!(
             (cic_flow.get_flow_header_length_std() - 12.484365222149).abs() < epsilon,

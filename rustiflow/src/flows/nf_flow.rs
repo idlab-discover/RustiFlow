@@ -1,26 +1,50 @@
-use std::{
-    net::IpAddr,
-    ops::Deref,
-    time::{Instant, SystemTime, UNIX_EPOCH},
-};
+use std::net::IpAddr;
 
 use chrono::{DateTime, Utc};
 
-use crate::{utils::utils::BasicFeatures, NO_CONTAMINANT_FEATURES};
+use crate::packet_features::PacketFeatures;
 
 use super::{cic_flow::CicFlow, flow::Flow};
 
 /// Represents a Nfstream inspired Flow, encapsulating various metrics and states of a network flow.
 ///
 /// This struct includes detailed information about both forward and backward
+#[derive(Clone)]
 pub struct NfFlow {
     pub cic_flow: CicFlow,
-    pub first_timestamp: SystemTime,
-    pub last_timestamp: SystemTime,
-    pub fwd_first_timestamp: SystemTime,
-    pub fwd_last_timestamp: SystemTime,
-    pub bwd_first_timestamp: SystemTime,
-    pub bwd_last_timestamp: SystemTime,
+    pub first_timestamp: DateTime<Utc>,
+    pub last_timestamp: DateTime<Utc>,
+    pub fwd_first_timestamp: DateTime<Utc>,
+    pub fwd_last_timestamp: DateTime<Utc>,
+    pub bwd_first_timestamp: Option<DateTime<Utc>>,
+    pub bwd_last_timestamp: Option<DateTime<Utc>>,
+}
+
+impl NfFlow {
+    fn get_bwd_duration(&self) -> i64 {
+        if self.bwd_first_timestamp.is_none() || self.bwd_last_timestamp.is_none() {
+            return 0;
+        }
+
+        (self.bwd_last_timestamp.unwrap().signed_duration_since(self.bwd_first_timestamp.unwrap()))
+        .num_milliseconds()
+    }
+
+    fn get_first_bwd_timestamp(&self) -> i64 {
+        if self.bwd_first_timestamp.is_none() {
+            return 0;
+        }
+
+        self.bwd_first_timestamp.unwrap().timestamp_millis()
+    }
+
+    fn get_bwd_last_timestamp(&self) -> i64 {
+        if self.bwd_last_timestamp.is_none() {
+            return 0;
+        }
+
+        self.bwd_last_timestamp.unwrap().timestamp_millis()
+    }
 }
 
 impl Flow for NfFlow {
@@ -31,7 +55,7 @@ impl Flow for NfFlow {
         ipv4_destination: IpAddr,
         port_destination: u16,
         protocol: u8,
-        ts_date: DateTime<Utc>,
+        timestamp: DateTime<Utc>,
     ) -> Self {
         NfFlow {
             cic_flow: CicFlow::new(
@@ -41,63 +65,51 @@ impl Flow for NfFlow {
                 ipv4_destination,
                 port_destination,
                 protocol,
-                ts_date,
+                timestamp,
             ),
-            first_timestamp: ts_date.into(),
-            last_timestamp: ts_date.into(),
-            fwd_first_timestamp: ts_date.into(),
-            fwd_last_timestamp: ts_date.into(),
-            bwd_first_timestamp: ts_date.into(),
-            bwd_last_timestamp: ts_date.into(),
+            first_timestamp: timestamp,
+            last_timestamp: timestamp,
+            fwd_first_timestamp: timestamp,
+            fwd_last_timestamp: timestamp,
+            bwd_first_timestamp: None,
+            bwd_last_timestamp: None,
         }
     }
 
-    fn update_flow(
-        &mut self,
-        packet: &BasicFeatures,
-        timestamp: &Instant,
-        ts_date: DateTime<Utc>,
-        fwd: bool,
-    ) -> Option<String> {
+    fn update_flow(&mut self, packet: &PacketFeatures, fwd: bool) -> bool {
+        let is_terminated = self.cic_flow.update_flow(packet, fwd);
         if fwd {
-            self.fwd_last_timestamp = ts_date.into();
+            self.fwd_last_timestamp = packet.timestamp;
         } else {
-            self.bwd_last_timestamp = ts_date.into();
-        }
-
-        let end = self.cic_flow.update_flow(packet, timestamp, ts_date, fwd);
-        if end.is_some() {
-            if *NO_CONTAMINANT_FEATURES.lock().unwrap().deref() {
-                return Some(self.dump_without_contamination());
-            } else {
-                return Some(self.dump());
+            if self.bwd_first_timestamp.is_none() {
+                self.bwd_first_timestamp = Some(packet.timestamp);
             }
+            self.bwd_last_timestamp = Some(packet.timestamp);
         }
-
-        None
+        is_terminated
     }
 
     fn dump(&self) -> String {
         format!("{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{}",
-            self.cic_flow.basic_flow.flow_id,
+            self.cic_flow.basic_flow.flow_key,
             self.cic_flow.basic_flow.ip_source,
             self.cic_flow.basic_flow.port_source,
             self.cic_flow.basic_flow.ip_destination,
             self.cic_flow.basic_flow.port_destination,
             self.cic_flow.basic_flow.protocol,
-            self.first_timestamp.duration_since(UNIX_EPOCH).unwrap().as_millis(),
-            self.last_timestamp.duration_since(UNIX_EPOCH).unwrap().as_millis(),
-            self.last_timestamp.duration_since(UNIX_EPOCH).unwrap().as_millis() - self.first_timestamp.duration_since(UNIX_EPOCH).unwrap().as_millis(),
+            self.first_timestamp.timestamp_millis(),
+            self.last_timestamp.timestamp_millis(),
+            self.last_timestamp.signed_duration_since(self.first_timestamp).num_milliseconds(),
             self.cic_flow.basic_flow.fwd_packet_count + self.cic_flow.basic_flow.bwd_packet_count,
             self.cic_flow.fwd_pkt_len_tot + self.cic_flow.bwd_pkt_len_tot,
-            self.fwd_first_timestamp.duration_since(UNIX_EPOCH).unwrap().as_millis(),
-            self.fwd_last_timestamp.duration_since(UNIX_EPOCH).unwrap().as_millis(),
-            self.fwd_last_timestamp.duration_since(UNIX_EPOCH).unwrap().as_millis() - self.fwd_first_timestamp.duration_since(UNIX_EPOCH).unwrap().as_millis(),
+            self.fwd_first_timestamp.timestamp_millis(),
+            self.fwd_last_timestamp.timestamp_millis(),
+            self.fwd_last_timestamp.signed_duration_since(self.fwd_first_timestamp).num_milliseconds(),
             self.cic_flow.basic_flow.fwd_packet_count,
             self.cic_flow.fwd_pkt_len_tot,
-            self.bwd_first_timestamp.duration_since(UNIX_EPOCH).unwrap().as_millis(),
-            self.bwd_last_timestamp.duration_since(UNIX_EPOCH).unwrap().as_millis(),
-            self.bwd_last_timestamp.duration_since(UNIX_EPOCH).unwrap().as_millis() - self.bwd_first_timestamp.duration_since(UNIX_EPOCH).unwrap().as_millis(),
+            self.get_first_bwd_timestamp(),
+            self.get_bwd_last_timestamp(),
+            self.get_bwd_duration(),
             self.cic_flow.basic_flow.bwd_packet_count,
             self.cic_flow.bwd_pkt_len_tot,
             self.cic_flow.get_flow_packet_length_min(),
@@ -173,37 +185,13 @@ impl Flow for NfFlow {
         {},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},\
         {},{},{},{},{},{},{},{},{},{},{},{},{}",
             self.cic_flow.basic_flow.protocol,
-            self.last_timestamp
-                .duration_since(UNIX_EPOCH)
-                .unwrap()
-                .as_millis()
-                - self
-                    .first_timestamp
-                    .duration_since(UNIX_EPOCH)
-                    .unwrap()
-                    .as_millis(),
+            self.last_timestamp.signed_duration_since(self.first_timestamp).num_milliseconds(),
             self.cic_flow.basic_flow.fwd_packet_count + self.cic_flow.basic_flow.bwd_packet_count,
             self.cic_flow.fwd_pkt_len_tot + self.cic_flow.bwd_pkt_len_tot,
-            self.fwd_last_timestamp
-                .duration_since(UNIX_EPOCH)
-                .unwrap()
-                .as_millis()
-                - self
-                    .fwd_first_timestamp
-                    .duration_since(UNIX_EPOCH)
-                    .unwrap()
-                    .as_millis(),
+            self.fwd_last_timestamp.signed_duration_since(self.fwd_first_timestamp).num_milliseconds(),
             self.cic_flow.basic_flow.fwd_packet_count,
             self.cic_flow.fwd_pkt_len_tot,
-            self.bwd_last_timestamp
-                .duration_since(UNIX_EPOCH)
-                .unwrap()
-                .as_millis()
-                - self
-                    .bwd_first_timestamp
-                    .duration_since(UNIX_EPOCH)
-                    .unwrap()
-                    .as_millis(),
+            self.get_bwd_duration(),
             self.cic_flow.basic_flow.bwd_packet_count,
             self.cic_flow.bwd_pkt_len_tot,
             self.cic_flow.get_flow_packet_length_min(),
@@ -281,5 +269,14 @@ impl Flow for NfFlow {
 
     fn get_first_timestamp(&self) -> DateTime<Utc> {
         self.cic_flow.get_first_timestamp()
+    }
+
+    fn is_expired(&self, timestamp: DateTime<Utc>, active_timeout: u64, idle_timeout: u64) -> bool {
+        self.cic_flow
+            .is_expired(timestamp, active_timeout, idle_timeout)
+    }
+
+    fn flow_key(&self) -> &String {
+        &self.cic_flow.basic_flow.flow_key
     }
 }

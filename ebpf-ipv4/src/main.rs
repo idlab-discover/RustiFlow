@@ -1,15 +1,16 @@
 #![no_std]
 #![no_main]
-#![allow(nonstandard_style, dead_code)]
+#![allow(nonstandard_style)]
 
 use aya_ebpf::{
     bindings::TC_ACT_PIPE,
     macros::{classifier, map},
-    maps::PerfEventArray,
+    maps::RingBuf,
     programs::TcContext,
 };
+use aya_log_ebpf::error;
 
-use common::BasicFeaturesIpv4;
+use common::EbpfEventIpv4;
 use network_types::{
     eth::{EthHdr, EtherType},
     ip::{IpProto, Ipv4Hdr},
@@ -24,8 +25,7 @@ fn panic(_info: &core::panic::PanicInfo) -> ! {
 }
 
 #[map]
-static EVENTS_IPV4: PerfEventArray<BasicFeaturesIpv4> =
-    PerfEventArray::with_max_entries(1024 * 1024, 0);
+static EVENTS_IPV4: RingBuf = RingBuf::with_byte_size(1024 * 1024 * 10, 0); // 10 MB
 
 #[classifier]
 pub fn tc_flow_track(ctx: TcContext) -> i32 {
@@ -36,49 +36,42 @@ pub fn tc_flow_track(ctx: TcContext) -> i32 {
 }
 
 fn process_packet(ctx: &TcContext) -> Result<i32, ()> {
-    let ethhdr = ctx.load::<EthHdr>(0).map_err(|_| ())?;
-    match ethhdr.ether_type {
-        EtherType::Ipv4 => process_ipv4_packet(ctx),
-        _ => Ok(TC_ACT_PIPE),
+    let ether_type = ctx.load::<EthHdr>(0).map_err(|_| ())?.ether_type;
+    if ether_type != EtherType::Ipv4 {
+        return Ok(TC_ACT_PIPE);
     }
-}
 
-fn process_ipv4_packet(ctx: &TcContext) -> Result<i32, ()> {
     let ipv4hdr = ctx.load::<Ipv4Hdr>(EthHdr::LEN).map_err(|_| ())?;
     let packet_info = PacketInfo::new(&ipv4hdr, ctx.data_end() - ctx.data())?;
 
     match ipv4hdr.proto {
-        IpProto::Tcp => process_tcp_packet(ctx, packet_info),
-        IpProto::Udp => process_udp_packet(ctx, packet_info),
-        IpProto::Icmp => process_icmp_packet(ctx, packet_info),
+        IpProto::Tcp => process_transport_packet::<TcpHdr>(ctx, packet_info),
+        IpProto::Udp => process_transport_packet::<UdpHdr>(ctx, packet_info),
+        IpProto::Icmp => process_transport_packet::<IcmpHdr>(ctx, packet_info),
         _ => Ok(TC_ACT_PIPE),
     }
 }
 
-fn process_tcp_packet(ctx: &TcContext, packet_info: PacketInfo) -> Result<i32, ()> {
-    let tcphdr = ctx
-        .load::<TcpHdr>(EthHdr::LEN + Ipv4Hdr::LEN)
+fn process_transport_packet<T: NetworkHeader>(
+    ctx: &TcContext,
+    packet_info: PacketInfo,
+) -> Result<i32, ()> {
+    let hdr = ctx
+        .load::<T>(EthHdr::LEN + Ipv4Hdr::LEN)
         .map_err(|_| ())?;
-    let packet_log = packet_info.to_packet_log(&tcphdr);
-    EVENTS_IPV4.output(ctx, &packet_log, 0);
-    Ok(TC_ACT_PIPE)
-}
+    let packet_log = packet_info.to_packet_log(&hdr);
 
-fn process_udp_packet(ctx: &TcContext, packet_info: PacketInfo) -> Result<i32, ()> {
-    let udphdr = ctx
-        .load::<UdpHdr>(EthHdr::LEN + Ipv4Hdr::LEN)
-        .map_err(|_| ())?;
-    let packet_log = packet_info.to_packet_log(&udphdr);
-    EVENTS_IPV4.output(ctx, &packet_log, 0);
-    Ok(TC_ACT_PIPE)
-}
-
-fn process_icmp_packet(ctx: &TcContext, packet_info: PacketInfo) -> Result<i32, ()> {
-    let icmphdr = ctx
-        .load::<IcmpHdr>(EthHdr::LEN + Ipv4Hdr::LEN)
-        .map_err(|_| ())?;
-    let packet_log = packet_info.to_packet_log(&icmphdr);
-    EVENTS_IPV4.output(ctx, &packet_log, 0);
+    // Reserve memory in the ring buffer for the event
+    if let Some(mut entry) = EVENTS_IPV4.reserve::<EbpfEventIpv4>(0) {
+        // Use MaybeUninit to write the packet_log data into the reserved memory
+        *entry = core::mem::MaybeUninit::new(packet_log);
+        // Submit the entry to make it visible to userspace
+        entry.submit(0);
+    } else {
+        // Handle the case where the ring buffer is full (optional logging)
+        error!(ctx, "Failed to reserve entry in ring buffer, buffer might be full.");
+    }
+    
     Ok(TC_ACT_PIPE)
 }
 
@@ -98,9 +91,10 @@ impl PacketInfo {
             protocol: ipv4hdr.proto as u8,
         })
     }
-
-    fn to_packet_log<T: NetworkHeader>(&self, header: &T) -> BasicFeaturesIpv4 {
-        BasicFeaturesIpv4::new(
+    
+    #[inline(always)]
+    fn to_packet_log<T: NetworkHeader>(&self, header: &T) -> EbpfEventIpv4 {
+        EbpfEventIpv4::new(
             self.ipv4_destination,
             self.ipv4_source,
             header.destination_port(),
@@ -111,6 +105,8 @@ impl PacketInfo {
             header.combined_flags(),
             self.protocol,
             header.header_length(),
+            header.sequence_number(),
+            header.sequence_number_ack(),
         )
     }
 }
@@ -121,6 +117,8 @@ trait NetworkHeader {
     fn window_size(&self) -> u16;
     fn combined_flags(&self) -> u8;
     fn header_length(&self) -> u8;
+    fn sequence_number(&self) -> u32;
+    fn sequence_number_ack(&self) -> u32;
 }
 
 impl NetworkHeader for TcpHdr {
@@ -146,6 +144,12 @@ impl NetworkHeader for TcpHdr {
     fn header_length(&self) -> u8 {
         TcpHdr::LEN as u8
     }
+    fn sequence_number(&self) -> u32 {
+        self.seq
+    }
+    fn sequence_number_ack(&self) -> u32 {
+        self.ack_seq
+    }
 }
 
 impl NetworkHeader for UdpHdr {
@@ -164,6 +168,12 @@ impl NetworkHeader for UdpHdr {
     fn header_length(&self) -> u8 {
         UdpHdr::LEN as u8
     }
+    fn sequence_number(&self) -> u32 {
+        0
+    }
+    fn sequence_number_ack(&self) -> u32 {
+        0
+    }
 }
 
 impl NetworkHeader for IcmpHdr {
@@ -181,5 +191,11 @@ impl NetworkHeader for IcmpHdr {
     }
     fn header_length(&self) -> u8 {
         IcmpHdr::LEN as u8
+    }
+    fn sequence_number(&self) -> u32 {
+        0
+    }
+    fn sequence_number_ack(&self) -> u32 {
+        0
     }
 }

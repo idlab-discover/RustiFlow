@@ -4,10 +4,10 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-aya-ebpf = { git = "https://github.com/aya-rs/aya" }
-aya-log-ebpf = { git = "https://github.com/aya-rs/aya" }
+aya-ebpf = "0.1.0"
+aya-log-ebpf = "0.1.0"
 common = { path = "../common" }
-network-types = "0.0.5"
+network-types = "0.0.7"
 
 [[bin]]
 name = "rustiflow-ebpf-ipv4"

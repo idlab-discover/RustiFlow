@@ -10,3 +10,8 @@ Cargo.lock
 **/*.rs.bk
 
 .vscode/
+
+# testing files
+testing/
+
+rustiflow.toml

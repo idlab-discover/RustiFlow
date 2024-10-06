@@ -1,13 +1,14 @@
 use chrono::{DateTime, Utc};
-use std::{net::IpAddr, ops::Deref, time::Instant};
+use std::net::IpAddr;
 
-use crate::{utils::utils::BasicFeatures, NO_CONTAMINANT_FEATURES};
+use crate::packet_features::PacketFeatures;
 
 use super::{basic_flow::BasicFlow, flow::Flow};
 
 /// Represents a CIDDS Flow, encapsulating various metrics and states of a network flow.
 ///
 /// This struct includes detailed information about a flow.
+#[derive(Clone)]
 pub struct CiddsFlow {
     /// The basic flow information.
     pub basic_flow: BasicFlow,
@@ -86,29 +87,9 @@ impl Flow for CiddsFlow {
         }
     }
 
-    fn update_flow(
-        &mut self,
-        packet: &BasicFeatures,
-        timestamp: &Instant,
-        ts_date: DateTime<Utc>,
-        fwd: bool,
-    ) -> Option<String> {
-        self.basic_flow.update_flow(packet, timestamp, ts_date, fwd);
-
+    fn update_flow(&mut self, packet: &PacketFeatures, fwd: bool) -> bool {
         self.bytes += packet.length as u32;
-
-        if self.basic_flow.flow_end_of_flow_ack > 0
-            || self.basic_flow.fwd_rst_flag_count > 0
-            || self.basic_flow.bwd_rst_flag_count > 0
-        {
-            if *NO_CONTAMINANT_FEATURES.lock().unwrap().deref() {
-                return Some(self.dump_without_contamination());
-            } else {
-                return Some(self.dump());
-            }
-        }
-
-        None
+        self.basic_flow.update_flow(packet, fwd)
     }
 
     fn dump(&self) -> String {
@@ -173,6 +154,15 @@ impl Flow for CiddsFlow {
 
     fn get_first_timestamp(&self) -> DateTime<Utc> {
         self.basic_flow.get_first_timestamp()
+    }
+
+    fn is_expired(&self, timestamp: DateTime<Utc>, active_timeout: u64, idle_timeout: u64) -> bool {
+        self.basic_flow
+            .is_expired(timestamp, active_timeout, idle_timeout)
+    }
+
+    fn flow_key(&self) -> &String {
+        &self.basic_flow.flow_key
     }
 }
 

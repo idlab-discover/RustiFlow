@@ -1,13 +1,14 @@
 use chrono::{DateTime, Utc};
-use std::{net::IpAddr, time::Instant};
+use std::net::IpAddr;
 
-use crate::utils::utils::BasicFeatures;
+use crate::packet_features::PacketFeatures;
 
 use super::{basic_flow::BasicFlow, flow::Flow};
 
 /// Represents a Custom Flow, encapsulating various metrics and states of a network flow.
 ///
 /// This struct is made so you can define your own features.
+#[derive(Clone)]
 pub struct CustomFlow {
     /// Choose here for an existing flow type or leave the basic flow.
     pub basic_flow: BasicFlow,
@@ -35,31 +36,19 @@ impl Flow for CustomFlow {
                 ipv4_destination,
                 port_destination,
                 protocol,
-                ts_date
+                ts_date,
             ),
             // Add here the initialization of the additional features.
         }
     }
 
-    fn update_flow(
-        &mut self,
-        packet: &BasicFeatures,
-        timestamp: &Instant,
-        ts_date: DateTime<Utc>,
-        fwd: bool,
-    ) -> Option<String> {
-        self.basic_flow.update_flow(packet, timestamp, ts_date, fwd);
-
+    fn update_flow(&mut self, packet: &PacketFeatures, fwd: bool) -> bool {
+        // Update the basic flow and returns true if the flow is terminated.
+        let is_terminated = self.basic_flow.update_flow(packet, fwd);
         // Add here the update of the additional features.
 
-        if self.basic_flow.flow_end_of_flow_ack > 0
-            || self.basic_flow.fwd_rst_flag_count > 0
-            || self.basic_flow.bwd_rst_flag_count > 0
-        {
-            return Some(self.dump());
-        }
-
-        None
+        // Return the termination status of the flow.
+        is_terminated
     }
 
     fn dump(&self) -> String {
@@ -84,6 +73,15 @@ impl Flow for CustomFlow {
 
     fn get_first_timestamp(&self) -> DateTime<Utc> {
         self.basic_flow.get_first_timestamp()
+    }
+
+    fn is_expired(&self, timestamp: DateTime<Utc>, active_timeout: u64, idle_timeout: u64) -> bool {
+        self.basic_flow
+            .is_expired(timestamp, active_timeout, idle_timeout)
+    }
+
+    fn flow_key(&self) -> &String {
+        &self.basic_flow.flow_key
     }
 }
 

@@ -1,28 +1,30 @@
 use chrono::{DateTime, Utc};
-use std::{net::IpAddr, ops::Deref, time::Instant};
+use std::net::IpAddr;
 
-use crate::{
-    utils::utils::{calculate_mean, calculate_std, get_duration, BasicFeatures},
-    NO_CONTAMINANT_FEATURES,
+use crate::packet_features::PacketFeatures;
+
+use super::{
+    basic_flow::BasicFlow,
+    flow::Flow,
+    util::{calculate_mean, calculate_std},
 };
-
-use super::{basic_flow::BasicFlow, flow::Flow};
 
 /// Represents a CIC Flow, encapsulating various metrics and states of a network flow.
 ///
 /// This struct includes detailed information about both forward and backward
 /// flow, active and idle times, as well as subflows.
+#[derive(Clone)]
 pub struct CicFlow {
     /// The basic flow information.
     pub basic_flow: BasicFlow,
     /// The timestamp of the last packet in the subflow.
-    pub sf_last_packet_timestamp: Option<Instant>,
+    pub sf_last_packet_timestamp: Option<DateTime<Utc>>,
     /// The number of subflows.
     pub sf_count: u32,
     /// The timestamp of the start of an active period.
-    pub start_active: Instant,
+    pub start_active: DateTime<Utc>,
     /// The timestamp of the end of an active period.
-    pub end_active: Instant,
+    pub end_active: DateTime<Utc>,
     /// The number of active periods.
     pub active_count: u32,
     /// The mean of active periods.
@@ -50,7 +52,7 @@ pub struct CicFlow {
     /// The minimum header length of the forward flow.
     fwd_header_len_min: u32,
     /// The timestamp of the last packet in the forward flow.
-    pub fwd_last_timestamp: Option<Instant>,
+    pub fwd_last_timestamp: Option<DateTime<Utc>>,
     /// The total length of packets in the forward flow.
     pub fwd_pkt_len_tot: u32,
     /// The total length of transport layer segments in the forward flow (tcp/udp header + data).
@@ -86,15 +88,15 @@ pub struct CicFlow {
     /// Helper variable for bulk packet count.
     fwd_bulk_packet_count_help: u64,
     /// Helper variable for bulk start timestamp.
-    fwd_bulk_start_help: Option<Instant>,
+    fwd_bulk_start_help: Option<DateTime<Utc>>,
     /// Helper variable for bulk size.
     fwd_bulk_size_help: u32,
     /// The timestamp of the last bulk packet in the forward flow.
-    pub fwd_last_bulk_timestamp: Option<Instant>,
+    pub fwd_last_bulk_timestamp: Option<DateTime<Utc>>,
     /// The initial window size of the backward flow.
     pub bwd_init_win_bytes: u16,
     /// The timestamp of the last packet in the backward flow.
-    pub bwd_last_timestamp: Option<Instant>,
+    pub bwd_last_timestamp: Option<DateTime<Utc>>,
     /// The total length of packets in the backward flow.
     pub bwd_pkt_len_tot: u32,
     /// The total length of transport layer segments in the backward flow (tcp/udp header + data).
@@ -130,11 +132,11 @@ pub struct CicFlow {
     /// Helper variable for bulk packet count.
     bwd_bulk_packet_count_help: u64,
     /// Helper variable for bulk start timestamp.
-    bwd_bulk_start_help: Option<Instant>,
+    bwd_bulk_start_help: Option<DateTime<Utc>>,
     /// Helper variable for bulk size.
     bwd_bulk_size_help: u32,
     /// The timestamp of the last bulk packet in the backward flow.
-    bwd_last_bulk_timestamp: Option<Instant>,
+    bwd_last_bulk_timestamp: Option<DateTime<Utc>>,
 }
 
 impl CicFlow {
@@ -392,7 +394,7 @@ impl CicFlow {
     ///
     /// * `timestamp` - The timestamp of the packet.
     /// * `len` - The length of the packet.
-    fn update_fwd_bulk_stats(&mut self, timestamp: &Instant, len: u32) {
+    fn update_fwd_bulk_stats(&mut self, timestamp: &DateTime<Utc>, len: u32) {
         if self.bwd_last_bulk_timestamp > self.fwd_bulk_start_help {
             self.fwd_bulk_start_help = None;
         }
@@ -408,9 +410,9 @@ impl CicFlow {
         } else {
             // too much idle time -> new bulk
             if timestamp
-                .duration_since(self.fwd_last_bulk_timestamp.unwrap())
-                .as_secs_f64()
-                > 1.0
+                .signed_duration_since(self.fwd_last_bulk_timestamp.unwrap())
+                .num_milliseconds()
+                > 1000
             {
                 self.fwd_bulk_start_help = Some(*timestamp);
                 self.fwd_last_bulk_timestamp = Some(*timestamp);
@@ -425,16 +427,18 @@ impl CicFlow {
                     self.fwd_bulk_packet_count += self.fwd_bulk_packet_count_help;
                     self.fwd_bulk_size_total += self.fwd_bulk_size_help;
                     self.fwd_bulk_duration += timestamp
-                        .duration_since(self.fwd_bulk_start_help.unwrap())
-                        .as_micros() as f64;
+                        .signed_duration_since(self.fwd_bulk_start_help.unwrap())
+                        .num_microseconds()
+                        .unwrap() as f64;
                 }
                 // continu bulk
                 else if self.fwd_bulk_packet_count_help > 4 {
                     self.fwd_bulk_packet_count += 1;
                     self.fwd_bulk_size_total += len;
                     self.fwd_bulk_duration += timestamp
-                        .duration_since(self.fwd_bulk_start_help.unwrap())
-                        .as_micros() as f64;
+                        .signed_duration_since(self.fwd_bulk_start_help.unwrap())
+                        .num_microseconds()
+                        .unwrap() as f64;
                 }
             }
             self.fwd_last_bulk_timestamp = Some(*timestamp);
@@ -450,7 +454,7 @@ impl CicFlow {
     ///
     /// * `timestamp` - The timestamp of the packet.
     /// * `len` - The length of the packet.
-    fn update_bwd_bulk_stats(&mut self, timestamp: &Instant, len: u32) {
+    fn update_bwd_bulk_stats(&mut self, timestamp: &DateTime<Utc>, len: u32) {
         if self.fwd_last_bulk_timestamp > self.bwd_bulk_start_help {
             self.bwd_bulk_start_help = None;
         }
@@ -464,11 +468,11 @@ impl CicFlow {
             self.bwd_bulk_size_help = len;
             self.bwd_last_bulk_timestamp = Some(*timestamp);
         } else {
-            // to much idle time -> new bulk
+            // too much idle time -> new bulk
             if timestamp
-                .duration_since(self.bwd_last_bulk_timestamp.unwrap())
-                .as_secs_f64()
-                > 1.0
+                .signed_duration_since(self.bwd_last_bulk_timestamp.unwrap())
+                .num_milliseconds()
+                > 1000
             {
                 self.bwd_bulk_start_help = Some(*timestamp);
                 self.bwd_last_bulk_timestamp = Some(*timestamp);
@@ -483,16 +487,18 @@ impl CicFlow {
                     self.bwd_bulk_packet_count += self.bwd_bulk_packet_count_help;
                     self.bwd_bulk_size_total += self.bwd_bulk_size_help;
                     self.bwd_bulk_duration += timestamp
-                        .duration_since(self.bwd_bulk_start_help.unwrap())
-                        .as_micros() as f64;
+                        .signed_duration_since(self.bwd_bulk_start_help.unwrap())
+                        .num_microseconds()
+                        .unwrap() as f64;
                 }
                 // continu bulk
                 else if self.bwd_bulk_packet_count_help > 4 {
                     self.bwd_bulk_packet_count += 1;
                     self.bwd_bulk_size_total += len;
                     self.bwd_bulk_duration += timestamp
-                        .duration_since(self.bwd_bulk_start_help.unwrap())
-                        .as_micros() as f64;
+                        .signed_duration_since(self.bwd_bulk_start_help.unwrap())
+                        .num_microseconds()
+                        .unwrap() as f64;
                 }
             }
             self.bwd_last_bulk_timestamp = Some(*timestamp);
@@ -507,15 +513,15 @@ impl CicFlow {
     /// ### Arguments
     ///
     /// * `timestamp` - The timestamp of the packet.
-    fn update_subflows(&mut self, timestamp: &Instant) {
+    fn update_subflows(&mut self, timestamp: &DateTime<Utc>) {
         if self.sf_last_packet_timestamp == None {
             self.sf_last_packet_timestamp = Some(*timestamp);
         }
 
         if timestamp
-            .duration_since(self.sf_last_packet_timestamp.unwrap())
-            .as_secs_f64()
-            > 1.0
+            .signed_duration_since(self.sf_last_packet_timestamp.unwrap())
+            .num_milliseconds()
+            > 1000
         {
             self.sf_count += 1;
             self.update_active_idle_time(timestamp, 5_000_000.0);
@@ -533,13 +539,23 @@ impl CicFlow {
     ///
     /// * `timestamp` - The timestamp of the packet or event triggering the update.
     /// * `threshold` - The threshold in microseconds to determine state transitions between active and idle.
-    fn update_active_idle_time(&mut self, timestamp: &Instant, threshold: f64) {
-        if timestamp.duration_since(self.end_active).as_micros() as f64 > threshold {
-            let duration = self.end_active.duration_since(self.start_active);
-            if duration.as_secs_f64() > 0.0 {
-                self.update_active_flow(duration.as_micros() as f64);
+    fn update_active_idle_time(&mut self, timestamp: &DateTime<Utc>, threshold: f64) {
+        if timestamp
+            .signed_duration_since(self.end_active)
+            .num_microseconds()
+            .unwrap() as f64
+            > threshold
+        {
+            let duration = self.end_active.signed_duration_since(self.start_active);
+            if !duration.is_zero() {
+                self.update_active_flow(duration.num_microseconds().unwrap() as f64);
             }
-            self.update_idle_flow(timestamp.duration_since(self.end_active).as_micros() as f64);
+            self.update_idle_flow(
+                timestamp
+                    .signed_duration_since(self.end_active)
+                    .num_microseconds()
+                    .unwrap() as f64,
+            );
             self.start_active = *timestamp;
             self.end_active = *timestamp;
         } else {
@@ -850,10 +866,8 @@ impl CicFlow {
     /// Bytes per second rate of the flow.
     fn get_flow_bytes_s(&self) -> f64 {
         (self.fwd_pkt_len_tot + self.bwd_pkt_len_tot) as f64
-            / (get_duration(
-                self.basic_flow.first_timestamp,
-                self.basic_flow.last_timestamp,
-            ) / 1_000_000.0)
+            / self.basic_flow.get_flow_duration_usec()
+            / 1_000_000.0
     }
 
     /// Calculates the packets per second rate of the flow.
@@ -866,10 +880,8 @@ impl CicFlow {
     /// Packets per second rate of the flow.
     fn get_flow_packets_s(&self) -> f64 {
         (self.basic_flow.fwd_packet_count + self.basic_flow.bwd_packet_count) as f64
-            / (get_duration(
-                self.basic_flow.first_timestamp,
-                self.basic_flow.last_timestamp,
-            ) / 1_000_000.0)
+            / self.basic_flow.get_flow_duration_usec()
+            / 1_000_000.0
     }
 
     /// Calculates the forward packets per second rate of the flow.
@@ -882,10 +894,8 @@ impl CicFlow {
     /// Forward packets per second rate of the flow.
     pub fn get_fwd_packets_s(&self) -> f64 {
         self.basic_flow.fwd_packet_count as f64
-            / (get_duration(
-                self.basic_flow.first_timestamp,
-                self.basic_flow.last_timestamp,
-            ) / 1_000_000.0)
+            / self.basic_flow.get_flow_duration_usec()
+            / 1_000_000.0
     }
 
     /// Calculates the backward packets per second rate of the flow.
@@ -898,10 +908,8 @@ impl CicFlow {
     /// Backward packets per second rate of the flow.
     pub fn get_bwd_packets_s(&self) -> f64 {
         self.basic_flow.bwd_packet_count as f64
-            / (get_duration(
-                self.basic_flow.first_timestamp,
-                self.basic_flow.last_timestamp,
-            ) / 1_000_000.0)
+            / self.basic_flow.get_flow_duration_usec()
+            / 1_000_000.0
     }
 
     /// Retrieves the average size of bulk transfers in the forward direction.
@@ -1092,28 +1100,28 @@ impl CicFlow {
 
 impl Flow for CicFlow {
     fn new(
-        flow_id: String,
+        flow_key: String,
         ipv4_source: IpAddr,
         port_source: u16,
         ipv4_destination: IpAddr,
         port_destination: u16,
         protocol: u8,
-        ts_date: DateTime<Utc>,
+        timestamp: DateTime<Utc>,
     ) -> Self {
         CicFlow {
             basic_flow: BasicFlow::new(
-                flow_id,
+                flow_key,
                 ipv4_source,
                 port_source,
                 ipv4_destination,
                 port_destination,
                 protocol,
-                ts_date,
+                timestamp,
             ),
             sf_last_packet_timestamp: None,
             sf_count: 0,
-            start_active: Instant::now(),
-            end_active: Instant::now(),
+            start_active: timestamp,
+            end_active: timestamp,
             active_count: 0,
             active_mean: 0.0,
             active_std: 0.0,
@@ -1173,15 +1181,9 @@ impl Flow for CicFlow {
         }
     }
 
-    fn update_flow(
-        &mut self,
-        packet: &BasicFeatures,
-        timestamp: &Instant,
-        ts_date: DateTime<Utc>,
-        fwd: bool,
-    ) -> Option<String> {
-        self.basic_flow.update_flow(packet, timestamp, ts_date, fwd);
-        self.update_subflows(timestamp);
+    fn update_flow(&mut self, packet: &PacketFeatures, fwd: bool) -> bool {
+        let is_terminated = self.basic_flow.update_flow(packet, fwd);
+        self.update_subflows(&packet.timestamp);
 
         if fwd {
             self.update_fwd_pkt_len_stats(packet.data_length as u32);
@@ -1191,9 +1193,12 @@ impl Flow for CicFlow {
 
             if self.basic_flow.fwd_packet_count > 1 {
                 self.update_fwd_iat_stats(
-                    timestamp
-                        .duration_since(self.fwd_last_timestamp.unwrap())
-                        .as_micros() as f64,
+                    packet
+                        .timestamp
+                        .signed_duration_since(self.fwd_last_timestamp.unwrap())
+                        .num_nanoseconds()
+                        .unwrap() as f64
+                        / 1000.0,
                 );
             }
 
@@ -1205,9 +1210,9 @@ impl Flow for CicFlow {
                 self.fwd_act_data_pkt += 1;
             }
 
-            self.update_fwd_bulk_stats(timestamp, packet.data_length as u32);
+            self.update_fwd_bulk_stats(&packet.timestamp, packet.data_length as u32);
             self.increase_fwd_header_length(packet.header_length as u32);
-            self.fwd_last_timestamp = Some(*timestamp);
+            self.fwd_last_timestamp = Some(packet.timestamp);
         } else {
             self.update_bwd_pkt_len_stats(packet.data_length as u32);
 
@@ -1215,9 +1220,12 @@ impl Flow for CicFlow {
 
             if self.basic_flow.bwd_packet_count > 1 {
                 self.update_bwd_iat_stats(
-                    timestamp
-                        .duration_since(self.bwd_last_timestamp.unwrap())
-                        .as_micros() as f64,
+                    packet
+                        .timestamp
+                        .signed_duration_since(self.bwd_last_timestamp.unwrap())
+                        .num_nanoseconds()
+                        .unwrap() as f64
+                        / 1000.0,
                 );
             }
 
@@ -1225,23 +1233,12 @@ impl Flow for CicFlow {
                 self.bwd_init_win_bytes = packet.window_size;
             }
 
-            self.update_bwd_bulk_stats(timestamp, packet.data_length as u32);
+            self.update_bwd_bulk_stats(&packet.timestamp, packet.data_length as u32);
             self.increase_bwd_header_length(packet.header_length as u32);
-            self.bwd_last_timestamp = Some(*timestamp);
+            self.bwd_last_timestamp = Some(packet.timestamp);
         }
 
-        if self.basic_flow.flow_end_of_flow_ack > 0
-            || self.basic_flow.fwd_rst_flag_count > 0
-            || self.basic_flow.bwd_rst_flag_count > 0
-        {
-            if *NO_CONTAMINANT_FEATURES.lock().unwrap().deref() {
-                return Some(self.dump_without_contamination());
-            } else {
-                return Some(self.dump());
-            }
-        }
-
-        None
+        is_terminated
     }
 
     fn dump(&self) -> String {
@@ -1251,7 +1248,7 @@ impl Flow for CicFlow {
             {},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},\
             {},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},\
             {},{},{},{},{}",
-            self.basic_flow.flow_id,
+            self.basic_flow.flow_key,
             self.basic_flow.ip_source,
             self.basic_flow.port_source,
             self.basic_flow.ip_destination,
@@ -1259,10 +1256,7 @@ impl Flow for CicFlow {
             self.basic_flow.protocol,
             self.basic_flow.first_timestamp,
             self.basic_flow.last_timestamp,
-            get_duration(
-                self.basic_flow.first_timestamp,
-                self.basic_flow.last_timestamp
-            ),
+            self.basic_flow.get_flow_duration_usec(),
             self.basic_flow.fwd_packet_count,
             self.basic_flow.bwd_packet_count,
             self.fwd_pkt_len_tot,
@@ -1368,10 +1362,7 @@ impl Flow for CicFlow {
             {},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},\
             {},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},\
             {},{},{},{},{}",
-            get_duration(
-                self.basic_flow.first_timestamp,
-                self.basic_flow.last_timestamp
-            ),
+            self.basic_flow.get_flow_duration_usec(),
             self.basic_flow.fwd_packet_count,
             self.basic_flow.bwd_packet_count,
             self.fwd_pkt_len_tot,
@@ -1459,1176 +1450,1185 @@ impl Flow for CicFlow {
     fn get_first_timestamp(&self) -> DateTime<Utc> {
         self.basic_flow.get_first_timestamp()
     }
-}
 
-#[cfg(test)]
-mod tests {
-    use crate::{
-        flows::{cic_flow::CicFlow, flow::Flow},
-        utils::utils::{get_duration, BasicFeatures},
-    };
-    use std::{
-        net::{IpAddr, Ipv4Addr},
-        time::{Duration, Instant},
-    };
-
-    fn setup_cic_flow() -> CicFlow {
-        CicFlow::new(
-            "".to_string(),
-            IpAddr::V4(Ipv4Addr::from(1)),
-            80,
-            IpAddr::V4(Ipv4Addr::from(2)),
-            8080,
-            6,
-            chrono::Utc::now(),
-        )
+    fn is_expired(&self, timestamp: DateTime<Utc>, active_timeout: u64, idle_timeout: u64) -> bool {
+        self.basic_flow
+            .is_expired(timestamp, active_timeout, idle_timeout)
     }
 
-    #[test]
-    fn test_increase_fwd_header_length() {
-        let mut cic_flow = setup_cic_flow();
-
-        let initial_length = cic_flow.fwd_header_length;
-
-        cic_flow.increase_fwd_header_length(20);
-        assert_eq!(cic_flow.fwd_header_length, initial_length + 20);
-
-        cic_flow.increase_fwd_header_length(0);
-        assert_eq!(cic_flow.fwd_header_length, initial_length + 20);
-    }
-
-    #[test]
-    fn test_increase_bwd_header_length() {
-        let mut cic_flow = setup_cic_flow();
-
-        let initial_length = cic_flow.bwd_header_length;
-
-        cic_flow.increase_bwd_header_length(30);
-        assert_eq!(cic_flow.bwd_header_length, initial_length + 30);
-
-        cic_flow.increase_bwd_header_length(0);
-        assert_eq!(cic_flow.bwd_header_length, initial_length + 30);
-    }
-
-    #[test]
-    fn test_update_fwd_pkt_len_stats() {
-        let mut cic_flow = setup_cic_flow();
-
-        cic_flow.basic_flow.fwd_packet_count = 1;
-
-        cic_flow.update_fwd_pkt_len_stats(100);
-
-        assert_eq!(cic_flow.fwd_pkt_len_max, 100);
-        assert_eq!(cic_flow.fwd_pkt_len_min, 100);
-        assert_eq!(cic_flow.fwd_pkt_len_mean, 100.0);
-        assert_eq!(cic_flow.fwd_pkt_len_std, 0.0);
-        assert_eq!(cic_flow.fwd_pkt_len_tot, 100);
-
-        cic_flow.basic_flow.fwd_packet_count = 2;
-
-        cic_flow.update_fwd_pkt_len_stats(50);
-
-        assert_eq!(cic_flow.fwd_pkt_len_max, 100);
-        assert_eq!(cic_flow.fwd_pkt_len_min, 50);
-        assert_eq!(cic_flow.fwd_pkt_len_mean, 75.0);
-        assert_eq!(cic_flow.fwd_pkt_len_std, 25.0);
-        assert_eq!(cic_flow.fwd_pkt_len_tot, 150);
-
-        cic_flow.basic_flow.fwd_packet_count = 3;
-
-        cic_flow.update_fwd_pkt_len_stats(0);
-
-        assert_eq!(cic_flow.fwd_pkt_len_max, 100);
-        assert_eq!(cic_flow.fwd_pkt_len_min, 0);
-        assert_eq!(cic_flow.fwd_pkt_len_mean, 50.0);
-        assert_eq!(cic_flow.fwd_pkt_len_std, 40.824829046386306);
-        assert_eq!(cic_flow.fwd_pkt_len_tot, 150);
-    }
-
-    #[test]
-    fn test_update_bwd_pkt_len_stats() {
-        let mut cic_flow = setup_cic_flow();
-
-        cic_flow.basic_flow.bwd_packet_count = 1;
-
-        cic_flow.update_bwd_pkt_len_stats(100);
-
-        assert_eq!(cic_flow.bwd_pkt_len_max, 100);
-        assert_eq!(cic_flow.bwd_pkt_len_min, 100);
-        assert_eq!(cic_flow.bwd_pkt_len_mean, 100.0);
-        assert_eq!(cic_flow.bwd_pkt_len_std, 0.0);
-        assert_eq!(cic_flow.bwd_pkt_len_tot, 100);
-
-        cic_flow.basic_flow.bwd_packet_count = 2;
-
-        cic_flow.update_bwd_pkt_len_stats(50);
-
-        assert_eq!(cic_flow.bwd_pkt_len_max, 100);
-        assert_eq!(cic_flow.bwd_pkt_len_min, 50);
-        assert_eq!(cic_flow.bwd_pkt_len_mean, 75.0);
-        assert_eq!(cic_flow.bwd_pkt_len_std, 25.0);
-        assert_eq!(cic_flow.bwd_pkt_len_tot, 150);
-
-        cic_flow.basic_flow.bwd_packet_count = 3;
-
-        cic_flow.update_bwd_pkt_len_stats(0);
-
-        assert_eq!(cic_flow.bwd_pkt_len_max, 100);
-        assert_eq!(cic_flow.bwd_pkt_len_min, 0);
-        assert_eq!(cic_flow.bwd_pkt_len_mean, 50.0);
-        assert_eq!(cic_flow.bwd_pkt_len_std, 40.824829046386306);
-        assert_eq!(cic_flow.bwd_pkt_len_tot, 150);
-    }
-
-    #[test]
-    fn test_update_fwd_iat_stats() {
-        let mut cic_flow = setup_cic_flow();
-        let epsilon = 1e-9; // floating-point arithmetic is not exact
-
-        cic_flow.basic_flow.fwd_packet_count = 2;
-
-        cic_flow.update_fwd_iat_stats(0.05);
-
-        assert_eq!(cic_flow.fwd_iat_max, 0.05);
-        assert_eq!(cic_flow.fwd_iat_min, 0.05);
-        assert_eq!(cic_flow.fwd_iat_mean, 0.05);
-        assert_eq!(cic_flow.fwd_iat_std, 0.0);
-        assert_eq!(cic_flow.fwd_iat_total, 0.05);
-
-        cic_flow.basic_flow.fwd_packet_count = 3;
-
-        cic_flow.update_fwd_iat_stats(0.01);
-
-        assert_eq!(cic_flow.fwd_iat_max, 0.05);
-        assert_eq!(cic_flow.fwd_iat_min, 0.01);
-        assert!(
-            (cic_flow.fwd_iat_mean - 0.03).abs() < epsilon,
-            "fwd_iat_mean is not within the expected range"
-        );
-        assert_eq!(cic_flow.fwd_iat_std, 0.02);
-        assert!(
-            (cic_flow.fwd_iat_total - 0.06).abs() < epsilon,
-            "fwd_iat_total is not within the expected range"
-        );
-
-        cic_flow.basic_flow.fwd_packet_count = 4;
-
-        cic_flow.update_fwd_iat_stats(0.698456231458);
-
-        assert_eq!(cic_flow.fwd_iat_max, 0.698456231458);
-        assert_eq!(cic_flow.fwd_iat_min, 0.01);
-        assert_eq!(cic_flow.fwd_iat_mean, 0.25281874381933334);
-        assert_eq!(cic_flow.fwd_iat_std, 0.31553613400230096);
-        assert_eq!(cic_flow.fwd_iat_total, 0.758456231458);
-    }
-
-    #[test]
-    fn test_update_bwd_iat_stats() {
-        let mut cic_flow = setup_cic_flow();
-        let epsilon = 1e-9; // floating-point arithmetic is not exact
-
-        cic_flow.basic_flow.bwd_packet_count = 2;
-
-        cic_flow.update_bwd_iat_stats(0.05);
-
-        assert_eq!(cic_flow.bwd_iat_max, 0.05);
-        assert_eq!(cic_flow.bwd_iat_min, 0.05);
-        assert_eq!(cic_flow.bwd_iat_mean, 0.05);
-        assert_eq!(cic_flow.bwd_iat_std, 0.0);
-        assert_eq!(cic_flow.bwd_iat_total, 0.05);
-
-        cic_flow.basic_flow.bwd_packet_count = 3;
-
-        cic_flow.update_bwd_iat_stats(0.01);
-
-        assert_eq!(cic_flow.bwd_iat_max, 0.05);
-        assert_eq!(cic_flow.bwd_iat_min, 0.01);
-        assert!(
-            (cic_flow.bwd_iat_mean - 0.03).abs() < epsilon,
-            "fwd_iat_mean is not within the expected range"
-        );
-        assert_eq!(cic_flow.bwd_iat_std, 0.02);
-        assert!(
-            (cic_flow.bwd_iat_total - 0.06).abs() < epsilon,
-            "fwd_iat_total is not within the expected range"
-        );
-
-        cic_flow.basic_flow.bwd_packet_count = 4;
-
-        cic_flow.update_bwd_iat_stats(0.698456231458);
-
-        assert_eq!(cic_flow.bwd_iat_max, 0.698456231458);
-        assert_eq!(cic_flow.bwd_iat_min, 0.01);
-        assert_eq!(cic_flow.bwd_iat_mean, 0.25281874381933334);
-        assert_eq!(cic_flow.bwd_iat_std, 0.31553613400230096);
-        assert_eq!(cic_flow.bwd_iat_total, 0.758456231458);
-    }
-
-    #[test]
-    fn test_update_fwd_bulk_stats() {
-        let mut cic_flow = setup_cic_flow();
-        let timestamp = Instant::now();
-        let timestamp_2 = Instant::now();
-        let timestamp_3 = Instant::now();
-        let timestamp_4 = Instant::now();
-
-        cic_flow.update_fwd_bulk_stats(&timestamp, 100);
-
-        assert_eq!(cic_flow.fwd_bulk_state_count, 0);
-        assert_eq!(cic_flow.fwd_bulk_packet_count, 0);
-        assert_eq!(cic_flow.fwd_bulk_size_total, 0);
-        assert_eq!(cic_flow.fwd_bulk_duration, 0.0);
-        assert_eq!(cic_flow.fwd_bulk_packet_count_help, 1);
-        assert_eq!(cic_flow.fwd_bulk_start_help, Some(timestamp));
-        assert_eq!(cic_flow.fwd_bulk_size_help, 100);
-        assert_eq!(cic_flow.fwd_last_bulk_timestamp, Some(timestamp));
-
-        cic_flow.update_fwd_bulk_stats(&timestamp_2, 200);
-
-        assert_eq!(cic_flow.fwd_bulk_state_count, 0);
-        assert_eq!(cic_flow.fwd_bulk_packet_count, 0);
-        assert_eq!(cic_flow.fwd_bulk_size_total, 0);
-        assert_eq!(cic_flow.fwd_bulk_duration, 0.0);
-        assert_eq!(cic_flow.fwd_bulk_packet_count_help, 2);
-        assert_eq!(cic_flow.fwd_bulk_start_help, Some(timestamp));
-        assert_eq!(cic_flow.fwd_bulk_size_help, 300);
-        assert_eq!(cic_flow.fwd_last_bulk_timestamp, Some(timestamp_2));
-
-        cic_flow.update_fwd_bulk_stats(&timestamp_3, 150);
-
-        assert_eq!(cic_flow.fwd_bulk_state_count, 0);
-        assert_eq!(cic_flow.fwd_bulk_packet_count, 0);
-        assert_eq!(cic_flow.fwd_bulk_size_total, 0);
-        assert_eq!(cic_flow.fwd_bulk_duration, 0.0);
-        assert_eq!(cic_flow.fwd_bulk_packet_count_help, 3);
-        assert_eq!(cic_flow.fwd_bulk_start_help, Some(timestamp));
-        assert_eq!(cic_flow.fwd_bulk_size_help, 450);
-        assert_eq!(cic_flow.fwd_last_bulk_timestamp, Some(timestamp_3));
-
-        cic_flow.update_fwd_bulk_stats(&timestamp_4, 50);
-
-        assert_eq!(cic_flow.fwd_bulk_state_count, 1);
-        assert_eq!(cic_flow.fwd_bulk_packet_count, 4);
-        assert_eq!(cic_flow.fwd_bulk_size_total, 500);
-        assert_eq!(
-            cic_flow.fwd_bulk_duration,
-            timestamp_4.duration_since(timestamp).as_micros() as f64
-        );
-        assert_eq!(cic_flow.fwd_bulk_packet_count_help, 4);
-        assert_eq!(cic_flow.fwd_bulk_start_help, Some(timestamp));
-        assert_eq!(cic_flow.fwd_bulk_size_help, 500);
-        assert_eq!(cic_flow.fwd_last_bulk_timestamp, Some(timestamp_4));
-
-        std::thread::sleep(std::time::Duration::from_secs(1));
-
-        let new_timestamp = Instant::now();
-
-        cic_flow.update_fwd_bulk_stats(&new_timestamp, 50);
-
-        assert_eq!(cic_flow.fwd_bulk_state_count, 1);
-        assert_eq!(cic_flow.fwd_bulk_packet_count, 4);
-        assert_eq!(cic_flow.fwd_bulk_size_total, 500);
-        assert_eq!(
-            cic_flow.fwd_bulk_duration,
-            timestamp_4.duration_since(timestamp).as_micros() as f64
-        );
-        assert_eq!(cic_flow.fwd_bulk_packet_count_help, 1);
-        assert_eq!(cic_flow.fwd_bulk_start_help, Some(new_timestamp));
-        assert_eq!(cic_flow.fwd_bulk_size_help, 50);
-        assert_eq!(cic_flow.fwd_last_bulk_timestamp, Some(new_timestamp));
-    }
-
-    #[test]
-    fn test_update_bwd_bulk_stats() {
-        let mut cic_flow = setup_cic_flow();
-        let timestamp = Instant::now();
-        let timestamp_2 = Instant::now();
-        let timestamp_3 = Instant::now();
-        let timestamp_4 = Instant::now();
-
-        cic_flow.update_bwd_bulk_stats(&timestamp, 100);
-
-        assert_eq!(cic_flow.bwd_bulk_state_count, 0);
-        assert_eq!(cic_flow.bwd_bulk_packet_count, 0);
-        assert_eq!(cic_flow.bwd_bulk_size_total, 0);
-        assert_eq!(cic_flow.bwd_bulk_duration, 0.0);
-        assert_eq!(cic_flow.bwd_bulk_packet_count_help, 1);
-        assert_eq!(cic_flow.bwd_bulk_start_help, Some(timestamp));
-        assert_eq!(cic_flow.bwd_bulk_size_help, 100);
-        assert_eq!(cic_flow.bwd_last_bulk_timestamp, Some(timestamp));
-
-        cic_flow.update_bwd_bulk_stats(&timestamp_2, 200);
-
-        assert_eq!(cic_flow.bwd_bulk_state_count, 0);
-        assert_eq!(cic_flow.bwd_bulk_packet_count, 0);
-        assert_eq!(cic_flow.bwd_bulk_size_total, 0);
-        assert_eq!(cic_flow.bwd_bulk_duration, 0.0);
-        assert_eq!(cic_flow.bwd_bulk_packet_count_help, 2);
-        assert_eq!(cic_flow.bwd_bulk_start_help, Some(timestamp));
-        assert_eq!(cic_flow.bwd_bulk_size_help, 300);
-        assert_eq!(cic_flow.bwd_last_bulk_timestamp, Some(timestamp_2));
-
-        cic_flow.update_bwd_bulk_stats(&timestamp_3, 150);
-
-        assert_eq!(cic_flow.bwd_bulk_state_count, 0);
-        assert_eq!(cic_flow.bwd_bulk_packet_count, 0);
-        assert_eq!(cic_flow.bwd_bulk_size_total, 0);
-        assert_eq!(cic_flow.bwd_bulk_duration, 0.0);
-        assert_eq!(cic_flow.bwd_bulk_packet_count_help, 3);
-        assert_eq!(cic_flow.bwd_bulk_start_help, Some(timestamp));
-        assert_eq!(cic_flow.bwd_bulk_size_help, 450);
-        assert_eq!(cic_flow.bwd_last_bulk_timestamp, Some(timestamp_3));
-
-        cic_flow.update_bwd_bulk_stats(&timestamp_4, 50);
-
-        assert_eq!(cic_flow.bwd_bulk_state_count, 1);
-        assert_eq!(cic_flow.bwd_bulk_packet_count, 4);
-        assert_eq!(cic_flow.bwd_bulk_size_total, 500);
-        assert_eq!(
-            cic_flow.bwd_bulk_duration,
-            timestamp_4.duration_since(timestamp).as_micros() as f64
-        );
-        assert_eq!(cic_flow.bwd_bulk_packet_count_help, 4);
-        assert_eq!(cic_flow.bwd_bulk_start_help, Some(timestamp));
-        assert_eq!(cic_flow.bwd_bulk_size_help, 500);
-        assert_eq!(cic_flow.bwd_last_bulk_timestamp, Some(timestamp_4));
-
-        std::thread::sleep(std::time::Duration::from_secs(1));
-
-        let new_timestamp = Instant::now();
-
-        cic_flow.update_bwd_bulk_stats(&new_timestamp, 50);
-
-        assert_eq!(cic_flow.bwd_bulk_state_count, 1);
-        assert_eq!(cic_flow.bwd_bulk_packet_count, 4);
-        assert_eq!(cic_flow.bwd_bulk_size_total, 500);
-        assert_eq!(
-            cic_flow.bwd_bulk_duration,
-            timestamp_4.duration_since(timestamp).as_micros() as f64
-        );
-        assert_eq!(cic_flow.bwd_bulk_packet_count_help, 1);
-        assert_eq!(cic_flow.bwd_bulk_start_help, Some(new_timestamp));
-        assert_eq!(cic_flow.bwd_bulk_size_help, 50);
-        assert_eq!(cic_flow.bwd_last_bulk_timestamp, Some(new_timestamp));
-    }
-
-    #[test]
-    fn test_update_active_flow() {
-        let mut cic_flow = setup_cic_flow();
-
-        cic_flow.update_active_flow(100.0);
-
-        assert_eq!(cic_flow.active_max, 100.0);
-        assert_eq!(cic_flow.active_min, 100.0);
-        assert_eq!(cic_flow.active_mean, 100.0);
-        assert_eq!(cic_flow.active_std, 0.0);
-        assert_eq!(cic_flow.active_count, 1);
-
-        cic_flow.update_active_flow(50.0);
-
-        assert_eq!(cic_flow.active_max, 100.0);
-        assert_eq!(cic_flow.active_min, 50.0);
-        assert_eq!(cic_flow.active_mean, 75.0);
-        assert_eq!(cic_flow.active_std, 25.0);
-        assert_eq!(cic_flow.active_count, 2);
-
-        cic_flow.update_active_flow(0.0);
-
-        assert_eq!(cic_flow.active_max, 100.0);
-        assert_eq!(cic_flow.active_min, 0.0);
-        assert_eq!(cic_flow.active_mean, 50.0);
-        assert_eq!(cic_flow.active_std, 40.824829046386306);
-        assert_eq!(cic_flow.active_count, 3);
-    }
-
-    #[test]
-    fn test_update_idle_flow() {
-        let mut cic_flow = setup_cic_flow();
-
-        cic_flow.update_idle_flow(100.0);
-
-        assert_eq!(cic_flow.idle_max, 100.0);
-        assert_eq!(cic_flow.idle_min, 100.0);
-        assert_eq!(cic_flow.idle_mean, 100.0);
-        assert_eq!(cic_flow.idle_std, 0.0);
-        assert_eq!(cic_flow.idle_count, 1);
-
-        cic_flow.update_idle_flow(50.0);
-
-        assert_eq!(cic_flow.idle_max, 100.0);
-        assert_eq!(cic_flow.idle_min, 50.0);
-        assert_eq!(cic_flow.idle_mean, 75.0);
-        assert_eq!(cic_flow.idle_std, 25.0);
-        assert_eq!(cic_flow.idle_count, 2);
-
-        cic_flow.update_idle_flow(0.0);
-
-        assert_eq!(cic_flow.idle_max, 100.0);
-        assert_eq!(cic_flow.idle_min, 0.0);
-        assert_eq!(cic_flow.idle_mean, 50.0);
-        assert_eq!(cic_flow.idle_std, 40.824829046386306);
-        assert_eq!(cic_flow.idle_count, 3);
-    }
-
-    #[test]
-    fn test_update_active_idle_time() {
-        let mut cic_flow = setup_cic_flow();
-
-        let threshold = 60_000_000.0;
-
-        let timestamp = Instant::now();
-        let timestamp_2 = timestamp + Duration::new(30, 0); // 30 seconds later
-        let timestamp_3 = timestamp + Duration::new(91, 0); // 90 seconds later
-
-        cic_flow.update_active_idle_time(&timestamp, threshold);
-
-        assert_eq!(cic_flow.end_active, timestamp);
-        assert_ne!(cic_flow.start_active, timestamp);
-        assert_eq!(cic_flow.active_count, 0);
-        assert_eq!(cic_flow.active_max, 0.0);
-        assert_eq!(cic_flow.active_min, f64::MAX);
-        assert_eq!(cic_flow.active_mean, 0.0);
-        assert_eq!(cic_flow.active_std, 0.0);
-        assert_eq!(cic_flow.idle_count, 0);
-        assert_eq!(cic_flow.idle_max, 0.0);
-        assert_eq!(cic_flow.idle_min, f64::MAX);
-        assert_eq!(cic_flow.idle_mean, 0.0);
-        assert_eq!(cic_flow.idle_std, 0.0);
-
-        cic_flow.update_active_idle_time(&timestamp_2, threshold);
-
-        assert_eq!(cic_flow.end_active, timestamp_2);
-        assert_ne!(cic_flow.start_active, timestamp_2);
-        assert_eq!(cic_flow.active_count, 0);
-        assert_eq!(cic_flow.active_max, 0.0);
-        assert_eq!(cic_flow.active_min, f64::MAX);
-        assert_eq!(cic_flow.active_mean, 0.0);
-        assert_eq!(cic_flow.active_std, 0.0);
-        assert_eq!(cic_flow.idle_count, 0);
-        assert_eq!(cic_flow.idle_max, 0.0);
-        assert_eq!(cic_flow.idle_min, f64::MAX);
-        assert_eq!(cic_flow.idle_mean, 0.0);
-        assert_eq!(cic_flow.idle_std, 0.0);
-
-        cic_flow.update_active_idle_time(&timestamp_3, threshold);
-        assert_eq!(cic_flow.end_active, timestamp_3);
-        assert_eq!(cic_flow.start_active, timestamp_3);
-        assert_eq!(cic_flow.active_count, 1);
-        assert_ne!(cic_flow.active_max, 0.0);
-        assert_ne!(cic_flow.active_min, f64::MAX);
-        assert_ne!(cic_flow.active_mean, 0.0);
-        assert_eq!(cic_flow.active_std, 0.0);
-        assert_eq!(cic_flow.idle_count, 1);
-        assert_ne!(cic_flow.idle_max, 0.0);
-        assert_ne!(cic_flow.idle_min, f64::MAX);
-        assert_ne!(cic_flow.idle_mean, 0.0);
-        assert_eq!(cic_flow.idle_std, 0.0);
-    }
-
-    #[test]
-    fn test_get_flow_iat_mean() {
-        let mut cic_flow = setup_cic_flow();
-
-        //let forward_iat = [1.0, 2.0, 3.0, 4.0, 5.0];
-        //let backward_iat = [1.5, 2.5, 3.5];
-
-        cic_flow.fwd_iat_mean = 3.0;
-        cic_flow.bwd_iat_mean = 2.5;
-
-        cic_flow.basic_flow.fwd_packet_count = 5;
-        cic_flow.basic_flow.bwd_packet_count = 3;
-
-        assert_eq!(cic_flow.get_flow_iat_mean(), 2.8125);
-    }
-
-    #[test]
-    fn test_get_flow_iat_std() {
-        let mut cic_flow = setup_cic_flow();
-        let epsilon = 1e-2; // floating-point arithmetic is not exact, here we have a lot of casting and the formula is also an approximation
-
-        //let forward_iat = [1.0, 2.0, 3.0, 4.0, 5.0];
-        //let backward_iat = [1.5, 2.5, 3.5];
-
-        cic_flow.fwd_iat_mean = 3.0;
-        cic_flow.bwd_iat_mean = 2.5;
-
-        cic_flow.basic_flow.fwd_packet_count = 5;
-        cic_flow.basic_flow.bwd_packet_count = 3;
-
-        cic_flow.fwd_iat_std = 1.4142135623731;
-        cic_flow.bwd_iat_std = 0.81649658092773;
-
-        assert!(
-            (cic_flow.get_flow_iat_std() - 1.2484365222149).abs() < epsilon,
-            "get_flow_iat_std is not within the expected range"
-        );
-    }
-
-    #[test]
-    fn test_get_flow_iat_max() {
-        let mut cic_flow = setup_cic_flow();
-
-        cic_flow.fwd_iat_max = 5.0;
-        cic_flow.bwd_iat_max = 3.0;
-
-        assert_eq!(cic_flow.get_flow_iat_max(), 5.0);
-    }
-
-    #[test]
-    fn test_get_flow_iat_min() {
-        let mut cic_flow = setup_cic_flow();
-
-        assert_eq!(cic_flow.get_flow_iat_min(), 0.0);
-
-        cic_flow.fwd_iat_min = 1.0;
-        cic_flow.bwd_iat_min = 2.0;
-
-        assert_eq!(cic_flow.get_flow_iat_min(), 1.0);
-    }
-
-    #[test]
-    fn test_get_fwd_iat_min() {
-        let mut cic_flow = setup_cic_flow();
-
-        assert_eq!(cic_flow.get_fwd_iat_min(), 0.0);
-
-        cic_flow.fwd_iat_min = 1.0;
-
-        assert_eq!(cic_flow.get_fwd_iat_min(), 1.0);
-    }
-
-    #[test]
-    fn test_get_bwd_iat_min() {
-        let mut cic_flow = setup_cic_flow();
-
-        assert_eq!(cic_flow.get_bwd_iat_min(), 0.0);
-
-        cic_flow.bwd_iat_min = 2.0;
-
-        assert_eq!(cic_flow.get_bwd_iat_min(), 2.0);
-    }
-
-    #[test]
-    fn test_get_flow_packet_length_min() {
-        let mut cic_flow = setup_cic_flow();
-
-        assert_eq!(cic_flow.get_flow_packet_length_min(), 0);
-
-        cic_flow.fwd_pkt_len_min = 50;
-        cic_flow.bwd_pkt_len_min = 100;
-
-        assert_eq!(cic_flow.get_flow_packet_length_min(), 50);
-    }
-
-    #[test]
-    fn test_get_fwd_packet_length_min() {
-        let mut cic_flow = setup_cic_flow();
-
-        assert_eq!(cic_flow.get_fwd_packet_length_min(), 0);
-
-        cic_flow.fwd_pkt_len_min = 50;
-
-        assert_eq!(cic_flow.get_fwd_packet_length_min(), 50);
-    }
-
-    #[test]
-    fn test_get_bwd_packet_length_min() {
-        let mut cic_flow = setup_cic_flow();
-
-        assert_eq!(cic_flow.get_bwd_packet_length_min(), 0);
-
-        cic_flow.bwd_pkt_len_min = 100;
-
-        assert_eq!(cic_flow.get_bwd_packet_length_min(), 100);
-    }
-
-    #[test]
-    fn test_get_flow_packet_length_max() {
-        let mut cic_flow = setup_cic_flow();
-
-        cic_flow.fwd_pkt_len_max = 100;
-        cic_flow.bwd_pkt_len_max = 50;
-
-        assert_eq!(cic_flow.get_flow_packet_length_max(), 100);
-    }
-
-    #[test]
-    fn test_get_flow_packet_length_mean() {
-        let mut cic_flow = setup_cic_flow();
-
-        //let forward_iat = [10, 20, 30, 40, 50];
-        //let backward_iat = [15, 25, 35];
-
-        cic_flow.fwd_pkt_len_mean = 30.0;
-        cic_flow.bwd_pkt_len_mean = 25.0;
-
-        cic_flow.basic_flow.fwd_packet_count = 5;
-        cic_flow.basic_flow.bwd_packet_count = 3;
-
-        assert_eq!(cic_flow.get_flow_packet_length_mean(), 28.125);
-    }
-
-    #[test]
-    fn test_get_flow_packet_length_variance() {
-        let mut cic_flow = setup_cic_flow();
-
-        //let forward_iat = [10, 20, 30, 40, 50];
-        //let backward_iat = [15, 25, 35];
-
-        cic_flow.fwd_pkt_len_std = 14.142135623731;
-        cic_flow.bwd_pkt_len_std = 8.1649658092773;
-
-        cic_flow.basic_flow.fwd_packet_count = 5;
-        cic_flow.basic_flow.bwd_packet_count = 3;
-
-        assert_eq!(cic_flow.get_flow_packet_length_variance() as u32, 155); // removing everything behind the comma because of arithmetic errors
-    }
-
-    #[test]
-    fn test_get_flow_packet_length_std() {
-        let mut cic_flow = setup_cic_flow();
-        let epsilon = 1e-1; // floating-point arithmetic is not exact, here we have a lot of casting and the formula is also an approximation
-
-        //let forward_iat = [10, 20, 30, 40, 50];
-        //let backward_iat = [15, 25, 35];
-
-        cic_flow.fwd_pkt_len_std = 14.142135623731;
-        cic_flow.bwd_pkt_len_std = 8.1649658092773;
-
-        cic_flow.basic_flow.fwd_packet_count = 5;
-        cic_flow.basic_flow.bwd_packet_count = 3;
-
-        assert!(
-            (cic_flow.get_flow_packet_length_std() - 12.484365222149).abs() < epsilon,
-            "get_flow_packet_length_std is not within the expected range"
-        );
-    }
-
-    #[test]
-    fn test_get_up_down_ratio() {
-        let mut cic_flow = setup_cic_flow();
-
-        cic_flow.basic_flow.fwd_packet_count = 5;
-        cic_flow.basic_flow.bwd_packet_count = 3;
-
-        assert_eq!(cic_flow.get_down_up_ratio(), 5 as f64 / 3 as f64);
-    }
-
-    #[test]
-    fn test_get_fwd_segment_length_mean() {
-        let mut cic_flow = setup_cic_flow();
-
-        cic_flow.fwd_seg_len_tot = 100;
-        cic_flow.basic_flow.fwd_packet_count = 5;
-
-        assert_eq!(cic_flow.get_fwd_segment_length_mean(), 20.0);
-    }
-
-    #[test]
-    fn test_get_bwd_segment_length_mean() {
-        let mut cic_flow = setup_cic_flow();
-
-        cic_flow.bwd_seg_len_tot = 100;
-        cic_flow.basic_flow.bwd_packet_count = 5;
-
-        assert_eq!(cic_flow.get_bwd_segment_length_mean(), 20.0);
-    }
-
-    #[test]
-    fn test_get_duration() {
-        let start = chrono::Utc::now();
-        let end = start + chrono::Duration::try_seconds(5).unwrap();
-
-        assert_eq!(get_duration(start, end), 5_000_000.0);
-    }
-
-    #[test]
-    fn test_get_flow_bytes_s() {
-        let mut cic_flow = setup_cic_flow();
-
-        cic_flow.basic_flow.first_timestamp = chrono::Utc::now();
-        cic_flow.basic_flow.last_timestamp =
-            chrono::Utc::now() + chrono::Duration::try_seconds(5).unwrap();
-
-        cic_flow.fwd_pkt_len_tot = 100;
-        cic_flow.bwd_pkt_len_tot = 100;
-
-        assert_eq!(cic_flow.get_flow_bytes_s(), 40.0);
-    }
-
-    #[test]
-    fn test_get_flow_packets_s() {
-        let mut cic_flow = setup_cic_flow();
-
-        cic_flow.basic_flow.first_timestamp = chrono::Utc::now();
-        cic_flow.basic_flow.last_timestamp =
-            chrono::Utc::now() + chrono::Duration::try_seconds(5).unwrap();
-
-        cic_flow.basic_flow.fwd_packet_count = 5;
-        cic_flow.basic_flow.bwd_packet_count = 5;
-
-        assert_eq!(cic_flow.get_flow_packets_s(), 2.0);
-    }
-
-    #[test]
-    fn test_get_fwd_packets_s() {
-        let mut cic_flow = setup_cic_flow();
-
-        cic_flow.basic_flow.first_timestamp = chrono::Utc::now();
-        cic_flow.basic_flow.last_timestamp =
-            chrono::Utc::now() + chrono::Duration::try_seconds(5).unwrap();
-
-        cic_flow.basic_flow.fwd_packet_count = 5;
-
-        assert_eq!(cic_flow.get_fwd_packets_s(), 1.0);
-    }
-
-    #[test]
-    fn test_get_bwd_packets_s() {
-        let mut cic_flow = setup_cic_flow();
-
-        cic_flow.basic_flow.first_timestamp = chrono::Utc::now();
-        cic_flow.basic_flow.last_timestamp =
-            chrono::Utc::now() + chrono::Duration::try_seconds(5).unwrap();
-
-        cic_flow.basic_flow.bwd_packet_count = 5;
-
-        assert_eq!(cic_flow.get_bwd_packets_s(), 1.0);
-    }
-
-    #[test]
-    fn test_get_fwd_bytes_bulk() {
-        let mut cic_flow = setup_cic_flow();
-
-        assert_eq!(cic_flow.get_fwd_bytes_bulk(), 0.0);
-
-        cic_flow.fwd_bulk_size_total = 100;
-        cic_flow.fwd_bulk_state_count = 5;
-
-        assert_eq!(cic_flow.get_fwd_bytes_bulk(), 20.0);
-    }
-
-    #[test]
-    fn test_get_fwd_packets_bulk() {
-        let mut cic_flow = setup_cic_flow();
-
-        assert_eq!(cic_flow.get_fwd_packets_bulk(), 0.0);
-
-        cic_flow.fwd_bulk_packet_count = 100;
-        cic_flow.fwd_bulk_state_count = 5;
-
-        assert_eq!(cic_flow.get_fwd_packets_bulk(), 20.0);
-    }
-
-    #[test]
-    fn test_get_fwd_bulk_rate() {
-        let mut cic_flow = setup_cic_flow();
-
-        assert_eq!(cic_flow.get_fwd_bulk_rate(), 0.0);
-
-        cic_flow.fwd_bulk_size_total = 100;
-        cic_flow.fwd_bulk_duration = 5_000_000.0;
-
-        assert_eq!(cic_flow.get_fwd_bulk_rate(), 20.0);
-    }
-
-    #[test]
-    fn test_get_bwd_bytes_bulk() {
-        let mut cic_flow = setup_cic_flow();
-
-        assert_eq!(cic_flow.get_bwd_bytes_bulk(), 0.0);
-
-        cic_flow.bwd_bulk_size_total = 100;
-        cic_flow.bwd_bulk_state_count = 5;
-
-        assert_eq!(cic_flow.get_bwd_bytes_bulk(), 20.0);
-    }
-
-    #[test]
-    fn test_get_bwd_packets_bulk() {
-        let mut cic_flow = setup_cic_flow();
-
-        assert_eq!(cic_flow.get_bwd_packets_bulk(), 0.0);
-
-        cic_flow.bwd_bulk_packet_count = 100;
-        cic_flow.bwd_bulk_state_count = 5;
-
-        assert_eq!(cic_flow.get_bwd_packets_bulk(), 20.0);
-    }
-
-    #[test]
-    fn test_get_bwd_bulk_rate() {
-        let mut cic_flow = setup_cic_flow();
-
-        assert_eq!(cic_flow.get_bwd_bulk_rate(), 0.0);
-
-        cic_flow.bwd_bulk_size_total = 100;
-        cic_flow.bwd_bulk_duration = 5_000_000.0;
-
-        assert_eq!(cic_flow.get_bwd_bulk_rate(), 20.0);
-    }
-
-    #[test]
-    fn test_update_flow_first_with_fwd_packet() {
-        let mut cic_flow = CicFlow::new(
-            "".to_string(),
-            IpAddr::V4(Ipv4Addr::from(1)),
-            80,
-            IpAddr::V4(Ipv4Addr::from(2)),
-            8080,
-            6,
-            chrono::Utc::now(),
-        );
-        let packet = BasicFeatures {
-            fin_flag: 1,
-            syn_flag: 0,
-            rst_flag: 0,
-            psh_flag: 0,
-            ack_flag: 1,
-            urg_flag: 0,
-            cwe_flag: 0,
-            ece_flag: 1,
-            data_length: 25,
-            header_length: 40,
-            length: 80,
-            window_size: 500,
-        };
-        let timestamp = Instant::now();
-
-        cic_flow.update_flow(&packet, &timestamp, chrono::Utc::now() , true);
-
-        assert_eq!(cic_flow.basic_flow.fwd_packet_count, 1);
-        assert_eq!(cic_flow.basic_flow.bwd_packet_count, 0);
-        assert_eq!(cic_flow.fwd_pkt_len_max, 25);
-        assert_eq!(cic_flow.fwd_pkt_len_min, 25);
-        assert_eq!(cic_flow.fwd_pkt_len_mean, 25.0);
-        assert_eq!(cic_flow.fwd_pkt_len_std, 0.0);
-        assert_eq!(cic_flow.fwd_pkt_len_tot, 25);
-        assert_eq!(cic_flow.fwd_iat_max, 0.0);
-        assert_eq!(cic_flow.fwd_iat_min, f64::MAX);
-        assert_eq!(cic_flow.fwd_iat_mean, 0.0);
-        assert_eq!(cic_flow.fwd_iat_std, 0.0);
-        assert_eq!(cic_flow.fwd_iat_total, 0.0);
-        assert_eq!(cic_flow.fwd_bulk_state_count, 0);
-        assert_eq!(cic_flow.fwd_bulk_packet_count, 0);
-        assert_eq!(cic_flow.fwd_bulk_size_total, 0);
-        assert_eq!(cic_flow.fwd_bulk_duration, 0.0);
-        assert_eq!(cic_flow.fwd_bulk_packet_count_help, 1);
-        assert_eq!(cic_flow.fwd_bulk_start_help, Some(timestamp));
-        assert_eq!(cic_flow.fwd_bulk_size_help, 25);
-        assert_eq!(cic_flow.fwd_last_bulk_timestamp, Some(timestamp));
-        assert_eq!(cic_flow.fwd_header_length, 40);
-        assert_eq!(cic_flow.fwd_last_timestamp, Some(timestamp));
-        assert_eq!(cic_flow.fwd_init_win_bytes, 500);
-        assert_eq!(cic_flow.bwd_header_length, 0);
-        assert_eq!(cic_flow.bwd_last_timestamp, None);
-        assert_eq!(cic_flow.bwd_pkt_len_max, 0);
-        assert_eq!(cic_flow.bwd_pkt_len_min, u32::MAX);
-        assert_eq!(cic_flow.bwd_pkt_len_mean, 0.0);
-        assert_eq!(cic_flow.bwd_pkt_len_std, 0.0);
-        assert_eq!(cic_flow.bwd_pkt_len_tot, 0);
-        assert_eq!(cic_flow.bwd_iat_max, 0.0);
-        assert_eq!(cic_flow.bwd_iat_min, f64::MAX);
-        assert_eq!(cic_flow.bwd_iat_mean, 0.0);
-        assert_eq!(cic_flow.bwd_iat_std, 0.0);
-        assert_eq!(cic_flow.bwd_iat_total, 0.0);
-        assert_eq!(cic_flow.bwd_bulk_state_count, 0);
-        assert_eq!(cic_flow.bwd_bulk_packet_count, 0);
-        assert_eq!(cic_flow.bwd_bulk_size_total, 0);
-        assert_eq!(cic_flow.bwd_bulk_duration, 0.0);
-        assert_eq!(cic_flow.bwd_bulk_packet_count_help, 0);
-        assert_eq!(cic_flow.bwd_bulk_start_help, None);
-        assert_eq!(cic_flow.bwd_bulk_size_help, 0);
-        assert_eq!(cic_flow.bwd_last_bulk_timestamp, None);
-        assert_eq!(cic_flow.bwd_init_win_bytes, 0);
-    }
-
-    #[test]
-    fn test_update_flow_first_with_bwd_packet() {
-        let mut cic_flow = CicFlow::new(
-            "".to_string(),
-            IpAddr::V4(Ipv4Addr::from(1)),
-            80,
-            IpAddr::V4(Ipv4Addr::from(2)),
-            8080,
-            6,
-            chrono::Utc::now(),
-        );
-        let packet = BasicFeatures {
-            fin_flag: 1,
-            syn_flag: 0,
-            rst_flag: 0,
-            psh_flag: 0,
-            ack_flag: 1,
-            urg_flag: 0,
-            cwe_flag: 0,
-            ece_flag: 1,
-            data_length: 25,
-            header_length: 40,
-            length: 80,
-            window_size: 500,
-        };
-        let timestamp = Instant::now();
-
-        cic_flow.update_flow(&packet, &timestamp, chrono::Utc::now(), false);
-
-        assert_eq!(cic_flow.basic_flow.fwd_packet_count, 0);
-        assert_eq!(cic_flow.basic_flow.bwd_packet_count, 1);
-        assert_eq!(cic_flow.fwd_pkt_len_max, 0);
-        assert_eq!(cic_flow.fwd_pkt_len_min, u32::MAX);
-        assert_eq!(cic_flow.fwd_pkt_len_mean, 0.0);
-        assert_eq!(cic_flow.fwd_pkt_len_std, 0.0);
-        assert_eq!(cic_flow.fwd_pkt_len_tot, 0);
-        assert_eq!(cic_flow.fwd_iat_max, 0.0);
-        assert_eq!(cic_flow.fwd_iat_min, f64::MAX);
-        assert_eq!(cic_flow.fwd_iat_mean, 0.0);
-        assert_eq!(cic_flow.fwd_iat_std, 0.0);
-        assert_eq!(cic_flow.fwd_iat_total, 0.0);
-        assert_eq!(cic_flow.fwd_bulk_state_count, 0);
-        assert_eq!(cic_flow.fwd_bulk_packet_count, 0);
-        assert_eq!(cic_flow.fwd_bulk_size_total, 0);
-        assert_eq!(cic_flow.fwd_bulk_duration, 0.0);
-        assert_eq!(cic_flow.fwd_bulk_packet_count_help, 0);
-        assert_eq!(cic_flow.fwd_bulk_start_help, None);
-        assert_eq!(cic_flow.fwd_bulk_size_help, 0);
-        assert_eq!(cic_flow.fwd_last_bulk_timestamp, None);
-        assert_eq!(cic_flow.fwd_header_length, 0);
-        assert_eq!(cic_flow.fwd_last_timestamp, None);
-        assert_eq!(cic_flow.fwd_init_win_bytes, 0);
-        assert_eq!(cic_flow.bwd_header_length, 40);
-        assert_eq!(cic_flow.bwd_last_timestamp, Some(timestamp));
-        assert_eq!(cic_flow.bwd_pkt_len_max, 25);
-        assert_eq!(cic_flow.bwd_pkt_len_min, 25);
-        assert_eq!(cic_flow.bwd_pkt_len_mean, 25.0);
-        assert_eq!(cic_flow.bwd_pkt_len_std, 0.0);
-        assert_eq!(cic_flow.bwd_pkt_len_tot, 25);
-        assert_eq!(cic_flow.bwd_iat_max, 0.0);
-        assert_eq!(cic_flow.bwd_iat_min, f64::MAX);
-        assert_eq!(cic_flow.bwd_iat_mean, 0.0);
-        assert_eq!(cic_flow.bwd_iat_std, 0.0);
-        assert_eq!(cic_flow.bwd_iat_total, 0.0);
-        assert_eq!(cic_flow.bwd_bulk_state_count, 0);
-        assert_eq!(cic_flow.bwd_bulk_packet_count, 0);
-        assert_eq!(cic_flow.bwd_bulk_size_total, 0);
-        assert_eq!(cic_flow.bwd_bulk_duration, 0.0);
-        assert_eq!(cic_flow.bwd_bulk_packet_count_help, 1);
-        assert_eq!(cic_flow.bwd_bulk_start_help, Some(timestamp));
-        assert_eq!(cic_flow.bwd_bulk_size_help, 25);
-        assert_eq!(cic_flow.bwd_last_bulk_timestamp, Some(timestamp));
-        assert_eq!(cic_flow.bwd_init_win_bytes, 500);
-    }
-
-    #[test]
-    fn test_update_flow_with_fwd_packet() {
-        let mut cic_flow = CicFlow::new(
-            "".to_string(),
-            IpAddr::V4(Ipv4Addr::from(1)),
-            80,
-            IpAddr::V4(Ipv4Addr::from(2)),
-            8080,
-            6,
-            chrono::Utc::now(),
-        );
-        let packet_1 = BasicFeatures {
-            fin_flag: 1,
-            syn_flag: 0,
-            rst_flag: 0,
-            psh_flag: 0,
-            ack_flag: 1,
-            urg_flag: 0,
-            cwe_flag: 0,
-            ece_flag: 1,
-            data_length: 25,
-            header_length: 40,
-            length: 80,
-            window_size: 500,
-        };
-        let timestamp_1 = Instant::now();
-
-        cic_flow.update_flow(&packet_1, &timestamp_1, chrono::Utc::now(), true);
-
-        std::thread::sleep(std::time::Duration::from_secs(1));
-
-        let packet_2 = BasicFeatures {
-            fin_flag: 1,
-            syn_flag: 0,
-            rst_flag: 0,
-            psh_flag: 0,
-            ack_flag: 1,
-            urg_flag: 0,
-            cwe_flag: 0,
-            ece_flag: 1,
-            data_length: 50,
-            header_length: 40,
-            length: 100,
-            window_size: 100,
-        };
-        let timestamp_2 = Instant::now();
-
-        cic_flow.update_flow(&packet_2, &timestamp_2, chrono::Utc::now(), true);
-
-        assert_eq!(cic_flow.basic_flow.fwd_packet_count, 2);
-        assert_eq!(cic_flow.basic_flow.bwd_packet_count, 0);
-        assert_eq!(cic_flow.fwd_pkt_len_max, 50);
-        assert_eq!(cic_flow.fwd_pkt_len_min, 25);
-        assert_eq!(cic_flow.fwd_pkt_len_mean, 37.5);
-        assert_eq!(cic_flow.fwd_pkt_len_std, 12.5);
-        assert_eq!(cic_flow.fwd_pkt_len_tot, 75);
-        assert_eq!(
-            cic_flow.fwd_iat_max,
-            timestamp_2.duration_since(timestamp_1).as_micros() as f64
-        );
-        assert_eq!(
-            cic_flow.fwd_iat_min,
-            timestamp_2.duration_since(timestamp_1).as_micros() as f64
-        );
-        assert_eq!(
-            cic_flow.fwd_iat_mean,
-            timestamp_2.duration_since(timestamp_1).as_micros() as f64
-        );
-        assert_eq!(cic_flow.fwd_iat_std, 0.0);
-        assert_eq!(
-            cic_flow.fwd_iat_total,
-            timestamp_2.duration_since(timestamp_1).as_micros() as f64
-        );
-        assert_eq!(cic_flow.fwd_bulk_state_count, 0);
-        assert_eq!(cic_flow.fwd_bulk_packet_count, 0);
-        assert_eq!(cic_flow.fwd_bulk_size_total, 0);
-        assert_eq!(cic_flow.fwd_bulk_duration, 0.0);
-        assert_eq!(cic_flow.fwd_bulk_packet_count_help, 1);
-        assert_eq!(cic_flow.fwd_bulk_start_help, Some(timestamp_2));
-        assert_eq!(cic_flow.fwd_bulk_size_help, 50);
-        assert_eq!(cic_flow.fwd_last_bulk_timestamp, Some(timestamp_2));
-        assert_eq!(cic_flow.fwd_header_length, 80);
-        assert_eq!(cic_flow.fwd_last_timestamp, Some(timestamp_2));
-        assert_eq!(cic_flow.fwd_init_win_bytes, 500);
-        assert_eq!(cic_flow.bwd_header_length, 0);
-        assert_eq!(cic_flow.bwd_last_timestamp, None);
-        assert_eq!(cic_flow.bwd_pkt_len_max, 0);
-        assert_eq!(cic_flow.bwd_pkt_len_min, u32::MAX);
-        assert_eq!(cic_flow.bwd_pkt_len_mean, 0.0);
-        assert_eq!(cic_flow.bwd_pkt_len_std, 0.0);
-        assert_eq!(cic_flow.bwd_pkt_len_tot, 0);
-        assert_eq!(cic_flow.bwd_iat_max, 0.0);
-        assert_eq!(cic_flow.bwd_iat_min, f64::MAX);
-        assert_eq!(cic_flow.bwd_iat_mean, 0.0);
-        assert_eq!(cic_flow.bwd_iat_std, 0.0);
-        assert_eq!(cic_flow.bwd_iat_total, 0.0);
-        assert_eq!(cic_flow.bwd_bulk_state_count, 0);
-        assert_eq!(cic_flow.bwd_bulk_packet_count, 0);
-        assert_eq!(cic_flow.bwd_bulk_size_total, 0);
-        assert_eq!(cic_flow.bwd_bulk_duration, 0.0);
-        assert_eq!(cic_flow.bwd_bulk_packet_count_help, 0);
-        assert_eq!(cic_flow.bwd_bulk_start_help, None);
-        assert_eq!(cic_flow.bwd_bulk_size_help, 0);
-        assert_eq!(cic_flow.bwd_last_bulk_timestamp, None);
-        assert_eq!(cic_flow.bwd_init_win_bytes, 0);
-    }
-
-    #[test]
-    fn test_update_flow_with_bwd_packet() {
-        let mut cic_flow = CicFlow::new(
-            "".to_string(),
-            IpAddr::V4(Ipv4Addr::from(1)),
-            80,
-            IpAddr::V4(Ipv4Addr::from(2)),
-            8080,
-            6,
-            chrono::Utc::now(),
-        );
-        let packet_1 = BasicFeatures {
-            fin_flag: 1,
-            syn_flag: 0,
-            rst_flag: 0,
-            psh_flag: 0,
-            ack_flag: 1,
-            urg_flag: 0,
-            cwe_flag: 0,
-            ece_flag: 1,
-            data_length: 25,
-            header_length: 40,
-            length: 80,
-            window_size: 500,
-        };
-        let timestamp_1 = Instant::now();
-
-        cic_flow.update_flow(&packet_1, &timestamp_1, chrono::Utc::now(), false);
-
-        std::thread::sleep(std::time::Duration::from_secs(1));
-
-        let packet_2 = BasicFeatures {
-            fin_flag: 1,
-            syn_flag: 0,
-            rst_flag: 0,
-            psh_flag: 0,
-            ack_flag: 1,
-            urg_flag: 0,
-            cwe_flag: 0,
-            ece_flag: 1,
-            data_length: 50,
-            header_length: 40,
-            length: 100,
-            window_size: 100,
-        };
-        let timestamp_2 = Instant::now();
-
-        cic_flow.update_flow(&packet_2, &timestamp_2, chrono::Utc::now(), false);
-
-        assert_eq!(cic_flow.basic_flow.fwd_packet_count, 0);
-        assert_eq!(cic_flow.basic_flow.bwd_packet_count, 2);
-        assert_eq!(cic_flow.fwd_pkt_len_max, 0);
-        assert_eq!(cic_flow.fwd_pkt_len_min, u32::MAX);
-        assert_eq!(cic_flow.fwd_pkt_len_mean, 0.0);
-        assert_eq!(cic_flow.fwd_pkt_len_std, 0.0);
-        assert_eq!(cic_flow.fwd_pkt_len_tot, 0);
-        assert_eq!(cic_flow.fwd_iat_max, 0.0);
-        assert_eq!(cic_flow.fwd_iat_min, f64::MAX);
-        assert_eq!(cic_flow.fwd_iat_mean, 0.0);
-        assert_eq!(cic_flow.fwd_iat_std, 0.0);
-        assert_eq!(cic_flow.fwd_iat_total, 0.0);
-        assert_eq!(cic_flow.fwd_bulk_state_count, 0);
-        assert_eq!(cic_flow.fwd_bulk_packet_count, 0);
-        assert_eq!(cic_flow.fwd_bulk_size_total, 0);
-        assert_eq!(cic_flow.fwd_bulk_duration, 0.0);
-        assert_eq!(cic_flow.fwd_bulk_packet_count_help, 0);
-        assert_eq!(cic_flow.fwd_bulk_start_help, None);
-        assert_eq!(cic_flow.fwd_bulk_size_help, 0);
-        assert_eq!(cic_flow.fwd_last_bulk_timestamp, None);
-        assert_eq!(cic_flow.fwd_header_length, 0);
-        assert_eq!(cic_flow.fwd_last_timestamp, None);
-        assert_eq!(cic_flow.fwd_init_win_bytes, 0);
-        assert_eq!(cic_flow.bwd_header_length, 80);
-        assert_eq!(cic_flow.bwd_last_timestamp, Some(timestamp_2));
-        assert_eq!(cic_flow.bwd_pkt_len_max, 50);
-        assert_eq!(cic_flow.bwd_pkt_len_min, 25);
-        assert_eq!(cic_flow.bwd_pkt_len_mean, 37.5);
-        assert_eq!(cic_flow.bwd_pkt_len_std, 12.5);
-        assert_eq!(cic_flow.bwd_pkt_len_tot, 75);
-        assert_eq!(
-            cic_flow.bwd_iat_max,
-            timestamp_2.duration_since(timestamp_1).as_micros() as f64
-        );
-        assert_eq!(
-            cic_flow.bwd_iat_min,
-            timestamp_2.duration_since(timestamp_1).as_micros() as f64
-        );
-        assert_eq!(
-            cic_flow.bwd_iat_mean,
-            timestamp_2.duration_since(timestamp_1).as_micros() as f64
-        );
-        assert_eq!(cic_flow.bwd_iat_std, 0.0);
-        assert_eq!(
-            cic_flow.bwd_iat_total,
-            timestamp_2.duration_since(timestamp_1).as_micros() as f64
-        );
-        assert_eq!(cic_flow.bwd_bulk_state_count, 0);
-        assert_eq!(cic_flow.bwd_bulk_packet_count, 0);
-        assert_eq!(cic_flow.bwd_bulk_size_total, 0);
-        assert_eq!(cic_flow.bwd_bulk_duration, 0.0);
-        assert_eq!(cic_flow.bwd_bulk_packet_count_help, 1);
-        assert_eq!(cic_flow.bwd_bulk_start_help, Some(timestamp_2));
-        assert_eq!(cic_flow.bwd_bulk_size_help, 50);
-        assert_eq!(cic_flow.bwd_last_bulk_timestamp, Some(timestamp_2));
-        assert_eq!(cic_flow.bwd_init_win_bytes, 500);
+    fn flow_key(&self) -> &String {
+        &self.basic_flow.flow_key
     }
 }
+
+// #[cfg(test)]
+// mod tests {
+//     use crate::{
+//         flows::{cic_flow::CicFlow, flow::Flow},
+//         utils::utils::{get_duration, PacketFeatures},
+//     };
+//     use std::{
+//         net::{IpAddr, Ipv4Addr},
+//         time::{Duration, Instant},
+//     };
+
+//     fn setup_cic_flow() -> CicFlow {
+//         CicFlow::new(
+//             "".to_string(),
+//             IpAddr::V4(Ipv4Addr::from(1)),
+//             80,
+//             IpAddr::V4(Ipv4Addr::from(2)),
+//             8080,
+//             6,
+//             chrono::Utc::now(),
+//         )
+//     }
+
+//     #[test]
+//     fn test_increase_fwd_header_length() {
+//         let mut cic_flow = setup_cic_flow();
+
+//         let initial_length = cic_flow.fwd_header_length;
+
+//         cic_flow.increase_fwd_header_length(20);
+//         assert_eq!(cic_flow.fwd_header_length, initial_length + 20);
+
+//         cic_flow.increase_fwd_header_length(0);
+//         assert_eq!(cic_flow.fwd_header_length, initial_length + 20);
+//     }
+
+//     #[test]
+//     fn test_increase_bwd_header_length() {
+//         let mut cic_flow = setup_cic_flow();
+
+//         let initial_length = cic_flow.bwd_header_length;
+
+//         cic_flow.increase_bwd_header_length(30);
+//         assert_eq!(cic_flow.bwd_header_length, initial_length + 30);
+
+//         cic_flow.increase_bwd_header_length(0);
+//         assert_eq!(cic_flow.bwd_header_length, initial_length + 30);
+//     }
+
+//     #[test]
+//     fn test_update_fwd_pkt_len_stats() {
+//         let mut cic_flow = setup_cic_flow();
+
+//         cic_flow.basic_flow.fwd_packet_count = 1;
+
+//         cic_flow.update_fwd_pkt_len_stats(100);
+
+//         assert_eq!(cic_flow.fwd_pkt_len_max, 100);
+//         assert_eq!(cic_flow.fwd_pkt_len_min, 100);
+//         assert_eq!(cic_flow.fwd_pkt_len_mean, 100.0);
+//         assert_eq!(cic_flow.fwd_pkt_len_std, 0.0);
+//         assert_eq!(cic_flow.fwd_pkt_len_tot, 100);
+
+//         cic_flow.basic_flow.fwd_packet_count = 2;
+
+//         cic_flow.update_fwd_pkt_len_stats(50);
+
+//         assert_eq!(cic_flow.fwd_pkt_len_max, 100);
+//         assert_eq!(cic_flow.fwd_pkt_len_min, 50);
+//         assert_eq!(cic_flow.fwd_pkt_len_mean, 75.0);
+//         assert_eq!(cic_flow.fwd_pkt_len_std, 25.0);
+//         assert_eq!(cic_flow.fwd_pkt_len_tot, 150);
+
+//         cic_flow.basic_flow.fwd_packet_count = 3;
+
+//         cic_flow.update_fwd_pkt_len_stats(0);
+
+//         assert_eq!(cic_flow.fwd_pkt_len_max, 100);
+//         assert_eq!(cic_flow.fwd_pkt_len_min, 0);
+//         assert_eq!(cic_flow.fwd_pkt_len_mean, 50.0);
+//         assert_eq!(cic_flow.fwd_pkt_len_std, 40.824829046386306);
+//         assert_eq!(cic_flow.fwd_pkt_len_tot, 150);
+//     }
+
+//     #[test]
+//     fn test_update_bwd_pkt_len_stats() {
+//         let mut cic_flow = setup_cic_flow();
+
+//         cic_flow.basic_flow.bwd_packet_count = 1;
+
+//         cic_flow.update_bwd_pkt_len_stats(100);
+
+//         assert_eq!(cic_flow.bwd_pkt_len_max, 100);
+//         assert_eq!(cic_flow.bwd_pkt_len_min, 100);
+//         assert_eq!(cic_flow.bwd_pkt_len_mean, 100.0);
+//         assert_eq!(cic_flow.bwd_pkt_len_std, 0.0);
+//         assert_eq!(cic_flow.bwd_pkt_len_tot, 100);
+
+//         cic_flow.basic_flow.bwd_packet_count = 2;
+
+//         cic_flow.update_bwd_pkt_len_stats(50);
+
+//         assert_eq!(cic_flow.bwd_pkt_len_max, 100);
+//         assert_eq!(cic_flow.bwd_pkt_len_min, 50);
+//         assert_eq!(cic_flow.bwd_pkt_len_mean, 75.0);
+//         assert_eq!(cic_flow.bwd_pkt_len_std, 25.0);
+//         assert_eq!(cic_flow.bwd_pkt_len_tot, 150);
+
+//         cic_flow.basic_flow.bwd_packet_count = 3;
+
+//         cic_flow.update_bwd_pkt_len_stats(0);
+
+//         assert_eq!(cic_flow.bwd_pkt_len_max, 100);
+//         assert_eq!(cic_flow.bwd_pkt_len_min, 0);
+//         assert_eq!(cic_flow.bwd_pkt_len_mean, 50.0);
+//         assert_eq!(cic_flow.bwd_pkt_len_std, 40.824829046386306);
+//         assert_eq!(cic_flow.bwd_pkt_len_tot, 150);
+//     }
+
+//     #[test]
+//     fn test_update_fwd_iat_stats() {
+//         let mut cic_flow = setup_cic_flow();
+//         let epsilon = 1e-9; // floating-point arithmetic is not exact
+
+//         cic_flow.basic_flow.fwd_packet_count = 2;
+
+//         cic_flow.update_fwd_iat_stats(0.05);
+
+//         assert_eq!(cic_flow.fwd_iat_max, 0.05);
+//         assert_eq!(cic_flow.fwd_iat_min, 0.05);
+//         assert_eq!(cic_flow.fwd_iat_mean, 0.05);
+//         assert_eq!(cic_flow.fwd_iat_std, 0.0);
+//         assert_eq!(cic_flow.fwd_iat_total, 0.05);
+
+//         cic_flow.basic_flow.fwd_packet_count = 3;
+
+//         cic_flow.update_fwd_iat_stats(0.01);
+
+//         assert_eq!(cic_flow.fwd_iat_max, 0.05);
+//         assert_eq!(cic_flow.fwd_iat_min, 0.01);
+//         assert!(
+//             (cic_flow.fwd_iat_mean - 0.03).abs() < epsilon,
+//             "fwd_iat_mean is not within the expected range"
+//         );
+//         assert_eq!(cic_flow.fwd_iat_std, 0.02);
+//         assert!(
+//             (cic_flow.fwd_iat_total - 0.06).abs() < epsilon,
+//             "fwd_iat_total is not within the expected range"
+//         );
+
+//         cic_flow.basic_flow.fwd_packet_count = 4;
+
+//         cic_flow.update_fwd_iat_stats(0.698456231458);
+
+//         assert_eq!(cic_flow.fwd_iat_max, 0.698456231458);
+//         assert_eq!(cic_flow.fwd_iat_min, 0.01);
+//         assert_eq!(cic_flow.fwd_iat_mean, 0.25281874381933334);
+//         assert_eq!(cic_flow.fwd_iat_std, 0.31553613400230096);
+//         assert_eq!(cic_flow.fwd_iat_total, 0.758456231458);
+//     }
+
+//     #[test]
+//     fn test_update_bwd_iat_stats() {
+//         let mut cic_flow = setup_cic_flow();
+//         let epsilon = 1e-9; // floating-point arithmetic is not exact
+
+//         cic_flow.basic_flow.bwd_packet_count = 2;
+
+//         cic_flow.update_bwd_iat_stats(0.05);
+
+//         assert_eq!(cic_flow.bwd_iat_max, 0.05);
+//         assert_eq!(cic_flow.bwd_iat_min, 0.05);
+//         assert_eq!(cic_flow.bwd_iat_mean, 0.05);
+//         assert_eq!(cic_flow.bwd_iat_std, 0.0);
+//         assert_eq!(cic_flow.bwd_iat_total, 0.05);
+
+//         cic_flow.basic_flow.bwd_packet_count = 3;
+
+//         cic_flow.update_bwd_iat_stats(0.01);
+
+//         assert_eq!(cic_flow.bwd_iat_max, 0.05);
+//         assert_eq!(cic_flow.bwd_iat_min, 0.01);
+//         assert!(
+//             (cic_flow.bwd_iat_mean - 0.03).abs() < epsilon,
+//             "fwd_iat_mean is not within the expected range"
+//         );
+//         assert_eq!(cic_flow.bwd_iat_std, 0.02);
+//         assert!(
+//             (cic_flow.bwd_iat_total - 0.06).abs() < epsilon,
+//             "fwd_iat_total is not within the expected range"
+//         );
+
+//         cic_flow.basic_flow.bwd_packet_count = 4;
+
+//         cic_flow.update_bwd_iat_stats(0.698456231458);
+
+//         assert_eq!(cic_flow.bwd_iat_max, 0.698456231458);
+//         assert_eq!(cic_flow.bwd_iat_min, 0.01);
+//         assert_eq!(cic_flow.bwd_iat_mean, 0.25281874381933334);
+//         assert_eq!(cic_flow.bwd_iat_std, 0.31553613400230096);
+//         assert_eq!(cic_flow.bwd_iat_total, 0.758456231458);
+//     }
+
+//     #[test]
+//     fn test_update_fwd_bulk_stats() {
+//         let mut cic_flow = setup_cic_flow();
+//         let timestamp = Instant::now();
+//         let timestamp_2 = Instant::now();
+//         let timestamp_3 = Instant::now();
+//         let timestamp_4 = Instant::now();
+
+//         cic_flow.update_fwd_bulk_stats(&timestamp, 100);
+
+//         assert_eq!(cic_flow.fwd_bulk_state_count, 0);
+//         assert_eq!(cic_flow.fwd_bulk_packet_count, 0);
+//         assert_eq!(cic_flow.fwd_bulk_size_total, 0);
+//         assert_eq!(cic_flow.fwd_bulk_duration, 0.0);
+//         assert_eq!(cic_flow.fwd_bulk_packet_count_help, 1);
+//         assert_eq!(cic_flow.fwd_bulk_start_help, Some(timestamp));
+//         assert_eq!(cic_flow.fwd_bulk_size_help, 100);
+//         assert_eq!(cic_flow.fwd_last_bulk_timestamp, Some(timestamp));
+
+//         cic_flow.update_fwd_bulk_stats(&timestamp_2, 200);
+
+//         assert_eq!(cic_flow.fwd_bulk_state_count, 0);
+//         assert_eq!(cic_flow.fwd_bulk_packet_count, 0);
+//         assert_eq!(cic_flow.fwd_bulk_size_total, 0);
+//         assert_eq!(cic_flow.fwd_bulk_duration, 0.0);
+//         assert_eq!(cic_flow.fwd_bulk_packet_count_help, 2);
+//         assert_eq!(cic_flow.fwd_bulk_start_help, Some(timestamp));
+//         assert_eq!(cic_flow.fwd_bulk_size_help, 300);
+//         assert_eq!(cic_flow.fwd_last_bulk_timestamp, Some(timestamp_2));
+
+//         cic_flow.update_fwd_bulk_stats(&timestamp_3, 150);
+
+//         assert_eq!(cic_flow.fwd_bulk_state_count, 0);
+//         assert_eq!(cic_flow.fwd_bulk_packet_count, 0);
+//         assert_eq!(cic_flow.fwd_bulk_size_total, 0);
+//         assert_eq!(cic_flow.fwd_bulk_duration, 0.0);
+//         assert_eq!(cic_flow.fwd_bulk_packet_count_help, 3);
+//         assert_eq!(cic_flow.fwd_bulk_start_help, Some(timestamp));
+//         assert_eq!(cic_flow.fwd_bulk_size_help, 450);
+//         assert_eq!(cic_flow.fwd_last_bulk_timestamp, Some(timestamp_3));
+
+//         cic_flow.update_fwd_bulk_stats(&timestamp_4, 50);
+
+//         assert_eq!(cic_flow.fwd_bulk_state_count, 1);
+//         assert_eq!(cic_flow.fwd_bulk_packet_count, 4);
+//         assert_eq!(cic_flow.fwd_bulk_size_total, 500);
+//         assert_eq!(
+//             cic_flow.fwd_bulk_duration,
+//             timestamp_4.duration_since(timestamp).as_micros() as f64
+//         );
+//         assert_eq!(cic_flow.fwd_bulk_packet_count_help, 4);
+//         assert_eq!(cic_flow.fwd_bulk_start_help, Some(timestamp));
+//         assert_eq!(cic_flow.fwd_bulk_size_help, 500);
+//         assert_eq!(cic_flow.fwd_last_bulk_timestamp, Some(timestamp_4));
+
+//         std::thread::sleep(std::time::Duration::from_secs(1));
+
+//         let new_timestamp = Instant::now();
+
+//         cic_flow.update_fwd_bulk_stats(&new_timestamp, 50);
+
+//         assert_eq!(cic_flow.fwd_bulk_state_count, 1);
+//         assert_eq!(cic_flow.fwd_bulk_packet_count, 4);
+//         assert_eq!(cic_flow.fwd_bulk_size_total, 500);
+//         assert_eq!(
+//             cic_flow.fwd_bulk_duration,
+//             timestamp_4.duration_since(timestamp).as_micros() as f64
+//         );
+//         assert_eq!(cic_flow.fwd_bulk_packet_count_help, 1);
+//         assert_eq!(cic_flow.fwd_bulk_start_help, Some(new_timestamp));
+//         assert_eq!(cic_flow.fwd_bulk_size_help, 50);
+//         assert_eq!(cic_flow.fwd_last_bulk_timestamp, Some(new_timestamp));
+//     }
+
+//     #[test]
+//     fn test_update_bwd_bulk_stats() {
+//         let mut cic_flow = setup_cic_flow();
+//         let timestamp = Instant::now();
+//         let timestamp_2 = Instant::now();
+//         let timestamp_3 = Instant::now();
+//         let timestamp_4 = Instant::now();
+
+//         cic_flow.update_bwd_bulk_stats(&timestamp, 100);
+
+//         assert_eq!(cic_flow.bwd_bulk_state_count, 0);
+//         assert_eq!(cic_flow.bwd_bulk_packet_count, 0);
+//         assert_eq!(cic_flow.bwd_bulk_size_total, 0);
+//         assert_eq!(cic_flow.bwd_bulk_duration, 0.0);
+//         assert_eq!(cic_flow.bwd_bulk_packet_count_help, 1);
+//         assert_eq!(cic_flow.bwd_bulk_start_help, Some(timestamp));
+//         assert_eq!(cic_flow.bwd_bulk_size_help, 100);
+//         assert_eq!(cic_flow.bwd_last_bulk_timestamp, Some(timestamp));
+
+//         cic_flow.update_bwd_bulk_stats(&timestamp_2, 200);
+
+//         assert_eq!(cic_flow.bwd_bulk_state_count, 0);
+//         assert_eq!(cic_flow.bwd_bulk_packet_count, 0);
+//         assert_eq!(cic_flow.bwd_bulk_size_total, 0);
+//         assert_eq!(cic_flow.bwd_bulk_duration, 0.0);
+//         assert_eq!(cic_flow.bwd_bulk_packet_count_help, 2);
+//         assert_eq!(cic_flow.bwd_bulk_start_help, Some(timestamp));
+//         assert_eq!(cic_flow.bwd_bulk_size_help, 300);
+//         assert_eq!(cic_flow.bwd_last_bulk_timestamp, Some(timestamp_2));
+
+//         cic_flow.update_bwd_bulk_stats(&timestamp_3, 150);
+
+//         assert_eq!(cic_flow.bwd_bulk_state_count, 0);
+//         assert_eq!(cic_flow.bwd_bulk_packet_count, 0);
+//         assert_eq!(cic_flow.bwd_bulk_size_total, 0);
+//         assert_eq!(cic_flow.bwd_bulk_duration, 0.0);
+//         assert_eq!(cic_flow.bwd_bulk_packet_count_help, 3);
+//         assert_eq!(cic_flow.bwd_bulk_start_help, Some(timestamp));
+//         assert_eq!(cic_flow.bwd_bulk_size_help, 450);
+//         assert_eq!(cic_flow.bwd_last_bulk_timestamp, Some(timestamp_3));
+
+//         cic_flow.update_bwd_bulk_stats(&timestamp_4, 50);
+
+//         assert_eq!(cic_flow.bwd_bulk_state_count, 1);
+//         assert_eq!(cic_flow.bwd_bulk_packet_count, 4);
+//         assert_eq!(cic_flow.bwd_bulk_size_total, 500);
+//         assert_eq!(
+//             cic_flow.bwd_bulk_duration,
+//             timestamp_4.duration_since(timestamp).as_micros() as f64
+//         );
+//         assert_eq!(cic_flow.bwd_bulk_packet_count_help, 4);
+//         assert_eq!(cic_flow.bwd_bulk_start_help, Some(timestamp));
+//         assert_eq!(cic_flow.bwd_bulk_size_help, 500);
+//         assert_eq!(cic_flow.bwd_last_bulk_timestamp, Some(timestamp_4));
+
+//         std::thread::sleep(std::time::Duration::from_secs(1));
+
+//         let new_timestamp = Instant::now();
+
+//         cic_flow.update_bwd_bulk_stats(&new_timestamp, 50);
+
+//         assert_eq!(cic_flow.bwd_bulk_state_count, 1);
+//         assert_eq!(cic_flow.bwd_bulk_packet_count, 4);
+//         assert_eq!(cic_flow.bwd_bulk_size_total, 500);
+//         assert_eq!(
+//             cic_flow.bwd_bulk_duration,
+//             timestamp_4.duration_since(timestamp).as_micros() as f64
+//         );
+//         assert_eq!(cic_flow.bwd_bulk_packet_count_help, 1);
+//         assert_eq!(cic_flow.bwd_bulk_start_help, Some(new_timestamp));
+//         assert_eq!(cic_flow.bwd_bulk_size_help, 50);
+//         assert_eq!(cic_flow.bwd_last_bulk_timestamp, Some(new_timestamp));
+//     }
+
+//     #[test]
+//     fn test_update_active_flow() {
+//         let mut cic_flow = setup_cic_flow();
+
+//         cic_flow.update_active_flow(100.0);
+
+//         assert_eq!(cic_flow.active_max, 100.0);
+//         assert_eq!(cic_flow.active_min, 100.0);
+//         assert_eq!(cic_flow.active_mean, 100.0);
+//         assert_eq!(cic_flow.active_std, 0.0);
+//         assert_eq!(cic_flow.active_count, 1);
+
+//         cic_flow.update_active_flow(50.0);
+
+//         assert_eq!(cic_flow.active_max, 100.0);
+//         assert_eq!(cic_flow.active_min, 50.0);
+//         assert_eq!(cic_flow.active_mean, 75.0);
+//         assert_eq!(cic_flow.active_std, 25.0);
+//         assert_eq!(cic_flow.active_count, 2);
+
+//         cic_flow.update_active_flow(0.0);
+
+//         assert_eq!(cic_flow.active_max, 100.0);
+//         assert_eq!(cic_flow.active_min, 0.0);
+//         assert_eq!(cic_flow.active_mean, 50.0);
+//         assert_eq!(cic_flow.active_std, 40.824829046386306);
+//         assert_eq!(cic_flow.active_count, 3);
+//     }
+
+//     #[test]
+//     fn test_update_idle_flow() {
+//         let mut cic_flow = setup_cic_flow();
+
+//         cic_flow.update_idle_flow(100.0);
+
+//         assert_eq!(cic_flow.idle_max, 100.0);
+//         assert_eq!(cic_flow.idle_min, 100.0);
+//         assert_eq!(cic_flow.idle_mean, 100.0);
+//         assert_eq!(cic_flow.idle_std, 0.0);
+//         assert_eq!(cic_flow.idle_count, 1);
+
+//         cic_flow.update_idle_flow(50.0);
+
+//         assert_eq!(cic_flow.idle_max, 100.0);
+//         assert_eq!(cic_flow.idle_min, 50.0);
+//         assert_eq!(cic_flow.idle_mean, 75.0);
+//         assert_eq!(cic_flow.idle_std, 25.0);
+//         assert_eq!(cic_flow.idle_count, 2);
+
+//         cic_flow.update_idle_flow(0.0);
+
+//         assert_eq!(cic_flow.idle_max, 100.0);
+//         assert_eq!(cic_flow.idle_min, 0.0);
+//         assert_eq!(cic_flow.idle_mean, 50.0);
+//         assert_eq!(cic_flow.idle_std, 40.824829046386306);
+//         assert_eq!(cic_flow.idle_count, 3);
+//     }
+
+//     #[test]
+//     fn test_update_active_idle_time() {
+//         let mut cic_flow = setup_cic_flow();
+
+//         let threshold = 60_000_000.0;
+
+//         let timestamp = Instant::now();
+//         let timestamp_2 = timestamp + Duration::new(30, 0); // 30 seconds later
+//         let timestamp_3 = timestamp + Duration::new(91, 0); // 90 seconds later
+
+//         cic_flow.update_active_idle_time(&timestamp, threshold);
+
+//         assert_eq!(cic_flow.end_active, timestamp);
+//         assert_ne!(cic_flow.start_active, timestamp);
+//         assert_eq!(cic_flow.active_count, 0);
+//         assert_eq!(cic_flow.active_max, 0.0);
+//         assert_eq!(cic_flow.active_min, f64::MAX);
+//         assert_eq!(cic_flow.active_mean, 0.0);
+//         assert_eq!(cic_flow.active_std, 0.0);
+//         assert_eq!(cic_flow.idle_count, 0);
+//         assert_eq!(cic_flow.idle_max, 0.0);
+//         assert_eq!(cic_flow.idle_min, f64::MAX);
+//         assert_eq!(cic_flow.idle_mean, 0.0);
+//         assert_eq!(cic_flow.idle_std, 0.0);
+
+//         cic_flow.update_active_idle_time(&timestamp_2, threshold);
+
+//         assert_eq!(cic_flow.end_active, timestamp_2);
+//         assert_ne!(cic_flow.start_active, timestamp_2);
+//         assert_eq!(cic_flow.active_count, 0);
+//         assert_eq!(cic_flow.active_max, 0.0);
+//         assert_eq!(cic_flow.active_min, f64::MAX);
+//         assert_eq!(cic_flow.active_mean, 0.0);
+//         assert_eq!(cic_flow.active_std, 0.0);
+//         assert_eq!(cic_flow.idle_count, 0);
+//         assert_eq!(cic_flow.idle_max, 0.0);
+//         assert_eq!(cic_flow.idle_min, f64::MAX);
+//         assert_eq!(cic_flow.idle_mean, 0.0);
+//         assert_eq!(cic_flow.idle_std, 0.0);
+
+//         cic_flow.update_active_idle_time(&timestamp_3, threshold);
+//         assert_eq!(cic_flow.end_active, timestamp_3);
+//         assert_eq!(cic_flow.start_active, timestamp_3);
+//         assert_eq!(cic_flow.active_count, 1);
+//         assert_ne!(cic_flow.active_max, 0.0);
+//         assert_ne!(cic_flow.active_min, f64::MAX);
+//         assert_ne!(cic_flow.active_mean, 0.0);
+//         assert_eq!(cic_flow.active_std, 0.0);
+//         assert_eq!(cic_flow.idle_count, 1);
+//         assert_ne!(cic_flow.idle_max, 0.0);
+//         assert_ne!(cic_flow.idle_min, f64::MAX);
+//         assert_ne!(cic_flow.idle_mean, 0.0);
+//         assert_eq!(cic_flow.idle_std, 0.0);
+//     }
+
+//     #[test]
+//     fn test_get_flow_iat_mean() {
+//         let mut cic_flow = setup_cic_flow();
+
+//         //let forward_iat = [1.0, 2.0, 3.0, 4.0, 5.0];
+//         //let backward_iat = [1.5, 2.5, 3.5];
+
+//         cic_flow.fwd_iat_mean = 3.0;
+//         cic_flow.bwd_iat_mean = 2.5;
+
+//         cic_flow.basic_flow.fwd_packet_count = 5;
+//         cic_flow.basic_flow.bwd_packet_count = 3;
+
+//         assert_eq!(cic_flow.get_flow_iat_mean(), 2.8125);
+//     }
+
+//     #[test]
+//     fn test_get_flow_iat_std() {
+//         let mut cic_flow = setup_cic_flow();
+//         let epsilon = 1e-2; // floating-point arithmetic is not exact, here we have a lot of casting and the formula is also an approximation
+
+//         //let forward_iat = [1.0, 2.0, 3.0, 4.0, 5.0];
+//         //let backward_iat = [1.5, 2.5, 3.5];
+
+//         cic_flow.fwd_iat_mean = 3.0;
+//         cic_flow.bwd_iat_mean = 2.5;
+
+//         cic_flow.basic_flow.fwd_packet_count = 5;
+//         cic_flow.basic_flow.bwd_packet_count = 3;
+
+//         cic_flow.fwd_iat_std = 1.4142135623731;
+//         cic_flow.bwd_iat_std = 0.81649658092773;
+
+//         assert!(
+//             (cic_flow.get_flow_iat_std() - 1.2484365222149).abs() < epsilon,
+//             "get_flow_iat_std is not within the expected range"
+//         );
+//     }
+
+//     #[test]
+//     fn test_get_flow_iat_max() {
+//         let mut cic_flow = setup_cic_flow();
+
+//         cic_flow.fwd_iat_max = 5.0;
+//         cic_flow.bwd_iat_max = 3.0;
+
+//         assert_eq!(cic_flow.get_flow_iat_max(), 5.0);
+//     }
+
+//     #[test]
+//     fn test_get_flow_iat_min() {
+//         let mut cic_flow = setup_cic_flow();
+
+//         assert_eq!(cic_flow.get_flow_iat_min(), 0.0);
+
+//         cic_flow.fwd_iat_min = 1.0;
+//         cic_flow.bwd_iat_min = 2.0;
+
+//         assert_eq!(cic_flow.get_flow_iat_min(), 1.0);
+//     }
+
+//     #[test]
+//     fn test_get_fwd_iat_min() {
+//         let mut cic_flow = setup_cic_flow();
+
+//         assert_eq!(cic_flow.get_fwd_iat_min(), 0.0);
+
+//         cic_flow.fwd_iat_min = 1.0;
+
+//         assert_eq!(cic_flow.get_fwd_iat_min(), 1.0);
+//     }
+
+//     #[test]
+//     fn test_get_bwd_iat_min() {
+//         let mut cic_flow = setup_cic_flow();
+
+//         assert_eq!(cic_flow.get_bwd_iat_min(), 0.0);
+
+//         cic_flow.bwd_iat_min = 2.0;
+
+//         assert_eq!(cic_flow.get_bwd_iat_min(), 2.0);
+//     }
+
+//     #[test]
+//     fn test_get_flow_packet_length_min() {
+//         let mut cic_flow = setup_cic_flow();
+
+//         assert_eq!(cic_flow.get_flow_packet_length_min(), 0);
+
+//         cic_flow.fwd_pkt_len_min = 50;
+//         cic_flow.bwd_pkt_len_min = 100;
+
+//         assert_eq!(cic_flow.get_flow_packet_length_min(), 50);
+//     }
+
+//     #[test]
+//     fn test_get_fwd_packet_length_min() {
+//         let mut cic_flow = setup_cic_flow();
+
+//         assert_eq!(cic_flow.get_fwd_packet_length_min(), 0);
+
+//         cic_flow.fwd_pkt_len_min = 50;
+
+//         assert_eq!(cic_flow.get_fwd_packet_length_min(), 50);
+//     }
+
+//     #[test]
+//     fn test_get_bwd_packet_length_min() {
+//         let mut cic_flow = setup_cic_flow();
+
+//         assert_eq!(cic_flow.get_bwd_packet_length_min(), 0);
+
+//         cic_flow.bwd_pkt_len_min = 100;
+
+//         assert_eq!(cic_flow.get_bwd_packet_length_min(), 100);
+//     }
+
+//     #[test]
+//     fn test_get_flow_packet_length_max() {
+//         let mut cic_flow = setup_cic_flow();
+
+//         cic_flow.fwd_pkt_len_max = 100;
+//         cic_flow.bwd_pkt_len_max = 50;
+
+//         assert_eq!(cic_flow.get_flow_packet_length_max(), 100);
+//     }
+
+//     #[test]
+//     fn test_get_flow_packet_length_mean() {
+//         let mut cic_flow = setup_cic_flow();
+
+//         //let forward_iat = [10, 20, 30, 40, 50];
+//         //let backward_iat = [15, 25, 35];
+
+//         cic_flow.fwd_pkt_len_mean = 30.0;
+//         cic_flow.bwd_pkt_len_mean = 25.0;
+
+//         cic_flow.basic_flow.fwd_packet_count = 5;
+//         cic_flow.basic_flow.bwd_packet_count = 3;
+
+//         assert_eq!(cic_flow.get_flow_packet_length_mean(), 28.125);
+//     }
+
+//     #[test]
+//     fn test_get_flow_packet_length_variance() {
+//         let mut cic_flow = setup_cic_flow();
+
+//         //let forward_iat = [10, 20, 30, 40, 50];
+//         //let backward_iat = [15, 25, 35];
+
+//         cic_flow.fwd_pkt_len_std = 14.142135623731;
+//         cic_flow.bwd_pkt_len_std = 8.1649658092773;
+
+//         cic_flow.basic_flow.fwd_packet_count = 5;
+//         cic_flow.basic_flow.bwd_packet_count = 3;
+
+//         assert_eq!(cic_flow.get_flow_packet_length_variance() as u32, 155); // removing everything behind the comma because of arithmetic errors
+//     }
+
+//     #[test]
+//     fn test_get_flow_packet_length_std() {
+//         let mut cic_flow = setup_cic_flow();
+//         let epsilon = 1e-1; // floating-point arithmetic is not exact, here we have a lot of casting and the formula is also an approximation
+
+//         //let forward_iat = [10, 20, 30, 40, 50];
+//         //let backward_iat = [15, 25, 35];
+
+//         cic_flow.fwd_pkt_len_std = 14.142135623731;
+//         cic_flow.bwd_pkt_len_std = 8.1649658092773;
+
+//         cic_flow.basic_flow.fwd_packet_count = 5;
+//         cic_flow.basic_flow.bwd_packet_count = 3;
+
+//         assert!(
+//             (cic_flow.get_flow_packet_length_std() - 12.484365222149).abs() < epsilon,
+//             "get_flow_packet_length_std is not within the expected range"
+//         );
+//     }
+
+//     #[test]
+//     fn test_get_up_down_ratio() {
+//         let mut cic_flow = setup_cic_flow();
+
+//         cic_flow.basic_flow.fwd_packet_count = 5;
+//         cic_flow.basic_flow.bwd_packet_count = 3;
+
+//         assert_eq!(cic_flow.get_down_up_ratio(), 5 as f64 / 3 as f64);
+//     }
+
+//     #[test]
+//     fn test_get_fwd_segment_length_mean() {
+//         let mut cic_flow = setup_cic_flow();
+
+//         cic_flow.fwd_seg_len_tot = 100;
+//         cic_flow.basic_flow.fwd_packet_count = 5;
+
+//         assert_eq!(cic_flow.get_fwd_segment_length_mean(), 20.0);
+//     }
+
+//     #[test]
+//     fn test_get_bwd_segment_length_mean() {
+//         let mut cic_flow = setup_cic_flow();
+
+//         cic_flow.bwd_seg_len_tot = 100;
+//         cic_flow.basic_flow.bwd_packet_count = 5;
+
+//         assert_eq!(cic_flow.get_bwd_segment_length_mean(), 20.0);
+//     }
+
+//     #[test]
+//     fn test_get_duration() {
+//         let start = chrono::Utc::now();
+//         let end = start + chrono::Duration::try_seconds(5).unwrap();
+
+//         assert_eq!(get_duration(start, end), 5_000_000.0);
+//     }
+
+//     #[test]
+//     fn test_get_flow_bytes_s() {
+//         let mut cic_flow = setup_cic_flow();
+
+//         cic_flow.basic_flow.first_timestamp = chrono::Utc::now();
+//         cic_flow.basic_flow.last_timestamp =
+//             chrono::Utc::now() + chrono::Duration::try_seconds(5).unwrap();
+
+//         cic_flow.fwd_pkt_len_tot = 100;
+//         cic_flow.bwd_pkt_len_tot = 100;
+
+//         assert_eq!(cic_flow.get_flow_bytes_s(), 40.0);
+//     }
+
+//     #[test]
+//     fn test_get_flow_packets_s() {
+//         let mut cic_flow = setup_cic_flow();
+
+//         cic_flow.basic_flow.first_timestamp = chrono::Utc::now();
+//         cic_flow.basic_flow.last_timestamp =
+//             chrono::Utc::now() + chrono::Duration::try_seconds(5).unwrap();
+
+//         cic_flow.basic_flow.fwd_packet_count = 5;
+//         cic_flow.basic_flow.bwd_packet_count = 5;
+
+//         assert_eq!(cic_flow.get_flow_packets_s(), 2.0);
+//     }
+
+//     #[test]
+//     fn test_get_fwd_packets_s() {
+//         let mut cic_flow = setup_cic_flow();
+
+//         cic_flow.basic_flow.first_timestamp = chrono::Utc::now();
+//         cic_flow.basic_flow.last_timestamp =
+//             chrono::Utc::now() + chrono::Duration::try_seconds(5).unwrap();
+
+//         cic_flow.basic_flow.fwd_packet_count = 5;
+
+//         assert_eq!(cic_flow.get_fwd_packets_s(), 1.0);
+//     }
+
+//     #[test]
+//     fn test_get_bwd_packets_s() {
+//         let mut cic_flow = setup_cic_flow();
+
+//         cic_flow.basic_flow.first_timestamp = chrono::Utc::now();
+//         cic_flow.basic_flow.last_timestamp =
+//             chrono::Utc::now() + chrono::Duration::try_seconds(5).unwrap();
+
+//         cic_flow.basic_flow.bwd_packet_count = 5;
+
+//         assert_eq!(cic_flow.get_bwd_packets_s(), 1.0);
+//     }
+
+//     #[test]
+//     fn test_get_fwd_bytes_bulk() {
+//         let mut cic_flow = setup_cic_flow();
+
+//         assert_eq!(cic_flow.get_fwd_bytes_bulk(), 0.0);
+
+//         cic_flow.fwd_bulk_size_total = 100;
+//         cic_flow.fwd_bulk_state_count = 5;
+
+//         assert_eq!(cic_flow.get_fwd_bytes_bulk(), 20.0);
+//     }
+
+//     #[test]
+//     fn test_get_fwd_packets_bulk() {
+//         let mut cic_flow = setup_cic_flow();
+
+//         assert_eq!(cic_flow.get_fwd_packets_bulk(), 0.0);
+
+//         cic_flow.fwd_bulk_packet_count = 100;
+//         cic_flow.fwd_bulk_state_count = 5;
+
+//         assert_eq!(cic_flow.get_fwd_packets_bulk(), 20.0);
+//     }
+
+//     #[test]
+//     fn test_get_fwd_bulk_rate() {
+//         let mut cic_flow = setup_cic_flow();
+
+//         assert_eq!(cic_flow.get_fwd_bulk_rate(), 0.0);
+
+//         cic_flow.fwd_bulk_size_total = 100;
+//         cic_flow.fwd_bulk_duration = 5_000_000.0;
+
+//         assert_eq!(cic_flow.get_fwd_bulk_rate(), 20.0);
+//     }
+
+//     #[test]
+//     fn test_get_bwd_bytes_bulk() {
+//         let mut cic_flow = setup_cic_flow();
+
+//         assert_eq!(cic_flow.get_bwd_bytes_bulk(), 0.0);
+
+//         cic_flow.bwd_bulk_size_total = 100;
+//         cic_flow.bwd_bulk_state_count = 5;
+
+//         assert_eq!(cic_flow.get_bwd_bytes_bulk(), 20.0);
+//     }
+
+//     #[test]
+//     fn test_get_bwd_packets_bulk() {
+//         let mut cic_flow = setup_cic_flow();
+
+//         assert_eq!(cic_flow.get_bwd_packets_bulk(), 0.0);
+
+//         cic_flow.bwd_bulk_packet_count = 100;
+//         cic_flow.bwd_bulk_state_count = 5;
+
+//         assert_eq!(cic_flow.get_bwd_packets_bulk(), 20.0);
+//     }
+
+//     #[test]
+//     fn test_get_bwd_bulk_rate() {
+//         let mut cic_flow = setup_cic_flow();
+
+//         assert_eq!(cic_flow.get_bwd_bulk_rate(), 0.0);
+
+//         cic_flow.bwd_bulk_size_total = 100;
+//         cic_flow.bwd_bulk_duration = 5_000_000.0;
+
+//         assert_eq!(cic_flow.get_bwd_bulk_rate(), 20.0);
+//     }
+
+//     #[test]
+//     fn test_update_flow_first_with_fwd_packet() {
+//         let mut cic_flow = CicFlow::new(
+//             "".to_string(),
+//             IpAddr::V4(Ipv4Addr::from(1)),
+//             80,
+//             IpAddr::V4(Ipv4Addr::from(2)),
+//             8080,
+//             6,
+//             chrono::Utc::now(),
+//         );
+//         let packet = PacketFeatures {
+//             fin_flag: 1,
+//             syn_flag: 0,
+//             rst_flag: 0,
+//             psh_flag: 0,
+//             ack_flag: 1,
+//             urg_flag: 0,
+//             cwe_flag: 0,
+//             ece_flag: 1,
+//             data_length: 25,
+//             header_length: 40,
+//             length: 80,
+//             window_size: 500,
+//         };
+//         let timestamp = Instant::now();
+
+//         cic_flow.update_flow(&packet, chrono::Utc::now() , true);
+
+//         assert_eq!(cic_flow.basic_flow.fwd_packet_count, 1);
+//         assert_eq!(cic_flow.basic_flow.bwd_packet_count, 0);
+//         assert_eq!(cic_flow.fwd_pkt_len_max, 25);
+//         assert_eq!(cic_flow.fwd_pkt_len_min, 25);
+//         assert_eq!(cic_flow.fwd_pkt_len_mean, 25.0);
+//         assert_eq!(cic_flow.fwd_pkt_len_std, 0.0);
+//         assert_eq!(cic_flow.fwd_pkt_len_tot, 25);
+//         assert_eq!(cic_flow.fwd_iat_max, 0.0);
+//         assert_eq!(cic_flow.fwd_iat_min, f64::MAX);
+//         assert_eq!(cic_flow.fwd_iat_mean, 0.0);
+//         assert_eq!(cic_flow.fwd_iat_std, 0.0);
+//         assert_eq!(cic_flow.fwd_iat_total, 0.0);
+//         assert_eq!(cic_flow.fwd_bulk_state_count, 0);
+//         assert_eq!(cic_flow.fwd_bulk_packet_count, 0);
+//         assert_eq!(cic_flow.fwd_bulk_size_total, 0);
+//         assert_eq!(cic_flow.fwd_bulk_duration, 0.0);
+//         assert_eq!(cic_flow.fwd_bulk_packet_count_help, 1);
+//         assert_eq!(cic_flow.fwd_bulk_start_help, Some(timestamp));
+//         assert_eq!(cic_flow.fwd_bulk_size_help, 25);
+//         assert_eq!(cic_flow.fwd_last_bulk_timestamp, Some(timestamp));
+//         assert_eq!(cic_flow.fwd_header_length, 40);
+//         assert_eq!(cic_flow.fwd_last_timestamp, Some(timestamp));
+//         assert_eq!(cic_flow.fwd_init_win_bytes, 500);
+//         assert_eq!(cic_flow.bwd_header_length, 0);
+//         assert_eq!(cic_flow.bwd_last_timestamp, None);
+//         assert_eq!(cic_flow.bwd_pkt_len_max, 0);
+//         assert_eq!(cic_flow.bwd_pkt_len_min, u32::MAX);
+//         assert_eq!(cic_flow.bwd_pkt_len_mean, 0.0);
+//         assert_eq!(cic_flow.bwd_pkt_len_std, 0.0);
+//         assert_eq!(cic_flow.bwd_pkt_len_tot, 0);
+//         assert_eq!(cic_flow.bwd_iat_max, 0.0);
+//         assert_eq!(cic_flow.bwd_iat_min, f64::MAX);
+//         assert_eq!(cic_flow.bwd_iat_mean, 0.0);
+//         assert_eq!(cic_flow.bwd_iat_std, 0.0);
+//         assert_eq!(cic_flow.bwd_iat_total, 0.0);
+//         assert_eq!(cic_flow.bwd_bulk_state_count, 0);
+//         assert_eq!(cic_flow.bwd_bulk_packet_count, 0);
+//         assert_eq!(cic_flow.bwd_bulk_size_total, 0);
+//         assert_eq!(cic_flow.bwd_bulk_duration, 0.0);
+//         assert_eq!(cic_flow.bwd_bulk_packet_count_help, 0);
+//         assert_eq!(cic_flow.bwd_bulk_start_help, None);
+//         assert_eq!(cic_flow.bwd_bulk_size_help, 0);
+//         assert_eq!(cic_flow.bwd_last_bulk_timestamp, None);
+//         assert_eq!(cic_flow.bwd_init_win_bytes, 0);
+//     }
+
+//     #[test]
+//     fn test_update_flow_first_with_bwd_packet() {
+//         let mut cic_flow = CicFlow::new(
+//             "".to_string(),
+//             IpAddr::V4(Ipv4Addr::from(1)),
+//             80,
+//             IpAddr::V4(Ipv4Addr::from(2)),
+//             8080,
+//             6,
+//             chrono::Utc::now(),
+//         );
+//         let packet = PacketFeatures {
+//             fin_flag: 1,
+//             syn_flag: 0,
+//             rst_flag: 0,
+//             psh_flag: 0,
+//             ack_flag: 1,
+//             urg_flag: 0,
+//             cwe_flag: 0,
+//             ece_flag: 1,
+//             data_length: 25,
+//             header_length: 40,
+//             length: 80,
+//             window_size: 500,
+//         };
+//         let timestamp = Instant::now();
+
+//         cic_flow.update_flow(&packet, chrono::Utc::now(), false);
+
+//         assert_eq!(cic_flow.basic_flow.fwd_packet_count, 0);
+//         assert_eq!(cic_flow.basic_flow.bwd_packet_count, 1);
+//         assert_eq!(cic_flow.fwd_pkt_len_max, 0);
+//         assert_eq!(cic_flow.fwd_pkt_len_min, u32::MAX);
+//         assert_eq!(cic_flow.fwd_pkt_len_mean, 0.0);
+//         assert_eq!(cic_flow.fwd_pkt_len_std, 0.0);
+//         assert_eq!(cic_flow.fwd_pkt_len_tot, 0);
+//         assert_eq!(cic_flow.fwd_iat_max, 0.0);
+//         assert_eq!(cic_flow.fwd_iat_min, f64::MAX);
+//         assert_eq!(cic_flow.fwd_iat_mean, 0.0);
+//         assert_eq!(cic_flow.fwd_iat_std, 0.0);
+//         assert_eq!(cic_flow.fwd_iat_total, 0.0);
+//         assert_eq!(cic_flow.fwd_bulk_state_count, 0);
+//         assert_eq!(cic_flow.fwd_bulk_packet_count, 0);
+//         assert_eq!(cic_flow.fwd_bulk_size_total, 0);
+//         assert_eq!(cic_flow.fwd_bulk_duration, 0.0);
+//         assert_eq!(cic_flow.fwd_bulk_packet_count_help, 0);
+//         assert_eq!(cic_flow.fwd_bulk_start_help, None);
+//         assert_eq!(cic_flow.fwd_bulk_size_help, 0);
+//         assert_eq!(cic_flow.fwd_last_bulk_timestamp, None);
+//         assert_eq!(cic_flow.fwd_header_length, 0);
+//         assert_eq!(cic_flow.fwd_last_timestamp, None);
+//         assert_eq!(cic_flow.fwd_init_win_bytes, 0);
+//         assert_eq!(cic_flow.bwd_header_length, 40);
+//         assert_eq!(cic_flow.bwd_last_timestamp, Some(timestamp));
+//         assert_eq!(cic_flow.bwd_pkt_len_max, 25);
+//         assert_eq!(cic_flow.bwd_pkt_len_min, 25);
+//         assert_eq!(cic_flow.bwd_pkt_len_mean, 25.0);
+//         assert_eq!(cic_flow.bwd_pkt_len_std, 0.0);
+//         assert_eq!(cic_flow.bwd_pkt_len_tot, 25);
+//         assert_eq!(cic_flow.bwd_iat_max, 0.0);
+//         assert_eq!(cic_flow.bwd_iat_min, f64::MAX);
+//         assert_eq!(cic_flow.bwd_iat_mean, 0.0);
+//         assert_eq!(cic_flow.bwd_iat_std, 0.0);
+//         assert_eq!(cic_flow.bwd_iat_total, 0.0);
+//         assert_eq!(cic_flow.bwd_bulk_state_count, 0);
+//         assert_eq!(cic_flow.bwd_bulk_packet_count, 0);
+//         assert_eq!(cic_flow.bwd_bulk_size_total, 0);
+//         assert_eq!(cic_flow.bwd_bulk_duration, 0.0);
+//         assert_eq!(cic_flow.bwd_bulk_packet_count_help, 1);
+//         assert_eq!(cic_flow.bwd_bulk_start_help, Some(timestamp));
+//         assert_eq!(cic_flow.bwd_bulk_size_help, 25);
+//         assert_eq!(cic_flow.bwd_last_bulk_timestamp, Some(timestamp));
+//         assert_eq!(cic_flow.bwd_init_win_bytes, 500);
+//     }
+
+//     #[test]
+//     fn test_update_flow_with_fwd_packet() {
+//         let mut cic_flow = CicFlow::new(
+//             "".to_string(),
+//             IpAddr::V4(Ipv4Addr::from(1)),
+//             80,
+//             IpAddr::V4(Ipv4Addr::from(2)),
+//             8080,
+//             6,
+//             chrono::Utc::now(),
+//         );
+//         let packet_1 = PacketFeatures {
+//             fin_flag: 1,
+//             syn_flag: 0,
+//             rst_flag: 0,
+//             psh_flag: 0,
+//             ack_flag: 1,
+//             urg_flag: 0,
+//             cwe_flag: 0,
+//             ece_flag: 1,
+//             data_length: 25,
+//             header_length: 40,
+//             length: 80,
+//             window_size: 500,
+//         };
+//         let timestamp_1 = Instant::now();
+
+//         cic_flow.update_flow(&packet_1, chrono::Utc::now(), true);
+
+//         std::thread::sleep(std::time::Duration::from_secs(1));
+
+//         let packet_2 = PacketFeatures {
+//             fin_flag: 1,
+//             syn_flag: 0,
+//             rst_flag: 0,
+//             psh_flag: 0,
+//             ack_flag: 1,
+//             urg_flag: 0,
+//             cwe_flag: 0,
+//             ece_flag: 1,
+//             data_length: 50,
+//             header_length: 40,
+//             length: 100,
+//             window_size: 100,
+//         };
+//         let timestamp_2 = Instant::now();
+
+//         cic_flow.update_flow(&packet_2, chrono::Utc::now(), true);
+
+//         assert_eq!(cic_flow.basic_flow.fwd_packet_count, 2);
+//         assert_eq!(cic_flow.basic_flow.bwd_packet_count, 0);
+//         assert_eq!(cic_flow.fwd_pkt_len_max, 50);
+//         assert_eq!(cic_flow.fwd_pkt_len_min, 25);
+//         assert_eq!(cic_flow.fwd_pkt_len_mean, 37.5);
+//         assert_eq!(cic_flow.fwd_pkt_len_std, 12.5);
+//         assert_eq!(cic_flow.fwd_pkt_len_tot, 75);
+//         assert_eq!(
+//             cic_flow.fwd_iat_max,
+//             timestamp_2.duration_since(timestamp_1).as_micros() as f64
+//         );
+//         assert_eq!(
+//             cic_flow.fwd_iat_min,
+//             timestamp_2.duration_since(timestamp_1).as_micros() as f64
+//         );
+//         assert_eq!(
+//             cic_flow.fwd_iat_mean,
+//             timestamp_2.duration_since(timestamp_1).as_micros() as f64
+//         );
+//         assert_eq!(cic_flow.fwd_iat_std, 0.0);
+//         assert_eq!(
+//             cic_flow.fwd_iat_total,
+//             timestamp_2.duration_since(timestamp_1).as_micros() as f64
+//         );
+//         assert_eq!(cic_flow.fwd_bulk_state_count, 0);
+//         assert_eq!(cic_flow.fwd_bulk_packet_count, 0);
+//         assert_eq!(cic_flow.fwd_bulk_size_total, 0);
+//         assert_eq!(cic_flow.fwd_bulk_duration, 0.0);
+//         assert_eq!(cic_flow.fwd_bulk_packet_count_help, 1);
+//         assert_eq!(cic_flow.fwd_bulk_start_help, Some(timestamp_2));
+//         assert_eq!(cic_flow.fwd_bulk_size_help, 50);
+//         assert_eq!(cic_flow.fwd_last_bulk_timestamp, Some(timestamp_2));
+//         assert_eq!(cic_flow.fwd_header_length, 80);
+//         assert_eq!(cic_flow.fwd_last_timestamp, Some(timestamp_2));
+//         assert_eq!(cic_flow.fwd_init_win_bytes, 500);
+//         assert_eq!(cic_flow.bwd_header_length, 0);
+//         assert_eq!(cic_flow.bwd_last_timestamp, None);
+//         assert_eq!(cic_flow.bwd_pkt_len_max, 0);
+//         assert_eq!(cic_flow.bwd_pkt_len_min, u32::MAX);
+//         assert_eq!(cic_flow.bwd_pkt_len_mean, 0.0);
+//         assert_eq!(cic_flow.bwd_pkt_len_std, 0.0);
+//         assert_eq!(cic_flow.bwd_pkt_len_tot, 0);
+//         assert_eq!(cic_flow.bwd_iat_max, 0.0);
+//         assert_eq!(cic_flow.bwd_iat_min, f64::MAX);
+//         assert_eq!(cic_flow.bwd_iat_mean, 0.0);
+//         assert_eq!(cic_flow.bwd_iat_std, 0.0);
+//         assert_eq!(cic_flow.bwd_iat_total, 0.0);
+//         assert_eq!(cic_flow.bwd_bulk_state_count, 0);
+//         assert_eq!(cic_flow.bwd_bulk_packet_count, 0);
+//         assert_eq!(cic_flow.bwd_bulk_size_total, 0);
+//         assert_eq!(cic_flow.bwd_bulk_duration, 0.0);
+//         assert_eq!(cic_flow.bwd_bulk_packet_count_help, 0);
+//         assert_eq!(cic_flow.bwd_bulk_start_help, None);
+//         assert_eq!(cic_flow.bwd_bulk_size_help, 0);
+//         assert_eq!(cic_flow.bwd_last_bulk_timestamp, None);
+//         assert_eq!(cic_flow.bwd_init_win_bytes, 0);
+//     }
+
+//     #[test]
+//     fn test_update_flow_with_bwd_packet() {
+//         let mut cic_flow = CicFlow::new(
+//             "".to_string(),
+//             IpAddr::V4(Ipv4Addr::from(1)),
+//             80,
+//             IpAddr::V4(Ipv4Addr::from(2)),
+//             8080,
+//             6,
+//             chrono::Utc::now(),
+//         );
+//         let packet_1 = PacketFeatures {
+//             fin_flag: 1,
+//             syn_flag: 0,
+//             rst_flag: 0,
+//             psh_flag: 0,
+//             ack_flag: 1,
+//             urg_flag: 0,
+//             cwe_flag: 0,
+//             ece_flag: 1,
+//             data_length: 25,
+//             header_length: 40,
+//             length: 80,
+//             window_size: 500,
+//         };
+//         let timestamp_1 = Instant::now();
+
+//         cic_flow.update_flow(&packet_1, chrono::Utc::now(), false);
+
+//         std::thread::sleep(std::time::Duration::from_secs(1));
+
+//         let packet_2 = PacketFeatures {
+//             fin_flag: 1,
+//             syn_flag: 0,
+//             rst_flag: 0,
+//             psh_flag: 0,
+//             ack_flag: 1,
+//             urg_flag: 0,
+//             cwe_flag: 0,
+//             ece_flag: 1,
+//             data_length: 50,
+//             header_length: 40,
+//             length: 100,
+//             window_size: 100,
+//         };
+//         let timestamp_2 = Instant::now();
+
+//         cic_flow.update_flow(&packet_2, chrono::Utc::now(), false);
+
+//         assert_eq!(cic_flow.basic_flow.fwd_packet_count, 0);
+//         assert_eq!(cic_flow.basic_flow.bwd_packet_count, 2);
+//         assert_eq!(cic_flow.fwd_pkt_len_max, 0);
+//         assert_eq!(cic_flow.fwd_pkt_len_min, u32::MAX);
+//         assert_eq!(cic_flow.fwd_pkt_len_mean, 0.0);
+//         assert_eq!(cic_flow.fwd_pkt_len_std, 0.0);
+//         assert_eq!(cic_flow.fwd_pkt_len_tot, 0);
+//         assert_eq!(cic_flow.fwd_iat_max, 0.0);
+//         assert_eq!(cic_flow.fwd_iat_min, f64::MAX);
+//         assert_eq!(cic_flow.fwd_iat_mean, 0.0);
+//         assert_eq!(cic_flow.fwd_iat_std, 0.0);
+//         assert_eq!(cic_flow.fwd_iat_total, 0.0);
+//         assert_eq!(cic_flow.fwd_bulk_state_count, 0);
+//         assert_eq!(cic_flow.fwd_bulk_packet_count, 0);
+//         assert_eq!(cic_flow.fwd_bulk_size_total, 0);
+//         assert_eq!(cic_flow.fwd_bulk_duration, 0.0);
+//         assert_eq!(cic_flow.fwd_bulk_packet_count_help, 0);
+//         assert_eq!(cic_flow.fwd_bulk_start_help, None);
+//         assert_eq!(cic_flow.fwd_bulk_size_help, 0);
+//         assert_eq!(cic_flow.fwd_last_bulk_timestamp, None);
+//         assert_eq!(cic_flow.fwd_header_length, 0);
+//         assert_eq!(cic_flow.fwd_last_timestamp, None);
+//         assert_eq!(cic_flow.fwd_init_win_bytes, 0);
+//         assert_eq!(cic_flow.bwd_header_length, 80);
+//         assert_eq!(cic_flow.bwd_last_timestamp, Some(timestamp_2));
+//         assert_eq!(cic_flow.bwd_pkt_len_max, 50);
+//         assert_eq!(cic_flow.bwd_pkt_len_min, 25);
+//         assert_eq!(cic_flow.bwd_pkt_len_mean, 37.5);
+//         assert_eq!(cic_flow.bwd_pkt_len_std, 12.5);
+//         assert_eq!(cic_flow.bwd_pkt_len_tot, 75);
+//         assert_eq!(
+//             cic_flow.bwd_iat_max,
+//             timestamp_2.duration_since(timestamp_1).as_micros() as f64
+//         );
+//         assert_eq!(
+//             cic_flow.bwd_iat_min,
+//             timestamp_2.duration_since(timestamp_1).as_micros() as f64
+//         );
+//         assert_eq!(
+//             cic_flow.bwd_iat_mean,
+//             timestamp_2.duration_since(timestamp_1).as_micros() as f64
+//         );
+//         assert_eq!(cic_flow.bwd_iat_std, 0.0);
+//         assert_eq!(
+//             cic_flow.bwd_iat_total,
+//             timestamp_2.duration_since(timestamp_1).as_micros() as f64
+//         );
+//         assert_eq!(cic_flow.bwd_bulk_state_count, 0);
+//         assert_eq!(cic_flow.bwd_bulk_packet_count, 0);
+//         assert_eq!(cic_flow.bwd_bulk_size_total, 0);
+//         assert_eq!(cic_flow.bwd_bulk_duration, 0.0);
+//         assert_eq!(cic_flow.bwd_bulk_packet_count_help, 1);
+//         assert_eq!(cic_flow.bwd_bulk_start_help, Some(timestamp_2));
+//         assert_eq!(cic_flow.bwd_bulk_size_help, 50);
+//         assert_eq!(cic_flow.bwd_last_bulk_timestamp, Some(timestamp_2));
+//         assert_eq!(cic_flow.bwd_init_win_bytes, 500);
+//     }
+// }
