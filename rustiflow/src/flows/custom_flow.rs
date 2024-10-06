@@ -43,10 +43,12 @@ impl Flow for CustomFlow {
     }
 
     fn update_flow(&mut self, packet: &PacketFeatures, fwd: bool) -> bool {
+        // Update the basic flow and returns true if the flow is terminated.
+        let is_terminated = self.basic_flow.update_flow(packet, fwd);
         // Add here the update of the additional features.
 
-        // Update the basic flow and returns true if the flow is terminated.
-        self.basic_flow.update_flow(packet, fwd)
+        // Return the termination status of the flow.
+        is_terminated
     }
 
     fn dump(&self) -> String {

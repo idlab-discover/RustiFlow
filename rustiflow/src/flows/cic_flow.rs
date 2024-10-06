@@ -1182,7 +1182,7 @@ impl Flow for CicFlow {
     }
 
     fn update_flow(&mut self, packet: &PacketFeatures, fwd: bool) -> bool {
-        self.basic_flow.update_flow(packet, fwd);
+        let is_terminated = self.basic_flow.update_flow(packet, fwd);
         self.update_subflows(&packet.timestamp);
 
         if fwd {
@@ -1238,14 +1238,7 @@ impl Flow for CicFlow {
             self.bwd_last_timestamp = Some(packet.timestamp);
         }
 
-        if self.basic_flow.flow_end_of_flow_ack > 0
-            || self.basic_flow.fwd_rst_flag_count > 0
-            || self.basic_flow.bwd_rst_flag_count > 0
-        {
-            return true;
-        }
-
-        false
+        is_terminated
     }
 
     fn dump(&self) -> String {

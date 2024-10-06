@@ -77,6 +77,7 @@ impl Flow for NfFlow {
     }
 
     fn update_flow(&mut self, packet: &PacketFeatures, fwd: bool) -> bool {
+        let is_terminated = self.cic_flow.update_flow(packet, fwd);
         if fwd {
             self.fwd_last_timestamp = packet.timestamp;
         } else {
@@ -85,8 +86,7 @@ impl Flow for NfFlow {
             }
             self.bwd_last_timestamp = Some(packet.timestamp);
         }
-
-        self.cic_flow.update_flow(packet, fwd)
+        is_terminated
     }
 
     fn dump(&self) -> String {

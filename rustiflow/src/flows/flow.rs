@@ -48,7 +48,6 @@ pub trait Flow: Send + Sync + 'static + Clone {
     /// ### Arguments
     ///
     /// * `packet` - A `BasicFeatures` instance representing the packet to be processed.
-    /// * `timestamp` - The time at which the packet is received.
     /// * `fwd` - A boolean flag indicating the direction of the flow (forward or not).
     ///
     /// ### Returns
