@@ -1,4 +1,5 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `rustiflow/src/flows/nf_flow.rs`."><title>nf_flow.rs - source</title><script>if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-46f98efaafac5295.ttf.woff2,FiraSans-Regular-018c141bf0843ffd.woff2,FiraSans-Medium-8f9a781e4970d388.woff2,SourceCodePro-Regular-562dcc5011b6de7d.ttf.woff2,SourceCodePro-Semibold-d899c5a5c4aeb14a.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2" crossorigin href="../../../static.files/${f}">`).join(""))</script><link rel="stylesheet" href="../../../static.files/normalize-76eba96aa4d2e634.css"><link rel="stylesheet" href="../../../static.files/rustdoc-dd39b87e5fcfba68.css"><meta name="rustdoc-vars" data-root-path="../../../" data-static-root-path="../../../static.files/" data-current-crate="rustiflow" data-themes="" data-resource-suffix="" data-rustdoc-version="1.81.0-nightly (0c81f94b9 2024-07-10)" data-channel="nightly" data-search-js="search-d234aafac6c221dd.js" data-settings-js="settings-4313503d2e1961c2.js" ><script src="../../../static.files/storage-118b08c4c78b968e.js"></script><script defer src="../../../static.files/src-script-e66d777a5a92e9b2.js"></script><script defer src="../../../src-files.js"></script><script defer src="../../../static.files/main-20a3ad099b048cf2.js"></script><noscript><link rel="stylesheet" href="../../../static.files/noscript-df360f571f6edeae.css"></noscript><link rel="alternate icon" type="image/png" href="../../../static.files/favicon-32x32-422f7d1d52889060.png"><link rel="icon" type="image/svg+xml" href="../../../static.files/favicon-2c020d218678b618.svg"></head><body class="rustdoc src"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="src-sidebar-title"><h2>Files</h2></div></nav><div class="sidebar-resizer"></div><main><rustdoc-search></rustdoc-search><section id="main-content" class="content"><div class="example-wrap"><div data-nosnippet><pre class="src-line-numbers"><a href="#1" id="1">1</a>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `rustiflow/src/flows/nf_flow.rs`."><title>nf_flow.rs - source</title><script>if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-46f98efaafac5295.ttf.woff2,FiraSans-Regular-018c141bf0843ffd.woff2,FiraSans-Medium-8f9a781e4970d388.woff2,SourceCodePro-Regular-562dcc5011b6de7d.ttf.woff2,SourceCodePro-Semibold-d899c5a5c4aeb14a.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2" crossorigin href="../../../static.files/${f}">`).join(""))</script><link rel="stylesheet" href="../../../static.files/normalize-76eba96aa4d2e634.css"><link rel="stylesheet" href="../../../static.files/rustdoc-6d8951b3ccd3cbca.css"><meta name="rustdoc-vars" data-root-path="../../../" data-static-root-path="../../../static.files/" data-current-crate="rustiflow" data-themes="" data-resource-suffix="" data-rustdoc-version="1.83.0-nightly (9096f4faf 2024-10-05)" data-channel="nightly" data-search-js="search-e056c65ede92db13.js" data-settings-js="settings-805db61a62df4bd2.js" ><script src="../../../static.files/storage-1d39b6787ed640ff.js"></script><script defer src="../../../static.files/src-script-e66d777a5a92e9b2.js"></script><script defer src="../../../src-files.js"></script><script defer src="../../../static.files/main-f070b9041d14864c.js"></script><noscript><link rel="stylesheet" href="../../../static.files/noscript-0111fcff984fae8f.css"></noscript><link rel="alternate icon" type="image/png" href="../../../static.files/favicon-32x32-422f7d1d52889060.png"><link rel="icon" type="image/svg+xml" href="../../../static.files/favicon-2c020d218678b618.svg"></head><body class="rustdoc src"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="src-sidebar-title"><h2>Files</h2></div></nav><div class="sidebar-resizer"></div><main><rustdoc-search></rustdoc-search><section id="main-content" class="content"><div class="main-heading"><h1><div class="sub-heading">rustiflow/flows/</div>nf_flow.rs</h1><rustdoc-toolbar></rustdoc-toolbar></div><div class="example-wrap"><div data-nosnippet><pre class="src-line-numbers">
+<a href="#1" id="1">1</a>
 <a href="#2" id="2">2</a>
 <a href="#3" id="3">3</a>
 <a href="#4" id="4">4</a>
@@ -279,33 +280,53 @@
 <a href="#279" id="279">279</a>
 <a href="#280" id="280">280</a>
 <a href="#281" id="281">281</a>
-<a href="#282" id="282">282</a>
-<a href="#283" id="283">283</a>
-<a href="#284" id="284">284</a>
-<a href="#285" id="285">285</a>
-</pre></div><pre class="rust"><code><span class="kw">use </span>std::{
-    net::IpAddr,
-    ops::Deref,
-    time::{Instant, SystemTime, UNIX_EPOCH},
-};
+<a href="#282" id="282">282</a></pre></div><pre class="rust"><code><span class="kw">use </span>std::net::IpAddr;
 
 <span class="kw">use </span>chrono::{DateTime, Utc};
 
-<span class="kw">use crate</span>::{utils::utils::BasicFeatures, NO_CONTAMINANT_FEATURES};
+<span class="kw">use </span><span class="kw">crate</span>::packet_features::PacketFeatures;
 
 <span class="kw">use super</span>::{cic_flow::CicFlow, flow::Flow};
 
 <span class="doccomment">/// Represents a Nfstream inspired Flow, encapsulating various metrics and states of a network flow.
 ///
 /// This struct includes detailed information about both forward and backward
+</span><span class="attr">#[derive(Clone)]
 </span><span class="kw">pub struct </span>NfFlow {
     <span class="kw">pub </span>cic_flow: CicFlow,
-    <span class="kw">pub </span>first_timestamp: SystemTime,
-    <span class="kw">pub </span>last_timestamp: SystemTime,
-    <span class="kw">pub </span>fwd_first_timestamp: SystemTime,
-    <span class="kw">pub </span>fwd_last_timestamp: SystemTime,
-    <span class="kw">pub </span>bwd_first_timestamp: SystemTime,
-    <span class="kw">pub </span>bwd_last_timestamp: SystemTime,
+    <span class="kw">pub </span>first_timestamp: DateTime&lt;Utc&gt;,
+    <span class="kw">pub </span>last_timestamp: DateTime&lt;Utc&gt;,
+    <span class="kw">pub </span>fwd_first_timestamp: DateTime&lt;Utc&gt;,
+    <span class="kw">pub </span>fwd_last_timestamp: DateTime&lt;Utc&gt;,
+    <span class="kw">pub </span>bwd_first_timestamp: <span class="prelude-ty">Option</span>&lt;DateTime&lt;Utc&gt;&gt;,
+    <span class="kw">pub </span>bwd_last_timestamp: <span class="prelude-ty">Option</span>&lt;DateTime&lt;Utc&gt;&gt;,
+}
+
+<span class="kw">impl </span>NfFlow {
+    <span class="kw">fn </span>get_bwd_duration(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; i64 {
+        <span class="kw">if </span><span class="self">self</span>.bwd_first_timestamp.is_none() || <span class="self">self</span>.bwd_last_timestamp.is_none() {
+            <span class="kw">return </span><span class="number">0</span>;
+        }
+
+        (<span class="self">self</span>.bwd_last_timestamp.unwrap().signed_duration_since(<span class="self">self</span>.bwd_first_timestamp.unwrap()))
+        .num_milliseconds()
+    }
+
+    <span class="kw">fn </span>get_first_bwd_timestamp(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; i64 {
+        <span class="kw">if </span><span class="self">self</span>.bwd_first_timestamp.is_none() {
+            <span class="kw">return </span><span class="number">0</span>;
+        }
+
+        <span class="self">self</span>.bwd_first_timestamp.unwrap().timestamp_millis()
+    }
+
+    <span class="kw">fn </span>get_bwd_last_timestamp(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; i64 {
+        <span class="kw">if </span><span class="self">self</span>.bwd_last_timestamp.is_none() {
+            <span class="kw">return </span><span class="number">0</span>;
+        }
+
+        <span class="self">self</span>.bwd_last_timestamp.unwrap().timestamp_millis()
+    }
 }
 
 <span class="kw">impl </span>Flow <span class="kw">for </span>NfFlow {
@@ -316,7 +337,7 @@
         ipv4_destination: IpAddr,
         port_destination: u16,
         protocol: u8,
-        ts_date: DateTime&lt;Utc&gt;,
+        timestamp: DateTime&lt;Utc&gt;,
     ) -&gt; <span class="self">Self </span>{
         NfFlow {
             cic_flow: CicFlow::new(
@@ -326,63 +347,51 @@
                 ipv4_destination,
                 port_destination,
                 protocol,
-                ts_date,
+                timestamp,
             ),
-            first_timestamp: ts_date.into(),
-            last_timestamp: ts_date.into(),
-            fwd_first_timestamp: ts_date.into(),
-            fwd_last_timestamp: ts_date.into(),
-            bwd_first_timestamp: ts_date.into(),
-            bwd_last_timestamp: ts_date.into(),
+            first_timestamp: timestamp,
+            last_timestamp: timestamp,
+            fwd_first_timestamp: timestamp,
+            fwd_last_timestamp: timestamp,
+            bwd_first_timestamp: <span class="prelude-val">None</span>,
+            bwd_last_timestamp: <span class="prelude-val">None</span>,
         }
     }
 
-    <span class="kw">fn </span>update_flow(
-        <span class="kw-2">&amp;mut </span><span class="self">self</span>,
-        packet: <span class="kw-2">&amp;</span>BasicFeatures,
-        timestamp: <span class="kw-2">&amp;</span>Instant,
-        ts_date: DateTime&lt;Utc&gt;,
-        fwd: bool,
-    ) -&gt; <span class="prelude-ty">Option</span>&lt;String&gt; {
+    <span class="kw">fn </span>update_flow(<span class="kw-2">&amp;mut </span><span class="self">self</span>, packet: <span class="kw-2">&amp;</span>PacketFeatures, fwd: bool) -&gt; bool {
+        <span class="kw">let </span>is_terminated = <span class="self">self</span>.cic_flow.update_flow(packet, fwd);
         <span class="kw">if </span>fwd {
-            <span class="self">self</span>.fwd_last_timestamp = ts_date.into();
+            <span class="self">self</span>.fwd_last_timestamp = packet.timestamp;
         } <span class="kw">else </span>{
-            <span class="self">self</span>.bwd_last_timestamp = ts_date.into();
-        }
-
-        <span class="kw">let </span>end = <span class="self">self</span>.cic_flow.update_flow(packet, timestamp, ts_date, fwd);
-        <span class="kw">if </span>end.is_some() {
-            <span class="kw">if </span><span class="kw-2">*</span>NO_CONTAMINANT_FEATURES.lock().unwrap().deref() {
-                <span class="kw">return </span><span class="prelude-val">Some</span>(<span class="self">self</span>.dump_without_contamination());
-            } <span class="kw">else </span>{
-                <span class="kw">return </span><span class="prelude-val">Some</span>(<span class="self">self</span>.dump());
+            <span class="kw">if </span><span class="self">self</span>.bwd_first_timestamp.is_none() {
+                <span class="self">self</span>.bwd_first_timestamp = <span class="prelude-val">Some</span>(packet.timestamp);
             }
+            <span class="self">self</span>.bwd_last_timestamp = <span class="prelude-val">Some</span>(packet.timestamp);
         }
-
-        <span class="prelude-val">None
-    </span>}
+        is_terminated
+    }
 
     <span class="kw">fn </span>dump(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; String {
         <span class="macro">format!</span>(<span class="string">"{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{}"</span>,
-            <span class="self">self</span>.cic_flow.basic_flow.flow_id,
+            <span class="self">self</span>.cic_flow.basic_flow.flow_key,
             <span class="self">self</span>.cic_flow.basic_flow.ip_source,
             <span class="self">self</span>.cic_flow.basic_flow.port_source,
             <span class="self">self</span>.cic_flow.basic_flow.ip_destination,
             <span class="self">self</span>.cic_flow.basic_flow.port_destination,
             <span class="self">self</span>.cic_flow.basic_flow.protocol,
-            <span class="self">self</span>.first_timestamp.duration_since(UNIX_EPOCH).unwrap().as_millis(),
-            <span class="self">self</span>.last_timestamp.duration_since(UNIX_EPOCH).unwrap().as_millis(),
-            <span class="self">self</span>.last_timestamp.duration_since(UNIX_EPOCH).unwrap().as_millis() - <span class="self">self</span>.first_timestamp.duration_since(UNIX_EPOCH).unwrap().as_millis(),
+            <span class="self">self</span>.first_timestamp.timestamp_millis(),
+            <span class="self">self</span>.last_timestamp.timestamp_millis(),
+            <span class="self">self</span>.last_timestamp.signed_duration_since(<span class="self">self</span>.first_timestamp).num_milliseconds(),
             <span class="self">self</span>.cic_flow.basic_flow.fwd_packet_count + <span class="self">self</span>.cic_flow.basic_flow.bwd_packet_count,
             <span class="self">self</span>.cic_flow.fwd_pkt_len_tot + <span class="self">self</span>.cic_flow.bwd_pkt_len_tot,
-            <span class="self">self</span>.fwd_first_timestamp.duration_since(UNIX_EPOCH).unwrap().as_millis(),
-            <span class="self">self</span>.fwd_last_timestamp.duration_since(UNIX_EPOCH).unwrap().as_millis(),
-            <span class="self">self</span>.fwd_last_timestamp.duration_since(UNIX_EPOCH).unwrap().as_millis() - <span class="self">self</span>.fwd_first_timestamp.duration_since(UNIX_EPOCH).unwrap().as_millis(),
+            <span class="self">self</span>.fwd_first_timestamp.timestamp_millis(),
+            <span class="self">self</span>.fwd_last_timestamp.timestamp_millis(),
+            <span class="self">self</span>.fwd_last_timestamp.signed_duration_since(<span class="self">self</span>.fwd_first_timestamp).num_milliseconds(),
             <span class="self">self</span>.cic_flow.basic_flow.fwd_packet_count,
             <span class="self">self</span>.cic_flow.fwd_pkt_len_tot,
-            <span class="self">self</span>.bwd_first_timestamp.duration_since(UNIX_EPOCH).unwrap().as_millis(),
-            <span class="self">self</span>.bwd_last_timestamp.duration_since(UNIX_EPOCH).unwrap().as_millis(),
-            <span class="self">self</span>.bwd_last_timestamp.duration_since(UNIX_EPOCH).unwrap().as_millis() - <span class="self">self</span>.bwd_first_timestamp.duration_since(UNIX_EPOCH).unwrap().as_millis(),
+            <span class="self">self</span>.get_first_bwd_timestamp(),
+            <span class="self">self</span>.get_bwd_last_timestamp(),
+            <span class="self">self</span>.get_bwd_duration(),
             <span class="self">self</span>.cic_flow.basic_flow.bwd_packet_count,
             <span class="self">self</span>.cic_flow.bwd_pkt_len_tot,
             <span class="self">self</span>.cic_flow.get_flow_packet_length_min(),
@@ -458,37 +467,13 @@
         {},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},\
         {},{},{},{},{},{},{},{},{},{},{},{},{}"</span>,
             <span class="self">self</span>.cic_flow.basic_flow.protocol,
-            <span class="self">self</span>.last_timestamp
-                .duration_since(UNIX_EPOCH)
-                .unwrap()
-                .as_millis()
-                - <span class="self">self
-                    </span>.first_timestamp
-                    .duration_since(UNIX_EPOCH)
-                    .unwrap()
-                    .as_millis(),
+            <span class="self">self</span>.last_timestamp.signed_duration_since(<span class="self">self</span>.first_timestamp).num_milliseconds(),
             <span class="self">self</span>.cic_flow.basic_flow.fwd_packet_count + <span class="self">self</span>.cic_flow.basic_flow.bwd_packet_count,
             <span class="self">self</span>.cic_flow.fwd_pkt_len_tot + <span class="self">self</span>.cic_flow.bwd_pkt_len_tot,
-            <span class="self">self</span>.fwd_last_timestamp
-                .duration_since(UNIX_EPOCH)
-                .unwrap()
-                .as_millis()
-                - <span class="self">self
-                    </span>.fwd_first_timestamp
-                    .duration_since(UNIX_EPOCH)
-                    .unwrap()
-                    .as_millis(),
+            <span class="self">self</span>.fwd_last_timestamp.signed_duration_since(<span class="self">self</span>.fwd_first_timestamp).num_milliseconds(),
             <span class="self">self</span>.cic_flow.basic_flow.fwd_packet_count,
             <span class="self">self</span>.cic_flow.fwd_pkt_len_tot,
-            <span class="self">self</span>.bwd_last_timestamp
-                .duration_since(UNIX_EPOCH)
-                .unwrap()
-                .as_millis()
-                - <span class="self">self
-                    </span>.bwd_first_timestamp
-                    .duration_since(UNIX_EPOCH)
-                    .unwrap()
-                    .as_millis(),
+            <span class="self">self</span>.get_bwd_duration(),
             <span class="self">self</span>.cic_flow.basic_flow.bwd_packet_count,
             <span class="self">self</span>.cic_flow.bwd_pkt_len_tot,
             <span class="self">self</span>.cic_flow.get_flow_packet_length_min(),
@@ -566,6 +551,15 @@
 
     <span class="kw">fn </span>get_first_timestamp(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; DateTime&lt;Utc&gt; {
         <span class="self">self</span>.cic_flow.get_first_timestamp()
+    }
+
+    <span class="kw">fn </span>is_expired(<span class="kw-2">&amp;</span><span class="self">self</span>, timestamp: DateTime&lt;Utc&gt;, active_timeout: u64, idle_timeout: u64) -&gt; bool {
+        <span class="self">self</span>.cic_flow
+            .is_expired(timestamp, active_timeout, idle_timeout)
+    }
+
+    <span class="kw">fn </span>flow_key(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>String {
+        <span class="kw-2">&amp;</span><span class="self">self</span>.cic_flow.basic_flow.flow_key
     }
 }
 </code></pre></div></section></main></body></html>

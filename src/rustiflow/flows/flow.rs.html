@@ -1,4 +1,5 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `rustiflow/src/flows/flow.rs`."><title>flow.rs - source</title><script>if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-46f98efaafac5295.ttf.woff2,FiraSans-Regular-018c141bf0843ffd.woff2,FiraSans-Medium-8f9a781e4970d388.woff2,SourceCodePro-Regular-562dcc5011b6de7d.ttf.woff2,SourceCodePro-Semibold-d899c5a5c4aeb14a.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2" crossorigin href="../../../static.files/${f}">`).join(""))</script><link rel="stylesheet" href="../../../static.files/normalize-76eba96aa4d2e634.css"><link rel="stylesheet" href="../../../static.files/rustdoc-dd39b87e5fcfba68.css"><meta name="rustdoc-vars" data-root-path="../../../" data-static-root-path="../../../static.files/" data-current-crate="rustiflow" data-themes="" data-resource-suffix="" data-rustdoc-version="1.81.0-nightly (0c81f94b9 2024-07-10)" data-channel="nightly" data-search-js="search-d234aafac6c221dd.js" data-settings-js="settings-4313503d2e1961c2.js" ><script src="../../../static.files/storage-118b08c4c78b968e.js"></script><script defer src="../../../static.files/src-script-e66d777a5a92e9b2.js"></script><script defer src="../../../src-files.js"></script><script defer src="../../../static.files/main-20a3ad099b048cf2.js"></script><noscript><link rel="stylesheet" href="../../../static.files/noscript-df360f571f6edeae.css"></noscript><link rel="alternate icon" type="image/png" href="../../../static.files/favicon-32x32-422f7d1d52889060.png"><link rel="icon" type="image/svg+xml" href="../../../static.files/favicon-2c020d218678b618.svg"></head><body class="rustdoc src"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="src-sidebar-title"><h2>Files</h2></div></nav><div class="sidebar-resizer"></div><main><rustdoc-search></rustdoc-search><section id="main-content" class="content"><div class="example-wrap"><div data-nosnippet><pre class="src-line-numbers"><a href="#1" id="1">1</a>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `rustiflow/src/flows/flow.rs`."><title>flow.rs - source</title><script>if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-46f98efaafac5295.ttf.woff2,FiraSans-Regular-018c141bf0843ffd.woff2,FiraSans-Medium-8f9a781e4970d388.woff2,SourceCodePro-Regular-562dcc5011b6de7d.ttf.woff2,SourceCodePro-Semibold-d899c5a5c4aeb14a.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2" crossorigin href="../../../static.files/${f}">`).join(""))</script><link rel="stylesheet" href="../../../static.files/normalize-76eba96aa4d2e634.css"><link rel="stylesheet" href="../../../static.files/rustdoc-6d8951b3ccd3cbca.css"><meta name="rustdoc-vars" data-root-path="../../../" data-static-root-path="../../../static.files/" data-current-crate="rustiflow" data-themes="" data-resource-suffix="" data-rustdoc-version="1.83.0-nightly (9096f4faf 2024-10-05)" data-channel="nightly" data-search-js="search-e056c65ede92db13.js" data-settings-js="settings-805db61a62df4bd2.js" ><script src="../../../static.files/storage-1d39b6787ed640ff.js"></script><script defer src="../../../static.files/src-script-e66d777a5a92e9b2.js"></script><script defer src="../../../src-files.js"></script><script defer src="../../../static.files/main-f070b9041d14864c.js"></script><noscript><link rel="stylesheet" href="../../../static.files/noscript-0111fcff984fae8f.css"></noscript><link rel="alternate icon" type="image/png" href="../../../static.files/favicon-32x32-422f7d1d52889060.png"><link rel="icon" type="image/svg+xml" href="../../../static.files/favicon-2c020d218678b618.svg"></head><body class="rustdoc src"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="src-sidebar-title"><h2>Files</h2></div></nav><div class="sidebar-resizer"></div><main><rustdoc-search></rustdoc-search><section id="main-content" class="content"><div class="main-heading"><h1><div class="sub-heading">rustiflow/flows/</div>flow.rs</h1><rustdoc-toolbar></rustdoc-toolbar></div><div class="example-wrap"><div data-nosnippet><pre class="src-line-numbers">
+<a href="#1" id="1">1</a>
 <a href="#2" id="2">2</a>
 <a href="#3" id="3">3</a>
 <a href="#4" id="4">4</a>
@@ -104,17 +105,27 @@
 <a href="#104" id="104">104</a>
 <a href="#105" id="105">105</a>
 <a href="#106" id="106">106</a>
-</pre></div><pre class="rust"><code><span class="kw">use </span>chrono::{DateTime, Utc};
-<span class="kw">use </span>std::{net::IpAddr, time::Instant};
+<a href="#107" id="107">107</a>
+<a href="#108" id="108">108</a>
+<a href="#109" id="109">109</a>
+<a href="#110" id="110">110</a>
+<a href="#111" id="111">111</a>
+<a href="#112" id="112">112</a>
+<a href="#113" id="113">113</a>
+<a href="#114" id="114">114</a>
+<a href="#115" id="115">115</a>
+<a href="#116" id="116">116</a>
+<a href="#117" id="117">117</a></pre></div><pre class="rust"><code><span class="kw">use </span>chrono::{DateTime, Utc};
+<span class="kw">use </span>std::net::IpAddr;
 
-<span class="kw">use </span><span class="kw">crate</span>::utils::utils::BasicFeatures;
+<span class="kw">use </span><span class="kw">crate</span>::packet_features::PacketFeatures;
 
 <span class="doccomment">/// `Flow` defines the behavior of a network flow.
 ///
 /// This trait should be implemented by structures that represent
 /// a network flow, providing mechanisms to update the flow state
 /// and to dump its current state into a string format.
-</span><span class="kw">pub trait </span>Flow {
+</span><span class="kw">pub trait </span>Flow: Send + Sync + <span class="lifetime">'static </span>+ Clone {
     <span class="doccomment">/// Constructs a new `Flow`.
     ///
     /// Initializes a `Flow` instance with the provided parameters, setting up
@@ -122,25 +133,29 @@
     ///
     /// ### Arguments
     ///
-    /// * `flow_id` - A unique identifier for the flow.
+    /// * `flow_key` - A unique identifier for the flow.
     /// * `ipv4_source` - The source IPv4 address.
     /// * `port_source` - The source port.
     /// * `ipv4_destination` - The destination IPv4 address.
     /// * `port_destination` - The destination port.
     /// * `protocol` - The protocol number.
+    /// * `timestamp` - The time at which the flow is created.
     ///
     /// ### Returns
     ///
     /// Returns a new instance of `Flow`.
     </span><span class="kw">fn </span>new(
-        flow_id: String,
+        flow_key: String,
         ipv4_source: IpAddr,
         port_source: u16,
         ipv4_destination: IpAddr,
         port_destination: u16,
         protocol: u8,
-        ts_date: DateTime&lt;Utc&gt;,
+        timestamp: DateTime&lt;Utc&gt;,
     ) -&gt; <span class="self">Self</span>;
+
+    <span class="doccomment">/// Returns the flow key.
+    </span><span class="kw">fn </span>flow_key(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>String;
 
     <span class="doccomment">/// Updates the flow with a new packet.
     ///
@@ -150,20 +165,12 @@
     /// ### Arguments
     ///
     /// * `packet` - A `BasicFeatures` instance representing the packet to be processed.
-    /// * `timestamp` - The timestamp at which the packet is received.
     /// * `fwd` - A boolean flag indicating the direction of the flow (forward or not).
     ///
     /// ### Returns
     ///
-    /// Returns an `Option&lt;String&gt;` which might contain a result after processing the packet.
-    /// If the flow is terminated, you will get a dump of all features of the flow.
-    </span><span class="kw">fn </span>update_flow(
-        <span class="kw-2">&amp;mut </span><span class="self">self</span>,
-        packet: <span class="kw-2">&amp;</span>BasicFeatures,
-        timestamp: <span class="kw-2">&amp;</span>Instant,
-        ts_date: DateTime&lt;Utc&gt;,
-        fwd: bool,
-    ) -&gt; <span class="prelude-ty">Option</span>&lt;String&gt;;
+    /// Returns an `boolean` indicating if the flow is terminated.
+    </span><span class="kw">fn </span>update_flow(<span class="kw-2">&amp;mut </span><span class="self">self</span>, packet: <span class="kw-2">&amp;</span>PacketFeatures, fwd: bool) -&gt; bool;
 
     <span class="doccomment">/// Dumps the current state of the flow.
     ///
@@ -209,5 +216,20 @@
     ///
     /// Returns a `String` that represents the features of the flow without contaminant features.
     </span><span class="kw">fn </span>get_features_without_contamination() -&gt; String;
+
+    <span class="doccomment">/// Checks if the flow is expired.
+    ///
+    /// This method checks if the flow is expired based on the provided timestamp, active timeout, and idle timeout.
+    ///
+    /// ### Arguments
+    ///
+    /// * `timestamp` - The current timestamp.
+    /// * `active_timeout` - The active timeout value.
+    /// * `idle_timeout` - The idle timeout value.
+    ///
+    /// ### Returns
+    ///
+    /// Returns a `boolean` indicating if the flow is expired.
+    </span><span class="kw">fn </span>is_expired(<span class="kw-2">&amp;</span><span class="self">self</span>, timestamp: DateTime&lt;Utc&gt;, active_timeout: u64, idle_timeout: u64) -&gt; bool;
 }
 </code></pre></div></section></main></body></html>

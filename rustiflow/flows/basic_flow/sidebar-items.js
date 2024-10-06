@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"struct":["BasicFlow"]};
+window.SIDEBAR_ITEMS = {"enum":["FlowState"],"struct":["BasicFlow"]};

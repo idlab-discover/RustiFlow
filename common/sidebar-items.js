@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"struct":["BasicFeaturesIpv4","BasicFeaturesIpv6"]};
+window.SIDEBAR_ITEMS = {"struct":["EbpfEventIpv4","EbpfEventIpv6"]};

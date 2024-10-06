@@ -1,4 +1,5 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `rustiflow/src/flows/basic_flow.rs`."><title>basic_flow.rs - source</title><script>if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-46f98efaafac5295.ttf.woff2,FiraSans-Regular-018c141bf0843ffd.woff2,FiraSans-Medium-8f9a781e4970d388.woff2,SourceCodePro-Regular-562dcc5011b6de7d.ttf.woff2,SourceCodePro-Semibold-d899c5a5c4aeb14a.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2" crossorigin href="../../../static.files/${f}">`).join(""))</script><link rel="stylesheet" href="../../../static.files/normalize-76eba96aa4d2e634.css"><link rel="stylesheet" href="../../../static.files/rustdoc-dd39b87e5fcfba68.css"><meta name="rustdoc-vars" data-root-path="../../../" data-static-root-path="../../../static.files/" data-current-crate="rustiflow" data-themes="" data-resource-suffix="" data-rustdoc-version="1.81.0-nightly (0c81f94b9 2024-07-10)" data-channel="nightly" data-search-js="search-d234aafac6c221dd.js" data-settings-js="settings-4313503d2e1961c2.js" ><script src="../../../static.files/storage-118b08c4c78b968e.js"></script><script defer src="../../../static.files/src-script-e66d777a5a92e9b2.js"></script><script defer src="../../../src-files.js"></script><script defer src="../../../static.files/main-20a3ad099b048cf2.js"></script><noscript><link rel="stylesheet" href="../../../static.files/noscript-df360f571f6edeae.css"></noscript><link rel="alternate icon" type="image/png" href="../../../static.files/favicon-32x32-422f7d1d52889060.png"><link rel="icon" type="image/svg+xml" href="../../../static.files/favicon-2c020d218678b618.svg"></head><body class="rustdoc src"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="src-sidebar-title"><h2>Files</h2></div></nav><div class="sidebar-resizer"></div><main><rustdoc-search></rustdoc-search><section id="main-content" class="content"><div class="example-wrap"><div data-nosnippet><pre class="src-line-numbers"><a href="#1" id="1">1</a>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `rustiflow/src/flows/basic_flow.rs`."><title>basic_flow.rs - source</title><script>if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-46f98efaafac5295.ttf.woff2,FiraSans-Regular-018c141bf0843ffd.woff2,FiraSans-Medium-8f9a781e4970d388.woff2,SourceCodePro-Regular-562dcc5011b6de7d.ttf.woff2,SourceCodePro-Semibold-d899c5a5c4aeb14a.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2" crossorigin href="../../../static.files/${f}">`).join(""))</script><link rel="stylesheet" href="../../../static.files/normalize-76eba96aa4d2e634.css"><link rel="stylesheet" href="../../../static.files/rustdoc-6d8951b3ccd3cbca.css"><meta name="rustdoc-vars" data-root-path="../../../" data-static-root-path="../../../static.files/" data-current-crate="rustiflow" data-themes="" data-resource-suffix="" data-rustdoc-version="1.83.0-nightly (9096f4faf 2024-10-05)" data-channel="nightly" data-search-js="search-e056c65ede92db13.js" data-settings-js="settings-805db61a62df4bd2.js" ><script src="../../../static.files/storage-1d39b6787ed640ff.js"></script><script defer src="../../../static.files/src-script-e66d777a5a92e9b2.js"></script><script defer src="../../../src-files.js"></script><script defer src="../../../static.files/main-f070b9041d14864c.js"></script><noscript><link rel="stylesheet" href="../../../static.files/noscript-0111fcff984fae8f.css"></noscript><link rel="alternate icon" type="image/png" href="../../../static.files/favicon-32x32-422f7d1d52889060.png"><link rel="icon" type="image/svg+xml" href="../../../static.files/favicon-2c020d218678b618.svg"></head><body class="rustdoc src"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="src-sidebar-title"><h2>Files</h2></div></nav><div class="sidebar-resizer"></div><main><rustdoc-search></rustdoc-search><section id="main-content" class="content"><div class="main-heading"><h1><div class="sub-heading">rustiflow/flows/</div>basic_flow.rs</h1><rustdoc-toolbar></rustdoc-toolbar></div><div class="example-wrap"><div data-nosnippet><pre class="src-line-numbers">
+<a href="#1" id="1">1</a>
 <a href="#2" id="2">2</a>
 <a href="#3" id="3">3</a>
 <a href="#4" id="4">4</a>
@@ -248,21 +249,93 @@
 <a href="#248" id="248">248</a>
 <a href="#249" id="249">249</a>
 <a href="#250" id="250">250</a>
-</pre></div><pre class="rust"><code><span class="kw">use </span>std::{net::IpAddr, ops::Deref, time::Instant};
+<a href="#251" id="251">251</a>
+<a href="#252" id="252">252</a>
+<a href="#253" id="253">253</a>
+<a href="#254" id="254">254</a>
+<a href="#255" id="255">255</a>
+<a href="#256" id="256">256</a>
+<a href="#257" id="257">257</a>
+<a href="#258" id="258">258</a>
+<a href="#259" id="259">259</a>
+<a href="#260" id="260">260</a>
+<a href="#261" id="261">261</a>
+<a href="#262" id="262">262</a>
+<a href="#263" id="263">263</a>
+<a href="#264" id="264">264</a>
+<a href="#265" id="265">265</a>
+<a href="#266" id="266">266</a>
+<a href="#267" id="267">267</a>
+<a href="#268" id="268">268</a>
+<a href="#269" id="269">269</a>
+<a href="#270" id="270">270</a>
+<a href="#271" id="271">271</a>
+<a href="#272" id="272">272</a>
+<a href="#273" id="273">273</a>
+<a href="#274" id="274">274</a>
+<a href="#275" id="275">275</a>
+<a href="#276" id="276">276</a>
+<a href="#277" id="277">277</a>
+<a href="#278" id="278">278</a>
+<a href="#279" id="279">279</a>
+<a href="#280" id="280">280</a>
+<a href="#281" id="281">281</a>
+<a href="#282" id="282">282</a>
+<a href="#283" id="283">283</a>
+<a href="#284" id="284">284</a>
+<a href="#285" id="285">285</a>
+<a href="#286" id="286">286</a>
+<a href="#287" id="287">287</a>
+<a href="#288" id="288">288</a>
+<a href="#289" id="289">289</a>
+<a href="#290" id="290">290</a>
+<a href="#291" id="291">291</a>
+<a href="#292" id="292">292</a>
+<a href="#293" id="293">293</a>
+<a href="#294" id="294">294</a>
+<a href="#295" id="295">295</a>
+<a href="#296" id="296">296</a>
+<a href="#297" id="297">297</a>
+<a href="#298" id="298">298</a>
+<a href="#299" id="299">299</a>
+<a href="#300" id="300">300</a>
+<a href="#301" id="301">301</a>
+<a href="#302" id="302">302</a>
+<a href="#303" id="303">303</a>
+<a href="#304" id="304">304</a>
+<a href="#305" id="305">305</a>
+<a href="#306" id="306">306</a>
+<a href="#307" id="307">307</a>
+<a href="#308" id="308">308</a>
+<a href="#309" id="309">309</a>
+<a href="#310" id="310">310</a>
+<a href="#311" id="311">311</a>
+<a href="#312" id="312">312</a>
+<a href="#313" id="313">313</a>
+<a href="#314" id="314">314</a>
+<a href="#315" id="315">315</a>
+<a href="#316" id="316">316</a>
+<a href="#317" id="317">317</a>
+<a href="#318" id="318">318</a></pre></div><pre class="rust"><code><span class="kw">use </span>std::net::IpAddr;
 
 <span class="kw">use </span>chrono::{DateTime, Utc};
 
-<span class="kw">use crate</span>::{
-    utils::utils::{get_duration, BasicFeatures},
-    NO_CONTAMINANT_FEATURES,
-};
+<span class="kw">use </span><span class="kw">crate</span>::packet_features::PacketFeatures;
 
 <span class="kw">use </span><span class="kw">super</span>::flow::Flow;
 
+<span class="attr">#[derive(Clone, PartialEq)]
+</span><span class="kw">enum </span>FlowState {
+    Established,
+    FinSent,
+    FinAcked
+}
+
 <span class="doccomment">/// A basic flow that stores the basic features of a flow.
+</span><span class="attr">#[derive(Clone)]
 </span><span class="kw">pub struct </span>BasicFlow {
     <span class="doccomment">/// The unique identifier of the flow.
-    </span><span class="kw">pub </span>flow_id: String,
+    </span><span class="kw">pub </span>flow_key: String,
     <span class="doccomment">/// The destination IP address of the flow.
     </span><span class="kw">pub </span>ip_destination: IpAddr,
     <span class="doccomment">/// The source IP address of the flow.
@@ -315,6 +388,60 @@
     </span><span class="kw">pub </span>bwd_ece_flag_count: u32,
     <span class="doccomment">/// The number of packets in the backward direction.
     </span><span class="kw">pub </span>bwd_packet_count: u32,
+    <span class="comment">// Tracking TCP Flow Termination
+    </span>state_fwd: FlowState,
+    state_bwd: FlowState,
+    expected_ack_seq_fwd: <span class="prelude-ty">Option</span>&lt;u32&gt;,
+    expected_ack_seq_bwd: <span class="prelude-ty">Option</span>&lt;u32&gt;,
+}
+
+<span class="kw">impl </span>BasicFlow {
+    <span class="doccomment">/// Checks if the flow is finished.
+    ///
+    /// A flow is considered finished when both FIN flags are set and the last ACK is received,
+    /// and the sequence numbers have been acknowledged by both parties.
+    ///
+    /// ### Arguments
+    ///
+    /// * `packet` - The packet to be checked.
+    ///
+    /// ### Returns
+    ///
+    /// A boolean indicating if the flow is finished.
+    </span><span class="kw">pub fn </span>is_tcp_finished(<span class="kw-2">&amp;mut </span><span class="self">self</span>, packet: <span class="kw-2">&amp;</span>PacketFeatures, forward: bool) -&gt; bool {
+        <span class="comment">// Update state when receiving FIN flag
+        </span><span class="kw">if </span>packet.fin_flag &gt; <span class="number">0 </span>{
+            <span class="kw">if </span>forward {
+                <span class="self">self</span>.state_fwd = FlowState::FinSent;
+                <span class="self">self</span>.expected_ack_seq_bwd = <span class="prelude-val">Some</span>(packet.sequence_number + packet.data_length <span class="kw">as </span>u32 + <span class="number">1</span>);
+            } <span class="kw">else </span>{
+                <span class="self">self</span>.state_bwd = FlowState::FinSent;
+                <span class="self">self</span>.expected_ack_seq_fwd = <span class="prelude-val">Some</span>(packet.sequence_number + packet.data_length <span class="kw">as </span>u32 + <span class="number">1</span>);
+            }
+        }
+
+        <span class="kw">if </span><span class="self">self</span>.state_bwd == FlowState::FinSent &amp;&amp; forward &amp;&amp; <span class="prelude-val">Some</span>(packet.sequence_number_ack) == <span class="self">self</span>.expected_ack_seq_fwd {
+            <span class="self">self</span>.state_bwd = FlowState::FinAcked;
+        } <span class="kw">else if </span><span class="self">self</span>.state_fwd == FlowState::FinSent &amp;&amp; !forward &amp;&amp; <span class="prelude-val">Some</span>(packet.sequence_number_ack) == <span class="self">self</span>.expected_ack_seq_bwd {
+            <span class="self">self</span>.state_fwd = FlowState::FinAcked;
+        }
+
+        <span class="comment">// Return true if both sides are finished and acknowledged the termination
+        </span><span class="self">self</span>.state_fwd == FlowState::FinAcked &amp;&amp; <span class="self">self</span>.state_bwd == FlowState::FinAcked
+    }
+
+    <span class="doccomment">/// Calculates the flow duration in microseconds.
+    ///
+    /// Returns the difference between the last and first packet timestamps in microseconds.
+    ///
+    /// ### Returns
+    ///
+    /// The duration of the flow in microseconds.
+    </span><span class="kw">pub fn </span>get_flow_duration_usec(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; f64 {
+        (<span class="self">self</span>.last_timestamp - <span class="self">self</span>.first_timestamp)
+            .num_microseconds()
+            .unwrap() <span class="kw">as </span>f64
+    }
 }
 
 <span class="kw">impl </span>Flow <span class="kw">for </span>BasicFlow {
@@ -325,17 +452,17 @@
         ip_destination: IpAddr,
         port_destination: u16,
         protocol: u8,
-        ts_date: DateTime&lt;Utc&gt;,
+        first_timestamp: DateTime&lt;Utc&gt;,
     ) -&gt; <span class="self">Self </span>{
         BasicFlow {
-            flow_id,
+            flow_key: flow_id,
             ip_destination,
             ip_source,
             port_destination,
             port_source,
             protocol,
-            first_timestamp: ts_date,
-            last_timestamp: ts_date,
+            first_timestamp,
+            last_timestamp: first_timestamp,
             flow_end_of_flow_ack: <span class="number">0</span>,
             fwd_fin_flag_count: <span class="number">0</span>,
             fwd_syn_flag_count: <span class="number">0</span>,
@@ -355,21 +482,18 @@
             bwd_cwe_flag_count: <span class="number">0</span>,
             bwd_ece_flag_count: <span class="number">0</span>,
             bwd_packet_count: <span class="number">0</span>,
+            state_fwd: FlowState::Established,
+            state_bwd: FlowState::Established,
+            expected_ack_seq_fwd: <span class="prelude-val">None</span>,
+            expected_ack_seq_bwd: <span class="prelude-val">None</span>,
         }
     }
 
-    <span class="kw">fn </span>update_flow(
-        <span class="kw-2">&amp;mut </span><span class="self">self</span>,
-        packet: <span class="kw-2">&amp;</span>BasicFeatures,
-        _timestamp: <span class="kw-2">&amp;</span>Instant,
-        ts_date: DateTime&lt;Utc&gt;,
-        fwd: bool,
-    ) -&gt; <span class="prelude-ty">Option</span>&lt;String&gt; {
-        <span class="self">self</span>.last_timestamp = ts_date;
+    <span class="kw">fn </span>update_flow(<span class="kw-2">&amp;mut </span><span class="self">self</span>, packet: <span class="kw-2">&amp;</span>PacketFeatures, fwd: bool) -&gt; bool {
+        <span class="self">self</span>.last_timestamp = packet.timestamp;
 
-        <span class="comment">// when both FIN flags are set, the flow can be finished when the last ACK is received
-        </span><span class="kw">if </span><span class="self">self</span>.fwd_fin_flag_count &gt; <span class="number">0 </span>&amp;&amp; <span class="self">self</span>.bwd_fin_flag_count &gt; <span class="number">0 </span>{
-            <span class="self">self</span>.flow_end_of_flow_ack = packet.ack_flag;
+        <span class="kw">if </span><span class="self">self</span>.is_tcp_finished(packet, fwd) {
+            <span class="self">self</span>.flow_end_of_flow_ack = <span class="number">1</span>;
         }
 
         <span class="kw">if </span>fwd {
@@ -398,21 +522,17 @@
             </span>|| <span class="self">self</span>.fwd_rst_flag_count &gt; <span class="number">0
             </span>|| <span class="self">self</span>.bwd_rst_flag_count &gt; <span class="number">0
         </span>{
-            <span class="kw">if </span><span class="kw-2">*</span>NO_CONTAMINANT_FEATURES.lock().unwrap().deref() {
-                <span class="kw">return </span><span class="prelude-val">Some</span>(<span class="self">self</span>.dump_without_contamination());
-            } <span class="kw">else </span>{
-                <span class="kw">return </span><span class="prelude-val">Some</span>(<span class="self">self</span>.dump());
-            }
+            <span class="kw">return </span><span class="bool-val">true</span>;
         }
 
-        <span class="prelude-val">None
+        <span class="bool-val">false
     </span>}
 
     <span class="kw">fn </span>dump(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; String {
         <span class="macro">format!</span>(
             <span class="string">"{},{},{},{},{},{},{},{},{},{},{},{},{},\
         {},{},{},{},{},{},{},{},{},{},{},{},{},{},{}"</span>,
-            <span class="self">self</span>.flow_id,
+            <span class="self">self</span>.flow_key,
             <span class="self">self</span>.ip_source,
             <span class="self">self</span>.port_source,
             <span class="self">self</span>.ip_destination,
@@ -420,7 +540,7 @@
             <span class="self">self</span>.protocol,
             <span class="self">self</span>.first_timestamp,
             <span class="self">self</span>.last_timestamp,
-            get_duration(<span class="self">self</span>.first_timestamp, <span class="self">self</span>.last_timestamp),
+            <span class="self">self</span>.get_flow_duration_usec(),
             <span class="self">self</span>.flow_end_of_flow_ack,
             <span class="self">self</span>.fwd_fin_flag_count,
             <span class="self">self</span>.fwd_syn_flag_count,
@@ -460,7 +580,7 @@
             <span class="string">"{},{},{},{},{},{},{},{},{},{},{},{},{},\
             {},{},{},{},{},{},{},{}"</span>,
             <span class="self">self</span>.protocol,
-            get_duration(<span class="self">self</span>.first_timestamp, <span class="self">self</span>.last_timestamp),
+            <span class="self">self</span>.get_flow_duration_usec(),
             <span class="self">self</span>.flow_end_of_flow_ack,
             <span class="self">self</span>.fwd_fin_flag_count,
             <span class="self">self</span>.fwd_syn_flag_count,
@@ -496,6 +616,22 @@
 
     <span class="kw">fn </span>get_first_timestamp(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; DateTime&lt;Utc&gt; {
         <span class="self">self</span>.first_timestamp
+    }
+
+    <span class="kw">fn </span>is_expired(<span class="kw-2">&amp;</span><span class="self">self</span>, timestamp: DateTime&lt;Utc&gt;, active_timeout: u64, idle_timeout: u64) -&gt; bool {
+        <span class="kw">if </span>(timestamp - <span class="self">self</span>.first_timestamp).num_seconds() <span class="kw">as </span>u64 &gt; active_timeout {
+            <span class="kw">return </span><span class="bool-val">true</span>;
+        }
+
+        <span class="kw">if </span>(timestamp - <span class="self">self</span>.last_timestamp).num_seconds() <span class="kw">as </span>u64 &gt; idle_timeout {
+            <span class="kw">return </span><span class="bool-val">true</span>;
+        }
+
+        <span class="bool-val">false
+    </span>}
+
+    <span class="kw">fn </span>flow_key(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>String {
+        <span class="kw-2">&amp;</span><span class="self">self</span>.flow_key
     }
 }
 </code></pre></div></section></main></body></html>

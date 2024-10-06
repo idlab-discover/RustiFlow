@@ -1,4 +1,5 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `rustiflow/src/flows/ntl_flow.rs`."><title>ntl_flow.rs - source</title><script>if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-46f98efaafac5295.ttf.woff2,FiraSans-Regular-018c141bf0843ffd.woff2,FiraSans-Medium-8f9a781e4970d388.woff2,SourceCodePro-Regular-562dcc5011b6de7d.ttf.woff2,SourceCodePro-Semibold-d899c5a5c4aeb14a.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2" crossorigin href="../../../static.files/${f}">`).join(""))</script><link rel="stylesheet" href="../../../static.files/normalize-76eba96aa4d2e634.css"><link rel="stylesheet" href="../../../static.files/rustdoc-dd39b87e5fcfba68.css"><meta name="rustdoc-vars" data-root-path="../../../" data-static-root-path="../../../static.files/" data-current-crate="rustiflow" data-themes="" data-resource-suffix="" data-rustdoc-version="1.81.0-nightly (0c81f94b9 2024-07-10)" data-channel="nightly" data-search-js="search-d234aafac6c221dd.js" data-settings-js="settings-4313503d2e1961c2.js" ><script src="../../../static.files/storage-118b08c4c78b968e.js"></script><script defer src="../../../static.files/src-script-e66d777a5a92e9b2.js"></script><script defer src="../../../src-files.js"></script><script defer src="../../../static.files/main-20a3ad099b048cf2.js"></script><noscript><link rel="stylesheet" href="../../../static.files/noscript-df360f571f6edeae.css"></noscript><link rel="alternate icon" type="image/png" href="../../../static.files/favicon-32x32-422f7d1d52889060.png"><link rel="icon" type="image/svg+xml" href="../../../static.files/favicon-2c020d218678b618.svg"></head><body class="rustdoc src"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="src-sidebar-title"><h2>Files</h2></div></nav><div class="sidebar-resizer"></div><main><rustdoc-search></rustdoc-search><section id="main-content" class="content"><div class="example-wrap"><div data-nosnippet><pre class="src-line-numbers"><a href="#1" id="1">1</a>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `rustiflow/src/flows/ntl_flow.rs`."><title>ntl_flow.rs - source</title><script>if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-46f98efaafac5295.ttf.woff2,FiraSans-Regular-018c141bf0843ffd.woff2,FiraSans-Medium-8f9a781e4970d388.woff2,SourceCodePro-Regular-562dcc5011b6de7d.ttf.woff2,SourceCodePro-Semibold-d899c5a5c4aeb14a.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2" crossorigin href="../../../static.files/${f}">`).join(""))</script><link rel="stylesheet" href="../../../static.files/normalize-76eba96aa4d2e634.css"><link rel="stylesheet" href="../../../static.files/rustdoc-6d8951b3ccd3cbca.css"><meta name="rustdoc-vars" data-root-path="../../../" data-static-root-path="../../../static.files/" data-current-crate="rustiflow" data-themes="" data-resource-suffix="" data-rustdoc-version="1.83.0-nightly (9096f4faf 2024-10-05)" data-channel="nightly" data-search-js="search-e056c65ede92db13.js" data-settings-js="settings-805db61a62df4bd2.js" ><script src="../../../static.files/storage-1d39b6787ed640ff.js"></script><script defer src="../../../static.files/src-script-e66d777a5a92e9b2.js"></script><script defer src="../../../src-files.js"></script><script defer src="../../../static.files/main-f070b9041d14864c.js"></script><noscript><link rel="stylesheet" href="../../../static.files/noscript-0111fcff984fae8f.css"></noscript><link rel="alternate icon" type="image/png" href="../../../static.files/favicon-32x32-422f7d1d52889060.png"><link rel="icon" type="image/svg+xml" href="../../../static.files/favicon-2c020d218678b618.svg"></head><body class="rustdoc src"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="src-sidebar-title"><h2>Files</h2></div></nav><div class="sidebar-resizer"></div><main><rustdoc-search></rustdoc-search><section id="main-content" class="content"><div class="main-heading"><h1><div class="sub-heading">rustiflow/flows/</div>ntl_flow.rs</h1><rustdoc-toolbar></rustdoc-toolbar></div><div class="example-wrap"><div data-nosnippet><pre class="src-line-numbers">
+<a href="#1" id="1">1</a>
 <a href="#2" id="2">2</a>
 <a href="#3" id="3">3</a>
 <a href="#4" id="4">4</a>
@@ -827,75 +828,24 @@
 <a href="#827" id="827">827</a>
 <a href="#828" id="828">828</a>
 <a href="#829" id="829">829</a>
-<a href="#830" id="830">830</a>
-<a href="#831" id="831">831</a>
-<a href="#832" id="832">832</a>
-<a href="#833" id="833">833</a>
-<a href="#834" id="834">834</a>
-<a href="#835" id="835">835</a>
-<a href="#836" id="836">836</a>
-<a href="#837" id="837">837</a>
-<a href="#838" id="838">838</a>
-<a href="#839" id="839">839</a>
-<a href="#840" id="840">840</a>
-<a href="#841" id="841">841</a>
-<a href="#842" id="842">842</a>
-<a href="#843" id="843">843</a>
-<a href="#844" id="844">844</a>
-<a href="#845" id="845">845</a>
-<a href="#846" id="846">846</a>
-<a href="#847" id="847">847</a>
-<a href="#848" id="848">848</a>
-<a href="#849" id="849">849</a>
-<a href="#850" id="850">850</a>
-<a href="#851" id="851">851</a>
-<a href="#852" id="852">852</a>
-<a href="#853" id="853">853</a>
-<a href="#854" id="854">854</a>
-<a href="#855" id="855">855</a>
-<a href="#856" id="856">856</a>
-<a href="#857" id="857">857</a>
-<a href="#858" id="858">858</a>
-<a href="#859" id="859">859</a>
-<a href="#860" id="860">860</a>
-<a href="#861" id="861">861</a>
-<a href="#862" id="862">862</a>
-<a href="#863" id="863">863</a>
-<a href="#864" id="864">864</a>
-<a href="#865" id="865">865</a>
-<a href="#866" id="866">866</a>
-<a href="#867" id="867">867</a>
-<a href="#868" id="868">868</a>
-<a href="#869" id="869">869</a>
-<a href="#870" id="870">870</a>
-<a href="#871" id="871">871</a>
-<a href="#872" id="872">872</a>
-<a href="#873" id="873">873</a>
-<a href="#874" id="874">874</a>
-<a href="#875" id="875">875</a>
-<a href="#876" id="876">876</a>
-<a href="#877" id="877">877</a>
-<a href="#878" id="878">878</a>
-<a href="#879" id="879">879</a>
-<a href="#880" id="880">880</a>
-<a href="#881" id="881">881</a>
-<a href="#882" id="882">882</a>
-<a href="#883" id="883">883</a>
-</pre></div><pre class="rust"><code><span class="kw">use </span>chrono::{DateTime, Utc};
-<span class="kw">use </span>std::ops::Deref;
-<span class="kw">use </span>std::{net::IpAddr, time::Instant};
+<a href="#830" id="830">830</a></pre></div><pre class="rust"><code><span class="kw">use </span>chrono::{DateTime, Utc};
+<span class="kw">use </span>std::net::IpAddr;
 
-<span class="kw">use </span><span class="kw">crate</span>::utils::utils::{calculate_mean, calculate_std, get_duration, BasicFeatures};
-<span class="kw">use </span><span class="kw">crate</span>::NO_CONTAMINANT_FEATURES;
+<span class="kw">use </span><span class="kw">crate</span>::packet_features::PacketFeatures;
 
-<span class="kw">use super</span>::{cic_flow::CicFlow, flow::Flow};
+<span class="kw">use super</span>::{
+    cic_flow::CicFlow,
+    flow::Flow,
+    util::{calculate_mean, calculate_std},
+};
 
 <span class="doccomment">/// Represents a NTL Flow, encapsulating various metrics and states of a network flow.
 ///
 /// This flow represents the same flow as the NTLFlowLyzer does.
+</span><span class="attr">#[derive(Clone)]
 </span><span class="kw">pub struct </span>NTLFlow {
     <span class="doccomment">/// The cic flow information.
-    </span><span class="kw">pub </span>basic_flow: CicFlow,
+    </span><span class="kw">pub </span>cic_flow: CicFlow,
     <span class="doccomment">/// The minimum header length of the forward flow.
     </span>fwd_header_len_min: u32,
     <span class="doccomment">/// The maximum header length of the forward flow.
@@ -934,16 +884,16 @@
         }
 
         <span class="comment">// update total
-        </span><span class="self">self</span>.basic_flow.fwd_header_length += len;
+        </span><span class="self">self</span>.cic_flow.fwd_header_length += len;
 
         <span class="comment">// update mean and std
         </span><span class="kw">let </span>new_fwd_header_len_mean = calculate_mean(
-            <span class="self">self</span>.basic_flow.basic_flow.fwd_packet_count <span class="kw">as </span>u64,
+            <span class="self">self</span>.cic_flow.basic_flow.fwd_packet_count <span class="kw">as </span>u64,
             <span class="self">self</span>.fwd_header_len_mean <span class="kw">as </span>f64,
             len <span class="kw">as </span>f64,
         ) <span class="kw">as </span>f32;
         <span class="self">self</span>.fwd_header_len_std = calculate_std(
-            <span class="self">self</span>.basic_flow.basic_flow.fwd_packet_count <span class="kw">as </span>u64,
+            <span class="self">self</span>.cic_flow.basic_flow.fwd_packet_count <span class="kw">as </span>u64,
             <span class="self">self</span>.fwd_header_len_std <span class="kw">as </span>f64,
             <span class="self">self</span>.fwd_header_len_mean <span class="kw">as </span>f64,
             new_fwd_header_len_mean <span class="kw">as </span>f64,
@@ -971,16 +921,16 @@
         }
 
         <span class="comment">// update total
-        </span><span class="self">self</span>.basic_flow.bwd_header_length += len;
+        </span><span class="self">self</span>.cic_flow.bwd_header_length += len;
 
         <span class="comment">// update mean and std
         </span><span class="kw">let </span>new_bwd_header_len_mean = calculate_mean(
-            <span class="self">self</span>.basic_flow.basic_flow.bwd_packet_count <span class="kw">as </span>u64,
+            <span class="self">self</span>.cic_flow.basic_flow.bwd_packet_count <span class="kw">as </span>u64,
             <span class="self">self</span>.bwd_header_len_mean <span class="kw">as </span>f64,
             len <span class="kw">as </span>f64,
         ) <span class="kw">as </span>f32;
         <span class="self">self</span>.bwd_header_len_std = calculate_std(
-            <span class="self">self</span>.basic_flow.basic_flow.bwd_packet_count <span class="kw">as </span>u64,
+            <span class="self">self</span>.cic_flow.basic_flow.bwd_packet_count <span class="kw">as </span>u64,
             <span class="self">self</span>.bwd_header_len_std <span class="kw">as </span>f64,
             <span class="self">self</span>.bwd_header_len_mean <span class="kw">as </span>f64,
             new_bwd_header_len_mean <span class="kw">as </span>f64,
@@ -1063,11 +1013,11 @@
     ///
     /// Mean packet header length of the flow.
     </span><span class="kw">pub fn </span>get_flow_header_length_mean(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; f32 {
-        (<span class="self">self</span>.fwd_header_len_mean * <span class="self">self</span>.basic_flow.basic_flow.fwd_packet_count <span class="kw">as </span>f32
-            + <span class="self">self</span>.bwd_header_len_mean * <span class="self">self</span>.basic_flow.basic_flow.bwd_packet_count <span class="kw">as </span>f32)
+        (<span class="self">self</span>.fwd_header_len_mean * <span class="self">self</span>.cic_flow.basic_flow.fwd_packet_count <span class="kw">as </span>f32
+            + <span class="self">self</span>.bwd_header_len_mean * <span class="self">self</span>.cic_flow.basic_flow.bwd_packet_count <span class="kw">as </span>f32)
             <span class="kw">as </span>f32
-            / (<span class="self">self</span>.basic_flow.basic_flow.fwd_packet_count
-                + <span class="self">self</span>.basic_flow.basic_flow.bwd_packet_count) <span class="kw">as </span>f32
+            / (<span class="self">self</span>.cic_flow.basic_flow.fwd_packet_count
+                + <span class="self">self</span>.cic_flow.basic_flow.bwd_packet_count) <span class="kw">as </span>f32
     }
 
     <span class="doccomment">/// Calculates the variance of the packet lengths in the flow.
@@ -1079,10 +1029,9 @@
     ///
     /// Variance of the flow's packet lengths, or 0 if not enough data.
     </span><span class="kw">pub fn </span>get_flow_header_length_variance(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; f64 {
-        <span class="kw">if </span><span class="self">self</span>.basic_flow.basic_flow.fwd_packet_count &lt; <span class="number">1
-            </span>|| <span class="self">self</span>.basic_flow.basic_flow.bwd_packet_count &lt; <span class="number">1
-            </span>|| <span class="self">self</span>.basic_flow.basic_flow.fwd_packet_count
-                + <span class="self">self</span>.basic_flow.basic_flow.bwd_packet_count
+        <span class="kw">if </span><span class="self">self</span>.cic_flow.basic_flow.fwd_packet_count &lt; <span class="number">1
+            </span>|| <span class="self">self</span>.cic_flow.basic_flow.bwd_packet_count &lt; <span class="number">1
+            </span>|| <span class="self">self</span>.cic_flow.basic_flow.fwd_packet_count + <span class="self">self</span>.cic_flow.basic_flow.bwd_packet_count
                 &lt; <span class="number">3
         </span>{
             <span class="kw">return </span><span class="number">0.0</span>;
@@ -1091,10 +1040,10 @@
         <span class="kw">let </span>fwd_pkt_std_squared = <span class="self">self</span>.fwd_header_len_std.powf(<span class="number">2.0</span>);
         <span class="kw">let </span>bwd_pkt_std_squared = <span class="self">self</span>.bwd_header_len_std.powf(<span class="number">2.0</span>);
 
-        ((<span class="self">self</span>.basic_flow.basic_flow.fwd_packet_count - <span class="number">1</span>) <span class="kw">as </span>f64 * fwd_pkt_std_squared <span class="kw">as </span>f64
-            + (<span class="self">self</span>.basic_flow.basic_flow.bwd_packet_count - <span class="number">1</span>) <span class="kw">as </span>f64 * bwd_pkt_std_squared <span class="kw">as </span>f64)
-            / (<span class="self">self</span>.basic_flow.basic_flow.fwd_packet_count
-                + <span class="self">self</span>.basic_flow.basic_flow.bwd_packet_count
+        ((<span class="self">self</span>.cic_flow.basic_flow.fwd_packet_count - <span class="number">1</span>) <span class="kw">as </span>f64 * fwd_pkt_std_squared <span class="kw">as </span>f64
+            + (<span class="self">self</span>.cic_flow.basic_flow.bwd_packet_count - <span class="number">1</span>) <span class="kw">as </span>f64 * bwd_pkt_std_squared <span class="kw">as </span>f64)
+            / (<span class="self">self</span>.cic_flow.basic_flow.fwd_packet_count
+                + <span class="self">self</span>.cic_flow.basic_flow.bwd_packet_count
                 - <span class="number">2</span>) <span class="kw">as </span>f64
     }
 
@@ -1118,17 +1067,17 @@
         ipv4_destination: IpAddr,
         port_destination: u16,
         protocol: u8,
-        ts_date: DateTime&lt;Utc&gt;,
+        timestamp: DateTime&lt;Utc&gt;,
     ) -&gt; <span class="self">Self </span>{
         NTLFlow {
-            basic_flow: CicFlow::new(
+            cic_flow: CicFlow::new(
                 flow_id,
                 ipv4_source,
                 port_source,
                 ipv4_destination,
                 port_destination,
                 protocol,
-                ts_date,
+                timestamp,
             ),
             fwd_header_len_min: u32::MAX,
             fwd_header_len_max: <span class="number">0</span>,
@@ -1141,33 +1090,19 @@
         }
     }
 
-    <span class="kw">fn </span>update_flow(
-        <span class="kw-2">&amp;mut </span><span class="self">self</span>,
-        packet: <span class="kw-2">&amp;</span>BasicFeatures,
-        timestamp: <span class="kw-2">&amp;</span>Instant,
-        ts_date: DateTime&lt;Utc&gt;,
-        fwd: bool,
-    ) -&gt; <span class="prelude-ty">Option</span>&lt;String&gt; {
-        <span class="kw">let </span>end = <span class="self">self</span>.basic_flow.update_flow(packet, timestamp, ts_date, fwd);
-
+    <span class="kw">fn </span>update_flow(<span class="kw-2">&amp;mut </span><span class="self">self</span>, packet: <span class="kw-2">&amp;</span>PacketFeatures, fwd: bool) -&gt; bool {
+        <span class="kw">let </span>is_terminated = <span class="self">self</span>.cic_flow.update_flow(packet, fwd);
         <span class="kw">if </span>fwd {
             <span class="self">self</span>.update_fwd_header_len_stats(packet.header_length <span class="kw">as </span>u32);
         } <span class="kw">else </span>{
             <span class="self">self</span>.update_bwd_header_len_stats(packet.header_length <span class="kw">as </span>u32);
         }
-
-        <span class="kw">if </span>end.is_some() {
-            <span class="kw">if </span><span class="kw-2">*</span>NO_CONTAMINANT_FEATURES.lock().unwrap().deref() {
-                <span class="kw">return </span><span class="prelude-val">Some</span>(<span class="self">self</span>.dump_without_contamination());
-            } <span class="kw">else </span>{
-                <span class="kw">return </span><span class="prelude-val">Some</span>(<span class="self">self</span>.dump());
-            }
-        }
-
-        <span class="prelude-val">None
-    </span>}
+        is_terminated
+    }
 
     <span class="kw">fn </span>dump(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; String {
+        <span class="kw">let </span>flow_duration =
+            <span class="self">self</span>.cic_flow.basic_flow.last_timestamp - <span class="self">self</span>.cic_flow.basic_flow.first_timestamp;
         <span class="macro">format!</span>(
             <span class="string">"{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},\
             {},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},\
@@ -1175,170 +1110,144 @@
             {},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},\
             {},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},\
             {},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{}"</span>,
-            <span class="self">self</span>.basic_flow.basic_flow.flow_id,
-            <span class="self">self</span>.basic_flow.basic_flow.ip_source,
-            <span class="self">self</span>.basic_flow.basic_flow.port_source,
-            <span class="self">self</span>.basic_flow.basic_flow.ip_destination,
-            <span class="self">self</span>.basic_flow.basic_flow.port_destination,
-            <span class="self">self</span>.basic_flow.basic_flow.protocol,
-            get_duration(
-                <span class="self">self</span>.basic_flow.basic_flow.first_timestamp,
-                <span class="self">self</span>.basic_flow.basic_flow.last_timestamp
-            ),
-            <span class="self">self</span>.basic_flow.basic_flow.fwd_packet_count
-                + <span class="self">self</span>.basic_flow.basic_flow.bwd_packet_count,
-            <span class="self">self</span>.basic_flow.basic_flow.fwd_packet_count,
-            <span class="self">self</span>.basic_flow.basic_flow.bwd_packet_count,
-            <span class="self">self</span>.basic_flow.fwd_pkt_len_tot + <span class="self">self</span>.basic_flow.bwd_pkt_len_tot,
-            <span class="self">self</span>.basic_flow.fwd_pkt_len_tot,
-            <span class="self">self</span>.basic_flow.bwd_pkt_len_tot,
-            <span class="self">self</span>.basic_flow.get_flow_packet_length_max(),
-            <span class="self">self</span>.basic_flow.get_flow_packet_length_min(),
-            <span class="self">self</span>.basic_flow.get_flow_packet_length_mean(),
-            <span class="self">self</span>.basic_flow.get_flow_packet_length_std(),
-            <span class="self">self</span>.basic_flow.get_flow_packet_length_variance(),
-            <span class="self">self</span>.basic_flow.fwd_pkt_len_max,
-            <span class="self">self</span>.basic_flow.get_fwd_packet_length_min(),
-            <span class="self">self</span>.basic_flow.fwd_pkt_len_mean,
-            <span class="self">self</span>.basic_flow.fwd_pkt_len_std,
-            <span class="self">self</span>.basic_flow.fwd_pkt_len_std.powf(<span class="number">2.0</span>),
-            <span class="self">self</span>.basic_flow.bwd_pkt_len_max,
-            <span class="self">self</span>.basic_flow.get_bwd_packet_length_min(),
-            <span class="self">self</span>.basic_flow.bwd_pkt_len_mean,
-            <span class="self">self</span>.basic_flow.bwd_pkt_len_std,
-            <span class="self">self</span>.basic_flow.bwd_pkt_len_std.powf(<span class="number">2.0</span>),
-            <span class="self">self</span>.basic_flow.fwd_header_length + <span class="self">self</span>.basic_flow.bwd_header_length,
+            <span class="self">self</span>.cic_flow.basic_flow.flow_key,
+            <span class="self">self</span>.cic_flow.basic_flow.ip_source,
+            <span class="self">self</span>.cic_flow.basic_flow.port_source,
+            <span class="self">self</span>.cic_flow.basic_flow.ip_destination,
+            <span class="self">self</span>.cic_flow.basic_flow.port_destination,
+            <span class="self">self</span>.cic_flow.basic_flow.protocol,
+            flow_duration.num_microseconds().unwrap(),
+            <span class="self">self</span>.cic_flow.basic_flow.fwd_packet_count + <span class="self">self</span>.cic_flow.basic_flow.bwd_packet_count,
+            <span class="self">self</span>.cic_flow.basic_flow.fwd_packet_count,
+            <span class="self">self</span>.cic_flow.basic_flow.bwd_packet_count,
+            <span class="self">self</span>.cic_flow.fwd_pkt_len_tot + <span class="self">self</span>.cic_flow.bwd_pkt_len_tot,
+            <span class="self">self</span>.cic_flow.fwd_pkt_len_tot,
+            <span class="self">self</span>.cic_flow.bwd_pkt_len_tot,
+            <span class="self">self</span>.cic_flow.get_flow_packet_length_max(),
+            <span class="self">self</span>.cic_flow.get_flow_packet_length_min(),
+            <span class="self">self</span>.cic_flow.get_flow_packet_length_mean(),
+            <span class="self">self</span>.cic_flow.get_flow_packet_length_std(),
+            <span class="self">self</span>.cic_flow.get_flow_packet_length_variance(),
+            <span class="self">self</span>.cic_flow.fwd_pkt_len_max,
+            <span class="self">self</span>.cic_flow.get_fwd_packet_length_min(),
+            <span class="self">self</span>.cic_flow.fwd_pkt_len_mean,
+            <span class="self">self</span>.cic_flow.fwd_pkt_len_std,
+            <span class="self">self</span>.cic_flow.fwd_pkt_len_std.powf(<span class="number">2.0</span>),
+            <span class="self">self</span>.cic_flow.bwd_pkt_len_max,
+            <span class="self">self</span>.cic_flow.get_bwd_packet_length_min(),
+            <span class="self">self</span>.cic_flow.bwd_pkt_len_mean,
+            <span class="self">self</span>.cic_flow.bwd_pkt_len_std,
+            <span class="self">self</span>.cic_flow.bwd_pkt_len_std.powf(<span class="number">2.0</span>),
+            <span class="self">self</span>.cic_flow.fwd_header_length + <span class="self">self</span>.cic_flow.bwd_header_length,
             <span class="self">self</span>.get_flow_header_length_max(),
             <span class="self">self</span>.get_flow_header_length_min(),
             <span class="self">self</span>.get_flow_header_length_mean(),
             <span class="self">self</span>.get_flow_header_length_std(),
-            <span class="self">self</span>.basic_flow.fwd_header_length,
+            <span class="self">self</span>.cic_flow.fwd_header_length,
             <span class="self">self</span>.fwd_header_len_max,
             <span class="self">self</span>.get_fwd_header_length_min(),
             <span class="self">self</span>.fwd_header_len_mean,
             <span class="self">self</span>.fwd_header_len_std,
-            <span class="self">self</span>.basic_flow.bwd_header_length,
+            <span class="self">self</span>.cic_flow.bwd_header_length,
             <span class="self">self</span>.bwd_header_len_max,
             <span class="self">self</span>.get_bwd_header_length_min(),
             <span class="self">self</span>.bwd_header_len_mean,
             <span class="self">self</span>.bwd_header_len_std,
-            <span class="self">self</span>.basic_flow.get_fwd_segment_length_mean(),
-            <span class="self">self</span>.basic_flow.get_bwd_segment_length_mean(),
-            <span class="self">self</span>.basic_flow.get_flow_segment_length_mean(),
-            <span class="self">self</span>.basic_flow.fwd_init_win_bytes,
-            <span class="self">self</span>.basic_flow.bwd_init_win_bytes,
-            <span class="self">self</span>.basic_flow.get_active_min(),
-            <span class="self">self</span>.basic_flow.active_max,
-            <span class="self">self</span>.basic_flow.active_mean,
-            <span class="self">self</span>.basic_flow.active_std,
-            <span class="self">self</span>.basic_flow.get_idle_min(),
-            <span class="self">self</span>.basic_flow.idle_max,
-            <span class="self">self</span>.basic_flow.idle_mean,
-            <span class="self">self</span>.basic_flow.idle_std,
-            (<span class="self">self</span>.basic_flow.fwd_pkt_len_tot + <span class="self">self</span>.basic_flow.bwd_pkt_len_tot) <span class="kw">as </span>f64
-                / (get_duration(
-                    <span class="self">self</span>.basic_flow.basic_flow.first_timestamp,
-                    <span class="self">self</span>.basic_flow.basic_flow.last_timestamp
-                ))
-                / <span class="number">1_000_000.0</span>,
-            <span class="self">self</span>.basic_flow.fwd_pkt_len_tot <span class="kw">as </span>f64
-                / (get_duration(
-                    <span class="self">self</span>.basic_flow.basic_flow.first_timestamp,
-                    <span class="self">self</span>.basic_flow.basic_flow.last_timestamp
-                ))
-                / <span class="number">1_000_000.0</span>,
-            <span class="self">self</span>.basic_flow.bwd_pkt_len_tot <span class="kw">as </span>f64
-                / (get_duration(
-                    <span class="self">self</span>.basic_flow.basic_flow.first_timestamp,
-                    <span class="self">self</span>.basic_flow.basic_flow.last_timestamp
-                ))
-                / <span class="number">1_000_000.0</span>,
-            (<span class="self">self</span>.basic_flow.basic_flow.fwd_packet_count
-                + <span class="self">self</span>.basic_flow.basic_flow.bwd_packet_count) <span class="kw">as </span>f64
-                / (get_duration(
-                    <span class="self">self</span>.basic_flow.basic_flow.first_timestamp,
-                    <span class="self">self</span>.basic_flow.basic_flow.last_timestamp
-                ))
-                / <span class="number">1_000_000.0</span>,
-            <span class="self">self</span>.basic_flow.basic_flow.bwd_packet_count <span class="kw">as </span>f64
-                / (get_duration(
-                    <span class="self">self</span>.basic_flow.basic_flow.first_timestamp,
-                    <span class="self">self</span>.basic_flow.basic_flow.last_timestamp
-                ))
-                / <span class="number">1_000_000.0</span>,
-            <span class="self">self</span>.basic_flow.basic_flow.fwd_packet_count <span class="kw">as </span>f64
-                / (get_duration(
-                    <span class="self">self</span>.basic_flow.basic_flow.first_timestamp,
-                    <span class="self">self</span>.basic_flow.basic_flow.last_timestamp
-                ))
-                / <span class="number">1_000_000.0</span>,
-            <span class="self">self</span>.basic_flow.get_down_up_ratio(),
-            <span class="self">self</span>.basic_flow.get_fwd_bytes_bulk(),
-            <span class="self">self</span>.basic_flow.get_fwd_packets_bulk(),
-            <span class="self">self</span>.basic_flow.get_fwd_bulk_rate(),
-            <span class="self">self</span>.basic_flow.get_bwd_bytes_bulk(),
-            <span class="self">self</span>.basic_flow.get_bwd_packets_bulk(),
-            <span class="self">self</span>.basic_flow.get_bwd_bulk_rate(),
-            <span class="self">self</span>.basic_flow.fwd_bulk_state_count,
-            <span class="self">self</span>.basic_flow.fwd_bulk_size_total,
-            <span class="self">self</span>.basic_flow.fwd_bulk_packet_count,
-            <span class="self">self</span>.basic_flow.fwd_bulk_duration,
-            <span class="self">self</span>.basic_flow.bwd_bulk_state_count,
-            <span class="self">self</span>.basic_flow.bwd_bulk_size_total,
-            <span class="self">self</span>.basic_flow.bwd_bulk_packet_count,
-            <span class="self">self</span>.basic_flow.bwd_bulk_duration,
-            <span class="self">self</span>.basic_flow.basic_flow.fwd_fin_flag_count
-                + <span class="self">self</span>.basic_flow.basic_flow.bwd_fin_flag_count,
-            <span class="self">self</span>.basic_flow.basic_flow.fwd_psh_flag_count
-                + <span class="self">self</span>.basic_flow.basic_flow.bwd_psh_flag_count,
-            <span class="self">self</span>.basic_flow.basic_flow.fwd_urg_flag_count
-                + <span class="self">self</span>.basic_flow.basic_flow.bwd_urg_flag_count,
-            <span class="self">self</span>.basic_flow.basic_flow.fwd_ece_flag_count
-                + <span class="self">self</span>.basic_flow.basic_flow.bwd_ece_flag_count,
-            <span class="self">self</span>.basic_flow.basic_flow.fwd_syn_flag_count
-                + <span class="self">self</span>.basic_flow.basic_flow.bwd_syn_flag_count,
-            <span class="self">self</span>.basic_flow.basic_flow.fwd_ack_flag_count
-                + <span class="self">self</span>.basic_flow.basic_flow.bwd_ack_flag_count,
-            <span class="self">self</span>.basic_flow.basic_flow.fwd_cwe_flag_count
-                + <span class="self">self</span>.basic_flow.basic_flow.bwd_cwe_flag_count,
-            <span class="self">self</span>.basic_flow.basic_flow.fwd_rst_flag_count
-                + <span class="self">self</span>.basic_flow.basic_flow.bwd_rst_flag_count,
-            <span class="self">self</span>.basic_flow.basic_flow.fwd_fin_flag_count,
-            <span class="self">self</span>.basic_flow.basic_flow.fwd_psh_flag_count,
-            <span class="self">self</span>.basic_flow.basic_flow.fwd_urg_flag_count,
-            <span class="self">self</span>.basic_flow.basic_flow.fwd_ece_flag_count,
-            <span class="self">self</span>.basic_flow.basic_flow.fwd_syn_flag_count,
-            <span class="self">self</span>.basic_flow.basic_flow.fwd_ack_flag_count,
-            <span class="self">self</span>.basic_flow.basic_flow.fwd_cwe_flag_count,
-            <span class="self">self</span>.basic_flow.basic_flow.fwd_rst_flag_count,
-            <span class="self">self</span>.basic_flow.basic_flow.bwd_fin_flag_count,
-            <span class="self">self</span>.basic_flow.basic_flow.bwd_psh_flag_count,
-            <span class="self">self</span>.basic_flow.basic_flow.bwd_urg_flag_count,
-            <span class="self">self</span>.basic_flow.basic_flow.bwd_ece_flag_count,
-            <span class="self">self</span>.basic_flow.basic_flow.bwd_syn_flag_count,
-            <span class="self">self</span>.basic_flow.basic_flow.bwd_ack_flag_count,
-            <span class="self">self</span>.basic_flow.basic_flow.bwd_cwe_flag_count,
-            <span class="self">self</span>.basic_flow.basic_flow.bwd_rst_flag_count,
-            <span class="self">self</span>.basic_flow.get_flow_iat_mean(),
-            <span class="self">self</span>.basic_flow.get_flow_iat_std(),
-            <span class="self">self</span>.basic_flow.get_flow_iat_max(),
-            <span class="self">self</span>.basic_flow.get_flow_iat_min(),
-            <span class="self">self</span>.basic_flow.fwd_iat_total + <span class="self">self</span>.basic_flow.bwd_iat_total,
-            <span class="self">self</span>.basic_flow.fwd_iat_mean,
-            <span class="self">self</span>.basic_flow.fwd_iat_std,
-            <span class="self">self</span>.basic_flow.fwd_iat_max,
-            <span class="self">self</span>.basic_flow.get_fwd_iat_min(),
-            <span class="self">self</span>.basic_flow.fwd_iat_total,
-            <span class="self">self</span>.basic_flow.fwd_iat_total,
-            <span class="self">self</span>.basic_flow.bwd_iat_mean,
-            <span class="self">self</span>.basic_flow.bwd_iat_std,
-            <span class="self">self</span>.basic_flow.bwd_iat_max,
-            <span class="self">self</span>.basic_flow.get_bwd_iat_min(),
-            <span class="self">self</span>.basic_flow.bwd_iat_total,
-            <span class="self">self</span>.basic_flow.get_sf_fwd_packets(),
-            <span class="self">self</span>.basic_flow.get_sf_bwd_packets(),
-            <span class="self">self</span>.basic_flow.get_sf_fwd_bytes(),
-            <span class="self">self</span>.basic_flow.get_sf_bwd_bytes(),
+            <span class="self">self</span>.cic_flow.get_fwd_segment_length_mean(),
+            <span class="self">self</span>.cic_flow.get_bwd_segment_length_mean(),
+            <span class="self">self</span>.cic_flow.get_flow_segment_length_mean(),
+            <span class="self">self</span>.cic_flow.fwd_init_win_bytes,
+            <span class="self">self</span>.cic_flow.bwd_init_win_bytes,
+            <span class="self">self</span>.cic_flow.get_active_min(),
+            <span class="self">self</span>.cic_flow.active_max,
+            <span class="self">self</span>.cic_flow.active_mean,
+            <span class="self">self</span>.cic_flow.active_std,
+            <span class="self">self</span>.cic_flow.get_idle_min(),
+            <span class="self">self</span>.cic_flow.idle_max,
+            <span class="self">self</span>.cic_flow.idle_mean,
+            <span class="self">self</span>.cic_flow.idle_std,
+            (<span class="self">self</span>.cic_flow.fwd_pkt_len_tot + <span class="self">self</span>.cic_flow.bwd_pkt_len_tot) <span class="kw">as </span>f64
+                / flow_duration.num_milliseconds() <span class="kw">as </span>f64
+                / <span class="number">1000.0</span>,
+            <span class="self">self</span>.cic_flow.fwd_pkt_len_tot <span class="kw">as </span>f64 / flow_duration.num_milliseconds() <span class="kw">as </span>f64 / <span class="number">1000.0</span>,
+            <span class="self">self</span>.cic_flow.bwd_pkt_len_tot <span class="kw">as </span>f64 / flow_duration.num_milliseconds() <span class="kw">as </span>f64 / <span class="number">1000.0</span>,
+            (<span class="self">self</span>.cic_flow.basic_flow.fwd_packet_count + <span class="self">self</span>.cic_flow.basic_flow.bwd_packet_count)
+                <span class="kw">as </span>f64
+                / flow_duration.num_milliseconds() <span class="kw">as </span>f64
+                / <span class="number">1000.0</span>,
+            <span class="self">self</span>.cic_flow.basic_flow.bwd_packet_count <span class="kw">as </span>f64
+                / flow_duration.num_milliseconds() <span class="kw">as </span>f64
+                / <span class="number">1000.0</span>,
+            <span class="self">self</span>.cic_flow.basic_flow.fwd_packet_count <span class="kw">as </span>f64
+                / flow_duration.num_milliseconds() <span class="kw">as </span>f64
+                / <span class="number">1000.0</span>,
+            <span class="self">self</span>.cic_flow.get_down_up_ratio(),
+            <span class="self">self</span>.cic_flow.get_fwd_bytes_bulk(),
+            <span class="self">self</span>.cic_flow.get_fwd_packets_bulk(),
+            <span class="self">self</span>.cic_flow.get_fwd_bulk_rate(),
+            <span class="self">self</span>.cic_flow.get_bwd_bytes_bulk(),
+            <span class="self">self</span>.cic_flow.get_bwd_packets_bulk(),
+            <span class="self">self</span>.cic_flow.get_bwd_bulk_rate(),
+            <span class="self">self</span>.cic_flow.fwd_bulk_state_count,
+            <span class="self">self</span>.cic_flow.fwd_bulk_size_total,
+            <span class="self">self</span>.cic_flow.fwd_bulk_packet_count,
+            <span class="self">self</span>.cic_flow.fwd_bulk_duration,
+            <span class="self">self</span>.cic_flow.bwd_bulk_state_count,
+            <span class="self">self</span>.cic_flow.bwd_bulk_size_total,
+            <span class="self">self</span>.cic_flow.bwd_bulk_packet_count,
+            <span class="self">self</span>.cic_flow.bwd_bulk_duration,
+            <span class="self">self</span>.cic_flow.basic_flow.fwd_fin_flag_count
+                + <span class="self">self</span>.cic_flow.basic_flow.bwd_fin_flag_count,
+            <span class="self">self</span>.cic_flow.basic_flow.fwd_psh_flag_count
+                + <span class="self">self</span>.cic_flow.basic_flow.bwd_psh_flag_count,
+            <span class="self">self</span>.cic_flow.basic_flow.fwd_urg_flag_count
+                + <span class="self">self</span>.cic_flow.basic_flow.bwd_urg_flag_count,
+            <span class="self">self</span>.cic_flow.basic_flow.fwd_ece_flag_count
+                + <span class="self">self</span>.cic_flow.basic_flow.bwd_ece_flag_count,
+            <span class="self">self</span>.cic_flow.basic_flow.fwd_syn_flag_count
+                + <span class="self">self</span>.cic_flow.basic_flow.bwd_syn_flag_count,
+            <span class="self">self</span>.cic_flow.basic_flow.fwd_ack_flag_count
+                + <span class="self">self</span>.cic_flow.basic_flow.bwd_ack_flag_count,
+            <span class="self">self</span>.cic_flow.basic_flow.fwd_cwe_flag_count
+                + <span class="self">self</span>.cic_flow.basic_flow.bwd_cwe_flag_count,
+            <span class="self">self</span>.cic_flow.basic_flow.fwd_rst_flag_count
+                + <span class="self">self</span>.cic_flow.basic_flow.bwd_rst_flag_count,
+            <span class="self">self</span>.cic_flow.basic_flow.fwd_fin_flag_count,
+            <span class="self">self</span>.cic_flow.basic_flow.fwd_psh_flag_count,
+            <span class="self">self</span>.cic_flow.basic_flow.fwd_urg_flag_count,
+            <span class="self">self</span>.cic_flow.basic_flow.fwd_ece_flag_count,
+            <span class="self">self</span>.cic_flow.basic_flow.fwd_syn_flag_count,
+            <span class="self">self</span>.cic_flow.basic_flow.fwd_ack_flag_count,
+            <span class="self">self</span>.cic_flow.basic_flow.fwd_cwe_flag_count,
+            <span class="self">self</span>.cic_flow.basic_flow.fwd_rst_flag_count,
+            <span class="self">self</span>.cic_flow.basic_flow.bwd_fin_flag_count,
+            <span class="self">self</span>.cic_flow.basic_flow.bwd_psh_flag_count,
+            <span class="self">self</span>.cic_flow.basic_flow.bwd_urg_flag_count,
+            <span class="self">self</span>.cic_flow.basic_flow.bwd_ece_flag_count,
+            <span class="self">self</span>.cic_flow.basic_flow.bwd_syn_flag_count,
+            <span class="self">self</span>.cic_flow.basic_flow.bwd_ack_flag_count,
+            <span class="self">self</span>.cic_flow.basic_flow.bwd_cwe_flag_count,
+            <span class="self">self</span>.cic_flow.basic_flow.bwd_rst_flag_count,
+            <span class="self">self</span>.cic_flow.get_flow_iat_mean(),
+            <span class="self">self</span>.cic_flow.get_flow_iat_std(),
+            <span class="self">self</span>.cic_flow.get_flow_iat_max(),
+            <span class="self">self</span>.cic_flow.get_flow_iat_min(),
+            <span class="self">self</span>.cic_flow.fwd_iat_total + <span class="self">self</span>.cic_flow.bwd_iat_total,
+            <span class="self">self</span>.cic_flow.fwd_iat_mean,
+            <span class="self">self</span>.cic_flow.fwd_iat_std,
+            <span class="self">self</span>.cic_flow.fwd_iat_max,
+            <span class="self">self</span>.cic_flow.get_fwd_iat_min(),
+            <span class="self">self</span>.cic_flow.fwd_iat_total,
+            <span class="self">self</span>.cic_flow.fwd_iat_total,
+            <span class="self">self</span>.cic_flow.bwd_iat_mean,
+            <span class="self">self</span>.cic_flow.bwd_iat_std,
+            <span class="self">self</span>.cic_flow.bwd_iat_max,
+            <span class="self">self</span>.cic_flow.get_bwd_iat_min(),
+            <span class="self">self</span>.cic_flow.bwd_iat_total,
+            <span class="self">self</span>.cic_flow.get_sf_fwd_packets(),
+            <span class="self">self</span>.cic_flow.get_sf_bwd_packets(),
+            <span class="self">self</span>.cic_flow.get_sf_fwd_bytes(),
+            <span class="self">self</span>.cic_flow.get_sf_bwd_bytes(),
         )
     }
 
@@ -1376,6 +1285,8 @@
     }
 
     <span class="kw">fn </span>dump_without_contamination(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; String {
+        <span class="kw">let </span>flow_duration =
+            <span class="self">self</span>.cic_flow.basic_flow.last_timestamp - <span class="self">self</span>.cic_flow.basic_flow.first_timestamp;
         <span class="comment">// Can be further updated after more research
         </span><span class="macro">format!</span>(
             <span class="string">"{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},\
@@ -1384,163 +1295,137 @@
             {},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},\
             {},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},\
             {},{},{},{},{},{},{},{},{},{},{},{}"</span>,
-            get_duration(
-                <span class="self">self</span>.basic_flow.basic_flow.first_timestamp,
-                <span class="self">self</span>.basic_flow.basic_flow.last_timestamp
-            ),
-            <span class="self">self</span>.basic_flow.basic_flow.fwd_packet_count
-                + <span class="self">self</span>.basic_flow.basic_flow.bwd_packet_count,
-            <span class="self">self</span>.basic_flow.basic_flow.fwd_packet_count,
-            <span class="self">self</span>.basic_flow.basic_flow.bwd_packet_count,
-            <span class="self">self</span>.basic_flow.fwd_pkt_len_tot + <span class="self">self</span>.basic_flow.bwd_pkt_len_tot,
-            <span class="self">self</span>.basic_flow.fwd_pkt_len_tot,
-            <span class="self">self</span>.basic_flow.bwd_pkt_len_tot,
-            <span class="self">self</span>.basic_flow.get_flow_packet_length_max(),
-            <span class="self">self</span>.basic_flow.get_flow_packet_length_min(),
-            <span class="self">self</span>.basic_flow.get_flow_packet_length_mean(),
-            <span class="self">self</span>.basic_flow.get_flow_packet_length_std(),
-            <span class="self">self</span>.basic_flow.get_flow_packet_length_variance(),
-            <span class="self">self</span>.basic_flow.fwd_pkt_len_max,
-            <span class="self">self</span>.basic_flow.get_fwd_packet_length_min(),
-            <span class="self">self</span>.basic_flow.fwd_pkt_len_mean,
-            <span class="self">self</span>.basic_flow.fwd_pkt_len_std,
-            <span class="self">self</span>.basic_flow.fwd_pkt_len_std.powf(<span class="number">2.0</span>),
-            <span class="self">self</span>.basic_flow.bwd_pkt_len_max,
-            <span class="self">self</span>.basic_flow.get_bwd_packet_length_min(),
-            <span class="self">self</span>.basic_flow.bwd_pkt_len_mean,
-            <span class="self">self</span>.basic_flow.bwd_pkt_len_std,
-            <span class="self">self</span>.basic_flow.bwd_pkt_len_std.powf(<span class="number">2.0</span>),
-            <span class="self">self</span>.basic_flow.fwd_header_length + <span class="self">self</span>.basic_flow.bwd_header_length,
+            flow_duration.num_microseconds().unwrap(),
+            <span class="self">self</span>.cic_flow.basic_flow.fwd_packet_count + <span class="self">self</span>.cic_flow.basic_flow.bwd_packet_count,
+            <span class="self">self</span>.cic_flow.basic_flow.fwd_packet_count,
+            <span class="self">self</span>.cic_flow.basic_flow.bwd_packet_count,
+            <span class="self">self</span>.cic_flow.fwd_pkt_len_tot + <span class="self">self</span>.cic_flow.bwd_pkt_len_tot,
+            <span class="self">self</span>.cic_flow.fwd_pkt_len_tot,
+            <span class="self">self</span>.cic_flow.bwd_pkt_len_tot,
+            <span class="self">self</span>.cic_flow.get_flow_packet_length_max(),
+            <span class="self">self</span>.cic_flow.get_flow_packet_length_min(),
+            <span class="self">self</span>.cic_flow.get_flow_packet_length_mean(),
+            <span class="self">self</span>.cic_flow.get_flow_packet_length_std(),
+            <span class="self">self</span>.cic_flow.get_flow_packet_length_variance(),
+            <span class="self">self</span>.cic_flow.fwd_pkt_len_max,
+            <span class="self">self</span>.cic_flow.get_fwd_packet_length_min(),
+            <span class="self">self</span>.cic_flow.fwd_pkt_len_mean,
+            <span class="self">self</span>.cic_flow.fwd_pkt_len_std,
+            <span class="self">self</span>.cic_flow.fwd_pkt_len_std.powf(<span class="number">2.0</span>),
+            <span class="self">self</span>.cic_flow.bwd_pkt_len_max,
+            <span class="self">self</span>.cic_flow.get_bwd_packet_length_min(),
+            <span class="self">self</span>.cic_flow.bwd_pkt_len_mean,
+            <span class="self">self</span>.cic_flow.bwd_pkt_len_std,
+            <span class="self">self</span>.cic_flow.bwd_pkt_len_std.powf(<span class="number">2.0</span>),
+            <span class="self">self</span>.cic_flow.fwd_header_length + <span class="self">self</span>.cic_flow.bwd_header_length,
             <span class="self">self</span>.get_flow_header_length_max(),
             <span class="self">self</span>.get_flow_header_length_min(),
             <span class="self">self</span>.get_flow_header_length_mean(),
             <span class="self">self</span>.get_flow_header_length_std(),
-            <span class="self">self</span>.basic_flow.fwd_header_length,
+            <span class="self">self</span>.cic_flow.fwd_header_length,
             <span class="self">self</span>.fwd_header_len_max,
             <span class="self">self</span>.get_fwd_header_length_min(),
             <span class="self">self</span>.fwd_header_len_mean,
             <span class="self">self</span>.fwd_header_len_std,
-            <span class="self">self</span>.basic_flow.bwd_header_length,
+            <span class="self">self</span>.cic_flow.bwd_header_length,
             <span class="self">self</span>.bwd_header_len_max,
             <span class="self">self</span>.get_bwd_header_length_min(),
             <span class="self">self</span>.bwd_header_len_mean,
             <span class="self">self</span>.bwd_header_len_std,
-            <span class="self">self</span>.basic_flow.get_fwd_segment_length_mean(),
-            <span class="self">self</span>.basic_flow.get_bwd_segment_length_mean(),
-            <span class="self">self</span>.basic_flow.get_flow_segment_length_mean(),
-            <span class="self">self</span>.basic_flow.fwd_init_win_bytes,
-            <span class="self">self</span>.basic_flow.bwd_init_win_bytes,
-            <span class="self">self</span>.basic_flow.get_active_min(),
-            <span class="self">self</span>.basic_flow.active_max,
-            <span class="self">self</span>.basic_flow.active_mean,
-            <span class="self">self</span>.basic_flow.active_std,
-            <span class="self">self</span>.basic_flow.get_idle_min(),
-            <span class="self">self</span>.basic_flow.idle_max,
-            <span class="self">self</span>.basic_flow.idle_mean,
-            <span class="self">self</span>.basic_flow.idle_std,
-            (<span class="self">self</span>.basic_flow.fwd_pkt_len_tot + <span class="self">self</span>.basic_flow.bwd_pkt_len_tot) <span class="kw">as </span>f64
-                / (get_duration(
-                    <span class="self">self</span>.basic_flow.basic_flow.first_timestamp,
-                    <span class="self">self</span>.basic_flow.basic_flow.last_timestamp
-                ))
-                / <span class="number">1_000_000.0</span>,
-            <span class="self">self</span>.basic_flow.fwd_pkt_len_tot <span class="kw">as </span>f64
-                / (get_duration(
-                    <span class="self">self</span>.basic_flow.basic_flow.first_timestamp,
-                    <span class="self">self</span>.basic_flow.basic_flow.last_timestamp
-                ))
-                / <span class="number">1_000_000.0</span>,
-            <span class="self">self</span>.basic_flow.bwd_pkt_len_tot <span class="kw">as </span>f64
-                / (get_duration(
-                    <span class="self">self</span>.basic_flow.basic_flow.first_timestamp,
-                    <span class="self">self</span>.basic_flow.basic_flow.last_timestamp
-                ))
-                / <span class="number">1_000_000.0</span>,
-            (<span class="self">self</span>.basic_flow.basic_flow.fwd_packet_count
-                + <span class="self">self</span>.basic_flow.basic_flow.bwd_packet_count) <span class="kw">as </span>f64
-                / (get_duration(
-                    <span class="self">self</span>.basic_flow.basic_flow.first_timestamp,
-                    <span class="self">self</span>.basic_flow.basic_flow.last_timestamp
-                ))
-                / <span class="number">1_000_000.0</span>,
-            <span class="self">self</span>.basic_flow.basic_flow.bwd_packet_count <span class="kw">as </span>f64
-                / (get_duration(
-                    <span class="self">self</span>.basic_flow.basic_flow.first_timestamp,
-                    <span class="self">self</span>.basic_flow.basic_flow.last_timestamp
-                ))
-                / <span class="number">1_000_000.0</span>,
-            <span class="self">self</span>.basic_flow.basic_flow.fwd_packet_count <span class="kw">as </span>f64
-                / (get_duration(
-                    <span class="self">self</span>.basic_flow.basic_flow.first_timestamp,
-                    <span class="self">self</span>.basic_flow.basic_flow.last_timestamp
-                ))
-                / <span class="number">1_000_000.0</span>,
-            <span class="self">self</span>.basic_flow.get_down_up_ratio(),
-            <span class="self">self</span>.basic_flow.get_fwd_bytes_bulk(),
-            <span class="self">self</span>.basic_flow.get_fwd_packets_bulk(),
-            <span class="self">self</span>.basic_flow.get_fwd_bulk_rate(),
-            <span class="self">self</span>.basic_flow.get_bwd_bytes_bulk(),
-            <span class="self">self</span>.basic_flow.get_bwd_packets_bulk(),
-            <span class="self">self</span>.basic_flow.get_bwd_bulk_rate(),
-            <span class="self">self</span>.basic_flow.fwd_bulk_state_count,
-            <span class="self">self</span>.basic_flow.fwd_bulk_size_total,
-            <span class="self">self</span>.basic_flow.fwd_bulk_packet_count,
-            <span class="self">self</span>.basic_flow.fwd_bulk_duration,
-            <span class="self">self</span>.basic_flow.bwd_bulk_state_count,
-            <span class="self">self</span>.basic_flow.bwd_bulk_size_total,
-            <span class="self">self</span>.basic_flow.bwd_bulk_packet_count,
-            <span class="self">self</span>.basic_flow.bwd_bulk_duration,
-            <span class="self">self</span>.basic_flow.basic_flow.fwd_fin_flag_count
-                + <span class="self">self</span>.basic_flow.basic_flow.bwd_fin_flag_count,
-            <span class="self">self</span>.basic_flow.basic_flow.fwd_psh_flag_count
-                + <span class="self">self</span>.basic_flow.basic_flow.bwd_psh_flag_count,
-            <span class="self">self</span>.basic_flow.basic_flow.fwd_urg_flag_count
-                + <span class="self">self</span>.basic_flow.basic_flow.bwd_urg_flag_count,
-            <span class="self">self</span>.basic_flow.basic_flow.fwd_ece_flag_count
-                + <span class="self">self</span>.basic_flow.basic_flow.bwd_ece_flag_count,
-            <span class="self">self</span>.basic_flow.basic_flow.fwd_syn_flag_count
-                + <span class="self">self</span>.basic_flow.basic_flow.bwd_syn_flag_count,
-            <span class="self">self</span>.basic_flow.basic_flow.fwd_ack_flag_count
-                + <span class="self">self</span>.basic_flow.basic_flow.bwd_ack_flag_count,
-            <span class="self">self</span>.basic_flow.basic_flow.fwd_cwe_flag_count
-                + <span class="self">self</span>.basic_flow.basic_flow.bwd_cwe_flag_count,
-            <span class="self">self</span>.basic_flow.basic_flow.fwd_rst_flag_count
-                + <span class="self">self</span>.basic_flow.basic_flow.bwd_rst_flag_count,
-            <span class="self">self</span>.basic_flow.basic_flow.fwd_fin_flag_count,
-            <span class="self">self</span>.basic_flow.basic_flow.fwd_psh_flag_count,
-            <span class="self">self</span>.basic_flow.basic_flow.fwd_urg_flag_count,
-            <span class="self">self</span>.basic_flow.basic_flow.fwd_ece_flag_count,
-            <span class="self">self</span>.basic_flow.basic_flow.fwd_syn_flag_count,
-            <span class="self">self</span>.basic_flow.basic_flow.fwd_ack_flag_count,
-            <span class="self">self</span>.basic_flow.basic_flow.fwd_cwe_flag_count,
-            <span class="self">self</span>.basic_flow.basic_flow.fwd_rst_flag_count,
-            <span class="self">self</span>.basic_flow.basic_flow.bwd_fin_flag_count,
-            <span class="self">self</span>.basic_flow.basic_flow.bwd_psh_flag_count,
-            <span class="self">self</span>.basic_flow.basic_flow.bwd_urg_flag_count,
-            <span class="self">self</span>.basic_flow.basic_flow.bwd_ece_flag_count,
-            <span class="self">self</span>.basic_flow.basic_flow.bwd_syn_flag_count,
-            <span class="self">self</span>.basic_flow.basic_flow.bwd_ack_flag_count,
-            <span class="self">self</span>.basic_flow.basic_flow.bwd_cwe_flag_count,
-            <span class="self">self</span>.basic_flow.basic_flow.bwd_rst_flag_count,
-            <span class="self">self</span>.basic_flow.get_flow_iat_mean(),
-            <span class="self">self</span>.basic_flow.get_flow_iat_std(),
-            <span class="self">self</span>.basic_flow.get_flow_iat_max(),
-            <span class="self">self</span>.basic_flow.get_flow_iat_min(),
-            <span class="self">self</span>.basic_flow.fwd_iat_total + <span class="self">self</span>.basic_flow.bwd_iat_total,
-            <span class="self">self</span>.basic_flow.fwd_iat_mean,
-            <span class="self">self</span>.basic_flow.fwd_iat_std,
-            <span class="self">self</span>.basic_flow.fwd_iat_max,
-            <span class="self">self</span>.basic_flow.get_fwd_iat_min(),
-            <span class="self">self</span>.basic_flow.fwd_iat_total,
-            <span class="self">self</span>.basic_flow.bwd_iat_mean,
-            <span class="self">self</span>.basic_flow.bwd_iat_std,
-            <span class="self">self</span>.basic_flow.bwd_iat_max,
-            <span class="self">self</span>.basic_flow.get_bwd_iat_min(),
-            <span class="self">self</span>.basic_flow.bwd_iat_total,
-            <span class="self">self</span>.basic_flow.get_sf_fwd_packets(),
-            <span class="self">self</span>.basic_flow.get_sf_bwd_packets(),
-            <span class="self">self</span>.basic_flow.get_sf_fwd_bytes(),
-            <span class="self">self</span>.basic_flow.get_sf_bwd_bytes(),
+            <span class="self">self</span>.cic_flow.get_fwd_segment_length_mean(),
+            <span class="self">self</span>.cic_flow.get_bwd_segment_length_mean(),
+            <span class="self">self</span>.cic_flow.get_flow_segment_length_mean(),
+            <span class="self">self</span>.cic_flow.fwd_init_win_bytes,
+            <span class="self">self</span>.cic_flow.bwd_init_win_bytes,
+            <span class="self">self</span>.cic_flow.get_active_min(),
+            <span class="self">self</span>.cic_flow.active_max,
+            <span class="self">self</span>.cic_flow.active_mean,
+            <span class="self">self</span>.cic_flow.active_std,
+            <span class="self">self</span>.cic_flow.get_idle_min(),
+            <span class="self">self</span>.cic_flow.idle_max,
+            <span class="self">self</span>.cic_flow.idle_mean,
+            <span class="self">self</span>.cic_flow.idle_std,
+            (<span class="self">self</span>.cic_flow.fwd_pkt_len_tot + <span class="self">self</span>.cic_flow.bwd_pkt_len_tot) <span class="kw">as </span>f64
+                / flow_duration.num_milliseconds() <span class="kw">as </span>f64
+                / <span class="number">1000.0</span>,
+            <span class="self">self</span>.cic_flow.fwd_pkt_len_tot <span class="kw">as </span>f64 / flow_duration.num_milliseconds() <span class="kw">as </span>f64 / <span class="number">1000.0</span>,
+            <span class="self">self</span>.cic_flow.bwd_pkt_len_tot <span class="kw">as </span>f64 / flow_duration.num_milliseconds() <span class="kw">as </span>f64 / <span class="number">1000.0</span>,
+            (<span class="self">self</span>.cic_flow.basic_flow.fwd_packet_count + <span class="self">self</span>.cic_flow.basic_flow.bwd_packet_count)
+                <span class="kw">as </span>f64
+                / flow_duration.num_milliseconds() <span class="kw">as </span>f64
+                / <span class="number">1000.0</span>,
+            <span class="self">self</span>.cic_flow.basic_flow.bwd_packet_count <span class="kw">as </span>f64
+                / flow_duration.num_milliseconds() <span class="kw">as </span>f64
+                / <span class="number">1000.0</span>,
+            <span class="self">self</span>.cic_flow.basic_flow.fwd_packet_count <span class="kw">as </span>f64
+                / flow_duration.num_milliseconds() <span class="kw">as </span>f64
+                / <span class="number">1000.0</span>,
+            <span class="self">self</span>.cic_flow.get_down_up_ratio(),
+            <span class="self">self</span>.cic_flow.get_fwd_bytes_bulk(),
+            <span class="self">self</span>.cic_flow.get_fwd_packets_bulk(),
+            <span class="self">self</span>.cic_flow.get_fwd_bulk_rate(),
+            <span class="self">self</span>.cic_flow.get_bwd_bytes_bulk(),
+            <span class="self">self</span>.cic_flow.get_bwd_packets_bulk(),
+            <span class="self">self</span>.cic_flow.get_bwd_bulk_rate(),
+            <span class="self">self</span>.cic_flow.fwd_bulk_state_count,
+            <span class="self">self</span>.cic_flow.fwd_bulk_size_total,
+            <span class="self">self</span>.cic_flow.fwd_bulk_packet_count,
+            <span class="self">self</span>.cic_flow.fwd_bulk_duration,
+            <span class="self">self</span>.cic_flow.bwd_bulk_state_count,
+            <span class="self">self</span>.cic_flow.bwd_bulk_size_total,
+            <span class="self">self</span>.cic_flow.bwd_bulk_packet_count,
+            <span class="self">self</span>.cic_flow.bwd_bulk_duration,
+            <span class="self">self</span>.cic_flow.basic_flow.fwd_fin_flag_count
+                + <span class="self">self</span>.cic_flow.basic_flow.bwd_fin_flag_count,
+            <span class="self">self</span>.cic_flow.basic_flow.fwd_psh_flag_count
+                + <span class="self">self</span>.cic_flow.basic_flow.bwd_psh_flag_count,
+            <span class="self">self</span>.cic_flow.basic_flow.fwd_urg_flag_count
+                + <span class="self">self</span>.cic_flow.basic_flow.bwd_urg_flag_count,
+            <span class="self">self</span>.cic_flow.basic_flow.fwd_ece_flag_count
+                + <span class="self">self</span>.cic_flow.basic_flow.bwd_ece_flag_count,
+            <span class="self">self</span>.cic_flow.basic_flow.fwd_syn_flag_count
+                + <span class="self">self</span>.cic_flow.basic_flow.bwd_syn_flag_count,
+            <span class="self">self</span>.cic_flow.basic_flow.fwd_ack_flag_count
+                + <span class="self">self</span>.cic_flow.basic_flow.bwd_ack_flag_count,
+            <span class="self">self</span>.cic_flow.basic_flow.fwd_cwe_flag_count
+                + <span class="self">self</span>.cic_flow.basic_flow.bwd_cwe_flag_count,
+            <span class="self">self</span>.cic_flow.basic_flow.fwd_rst_flag_count
+                + <span class="self">self</span>.cic_flow.basic_flow.bwd_rst_flag_count,
+            <span class="self">self</span>.cic_flow.basic_flow.fwd_fin_flag_count,
+            <span class="self">self</span>.cic_flow.basic_flow.fwd_psh_flag_count,
+            <span class="self">self</span>.cic_flow.basic_flow.fwd_urg_flag_count,
+            <span class="self">self</span>.cic_flow.basic_flow.fwd_ece_flag_count,
+            <span class="self">self</span>.cic_flow.basic_flow.fwd_syn_flag_count,
+            <span class="self">self</span>.cic_flow.basic_flow.fwd_ack_flag_count,
+            <span class="self">self</span>.cic_flow.basic_flow.fwd_cwe_flag_count,
+            <span class="self">self</span>.cic_flow.basic_flow.fwd_rst_flag_count,
+            <span class="self">self</span>.cic_flow.basic_flow.bwd_fin_flag_count,
+            <span class="self">self</span>.cic_flow.basic_flow.bwd_psh_flag_count,
+            <span class="self">self</span>.cic_flow.basic_flow.bwd_urg_flag_count,
+            <span class="self">self</span>.cic_flow.basic_flow.bwd_ece_flag_count,
+            <span class="self">self</span>.cic_flow.basic_flow.bwd_syn_flag_count,
+            <span class="self">self</span>.cic_flow.basic_flow.bwd_ack_flag_count,
+            <span class="self">self</span>.cic_flow.basic_flow.bwd_cwe_flag_count,
+            <span class="self">self</span>.cic_flow.basic_flow.bwd_rst_flag_count,
+            <span class="self">self</span>.cic_flow.get_flow_iat_mean(),
+            <span class="self">self</span>.cic_flow.get_flow_iat_std(),
+            <span class="self">self</span>.cic_flow.get_flow_iat_max(),
+            <span class="self">self</span>.cic_flow.get_flow_iat_min(),
+            <span class="self">self</span>.cic_flow.fwd_iat_total + <span class="self">self</span>.cic_flow.bwd_iat_total,
+            <span class="self">self</span>.cic_flow.fwd_iat_mean,
+            <span class="self">self</span>.cic_flow.fwd_iat_std,
+            <span class="self">self</span>.cic_flow.fwd_iat_max,
+            <span class="self">self</span>.cic_flow.get_fwd_iat_min(),
+            <span class="self">self</span>.cic_flow.fwd_iat_total,
+            <span class="self">self</span>.cic_flow.bwd_iat_mean,
+            <span class="self">self</span>.cic_flow.bwd_iat_std,
+            <span class="self">self</span>.cic_flow.bwd_iat_max,
+            <span class="self">self</span>.cic_flow.get_bwd_iat_min(),
+            <span class="self">self</span>.cic_flow.bwd_iat_total,
+            <span class="self">self</span>.cic_flow.get_sf_fwd_packets(),
+            <span class="self">self</span>.cic_flow.get_sf_bwd_packets(),
+            <span class="self">self</span>.cic_flow.get_sf_fwd_bytes(),
+            <span class="self">self</span>.cic_flow.get_sf_bwd_bytes(),
         )
     }
 
@@ -1576,7 +1461,16 @@
     }
 
     <span class="kw">fn </span>get_first_timestamp(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; DateTime&lt;Utc&gt; {
-        <span class="self">self</span>.basic_flow.get_first_timestamp()
+        <span class="self">self</span>.cic_flow.get_first_timestamp()
+    }
+
+    <span class="kw">fn </span>is_expired(<span class="kw-2">&amp;</span><span class="self">self</span>, timestamp: DateTime&lt;Utc&gt;, active_timeout: u64, idle_timeout: u64) -&gt; bool {
+        <span class="self">self</span>.cic_flow
+            .is_expired(timestamp, active_timeout, idle_timeout)
+    }
+
+    <span class="kw">fn </span>flow_key(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>String {
+        <span class="kw-2">&amp;</span><span class="self">self</span>.cic_flow.basic_flow.flow_key
     }
 }
 
@@ -1604,7 +1498,7 @@
     </span><span class="kw">fn </span>test_update_fwd_pkt_len_stats() {
         <span class="kw">let </span><span class="kw-2">mut </span>ntl_flow = setup_ntl_flow();
 
-        ntl_flow.basic_flow.basic_flow.fwd_packet_count = <span class="number">1</span>;
+        ntl_flow.cic_flow.basic_flow.fwd_packet_count = <span class="number">1</span>;
 
         ntl_flow.update_fwd_header_len_stats(<span class="number">100</span>);
 
@@ -1612,9 +1506,9 @@
         <span class="macro">assert_eq!</span>(ntl_flow.fwd_header_len_min, <span class="number">100</span>);
         <span class="macro">assert_eq!</span>(ntl_flow.fwd_header_len_mean, <span class="number">100.0</span>);
         <span class="macro">assert_eq!</span>(ntl_flow.fwd_header_len_std, <span class="number">0.0</span>);
-        <span class="macro">assert_eq!</span>(ntl_flow.basic_flow.fwd_header_length, <span class="number">100</span>);
+        <span class="macro">assert_eq!</span>(ntl_flow.cic_flow.fwd_header_length, <span class="number">100</span>);
 
-        ntl_flow.basic_flow.basic_flow.fwd_packet_count = <span class="number">2</span>;
+        ntl_flow.cic_flow.basic_flow.fwd_packet_count = <span class="number">2</span>;
 
         ntl_flow.update_fwd_header_len_stats(<span class="number">50</span>);
 
@@ -1622,9 +1516,9 @@
         <span class="macro">assert_eq!</span>(ntl_flow.fwd_header_len_min, <span class="number">50</span>);
         <span class="macro">assert_eq!</span>(ntl_flow.fwd_header_len_mean, <span class="number">75.0</span>);
         <span class="macro">assert_eq!</span>(ntl_flow.fwd_header_len_std, <span class="number">25.0</span>);
-        <span class="macro">assert_eq!</span>(ntl_flow.basic_flow.fwd_header_length, <span class="number">150</span>);
+        <span class="macro">assert_eq!</span>(ntl_flow.cic_flow.fwd_header_length, <span class="number">150</span>);
 
-        ntl_flow.basic_flow.basic_flow.fwd_packet_count = <span class="number">3</span>;
+        ntl_flow.cic_flow.basic_flow.fwd_packet_count = <span class="number">3</span>;
 
         ntl_flow.update_fwd_header_len_stats(<span class="number">0</span>);
 
@@ -1632,14 +1526,14 @@
         <span class="macro">assert_eq!</span>(ntl_flow.fwd_header_len_min, <span class="number">0</span>);
         <span class="macro">assert_eq!</span>(ntl_flow.fwd_header_len_mean, <span class="number">50.0</span>);
         <span class="macro">assert_eq!</span>(ntl_flow.fwd_header_len_std, <span class="number">40.824829046386306</span>);
-        <span class="macro">assert_eq!</span>(ntl_flow.basic_flow.fwd_header_length, <span class="number">150</span>);
+        <span class="macro">assert_eq!</span>(ntl_flow.cic_flow.fwd_header_length, <span class="number">150</span>);
     }
 
     <span class="attr">#[test]
     </span><span class="kw">fn </span>test_update_bwd_pkt_len_stats() {
         <span class="kw">let </span><span class="kw-2">mut </span>ntl_flow = setup_ntl_flow();
 
-        ntl_flow.basic_flow.basic_flow.bwd_packet_count = <span class="number">1</span>;
+        ntl_flow.cic_flow.basic_flow.bwd_packet_count = <span class="number">1</span>;
 
         ntl_flow.update_bwd_header_len_stats(<span class="number">100</span>);
 
@@ -1647,9 +1541,9 @@
         <span class="macro">assert_eq!</span>(ntl_flow.bwd_header_len_min, <span class="number">100</span>);
         <span class="macro">assert_eq!</span>(ntl_flow.bwd_header_len_mean, <span class="number">100.0</span>);
         <span class="macro">assert_eq!</span>(ntl_flow.bwd_header_len_std, <span class="number">0.0</span>);
-        <span class="macro">assert_eq!</span>(ntl_flow.basic_flow.bwd_header_length, <span class="number">100</span>);
+        <span class="macro">assert_eq!</span>(ntl_flow.cic_flow.bwd_header_length, <span class="number">100</span>);
 
-        ntl_flow.basic_flow.basic_flow.bwd_packet_count = <span class="number">2</span>;
+        ntl_flow.cic_flow.basic_flow.bwd_packet_count = <span class="number">2</span>;
 
         ntl_flow.update_bwd_header_len_stats(<span class="number">50</span>);
 
@@ -1657,9 +1551,9 @@
         <span class="macro">assert_eq!</span>(ntl_flow.bwd_header_len_min, <span class="number">50</span>);
         <span class="macro">assert_eq!</span>(ntl_flow.bwd_header_len_mean, <span class="number">75.0</span>);
         <span class="macro">assert_eq!</span>(ntl_flow.bwd_header_len_std, <span class="number">25.0</span>);
-        <span class="macro">assert_eq!</span>(ntl_flow.basic_flow.bwd_header_length, <span class="number">150</span>);
+        <span class="macro">assert_eq!</span>(ntl_flow.cic_flow.bwd_header_length, <span class="number">150</span>);
 
-        ntl_flow.basic_flow.basic_flow.bwd_packet_count = <span class="number">3</span>;
+        ntl_flow.cic_flow.basic_flow.bwd_packet_count = <span class="number">3</span>;
 
         ntl_flow.update_bwd_header_len_stats(<span class="number">0</span>);
 
@@ -1667,7 +1561,7 @@
         <span class="macro">assert_eq!</span>(ntl_flow.bwd_header_len_min, <span class="number">0</span>);
         <span class="macro">assert_eq!</span>(ntl_flow.bwd_header_len_mean, <span class="number">50.0</span>);
         <span class="macro">assert_eq!</span>(ntl_flow.bwd_header_len_std, <span class="number">40.824829046386306</span>);
-        <span class="macro">assert_eq!</span>(ntl_flow.basic_flow.bwd_header_length, <span class="number">150</span>);
+        <span class="macro">assert_eq!</span>(ntl_flow.cic_flow.bwd_header_length, <span class="number">150</span>);
     }
 
     <span class="attr">#[test]
@@ -1722,8 +1616,8 @@
         </span>cic_flow.fwd_header_len_mean = <span class="number">30.0</span>;
         cic_flow.bwd_header_len_mean = <span class="number">25.0</span>;
 
-        cic_flow.basic_flow.basic_flow.fwd_packet_count = <span class="number">5</span>;
-        cic_flow.basic_flow.basic_flow.bwd_packet_count = <span class="number">3</span>;
+        cic_flow.cic_flow.basic_flow.fwd_packet_count = <span class="number">5</span>;
+        cic_flow.cic_flow.basic_flow.bwd_packet_count = <span class="number">3</span>;
 
         <span class="macro">assert_eq!</span>(cic_flow.get_flow_header_length_mean(), <span class="number">28.125</span>);
     }
@@ -1738,8 +1632,8 @@
         </span>cic_flow.fwd_header_len_std = <span class="number">14.142135623731</span>;
         cic_flow.bwd_header_len_std = <span class="number">8.1649658092773</span>;
 
-        cic_flow.basic_flow.basic_flow.fwd_packet_count = <span class="number">5</span>;
-        cic_flow.basic_flow.basic_flow.bwd_packet_count = <span class="number">3</span>;
+        cic_flow.cic_flow.basic_flow.fwd_packet_count = <span class="number">5</span>;
+        cic_flow.cic_flow.basic_flow.bwd_packet_count = <span class="number">3</span>;
 
         <span class="macro">assert_eq!</span>(cic_flow.get_flow_header_length_variance() <span class="kw">as </span>u32, <span class="number">155</span>); <span class="comment">// removing everything behind the comma because of arithmetic errors
     </span>}
@@ -1755,8 +1649,8 @@
         </span>cic_flow.fwd_header_len_std = <span class="number">14.142135623731</span>;
         cic_flow.bwd_header_len_std = <span class="number">8.1649658092773</span>;
 
-        cic_flow.basic_flow.basic_flow.fwd_packet_count = <span class="number">5</span>;
-        cic_flow.basic_flow.basic_flow.bwd_packet_count = <span class="number">3</span>;
+        cic_flow.cic_flow.basic_flow.fwd_packet_count = <span class="number">5</span>;
+        cic_flow.cic_flow.basic_flow.bwd_packet_count = <span class="number">3</span>;
 
         <span class="macro">assert!</span>(
             (cic_flow.get_flow_header_length_std() - <span class="number">12.484365222149</span>).abs() &lt; epsilon,

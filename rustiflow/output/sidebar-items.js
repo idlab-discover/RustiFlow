@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"mod":["csv","print"],"type":["Export"]};
+window.SIDEBAR_ITEMS = {"struct":["OutputWriter"]};
