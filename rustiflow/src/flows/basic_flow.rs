@@ -1,10 +1,18 @@
 use std::net::IpAddr;
 
 use chrono::{DateTime, Utc};
+use log::debug;
 
 use crate::packet_features::PacketFeatures;
 
 use super::flow::Flow;
+
+#[derive(Clone, PartialEq)]
+enum FlowState {
+    Established,
+    FinSent,
+    FinAcked
+}
 
 /// A basic flow that stores the basic features of a flow.
 #[derive(Clone)]
@@ -63,8 +71,11 @@ pub struct BasicFlow {
     pub bwd_ece_flag_count: u32,
     /// The number of packets in the backward direction.
     pub bwd_packet_count: u32,
-    /// The expected acknowledgment sequence number.
-    pub expected_ack_seq: u32,
+    // Tracking TCP Flow Termination
+    state_fwd: FlowState,
+    state_bwd: FlowState,
+    expected_ack_seq_fwd: Option<u32>,
+    expected_ack_seq_bwd: Option<u32>,
 }
 
 impl BasicFlow {
@@ -80,26 +91,30 @@ impl BasicFlow {
     /// ### Returns
     ///
     /// A boolean indicating if the flow is finished.
-    pub fn is_tcp_finished(&mut self, packet: &PacketFeatures) -> bool {
-        // Check if both sides have sent FIN
-        let both_fin_flags_set = self.fwd_fin_flag_count > 0 && self.bwd_fin_flag_count > 0;
-
-        // Check if the last ACK has been received (acknowledgment of both FINs)
-        let last_ack_received = packet.ack_flag > 0 && packet.sequence_number_ack == self.expected_ack_seq;
-
-        // Add logic for updating the expected acknowledgment sequence after receiving a FIN
-        if self.fwd_fin_flag_count > 0 && self.bwd_fin_flag_count == 0 {
-            // Set the expected acknowledgment sequence based on the forward FIN
-            self.expected_ack_seq = packet.sequence_number + 1;  // FIN consumes one sequence number
+    pub fn is_tcp_finished(&mut self, packet: &PacketFeatures, forward: bool) -> bool {
+        // Update state when receiving FIN flag
+        if packet.fin_flag > 0 {
+            if forward {
+                self.state_fwd = FlowState::FinSent;
+                self.expected_ack_seq_bwd = Some(packet.sequence_number + packet.data_length as u32 + 1);
+                debug!("Flow {} FIN sent in forward direction with sequence number {} and payload length {}", self.flow_key, packet.sequence_number, packet.data_length);
+            } else {
+                self.state_bwd = FlowState::FinSent;
+                self.expected_ack_seq_fwd = Some(packet.sequence_number + packet.data_length as u32 + 1);
+                debug!("Flow {} FIN sent in backward direction with sequence number {} and payload length {}", self.flow_key, packet.sequence_number, packet.data_length);
+            }
         }
 
-        if self.bwd_fin_flag_count > 0 && self.fwd_fin_flag_count == 0 {
-            // Set the expected acknowledgment sequence based on the backward FIN
-            self.expected_ack_seq = packet.sequence_number + 1;
+        if self.state_bwd == FlowState::FinSent && forward && Some(packet.sequence_number_ack) == self.expected_ack_seq_fwd {
+            self.state_bwd = FlowState::FinAcked;
+            debug!("Flow {} FIN acknowledged in backward direction with sequence number {}", self.flow_key, packet.sequence_number_ack);
+        } else if self.state_fwd == FlowState::FinSent && !forward && Some(packet.sequence_number_ack) == self.expected_ack_seq_bwd {
+            self.state_fwd = FlowState::FinAcked;
+            debug!("Flow {} FIN acknowledged in forward direction with sequence number {}", self.flow_key, packet.sequence_number_ack);
         }
 
-        // Check if the flow is finished based on FINs and ACKs
-        both_fin_flags_set && last_ack_received
+        // Return true if both sides are finished and acknowledged the termination
+        self.state_fwd == FlowState::FinAcked && self.state_bwd == FlowState::FinAcked
     }
 
     /// Calculates the flow duration in microseconds.
@@ -154,15 +169,19 @@ impl Flow for BasicFlow {
             bwd_cwe_flag_count: 0,
             bwd_ece_flag_count: 0,
             bwd_packet_count: 0,
-            expected_ack_seq: 0,
+            state_fwd: FlowState::Established,
+            state_bwd: FlowState::Established,
+            expected_ack_seq_fwd: None,
+            expected_ack_seq_bwd: None,
         }
     }
 
     fn update_flow(&mut self, packet: &PacketFeatures, fwd: bool) -> bool {
         self.last_timestamp = packet.timestamp;
 
-        if self.is_tcp_finished(packet) {
+        if self.is_tcp_finished(packet, fwd) {
             self.flow_end_of_flow_ack = 1;
+            debug!("Flow {} terminated", self.flow_key);
         }
 
         if fwd {
