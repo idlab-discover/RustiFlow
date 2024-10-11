@@ -1,12 +1,19 @@
-# RustiFlow: A NIDS Feature Extraction Tool
+██████╗░██╗░░░██╗░██████╗████████╗██╗███████╗██╗░░░░░░█████╗░░██╗░░░░░░░██╗
+██╔══██╗██║░░░██║██╔════╝╚══██╔══╝██║██╔════╝██║░░░░░██╔══██╗░██║░░██╗░░██║
+██████╔╝██║░░░██║╚█████╗░░░░██║░░░██║█████╗░░██║░░░░░██║░░██║░╚██╗████╗██╔╝
+██╔══██╗██║░░░██║░╚═══██╗░░░██║░░░██║██╔══╝░░██║░░░░░██║░░██║░░████╔═████║░
+██║░░██║╚██████╔╝██████╔╝░░░██║░░░██║██║░░░░░███████╗╚█████╔╝░░╚██╔╝░╚██╔╝░
+╚═╝░░╚═╝░╚═════╝░╚═════╝░░░░╚═╝░░░╚═╝╚═╝░░░░░╚══════╝░╚════╝░░░░╚═╝░░░╚═╝░░
 
+# A Network Traffic Feature Extraction Tool
 ![RustiFlow Logo](RustiFlow.png)
 
 ## Overview
 
 This tool is engineered for robust and efficient feature extraction, particularly for applications such as network intrusion detection systems, among others. Leveraging Rust language and eBPF, it excels in processing high volumes of network traffic with remarkable speed and throughput. (When your traffic is already captured, don't worry! It also has a build in pcap reader which is also amazingly fast.) With various pre-defined feature sets and the ability to create custom feature sets, RustiFlow offers a versatile solution for network security applications.
 
-![Badge displaying GitHub Actions Workflow Status](https://img.shields.io/github/actions/workflow/status/idlab-discover/RustiFlow/rust.yml?logo=github) ![Badge linking to the project documentation website](https://img.shields.io/website?url=https%3A%2F%2Fidlab-discover.github.io%2FRustiFlow&label=Documentation) ![GitHub license](https://img.shields.io/github/license/idlab-discover/RustiFlow) 
+<a href="https://github.com/idlab-discover/RustiFlow/actions">![Badge displaying GitHub Actions Workflow Status](https://img.shields.io/github/actions/workflow/status/idlab-discover/RustiFlow/rust.yml?logo=github)</a> 
+<a href="https://idlab-discover.github.io/RustiFlow"> ![Badge linking to the project documentation website](https://img.shields.io/website?url=https%3A%2F%2Fidlab-discover.github.io%2FRustiFlow&label=Documentation)</a> <a href="https://github.com/idlab-discover/RustiFlow/blob/main/LICENSE"> ![GitHub license](https://img.shields.io/github/license/idlab-discover/RustiFlow) </a>
 
 ![Ubuntu 24](https://img.shields.io/badge/Tested%20on%20ubuntu-purple?logo=ubuntu) 
 
@@ -22,7 +29,7 @@ This tool is engineered for robust and efficient feature extraction, particularl
 
 ## Feature sets
 
-See the wiki for the different feature sets available.
+See the [wiki](https://github.com/idlab-discover/RustiFlow/wiki) for the different feature sets available.
 
 ## Architecture
 
@@ -45,9 +52,9 @@ You can then run the binary with the following commands displayed on the [help m
 
 If you want a more graphical interface, you can use the tui interface by just running `rustiflow` without any arguments. This will open the following interface:
 
-![The tui interface](tui.png)
+![The tui interface](tui_rustiflow.GIF)
 
-> **NOTE:** When using the save button, the current selection will be saved to the rustiflow.toml file. You can reuse this file with following command:
+> **NOTE:** When using the save button, the current selection will be saved to the `rustiflow.toml` file. You can reuse this file with following command:
   ```bash
   rustiflow --config-file rustiflow.toml realtime <interface> [--only-ingress]
   ```
