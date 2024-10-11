@@ -627,9 +627,9 @@ fn ui_main_screen<B: Backend>(f: &mut Frame<B>, app: &App) {
         .direction(Direction::Horizontal)
         .constraints(
             [
-                Constraint::Percentage(30), // Left column: Menu
-                Constraint::Percentage(40), // Middle column: Content
-                Constraint::Percentage(30), // Right column: Current Selections
+                Constraint::Percentage(38), // Left column: Menu
+                Constraint::Percentage(25), // Middle column: Content
+                Constraint::Percentage(37), // Right column: Current Selections
             ]
             .as_ref(),
         )
