@@ -1,14 +1,8 @@
-█████╗░██╗░░░██╗░██████╗████████╗██╗███████╗██╗░░░░░░█████╗░░██╗░░░░░░░██
-█╔══██╗██║░░░██║██╔════╝╚══██╔══╝██║██╔════╝██║░░░░░██╔══██╗░██║░░██╗░░██
-█████╔╝██║░░░██║╚█████╗░░░░██║░░░██║█████╗░░██║░░░░░██║░░██║░╚██╗████╗██╔
-█╔══██╗██║░░░██║░╚═══██╗░░░██║░░░██║██╔══╝░░██║░░░░░██║░░██║░░████╔═████║
-█║░░██║╚██████╔╝██████╔╝░░░██║░░░██║██║░░░░░███████╗╚█████╔╝░░╚██╔╝░╚██╔╝
-═╝░░╚═╝░╚═════╝░╚═════╝░░░░╚═╝░░░╚═╝╚═╝░░░░░╚══════╝░╚════╝░░░░╚═╝░░░╚═╝░
 
-# A Network Traffic Feature Extraction Tool
-![RustiFlow Logo](RustiFlow.png)
+![banner](banner.jpg)
+# RustiFlow: A Network Traffic Feature Extraction Tool
 
-## Overview
+## <img src="RustiFlow_nobg.png" width="60px"/> Overview
 
 This tool is engineered for robust and efficient feature extraction, particularly for applications such as network intrusion detection systems, among others. Leveraging Rust language and eBPF, it excels in processing high volumes of network traffic with remarkable speed and throughput. (When your traffic is already captured, don't worry! It also has a build in pcap reader which is also amazingly fast.) With various pre-defined feature sets and the ability to create custom feature sets, RustiFlow offers a versatile solution for network security applications.
 
@@ -20,7 +14,7 @@ This tool is engineered for robust and efficient feature extraction, particularl
 
 ![Animated image showing network flows](flows.gif)
 
-## Key Features
+## <img src="RustiFlow_nobg.png" width="60px"/> Key Features
 
 - **High Throughput:** Utilizes Rust and the [Aya](https://aya-rs.dev/) library for eBPF program compilation and execution, ensuring exceptional performance and resource efficiency.
 - **Versatile Feature Sets:** Offers a variety of pre-defined feature sets (flows) and the flexibility to create custom feature sets tailored to specific requirements.
@@ -31,11 +25,11 @@ This tool is engineered for robust and efficient feature extraction, particularl
 
 See the [wiki](https://github.com/idlab-discover/RustiFlow/wiki) for the different feature sets available.
 
-## Architecture
+## <img src="RustiFlow_nobg.png" width="60px"/> Architecture
 
 ![RustiFlow Architecture](RustiFlow.svg)
 
-## Using the release binary:
+## <img src="RustiFlow_nobg.png" width="60px"/> Using the release binary:
 
 Copy the rustiflow binary that you can find in this repo in releases to a location of your choice or to the `/usr/local/bin` folder.
 If it does not have the right permissions, you can run the following command:
@@ -97,7 +91,7 @@ header = true
 drop_contaminant_features = false
 ```
 
-## Using the Container:
+## <img src="RustiFlow_nobg.png" width="60px"/> Using the Container:
 
 Make sure that you don't use docker desktop and that you don't have it installed on your machine. If you have this setup, it will not work as intended as the `--network host` will not link the container to the host network, but to the network of a VM that docker desktop uses.
 
@@ -118,7 +112,7 @@ Make sure that you don't use docker desktop and that you don't have it installed
   docker run --privileged --network host -v /home/matisse/Documents:/app rustiflow realtime enp5s0 cic-flow 60 csv /app/output.csv
   ```
 
-## Installation Guide for development
+## <img src="RustiFlow_nobg.png" width="60px"/> Installation Guide for development
 
 ### Prerequisites:
 - **libpcap-dev**:
@@ -151,7 +145,7 @@ Make sure that you don't use docker desktop and that you don't have it installed
   export PATH=/usr/lib/linux-tools/5.8.0-63-generic:$PATH
   ```
 
-## Building the Project
+## <img src="RustiFlow_nobg.png" width="60px"/> Building the Project
 
 - **eBPF Programs**:
   ```bash
@@ -169,7 +163,7 @@ Make sure that you don't use docker desktop and that you don't have it installed
   cargo xtask run -- [OPTIONS] <COMMAND>
   ```
 
-## Usage Instructions
+## <img src="RustiFlow_nobg.png" width="60px"/> Usage Instructions
 
 ### Command Help:
   ```bash
