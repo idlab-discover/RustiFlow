@@ -1,6 +1,5 @@
-
 ![banner](banner.jpg)
-# RustiFlow: A Network Traffic Feature Extraction Tool
+# A Network Traffic Feature Extraction Tool
 
 ## <img src="RustiFlow_nobg.png" width="60px"/> Overview
 
