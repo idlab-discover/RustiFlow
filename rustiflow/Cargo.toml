@@ -10,7 +10,7 @@ publish = false
 clap = { version = "4.5.0", features = ["derive"] }
 csv = "1.3.0"
 serde = { version = "1.0.196", features = ["derive"] }
-aya = { version = "0.12.0", features = ["async_tokio"] }
+aya = { version = "0.13.0", features = ["async_tokio"] }
 aya-log = "0.2.0"
 common = { path = "../common", features = ["user"] }
 anyhow = "1"

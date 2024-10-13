@@ -1,4 +1,3 @@
-
 use std::hash::{DefaultHasher, Hash, Hasher};
 
 use crate::debug;
@@ -7,9 +6,9 @@ use aya::{
     include_bytes_aligned,
     maps::RingBuf,
     programs::{tc, SchedClassifier, TcAttachType},
-    Bpf,
+    Ebpf,
 };
-use aya_log::BpfLogger;
+use aya_log::EbpfLogger;
 use common::{EbpfEventIpv4, EbpfEventIpv6};
 use log::{error, info};
 use tokio::{io::unix::AsyncFd, signal, sync::mpsc::{self, Sender}, task::JoinSet};
@@ -186,19 +185,19 @@ fn bump_memlock_rlimit() {
     }
 }
 
-fn load_ebpf_ipv4(interface: &str, tc_attach_type: TcAttachType) -> Result<Bpf, anyhow::Error> {
+fn load_ebpf_ipv4(interface: &str, tc_attach_type: TcAttachType) -> Result<Ebpf, anyhow::Error> {
     // Loading the eBPF program, the macros make sure the correct file is loaded
     #[cfg(debug_assertions)]
-    let mut bpf_ipv4 = Bpf::load(include_bytes_aligned!(
+    let mut bpf_ipv4 = Ebpf::load(include_bytes_aligned!(
         "../../target/bpfel-unknown-none/debug/rustiflow-ebpf-ipv4"
     ))?;
     #[cfg(not(debug_assertions))]
-    let mut bpf_ipv4 = Bpf::load(include_bytes_aligned!(
+    let mut bpf_ipv4 = Ebpf::load(include_bytes_aligned!(
         "../../target/bpfel-unknown-none/release/rustiflow-ebpf-ipv4"
     ))?;
 
     // Attach the eBPF program function
-    let _ = BpfLogger::init(&mut bpf_ipv4);
+    let _ = EbpfLogger::init(&mut bpf_ipv4);
     let _ = tc::qdisc_add_clsact(interface);
   
     let program_egress_ipv4: &mut SchedClassifier =
@@ -215,19 +214,21 @@ fn load_ebpf_ipv4(interface: &str, tc_attach_type: TcAttachType) -> Result<Bpf, 
     Ok(bpf_ipv4)
 }
 
-fn load_ebpf_ipv6(interface: &str, tc_attach_type: TcAttachType) -> Result<Bpf, anyhow::Error> {
+fn load_ebpf_ipv6(interface: &str, tc_attach_type: TcAttachType) -> Result<Ebpf, anyhow::Error> {
     // Loading the eBPF program, the macros make sure the correct file is loaded
     #[cfg(debug_assertions)]
-    let mut bpf_ipv6 = Bpf::load(include_bytes_aligned!(
+    let mut bpf_ipv6 = Ebpf::load(include_bytes_aligned!(
         "../../target/bpfel-unknown-none/debug/rustiflow-ebpf-ipv6"
     ))?;
     #[cfg(not(debug_assertions))]
-    let mut bpf_ipv6 = Bpf::load(include_bytes_aligned!(
+    let mut bpf_ipv6 = Ebpf::load(include_bytes_aligned!(
         "../../target/bpfel-unknown-none/release/rustiflow-ebpf-ipv6"
     ))?;
 
     // Attach the eBPF program function
+    let _ = EbpfLogger::init(&mut bpf_ipv6);
     let _ = tc::qdisc_add_clsact(interface);
+
     let program_egress_ipv6: &mut SchedClassifier =
         bpf_ipv6.program_mut("tc_flow_track").unwrap().try_into()?;
     program_egress_ipv6.load()?;
