@@ -1,4 +1,4 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `rustiflow/src/realtime.rs`."><title>realtime.rs - source</title><script>if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-46f98efaafac5295.ttf.woff2,FiraSans-Regular-018c141bf0843ffd.woff2,FiraSans-Medium-8f9a781e4970d388.woff2,SourceCodePro-Regular-562dcc5011b6de7d.ttf.woff2,SourceCodePro-Semibold-d899c5a5c4aeb14a.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2" crossorigin href="../../static.files/${f}">`).join(""))</script><link rel="stylesheet" href="../../static.files/normalize-76eba96aa4d2e634.css"><link rel="stylesheet" href="../../static.files/rustdoc-6d8951b3ccd3cbca.css"><meta name="rustdoc-vars" data-root-path="../../" data-static-root-path="../../static.files/" data-current-crate="rustiflow" data-themes="" data-resource-suffix="" data-rustdoc-version="1.83.0-nightly (9096f4faf 2024-10-05)" data-channel="nightly" data-search-js="search-e056c65ede92db13.js" data-settings-js="settings-805db61a62df4bd2.js" ><script src="../../static.files/storage-1d39b6787ed640ff.js"></script><script defer src="../../static.files/src-script-e66d777a5a92e9b2.js"></script><script defer src="../../src-files.js"></script><script defer src="../../static.files/main-f070b9041d14864c.js"></script><noscript><link rel="stylesheet" href="../../static.files/noscript-0111fcff984fae8f.css"></noscript><link rel="alternate icon" type="image/png" href="../../static.files/favicon-32x32-422f7d1d52889060.png"><link rel="icon" type="image/svg+xml" href="../../static.files/favicon-2c020d218678b618.svg"></head><body class="rustdoc src"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="src-sidebar-title"><h2>Files</h2></div></nav><div class="sidebar-resizer"></div><main><rustdoc-search></rustdoc-search><section id="main-content" class="content"><div class="main-heading"><h1><div class="sub-heading">rustiflow/</div>realtime.rs</h1><rustdoc-toolbar></rustdoc-toolbar></div><div class="example-wrap"><div data-nosnippet><pre class="src-line-numbers">
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `rustiflow/src/realtime.rs`."><title>realtime.rs - source</title><script>if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-46f98efaafac5295.ttf.woff2,FiraSans-Regular-018c141bf0843ffd.woff2,FiraSans-Medium-8f9a781e4970d388.woff2,SourceCodePro-Regular-562dcc5011b6de7d.ttf.woff2,SourceCodePro-Semibold-d899c5a5c4aeb14a.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2" crossorigin href="../../static.files/${f}">`).join(""))</script><link rel="stylesheet" href="../../static.files/normalize-76eba96aa4d2e634.css"><link rel="stylesheet" href="../../static.files/rustdoc-b0742ba02757f159.css"><meta name="rustdoc-vars" data-root-path="../../" data-static-root-path="../../static.files/" data-current-crate="rustiflow" data-themes="" data-resource-suffix="" data-rustdoc-version="1.84.0-nightly (27861c429 2024-10-13)" data-channel="nightly" data-search-js="search-e056c65ede92db13.js" data-settings-js="settings-805db61a62df4bd2.js" ><script src="../../static.files/storage-1d39b6787ed640ff.js"></script><script defer src="../../static.files/src-script-e66d777a5a92e9b2.js"></script><script defer src="../../src-files.js"></script><script defer src="../../static.files/main-f070b9041d14864c.js"></script><noscript><link rel="stylesheet" href="../../static.files/noscript-0111fcff984fae8f.css"></noscript><link rel="alternate icon" type="image/png" href="../../static.files/favicon-32x32-422f7d1d52889060.png"><link rel="icon" type="image/svg+xml" href="../../static.files/favicon-2c020d218678b618.svg"></head><body class="rustdoc src"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="src-sidebar-title"><h2>Files</h2></div></nav><div class="sidebar-resizer"></div><main><rustdoc-search></rustdoc-search><section id="main-content" class="content"><div class="main-heading"><h1><div class="sub-heading">rustiflow/</div>realtime.rs</h1><rustdoc-toolbar></rustdoc-toolbar></div><div class="example-wrap"><div data-nosnippet><pre class="src-line-numbers">
 <a href="#1" id="1">1</a>
 <a href="#2" id="2">2</a>
 <a href="#3" id="3">3</a>
@@ -235,8 +235,8 @@
 <a href="#234" id="234">234</a>
 <a href="#235" id="235">235</a>
 <a href="#236" id="236">236</a>
-<a href="#237" id="237">237</a></pre></div><pre class="rust"><code>
-<span class="kw">use </span>std::hash::{DefaultHasher, Hash, Hasher};
+<a href="#237" id="237">237</a>
+<a href="#238" id="238">238</a></pre></div><pre class="rust"><code><span class="kw">use </span>std::hash::{DefaultHasher, Hash, Hasher};
 
 <span class="kw">use </span><span class="kw">crate</span>::debug;
 <span class="kw">use crate</span>::{flow_table::FlowTable, flows::flow::Flow, packet_features::PacketFeatures};
@@ -244,9 +244,9 @@
     include_bytes_aligned,
     maps::RingBuf,
     programs::{tc, SchedClassifier, TcAttachType},
-    Bpf,
+    Ebpf,
 };
-<span class="kw">use </span>aya_log::BpfLogger;
+<span class="kw">use </span>aya_log::EbpfLogger;
 <span class="kw">use </span>common::{EbpfEventIpv4, EbpfEventIpv6};
 <span class="kw">use </span>log::{error, info};
 <span class="kw">use </span>tokio::{io::unix::AsyncFd, signal, sync::mpsc::{<span class="self">self</span>, Sender}, task::JoinSet};
@@ -423,19 +423,19 @@
     }
 }
 
-<span class="kw">fn </span>load_ebpf_ipv4(interface: <span class="kw-2">&amp;</span>str, tc_attach_type: TcAttachType) -&gt; <span class="prelude-ty">Result</span>&lt;Bpf, anyhow::Error&gt; {
+<span class="kw">fn </span>load_ebpf_ipv4(interface: <span class="kw-2">&amp;</span>str, tc_attach_type: TcAttachType) -&gt; <span class="prelude-ty">Result</span>&lt;Ebpf, anyhow::Error&gt; {
     <span class="comment">// Loading the eBPF program, the macros make sure the correct file is loaded
     </span><span class="attr">#[cfg(debug_assertions)]
-    </span><span class="kw">let </span><span class="kw-2">mut </span>bpf_ipv4 = Bpf::load(<span class="macro">include_bytes_aligned!</span>(
+    </span><span class="kw">let </span><span class="kw-2">mut </span>bpf_ipv4 = Ebpf::load(<span class="macro">include_bytes_aligned!</span>(
         <span class="string">"../../target/bpfel-unknown-none/debug/rustiflow-ebpf-ipv4"
     </span>))<span class="question-mark">?</span>;
     <span class="attr">#[cfg(not(debug_assertions))]
-    </span><span class="kw">let </span><span class="kw-2">mut </span>bpf_ipv4 = Bpf::load(<span class="macro">include_bytes_aligned!</span>(
+    </span><span class="kw">let </span><span class="kw-2">mut </span>bpf_ipv4 = Ebpf::load(<span class="macro">include_bytes_aligned!</span>(
         <span class="string">"../../target/bpfel-unknown-none/release/rustiflow-ebpf-ipv4"
     </span>))<span class="question-mark">?</span>;
 
     <span class="comment">// Attach the eBPF program function
-    </span><span class="kw">let _ </span>= BpfLogger::init(<span class="kw-2">&amp;mut </span>bpf_ipv4);
+    </span><span class="kw">let _ </span>= EbpfLogger::init(<span class="kw-2">&amp;mut </span>bpf_ipv4);
     <span class="kw">let _ </span>= tc::qdisc_add_clsact(interface);
   
     <span class="kw">let </span>program_egress_ipv4: <span class="kw-2">&amp;mut </span>SchedClassifier =
@@ -452,19 +452,21 @@
     <span class="prelude-val">Ok</span>(bpf_ipv4)
 }
 
-<span class="kw">fn </span>load_ebpf_ipv6(interface: <span class="kw-2">&amp;</span>str, tc_attach_type: TcAttachType) -&gt; <span class="prelude-ty">Result</span>&lt;Bpf, anyhow::Error&gt; {
+<span class="kw">fn </span>load_ebpf_ipv6(interface: <span class="kw-2">&amp;</span>str, tc_attach_type: TcAttachType) -&gt; <span class="prelude-ty">Result</span>&lt;Ebpf, anyhow::Error&gt; {
     <span class="comment">// Loading the eBPF program, the macros make sure the correct file is loaded
     </span><span class="attr">#[cfg(debug_assertions)]
-    </span><span class="kw">let </span><span class="kw-2">mut </span>bpf_ipv6 = Bpf::load(<span class="macro">include_bytes_aligned!</span>(
+    </span><span class="kw">let </span><span class="kw-2">mut </span>bpf_ipv6 = Ebpf::load(<span class="macro">include_bytes_aligned!</span>(
         <span class="string">"../../target/bpfel-unknown-none/debug/rustiflow-ebpf-ipv6"
     </span>))<span class="question-mark">?</span>;
     <span class="attr">#[cfg(not(debug_assertions))]
-    </span><span class="kw">let </span><span class="kw-2">mut </span>bpf_ipv6 = Bpf::load(<span class="macro">include_bytes_aligned!</span>(
+    </span><span class="kw">let </span><span class="kw-2">mut </span>bpf_ipv6 = Ebpf::load(<span class="macro">include_bytes_aligned!</span>(
         <span class="string">"../../target/bpfel-unknown-none/release/rustiflow-ebpf-ipv6"
     </span>))<span class="question-mark">?</span>;
 
     <span class="comment">// Attach the eBPF program function
-    </span><span class="kw">let _ </span>= tc::qdisc_add_clsact(interface);
+    </span><span class="kw">let _ </span>= EbpfLogger::init(<span class="kw-2">&amp;mut </span>bpf_ipv6);
+    <span class="kw">let _ </span>= tc::qdisc_add_clsact(interface);
+
     <span class="kw">let </span>program_egress_ipv6: <span class="kw-2">&amp;mut </span>SchedClassifier =
         bpf_ipv6.program_mut(<span class="string">"tc_flow_track"</span>).unwrap().try_into()<span class="question-mark">?</span>;
     program_egress_ipv6.load()<span class="question-mark">?</span>;
