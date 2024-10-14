@@ -5,7 +5,7 @@
 use aya_ebpf::{
     bindings::TC_ACT_PIPE,
     macros::{classifier, map},
-    maps::RingBuf,
+    maps::{RingBuf, PerCpuArray},
     programs::TcContext,
 };
 use aya_log_ebpf::error;
@@ -23,6 +23,9 @@ use network_types::{
 fn panic(_info: &core::panic::PanicInfo) -> ! {
     unsafe { core::hint::unreachable_unchecked() }
 }
+
+#[map]
+static DROPPED_PACKETS: PerCpuArray<u64> = PerCpuArray::with_max_entries(1, 0);
 
 #[map]
 static EVENTS_IPV6: RingBuf = RingBuf::with_byte_size(1024 * 1024 * 10, 0); // 10 MB
@@ -68,7 +71,10 @@ fn process_transport_packet<T: NetworkHeader>(
         // Submit the entry to make it visible to userspace
         entry.submit(0);
     } else {
-        // Handle the case where the ring buffer is full (optional logging)
+        // Handle the case where the ring buffer is full
+        if let Some(counter) = DROPPED_PACKETS.get_ptr_mut(0) {
+            unsafe { *counter += 1; }
+        }
         error!(ctx, "Failed to reserve entry in ring buffer, buffer might be full.");
     }
 

@@ -3,9 +3,10 @@ use std::hash::{DefaultHasher, Hash, Hasher};
 
 use crate::debug;
 use crate::{flow_table::FlowTable, flows::flow::Flow, packet_features::PacketFeatures};
+use aya::maps::PerCpuValues;
 use aya::{
     include_bytes_aligned,
-    maps::RingBuf,
+    maps::{RingBuf, PerCpuArray},
     programs::{tc, SchedClassifier, TcAttachType},
     Bpf,
 };
@@ -34,20 +35,27 @@ where
     let mut bpf_ingress_ipv4 = load_ebpf_ipv4(interface, TcAttachType::Ingress)?;
     let mut bpf_ingress_ipv6 = load_ebpf_ipv6(interface, TcAttachType::Ingress)?;
     let events_ingress_ipv4 = RingBuf::try_from(bpf_ingress_ipv4.take_map("EVENTS_IPV4").unwrap())?;
+    let dropped_packets_ingress_ipv4 = PerCpuArray::try_from(bpf_ingress_ipv4.take_map("DROPPED_PACKETS").unwrap())?;
     let events_ingress_ipv6 = RingBuf::try_from(bpf_ingress_ipv6.take_map("EVENTS_IPV6").unwrap())?;
+    let dropped_packets_ingress_ipv6 = PerCpuArray::try_from(bpf_ingress_ipv6.take_map("DROPPED_PACKETS").unwrap())?;
     let event_sources_v4;
     let event_sources_v6;
+    let dropped_packet_counters;
 
     if !ingress_only {
         let mut bpf_egress_ipv4 = load_ebpf_ipv4(interface, TcAttachType::Egress)?;
         let mut bpf_egress_ipv6 = load_ebpf_ipv6(interface, TcAttachType::Egress)?;
         let events_egress_ipv4 = RingBuf::try_from(bpf_egress_ipv4.take_map("EVENTS_IPV4").unwrap())?;
+        let dropped_packets_egress_ipv4 = PerCpuArray::try_from(bpf_egress_ipv4.take_map("DROPPED_PACKETS").unwrap())?;
         let events_egress_ipv6 = RingBuf::try_from(bpf_egress_ipv6.take_map("EVENTS_IPV6").unwrap())?;
+        let dropped_packets_egress_ipv6 = PerCpuArray::try_from(bpf_egress_ipv6.take_map("DROPPED_PACKETS").unwrap())?;
         event_sources_v4 = vec![events_egress_ipv4, events_ingress_ipv4];
         event_sources_v6 = vec![events_egress_ipv6, events_ingress_ipv6];
+        dropped_packet_counters = vec![dropped_packets_egress_ipv4, dropped_packets_ingress_ipv4, dropped_packets_egress_ipv6, dropped_packets_ingress_ipv6];
     } else {
         event_sources_v4 = vec![events_ingress_ipv4];
         event_sources_v6 = vec![events_ingress_ipv6];
+        dropped_packet_counters = vec![dropped_packets_ingress_ipv4, dropped_packets_ingress_ipv6];
     }
 
     let buffer_num_packets = 10_000;
@@ -140,6 +148,16 @@ where
     info!("Waiting for Ctrl-C...");
 
     signal::ctrl_c().await?;
+
+    // Fetch the dropped packets counter from the eBPF program before terminating
+    let mut total_dropped = 0;
+    for dropped_packets_array in dropped_packet_counters {
+        let values: PerCpuValues<u64> = dropped_packets_array.get(&0, 0)?;
+        for cpu_val in values.iter() {
+            total_dropped += *cpu_val;
+        }
+    }
+    info!("Total dropped packets: {}", total_dropped);
 
     // Cancel the tasks reading ebpf events
     handle_set.abort_all();
