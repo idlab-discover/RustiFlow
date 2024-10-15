@@ -16,7 +16,7 @@ use flows::{
     basic_flow::BasicFlow, cidds_flow::CiddsFlow, custom_flow::CustomFlow, flow::Flow,
     nf_flow::NfFlow,
 };
-use log::{debug, error};
+use log::{debug, error, info};
 use output::OutputWriter;
 use std::time::Instant;
 use tokio::sync::mpsc;
@@ -121,7 +121,7 @@ async fn run_with_config(config: Config) {
                     
                     debug!("Starting realtime processing...");
                     let start = Instant::now();
-                    if let Err(err) = handle_realtime::<$flow_ty>(
+                    let result = handle_realtime::<$flow_ty>(
                         &interface,
                         sender,
                         config.config.threads.unwrap_or(num_cpus::get() as u8),
@@ -131,21 +131,30 @@ async fn run_with_config(config: Config) {
                         config.config.expiration_check_interval,
                         ingress_only,
                     )
-                    .await
-                    {
-                        error!("Error: {:?}", err);
+                    .await;
+
+                    // Wait for the output task to finish (flush and close the writer)
+                    if let Err(e) = output_task.await {
+                        error!("Error waiting for output task: {:?}", e);
                     }
 
-                    // Wait for the output task to finish
-                    output_task.await.unwrap_or_else(|e| {
-                        error!("Error waiting for output task: {:?}", e);
-                    });
-
                     let end = Instant::now();
-                    debug!(
-                        "Duration: {:?} milliseconds",
-                        end.duration_since(start).as_millis()
+                    info!(
+                        "Duration: {:?} seconds",
+                        end.duration_since(start).as_secs_f64()
                     );
+        
+                    // Now process the result and print the dropped packets
+                    match result {
+                        Ok(dropped_packets) => {
+                            // If successful, log dropped packets count after writer is flushed
+                            info!("Total dropped packets: {}", dropped_packets);
+                        }
+                        Err(err) => {
+                            // Handle errors and log them
+                            error!("Error during realtime processing: {:?}", err);
+                        }
+                    }
                 }};
             }
 

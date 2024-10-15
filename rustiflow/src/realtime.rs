@@ -14,6 +14,8 @@ use common::{EbpfEventIpv4, EbpfEventIpv6};
 use log::{error, info};
 use tokio::{io::unix::AsyncFd, signal, sync::mpsc::{self, Sender}, task::JoinSet};
 
+/// Starts the realtime processing of packets on the given interface.
+/// The function will return the number of packets dropped by the eBPF program.
 pub async fn handle_realtime<T>(
     interface: &str,
     output_channel: Sender<T>,
@@ -23,7 +25,7 @@ pub async fn handle_realtime<T>(
     early_export: Option<u64>,
     expiration_check_interval: u64,
     ingress_only: bool,
-) -> Result<(), anyhow::Error>
+) -> Result<u64, anyhow::Error>
 where
     T: Flow,
 {
@@ -156,7 +158,6 @@ where
             total_dropped += *cpu_val;
         }
     }
-    info!("Total dropped packets: {}", total_dropped);
 
     // Cancel the tasks reading ebpf events
     handle_set.abort_all();
@@ -179,7 +180,7 @@ where
         }
     }
 
-    Ok(())
+    Ok(total_dropped)
 }
 
 fn compute_shard_index(flow_key: &str, num_shards: u8) -> usize {
