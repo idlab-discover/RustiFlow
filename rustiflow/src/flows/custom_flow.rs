@@ -7,15 +7,32 @@ use super::{basic_flow::BasicFlow, flow::Flow};
 
 /// Represents a Custom Flow, encapsulating various metrics and states of a network flow.
 ///
+/// As an example, this flow has one feature that represents the sum of the inter arrival times of the first 10 packets for both egress and ingress direction.
+/// 
 /// This struct is made so you can define your own features.
 #[derive(Clone)]
 pub struct CustomFlow {
     /// Choose here for an existing flow type or leave the basic flow.
     pub basic_flow: BasicFlow,
+    /// Add here the additional features.
+    pub inter_arrival_time_total: f64,
+    pub last_timestamp: Option<DateTime<Utc>>,
 }
 
 impl CustomFlow {
     // Define here the custom flow functions that calculate the additional features.
+    fn update_inter_arrival_time_total(&mut self, packet: &PacketFeatures) {
+        if (self.basic_flow.fwd_packet_count + self.basic_flow.bwd_packet_count) > 10 {
+            let iat = packet
+            .timestamp
+            .signed_duration_since(self.last_timestamp.unwrap())
+            .num_nanoseconds()
+            .unwrap() as f64
+            / 1000.0;
+
+            self.inter_arrival_time_total += iat;
+        }
+    }
 }
 
 impl Flow for CustomFlow {
@@ -39,13 +56,18 @@ impl Flow for CustomFlow {
                 ts_date,
             ),
             // Add here the initialization of the additional features.
+            inter_arrival_time_total: 0.0,
+            last_timestamp: Some(ts_date),
         }
     }
 
     fn update_flow(&mut self, packet: &PacketFeatures, fwd: bool) -> bool {
         // Update the basic flow and returns true if the flow is terminated.
         let is_terminated = self.basic_flow.update_flow(packet, fwd);
+
         // Add here the update of the additional features.
+        self.update_inter_arrival_time_total(packet);
+        self.last_timestamp = Some(packet.timestamp);
 
         // Return the termination status of the flow.
         is_terminated
@@ -53,22 +75,22 @@ impl Flow for CustomFlow {
 
     fn dump(&self) -> String {
         // Add here the dump of the custom flow.
-        format!("")
+        format!("{},{}", self.basic_flow.flow_key, self.inter_arrival_time_total)
     }
 
     fn get_features() -> String {
         // Add here the features of the custom flow.
-        format!("")
+        format!("FLOW_KEY,INTER_ARRIVAL_TIME_TOTAL")
     }
 
     fn dump_without_contamination(&self) -> String {
         // Add here the dump of the custom flow without contaminant features.
-        format!("")
+        format!("{}", self.inter_arrival_time_total)
     }
 
     fn get_features_without_contamination() -> String {
         // Add here the features of the custom flow without contaminant features.
-        format!("")
+        format!("INTER_ARRIVAL_TIME_TOTAL")
     }
 
     fn get_first_timestamp(&self) -> DateTime<Utc> {
@@ -83,26 +105,4 @@ impl Flow for CustomFlow {
     fn flow_key(&self) -> &String {
         &self.basic_flow.flow_key
     }
-}
-
-#[cfg(test)]
-mod tests {
-    // use std::net::{IpAddr, Ipv4Addr};
-
-    // use crate::flows::flow::Flow;
-
-    // use super::CustomFlow;
-
-    // fn setup_customflow() -> CustomFlow {
-    //     CustomFlow::new(
-    //         "".to_string(),
-    //         IpAddr::V4(Ipv4Addr::from(1)),
-    //         80,
-    //         IpAddr::V4(Ipv4Addr::from(2)),
-    //         8080,
-    //         6,
-    //     )
-    // }
-
-    // Add here the tests for the custom flow, if you want to test the custom flow.
 }
