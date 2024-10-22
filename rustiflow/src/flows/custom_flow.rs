@@ -16,7 +16,6 @@ pub struct CustomFlow {
     pub basic_flow: BasicFlow,
     /// Add here the additional features.
     pub inter_arrival_time_total: f64,
-    pub last_timestamp: Option<DateTime<Utc>>,
 }
 
 impl CustomFlow {
@@ -25,7 +24,7 @@ impl CustomFlow {
         if (self.basic_flow.fwd_packet_count + self.basic_flow.bwd_packet_count) > 10 {
             let iat = packet
             .timestamp
-            .signed_duration_since(self.last_timestamp.unwrap())
+            .signed_duration_since(self.basic_flow.last_timestamp)
             .num_nanoseconds()
             .unwrap() as f64
             / 1000.0;
@@ -57,17 +56,17 @@ impl Flow for CustomFlow {
             ),
             // Add here the initialization of the additional features.
             inter_arrival_time_total: 0.0,
-            last_timestamp: Some(ts_date),
         }
     }
 
     fn update_flow(&mut self, packet: &PacketFeatures, fwd: bool) -> bool {
+        // Add here the update of the additional features.
+        self.update_inter_arrival_time_total(packet);
+
         // Update the basic flow and returns true if the flow is terminated.
         let is_terminated = self.basic_flow.update_flow(packet, fwd);
 
-        // Add here the update of the additional features.
-        self.update_inter_arrival_time_total(packet);
-        self.last_timestamp = Some(packet.timestamp);
+        // Add here the update of the additional features that depend on the basic flow to be updated first.
 
         // Return the termination status of the flow.
         is_terminated
