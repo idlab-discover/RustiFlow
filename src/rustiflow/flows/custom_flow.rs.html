@@ -1,4 +1,4 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `rustiflow/src/flows/custom_flow.rs`."><title>custom_flow.rs - source</title><script>if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-6b053e98.ttf.woff2,FiraSans-Regular-0fe48ade.woff2,FiraSans-Medium-e1aa3f0a.woff2,SourceCodePro-Regular-8badfe75.ttf.woff2,SourceCodePro-Semibold-aa29a496.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2" crossorigin href="../../../static.files/${f}">`).join(""))</script><link rel="stylesheet" href="../../../static.files/normalize-9960930a.css"><link rel="stylesheet" href="../../../static.files/rustdoc-a5dc3bae.css"><meta name="rustdoc-vars" data-root-path="../../../" data-static-root-path="../../../static.files/" data-current-crate="rustiflow" data-themes="" data-resource-suffix="" data-rustdoc-version="1.84.0-nightly (662180b34 2024-10-20)" data-channel="nightly" data-search-js="search-c5a66128.js" data-settings-js="settings-0f613d39.js" ><script src="../../../static.files/storage-59e33391.js"></script><script defer src="../../../static.files/src-script-56102188.js"></script><script defer src="../../../src-files.js"></script><script defer src="../../../static.files/main-5f194d8c.js"></script><noscript><link rel="stylesheet" href="../../../static.files/noscript-893ab5e7.css"></noscript><link rel="alternate icon" type="image/png" href="../../../static.files/favicon-32x32-6580c154.png"><link rel="icon" type="image/svg+xml" href="../../../static.files/favicon-044be391.svg"></head><body class="rustdoc src"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="src-sidebar-title"><h2>Files</h2></div></nav><div class="sidebar-resizer"></div><main><rustdoc-search></rustdoc-search><section id="main-content" class="content"><div class="main-heading"><h1><div class="sub-heading">rustiflow/flows/</div>custom_flow.rs</h1><rustdoc-toolbar></rustdoc-toolbar></div><div class="example-wrap"><div data-nosnippet><pre class="src-line-numbers">
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `rustiflow/src/flows/custom_flow.rs`."><title>custom_flow.rs - source</title><script>if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-6b053e98.ttf.woff2,FiraSans-Regular-0fe48ade.woff2,FiraSans-Medium-e1aa3f0a.woff2,SourceCodePro-Regular-8badfe75.ttf.woff2,SourceCodePro-Semibold-aa29a496.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2" crossorigin href="../../../static.files/${f}">`).join(""))</script><link rel="stylesheet" href="../../../static.files/normalize-9960930a.css"><link rel="stylesheet" href="../../../static.files/rustdoc-a5dc3bae.css"><meta name="rustdoc-vars" data-root-path="../../../" data-static-root-path="../../../static.files/" data-current-crate="rustiflow" data-themes="" data-resource-suffix="" data-rustdoc-version="1.84.0-nightly (439284741 2024-10-21)" data-channel="nightly" data-search-js="search-c5a66128.js" data-settings-js="settings-0f613d39.js" ><script src="../../../static.files/storage-59e33391.js"></script><script defer src="../../../static.files/src-script-56102188.js"></script><script defer src="../../../src-files.js"></script><script defer src="../../../static.files/main-5f194d8c.js"></script><noscript><link rel="stylesheet" href="../../../static.files/noscript-893ab5e7.css"></noscript><link rel="alternate icon" type="image/png" href="../../../static.files/favicon-32x32-6580c154.png"><link rel="icon" type="image/svg+xml" href="../../../static.files/favicon-044be391.svg"></head><body class="rustdoc src"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="src-sidebar-title"><h2>Files</h2></div></nav><div class="sidebar-resizer"></div><main><rustdoc-search></rustdoc-search><section id="main-content" class="content"><div class="main-heading"><h1><div class="sub-heading">rustiflow/flows/</div>custom_flow.rs</h1><rustdoc-toolbar></rustdoc-toolbar></div><div class="example-wrap"><div data-nosnippet><pre class="src-line-numbers">
 <a href="#1" id="1">1</a>
 <a href="#2" id="2">2</a>
 <a href="#3" id="3">3</a>
@@ -105,8 +105,7 @@
 <a href="#104" id="104">104</a>
 <a href="#105" id="105">105</a>
 <a href="#106" id="106">106</a>
-<a href="#107" id="107">107</a>
-<a href="#108" id="108">108</a></pre></div><pre class="rust"><code><span class="kw">use </span>chrono::{DateTime, Utc};
+<a href="#107" id="107">107</a></pre></div><pre class="rust"><code><span class="kw">use </span>chrono::{DateTime, Utc};
 <span class="kw">use </span>std::net::IpAddr;
 
 <span class="kw">use </span><span class="kw">crate</span>::packet_features::PacketFeatures;
@@ -115,16 +114,32 @@
 
 <span class="doccomment">/// Represents a Custom Flow, encapsulating various metrics and states of a network flow.
 ///
+/// As an example, this flow has one feature that represents the sum of the inter arrival times of the first 10 packets for both egress and ingress direction.
+/// 
 /// This struct is made so you can define your own features.
 </span><span class="attr">#[derive(Clone)]
 </span><span class="kw">pub struct </span>CustomFlow {
     <span class="doccomment">/// Choose here for an existing flow type or leave the basic flow.
     </span><span class="kw">pub </span>basic_flow: BasicFlow,
+    <span class="doccomment">/// Add here the additional features.
+    </span><span class="kw">pub </span>inter_arrival_time_total: f64,
 }
 
 <span class="kw">impl </span>CustomFlow {
     <span class="comment">// Define here the custom flow functions that calculate the additional features.
-</span>}
+    </span><span class="kw">fn </span>update_inter_arrival_time_total(<span class="kw-2">&amp;mut </span><span class="self">self</span>, packet: <span class="kw-2">&amp;</span>PacketFeatures) {
+        <span class="kw">if </span>(<span class="self">self</span>.basic_flow.fwd_packet_count + <span class="self">self</span>.basic_flow.bwd_packet_count) &gt; <span class="number">10 </span>{
+            <span class="kw">let </span>iat = packet
+            .timestamp
+            .signed_duration_since(<span class="self">self</span>.basic_flow.last_timestamp)
+            .num_nanoseconds()
+            .unwrap() <span class="kw">as </span>f64
+            / <span class="number">1000.0</span>;
+
+            <span class="self">self</span>.inter_arrival_time_total += iat;
+        }
+    }
+}
 
 <span class="kw">impl </span>Flow <span class="kw">for </span>CustomFlow {
     <span class="kw">fn </span>new(
@@ -147,13 +162,18 @@
                 ts_date,
             ),
             <span class="comment">// Add here the initialization of the additional features.
-        </span>}
+            </span>inter_arrival_time_total: <span class="number">0.0</span>,
+        }
     }
 
     <span class="kw">fn </span>update_flow(<span class="kw-2">&amp;mut </span><span class="self">self</span>, packet: <span class="kw-2">&amp;</span>PacketFeatures, fwd: bool) -&gt; bool {
+        <span class="comment">// Add here the update of the additional features.
+        </span><span class="self">self</span>.update_inter_arrival_time_total(packet);
+
         <span class="comment">// Update the basic flow and returns true if the flow is terminated.
         </span><span class="kw">let </span>is_terminated = <span class="self">self</span>.basic_flow.update_flow(packet, fwd);
-        <span class="comment">// Add here the update of the additional features.
+
+        <span class="comment">// Add here the update of the additional features that depend on the basic flow to be updated first.
 
         // Return the termination status of the flow.
         </span>is_terminated
@@ -161,22 +181,22 @@
 
     <span class="kw">fn </span>dump(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; String {
         <span class="comment">// Add here the dump of the custom flow.
-        </span><span class="macro">format!</span>(<span class="string">""</span>)
+        </span><span class="macro">format!</span>(<span class="string">"{},{}"</span>, <span class="self">self</span>.basic_flow.flow_key, <span class="self">self</span>.inter_arrival_time_total)
     }
 
     <span class="kw">fn </span>get_features() -&gt; String {
         <span class="comment">// Add here the features of the custom flow.
-        </span><span class="macro">format!</span>(<span class="string">""</span>)
+        </span><span class="macro">format!</span>(<span class="string">"FLOW_KEY,INTER_ARRIVAL_TIME_TOTAL"</span>)
     }
 
     <span class="kw">fn </span>dump_without_contamination(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; String {
         <span class="comment">// Add here the dump of the custom flow without contaminant features.
-        </span><span class="macro">format!</span>(<span class="string">""</span>)
+        </span><span class="macro">format!</span>(<span class="string">"{}"</span>, <span class="self">self</span>.inter_arrival_time_total)
     }
 
     <span class="kw">fn </span>get_features_without_contamination() -&gt; String {
         <span class="comment">// Add here the features of the custom flow without contaminant features.
-        </span><span class="macro">format!</span>(<span class="string">""</span>)
+        </span><span class="macro">format!</span>(<span class="string">"INTER_ARRIVAL_TIME_TOTAL"</span>)
     }
 
     <span class="kw">fn </span>get_first_timestamp(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; DateTime&lt;Utc&gt; {
@@ -192,26 +212,4 @@
         <span class="kw-2">&amp;</span><span class="self">self</span>.basic_flow.flow_key
     }
 }
-
-<span class="attr">#[cfg(test)]
-</span><span class="kw">mod </span>tests {
-    <span class="comment">// use std::net::{IpAddr, Ipv4Addr};
-
-    // use crate::flows::flow::Flow;
-
-    // use super::CustomFlow;
-
-    // fn setup_customflow() -&gt; CustomFlow {
-    //     CustomFlow::new(
-    //         "".to_string(),
-    //         IpAddr::V4(Ipv4Addr::from(1)),
-    //         80,
-    //         IpAddr::V4(Ipv4Addr::from(2)),
-    //         8080,
-    //         6,
-    //     )
-    // }
-
-    // Add here the tests for the custom flow, if you want to test the custom flow.
-</span>}
 </code></pre></div></section></main></body></html>
