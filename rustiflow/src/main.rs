@@ -118,7 +118,7 @@ async fn run_with_config(config: Config) {
                         });
                         debug!("OutputWriter task finished");
                     });
-                    
+
                     debug!("Starting realtime processing...");
                     let start = Instant::now();
                     let result = handle_realtime::<$flow_ty>(
@@ -143,7 +143,7 @@ async fn run_with_config(config: Config) {
                         "Duration: {:.4} seconds",
                         end.duration_since(start).as_secs_f64()
                     );
-        
+
                     // Now process the result and print the dropped packets
                     match result {
                         Ok(dropped_packets) => {

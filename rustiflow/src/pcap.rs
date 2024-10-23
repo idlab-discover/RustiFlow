@@ -5,7 +5,10 @@ use crate::{flow_table::FlowTable, packet_features::PacketFeatures};
 use chrono::{DateTime, Utc};
 use log::{debug, error};
 use pnet::packet::{
-    ethernet::{EtherTypes, EthernetPacket}, ipv4::Ipv4Packet, ipv6::Ipv6Packet, Packet
+    ethernet::{EtherTypes, EthernetPacket},
+    ipv4::Ipv4Packet,
+    ipv6::Ipv6Packet,
+    Packet,
 };
 use tokio::sync::mpsc;
 use tokio::sync::mpsc::Sender;
@@ -61,26 +64,54 @@ where
             match ethernet.get_ethertype() {
                 EtherTypes::Ipv4 => {
                     if let Some(packet) = Ipv4Packet::new(ethernet.payload()) {
-                        process_packet::<T, Ipv4Packet>(&packet, timestamp, &shard_senders, num_threads, PacketFeatures::from_ipv4_packet).await;
-                    } 
-                },
+                        process_packet::<T, Ipv4Packet>(
+                            &packet,
+                            timestamp,
+                            &shard_senders,
+                            num_threads,
+                            PacketFeatures::from_ipv4_packet,
+                        )
+                        .await;
+                    }
+                }
                 EtherTypes::Ipv6 => {
                     if let Some(packet) = Ipv6Packet::new(ethernet.payload()) {
-                        process_packet::<T, Ipv6Packet>(&packet, timestamp, &shard_senders, num_threads, PacketFeatures::from_ipv6_packet).await;
-                    } 
-                },
+                        process_packet::<T, Ipv6Packet>(
+                            &packet,
+                            timestamp,
+                            &shard_senders,
+                            num_threads,
+                            PacketFeatures::from_ipv6_packet,
+                        )
+                        .await;
+                    }
+                }
                 _ => {
                     // Check if it is a Linux cooked capture
                     let ethertype = u16::from_be_bytes([packet.data[14], packet.data[15]]);
                     match ethertype {
                         SLL_IPV4 => {
                             if let Some(packet) = Ipv4Packet::new(&packet.data[16..]) {
-                                process_packet::<T, Ipv4Packet>(&packet, timestamp, &shard_senders, num_threads, PacketFeatures::from_ipv4_packet).await;
+                                process_packet::<T, Ipv4Packet>(
+                                    &packet,
+                                    timestamp,
+                                    &shard_senders,
+                                    num_threads,
+                                    PacketFeatures::from_ipv4_packet,
+                                )
+                                .await;
                             }
                         }
                         SLL_IPV6 => {
                             if let Some(packet) = Ipv6Packet::new(&packet.data[16..]) {
-                                process_packet::<T, Ipv6Packet>(&packet, timestamp, &shard_senders, num_threads, PacketFeatures::from_ipv6_packet).await;
+                                process_packet::<T, Ipv6Packet>(
+                                    &packet,
+                                    timestamp,
+                                    &shard_senders,
+                                    num_threads,
+                                    PacketFeatures::from_ipv6_packet,
+                                )
+                                .await;
                             }
                         }
                         _ => debug!("Failed to parse packet as IPv4 or IPv6..."),

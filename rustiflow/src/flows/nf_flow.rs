@@ -26,7 +26,10 @@ impl NfFlow {
             return 0;
         }
 
-        (self.bwd_last_timestamp.unwrap().signed_duration_since(self.bwd_first_timestamp.unwrap()))
+        (self
+            .bwd_last_timestamp
+            .unwrap()
+            .signed_duration_since(self.bwd_first_timestamp.unwrap()))
         .num_milliseconds()
     }
 
@@ -185,10 +188,14 @@ impl Flow for NfFlow {
         {},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},\
         {},{},{},{},{},{},{},{},{},{},{},{},{}",
             self.cic_flow.basic_flow.protocol,
-            self.last_timestamp.signed_duration_since(self.first_timestamp).num_milliseconds(),
+            self.last_timestamp
+                .signed_duration_since(self.first_timestamp)
+                .num_milliseconds(),
             self.cic_flow.basic_flow.fwd_packet_count + self.cic_flow.basic_flow.bwd_packet_count,
             self.cic_flow.fwd_pkt_len_tot + self.cic_flow.bwd_pkt_len_tot,
-            self.fwd_last_timestamp.signed_duration_since(self.fwd_first_timestamp).num_milliseconds(),
+            self.fwd_last_timestamp
+                .signed_duration_since(self.fwd_first_timestamp)
+                .num_milliseconds(),
             self.cic_flow.basic_flow.fwd_packet_count,
             self.cic_flow.fwd_pkt_len_tot,
             self.get_bwd_duration(),
