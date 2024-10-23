@@ -1,4 +1,4 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `rustiflow/src/tui.rs`."><title>tui.rs - source</title><script>if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-6b053e98.ttf.woff2,FiraSans-Regular-0fe48ade.woff2,FiraSans-Medium-e1aa3f0a.woff2,SourceCodePro-Regular-8badfe75.ttf.woff2,SourceCodePro-Semibold-aa29a496.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2" crossorigin href="../../static.files/${f}">`).join(""))</script><link rel="stylesheet" href="../../static.files/normalize-9960930a.css"><link rel="stylesheet" href="../../static.files/rustdoc-a5dc3bae.css"><meta name="rustdoc-vars" data-root-path="../../" data-static-root-path="../../static.files/" data-current-crate="rustiflow" data-themes="" data-resource-suffix="" data-rustdoc-version="1.84.0-nightly (439284741 2024-10-21)" data-channel="nightly" data-search-js="search-c5a66128.js" data-settings-js="settings-0f613d39.js" ><script src="../../static.files/storage-59e33391.js"></script><script defer src="../../static.files/src-script-56102188.js"></script><script defer src="../../src-files.js"></script><script defer src="../../static.files/main-5f194d8c.js"></script><noscript><link rel="stylesheet" href="../../static.files/noscript-893ab5e7.css"></noscript><link rel="alternate icon" type="image/png" href="../../static.files/favicon-32x32-6580c154.png"><link rel="icon" type="image/svg+xml" href="../../static.files/favicon-044be391.svg"></head><body class="rustdoc src"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="src-sidebar-title"><h2>Files</h2></div></nav><div class="sidebar-resizer"></div><main><rustdoc-search></rustdoc-search><section id="main-content" class="content"><div class="main-heading"><h1><div class="sub-heading">rustiflow/</div>tui.rs</h1><rustdoc-toolbar></rustdoc-toolbar></div><div class="example-wrap"><div data-nosnippet><pre class="src-line-numbers">
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `rustiflow/src/tui.rs`."><title>tui.rs - source</title><script>if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-6b053e98.ttf.woff2,FiraSans-Regular-0fe48ade.woff2,FiraSans-Medium-e1aa3f0a.woff2,SourceCodePro-Regular-8badfe75.ttf.woff2,SourceCodePro-Semibold-aa29a496.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2" crossorigin href="../../static.files/${f}">`).join(""))</script><link rel="stylesheet" href="../../static.files/normalize-9960930a.css"><link rel="stylesheet" href="../../static.files/rustdoc-a5dc3bae.css"><meta name="rustdoc-vars" data-root-path="../../" data-static-root-path="../../static.files/" data-current-crate="rustiflow" data-themes="" data-resource-suffix="" data-rustdoc-version="1.84.0-nightly (86d69c705 2024-10-22)" data-channel="nightly" data-search-js="search-c5a66128.js" data-settings-js="settings-0f613d39.js" ><script src="../../static.files/storage-59e33391.js"></script><script defer src="../../static.files/src-script-56102188.js"></script><script defer src="../../src-files.js"></script><script defer src="../../static.files/main-5f194d8c.js"></script><noscript><link rel="stylesheet" href="../../static.files/noscript-893ab5e7.css"></noscript><link rel="alternate icon" type="image/png" href="../../static.files/favicon-32x32-6580c154.png"><link rel="icon" type="image/svg+xml" href="../../static.files/favicon-044be391.svg"></head><body class="rustdoc src"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="src-sidebar-title"><h2>Files</h2></div></nav><div class="sidebar-resizer"></div><main><rustdoc-search></rustdoc-search><section id="main-content" class="content"><div class="main-heading"><h1><div class="sub-heading">rustiflow/</div>tui.rs</h1><rustdoc-toolbar></rustdoc-toolbar></div><div class="example-wrap"><div data-nosnippet><pre class="src-line-numbers">
 <a href="#1" id="1">1</a>
 <a href="#2" id="2">2</a>
 <a href="#3" id="3">3</a>
@@ -1127,24 +1127,52 @@
 <a href="#1126" id="1126">1126</a>
 <a href="#1127" id="1127">1127</a>
 <a href="#1128" id="1128">1128</a>
-<a href="#1129" id="1129">1129</a></pre></div><pre class="rust"><code><span class="kw">use </span>log::error;
-<span class="kw">use </span>serde::{Deserialize, Serialize};
-<span class="kw">use </span>strum::VariantNames;
-<span class="kw">use </span>tui::text::{Span, Spans, Text};
-<span class="kw">use </span>std::error::Error;
-<span class="kw">use </span>std::io;
-<span class="kw">use </span>tui::backend::{Backend, CrosstermBackend};
-<span class="kw">use </span>tui::layout::{Alignment, Constraint, Direction, Layout, Rect};
-<span class="kw">use </span>tui::style::{Color, Modifier, Style};
-<span class="kw">use </span>tui::widgets::{Block, Borders, Clear, List, ListItem, ListState, Paragraph};
-<span class="kw">use </span>tui::{Frame, Terminal};
-<span class="kw">use </span>crossterm::event::{<span class="self">self</span>, DisableMouseCapture, EnableMouseCapture, Event, KeyCode, KeyEvent};
+<a href="#1129" id="1129">1129</a>
+<a href="#1130" id="1130">1130</a>
+<a href="#1131" id="1131">1131</a>
+<a href="#1132" id="1132">1132</a>
+<a href="#1133" id="1133">1133</a>
+<a href="#1134" id="1134">1134</a>
+<a href="#1135" id="1135">1135</a>
+<a href="#1136" id="1136">1136</a>
+<a href="#1137" id="1137">1137</a>
+<a href="#1138" id="1138">1138</a>
+<a href="#1139" id="1139">1139</a>
+<a href="#1140" id="1140">1140</a>
+<a href="#1141" id="1141">1141</a>
+<a href="#1142" id="1142">1142</a>
+<a href="#1143" id="1143">1143</a>
+<a href="#1144" id="1144">1144</a>
+<a href="#1145" id="1145">1145</a>
+<a href="#1146" id="1146">1146</a>
+<a href="#1147" id="1147">1147</a>
+<a href="#1148" id="1148">1148</a>
+<a href="#1149" id="1149">1149</a>
+<a href="#1150" id="1150">1150</a>
+<a href="#1151" id="1151">1151</a>
+<a href="#1152" id="1152">1152</a>
+<a href="#1153" id="1153">1153</a>
+<a href="#1154" id="1154">1154</a>
+<a href="#1155" id="1155">1155</a></pre></div><pre class="rust"><code><span class="kw">use </span>crossterm::event::{<span class="self">self</span>, DisableMouseCapture, EnableMouseCapture, Event, KeyCode, KeyEvent};
 <span class="kw">use </span>crossterm::execute;
 <span class="kw">use </span>crossterm::terminal::{
     disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen,
 };
+<span class="kw">use </span>log::error;
+<span class="kw">use </span>serde::{Deserialize, Serialize};
+<span class="kw">use </span>std::error::Error;
+<span class="kw">use </span>std::io;
+<span class="kw">use </span>strum::VariantNames;
+<span class="kw">use </span>tui::backend::{Backend, CrosstermBackend};
+<span class="kw">use </span>tui::layout::{Alignment, Constraint, Direction, Layout, Rect};
+<span class="kw">use </span>tui::style::{Color, Modifier, Style};
+<span class="kw">use </span>tui::text::{Span, Spans, Text};
+<span class="kw">use </span>tui::widgets::{Block, Borders, Clear, List, ListItem, ListState, Paragraph};
+<span class="kw">use </span>tui::{Frame, Terminal};
 
 <span class="kw">use </span><span class="kw">crate</span>::args::{Commands, ConfigFile, ExportConfig, ExportMethodType, FlowType, OutputConfig};
+
+<span class="kw">const </span>CONFIG_FILE_NAME: <span class="kw-2">&amp;</span>str = <span class="string">"rustiflow.toml"</span>;
 
 <span class="attr">#[derive(Serialize, Deserialize, Debug, Clone)]
 </span><span class="kw">pub struct </span>Config {
@@ -1153,8 +1181,8 @@
     <span class="kw">pub </span>command: Commands,
 }
 
-<span class="kw">impl </span>Default <span class="kw">for </span>Config {
-    <span class="kw">fn </span>default() -&gt; <span class="self">Self </span>{
+<span class="kw">impl </span>Config {
+    <span class="kw">fn </span>reset() -&gt; <span class="self">Self </span>{
         Config {
             config: ExportConfig {
                 features: FlowType::Basic,
@@ -1170,6 +1198,44 @@
                 header: <span class="bool-val">false</span>,
                 drop_contaminant_features: <span class="bool-val">false</span>,
             },
+            command: Commands::Realtime {
+                interface: String::from(<span class="string">"eth0"</span>),
+                ingress_only: <span class="bool-val">false</span>,
+            },
+        }
+    }
+}
+
+<span class="kw">impl </span>Default <span class="kw">for </span>Config {
+    <span class="kw">fn </span>default() -&gt; <span class="self">Self </span>{
+        <span class="kw">let </span>config: ConfigFile = <span class="kw">match </span>confy::load_path(CONFIG_FILE_NAME) {
+            <span class="prelude-val">Ok</span>(config) =&gt; config,
+            <span class="prelude-val">Err</span>(<span class="kw">_</span>) =&gt; {
+                <span class="kw">return </span>Config {
+                    config: ExportConfig {
+                        features: FlowType::Basic,
+                        active_timeout: <span class="number">3600</span>,
+                        idle_timeout: <span class="number">120</span>,
+                        early_export: <span class="prelude-val">None</span>,
+                        threads: <span class="prelude-val">None</span>,
+                        expiration_check_interval: <span class="number">60</span>,
+                    },
+                    output: OutputConfig {
+                        output: ExportMethodType::Print,
+                        export_path: <span class="prelude-val">None</span>,
+                        header: <span class="bool-val">false</span>,
+                        drop_contaminant_features: <span class="bool-val">false</span>,
+                    },
+                    command: Commands::Realtime {
+                        interface: String::from(<span class="string">"eth0"</span>),
+                        ingress_only: <span class="bool-val">false</span>,
+                    },
+                };
+            }
+        };
+        Config {
+            config: config.config,
+            output: config.output,
             command: Commands::Realtime {
                 interface: String::from(<span class="string">"eth0"</span>),
                 ingress_only: <span class="bool-val">false</span>,
@@ -1301,7 +1367,7 @@
                         <span class="kw">if let </span><span class="prelude-val">Some</span>(config) = handle_title_bar_input(key, app)<span class="question-mark">? </span>{
                             <span class="kw">return </span><span class="prelude-val">Ok</span>(<span class="prelude-val">Some</span>(config));
                         }
-                    },
+                    }
                     AppFocus::Menu =&gt; handle_menu_input(key, app)<span class="question-mark">?</span>,
                     AppFocus::FlowType =&gt; handle_flow_type_input(key, app)<span class="question-mark">?</span>,
                     AppFocus::ActiveTimeoutInput
@@ -1359,13 +1425,13 @@
                     output: app.config.output.clone(),
                 };
 
-                <span class="kw">if let </span><span class="prelude-val">Err</span>(e) = confy::store_path(<span class="string">"rustiflow.toml"</span>, config_file) {
+                <span class="kw">if let </span><span class="prelude-val">Err</span>(e) = confy::store_path(CONFIG_FILE_NAME, config_file) {
                     <span class="macro">error!</span>(<span class="string">"Error saving configuration file: {:?}"</span>, e);
                 }
             }
             <span class="prelude-val">Some</span>(<span class="number">3</span>) =&gt; {
                 <span class="comment">// Reset config
-                </span>app.config = Config::default();
+                </span>app.config = Config::reset();
             }
             <span class="kw">_ </span>=&gt; {}
         },
@@ -1718,25 +1784,13 @@
 
     <span class="kw">let </span>chunks = Layout::default()
         .direction(Direction::Vertical)
-        .constraints(
-            [
-                Constraint::Length(<span class="number">3</span>),
-                Constraint::Min(<span class="number">0</span>),
-            ]
-            .as_ref(),
-        )
+        .constraints([Constraint::Length(<span class="number">3</span>), Constraint::Min(<span class="number">0</span>)].as_ref())
         .split(size);
 
     <span class="comment">// Title Bar
     </span><span class="kw">let </span>title_bar_layout = Layout::default()
         .direction(Direction::Horizontal)
-        .constraints(
-            [
-                Constraint::Percentage(<span class="number">50</span>),
-                Constraint::Percentage(<span class="number">50</span>),
-            ]
-            .as_ref(),
-        )
+        .constraints([Constraint::Percentage(<span class="number">50</span>), Constraint::Percentage(<span class="number">50</span>)].as_ref())
         .split(chunks[<span class="number">0</span>]);
 
     <span class="kw">let </span>rustiflow_art = <span class="string">"
@@ -2075,9 +2129,7 @@
             ),
         ])),
         ListItem::new(Text::from(<span class="macro">vec!</span>[
-            Spans::from(<span class="macro">vec!</span>[
-                Span::raw(<span class="string">"Expiration Check"</span>),
-            ]),
+            Spans::from(<span class="macro">vec!</span>[Span::raw(<span class="string">"Expiration Check"</span>)]),
             Spans::from(<span class="macro">vec!</span>[
                 Span::raw(<span class="string">"Interval: "</span>),
                 Span::styled(
@@ -2108,9 +2160,7 @@
             ),
         ])),
         ListItem::new(Text::from(<span class="macro">vec!</span>[
-            Spans::from(<span class="macro">vec!</span>[
-                Span::raw(<span class="string">"Drop Contaminant"</span>),
-            ]),
+            Spans::from(<span class="macro">vec!</span>[Span::raw(<span class="string">"Drop Contaminant"</span>)]),
             Spans::from(<span class="macro">vec!</span>[
                 Span::raw(<span class="string">"Features: "</span>),
                 Span::styled(
@@ -2123,7 +2173,10 @@
 
     <span class="comment">// Build the Mode entry dynamically
     </span><span class="kw">let </span>mode_item = <span class="kw">match </span><span class="kw-2">&amp;</span>app.config.command {
-        Commands::Realtime { interface, ingress_only } =&gt; {
+        Commands::Realtime {
+            interface,
+            ingress_only,
+        } =&gt; {
             <span class="kw">let </span><span class="kw-2">mut </span>text = Text::from(Spans::from(<span class="macro">vec!</span>[
                 Span::raw(<span class="string">"Mode: "</span>),
                 Span::styled(<span class="string">"Realtime"</span>, Style::default().fg(Color::Yellow)),
@@ -2192,22 +2245,21 @@
             Commands::Realtime { ingress_only, .. } =&gt; <span class="kw-2">*</span>ingress_only,
             <span class="kw">_ </span>=&gt; <span class="bool-val">false</span>,
         };
-        
+
         <span class="kw">let </span>popup_area = centered_rect(<span class="number">50</span>, <span class="number">25</span>, size);
         f.render_widget(Clear, popup_area);
-        
+
         <span class="kw">let </span>boolean_input_block = Block::default()
-        .title(<span class="string">"Ingress Only?"</span>)
-        .borders(Borders::ALL)
-        .style(Style::default().bg(Color::Black))
-        .border_style(Style::default().fg(Color::Yellow));
+            .title(<span class="string">"Ingress Only?"</span>)
+            .borders(Borders::ALL)
+            .style(Style::default().bg(Color::Black))
+            .border_style(Style::default().fg(Color::Yellow));
 
         <span class="kw">let </span>inner_area = boolean_input_block.inner(popup_area);
 
         f.render_widget(boolean_input_block, popup_area);
 
         render_boolean_choice(f, inner_area, is_true_selected);
-        
     }
 }
 
@@ -2255,4 +2307,5 @@
             .as_ref(),
         )
         .split(popup_layout[<span class="number">1</span>])[<span class="number">1</span>]
-}</code></pre></div></section></main></body></html>
+}
+</code></pre></div></section></main></body></html>

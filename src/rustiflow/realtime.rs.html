@@ -1,4 +1,4 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `rustiflow/src/realtime.rs`."><title>realtime.rs - source</title><script>if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-6b053e98.ttf.woff2,FiraSans-Regular-0fe48ade.woff2,FiraSans-Medium-e1aa3f0a.woff2,SourceCodePro-Regular-8badfe75.ttf.woff2,SourceCodePro-Semibold-aa29a496.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2" crossorigin href="../../static.files/${f}">`).join(""))</script><link rel="stylesheet" href="../../static.files/normalize-9960930a.css"><link rel="stylesheet" href="../../static.files/rustdoc-a5dc3bae.css"><meta name="rustdoc-vars" data-root-path="../../" data-static-root-path="../../static.files/" data-current-crate="rustiflow" data-themes="" data-resource-suffix="" data-rustdoc-version="1.84.0-nightly (439284741 2024-10-21)" data-channel="nightly" data-search-js="search-c5a66128.js" data-settings-js="settings-0f613d39.js" ><script src="../../static.files/storage-59e33391.js"></script><script defer src="../../static.files/src-script-56102188.js"></script><script defer src="../../src-files.js"></script><script defer src="../../static.files/main-5f194d8c.js"></script><noscript><link rel="stylesheet" href="../../static.files/noscript-893ab5e7.css"></noscript><link rel="alternate icon" type="image/png" href="../../static.files/favicon-32x32-6580c154.png"><link rel="icon" type="image/svg+xml" href="../../static.files/favicon-044be391.svg"></head><body class="rustdoc src"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="src-sidebar-title"><h2>Files</h2></div></nav><div class="sidebar-resizer"></div><main><rustdoc-search></rustdoc-search><section id="main-content" class="content"><div class="main-heading"><h1><div class="sub-heading">rustiflow/</div>realtime.rs</h1><rustdoc-toolbar></rustdoc-toolbar></div><div class="example-wrap"><div data-nosnippet><pre class="src-line-numbers">
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `rustiflow/src/realtime.rs`."><title>realtime.rs - source</title><script>if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-6b053e98.ttf.woff2,FiraSans-Regular-0fe48ade.woff2,FiraSans-Medium-e1aa3f0a.woff2,SourceCodePro-Regular-8badfe75.ttf.woff2,SourceCodePro-Semibold-aa29a496.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2" crossorigin href="../../static.files/${f}">`).join(""))</script><link rel="stylesheet" href="../../static.files/normalize-9960930a.css"><link rel="stylesheet" href="../../static.files/rustdoc-a5dc3bae.css"><meta name="rustdoc-vars" data-root-path="../../" data-static-root-path="../../static.files/" data-current-crate="rustiflow" data-themes="" data-resource-suffix="" data-rustdoc-version="1.84.0-nightly (86d69c705 2024-10-22)" data-channel="nightly" data-search-js="search-c5a66128.js" data-settings-js="settings-0f613d39.js" ><script src="../../static.files/storage-59e33391.js"></script><script defer src="../../static.files/src-script-56102188.js"></script><script defer src="../../src-files.js"></script><script defer src="../../static.files/main-5f194d8c.js"></script><noscript><link rel="stylesheet" href="../../static.files/noscript-893ab5e7.css"></noscript><link rel="alternate icon" type="image/png" href="../../static.files/favicon-32x32-6580c154.png"><link rel="icon" type="image/svg+xml" href="../../static.files/favicon-044be391.svg"></head><body class="rustdoc src"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="src-sidebar-title"><h2>Files</h2></div></nav><div class="sidebar-resizer"></div><main><rustdoc-search></rustdoc-search><section id="main-content" class="content"><div class="main-heading"><h1><div class="sub-heading">rustiflow/</div>realtime.rs</h1><rustdoc-toolbar></rustdoc-toolbar></div><div class="example-wrap"><div data-nosnippet><pre class="src-line-numbers">
 <a href="#1" id="1">1</a>
 <a href="#2" id="2">2</a>
 <a href="#3" id="3">3</a>
@@ -255,21 +255,52 @@
 <a href="#254" id="254">254</a>
 <a href="#255" id="255">255</a>
 <a href="#256" id="256">256</a>
-<a href="#257" id="257">257</a></pre></div><pre class="rust"><code><span class="kw">use </span>std::hash::{DefaultHasher, Hash, Hasher};
+<a href="#257" id="257">257</a>
+<a href="#258" id="258">258</a>
+<a href="#259" id="259">259</a>
+<a href="#260" id="260">260</a>
+<a href="#261" id="261">261</a>
+<a href="#262" id="262">262</a>
+<a href="#263" id="263">263</a>
+<a href="#264" id="264">264</a>
+<a href="#265" id="265">265</a>
+<a href="#266" id="266">266</a>
+<a href="#267" id="267">267</a>
+<a href="#268" id="268">268</a>
+<a href="#269" id="269">269</a>
+<a href="#270" id="270">270</a>
+<a href="#271" id="271">271</a>
+<a href="#272" id="272">272</a>
+<a href="#273" id="273">273</a>
+<a href="#274" id="274">274</a>
+<a href="#275" id="275">275</a>
+<a href="#276" id="276">276</a>
+<a href="#277" id="277">277</a>
+<a href="#278" id="278">278</a>
+<a href="#279" id="279">279</a>
+<a href="#280" id="280">280</a>
+<a href="#281" id="281">281</a>
+<a href="#282" id="282">282</a>
+<a href="#283" id="283">283</a></pre></div><pre class="rust"><code><span class="kw">use </span>std::hash::{DefaultHasher, Hash, Hasher};
 
 <span class="kw">use </span><span class="kw">crate</span>::debug;
 <span class="kw">use crate</span>::{flow_table::FlowTable, flows::flow::Flow, packet_features::PacketFeatures};
 <span class="kw">use </span>aya::maps::PerCpuValues;
 <span class="kw">use </span>aya::{
     include_bytes_aligned,
-    maps::{RingBuf, PerCpuArray},
+    maps::{PerCpuArray, RingBuf},
     programs::{tc, SchedClassifier, TcAttachType},
     Ebpf,
 };
 <span class="kw">use </span>aya_log::EbpfLogger;
 <span class="kw">use </span>common::{EbpfEventIpv4, EbpfEventIpv6};
 <span class="kw">use </span>log::{error, info};
-<span class="kw">use </span>tokio::{io::unix::AsyncFd, signal, sync::mpsc::{<span class="self">self</span>, Sender}, task::JoinSet};
+<span class="kw">use </span>tokio::{
+    io::unix::AsyncFd,
+    signal,
+    sync::mpsc::{<span class="self">self</span>, Sender},
+    task::JoinSet,
+};
 
 <span class="doccomment">/// Starts the realtime processing of packets on the given interface.
 /// The function will return the number of packets dropped by the eBPF program.
@@ -293,9 +324,11 @@
     </span><span class="kw">let </span><span class="kw-2">mut </span>bpf_ingress_ipv4 = load_ebpf_ipv4(interface, TcAttachType::Ingress)<span class="question-mark">?</span>;
     <span class="kw">let </span><span class="kw-2">mut </span>bpf_ingress_ipv6 = load_ebpf_ipv6(interface, TcAttachType::Ingress)<span class="question-mark">?</span>;
     <span class="kw">let </span>events_ingress_ipv4 = RingBuf::try_from(bpf_ingress_ipv4.take_map(<span class="string">"EVENTS_IPV4"</span>).unwrap())<span class="question-mark">?</span>;
-    <span class="kw">let </span>dropped_packets_ingress_ipv4 = PerCpuArray::try_from(bpf_ingress_ipv4.take_map(<span class="string">"DROPPED_PACKETS"</span>).unwrap())<span class="question-mark">?</span>;
+    <span class="kw">let </span>dropped_packets_ingress_ipv4 =
+        PerCpuArray::try_from(bpf_ingress_ipv4.take_map(<span class="string">"DROPPED_PACKETS"</span>).unwrap())<span class="question-mark">?</span>;
     <span class="kw">let </span>events_ingress_ipv6 = RingBuf::try_from(bpf_ingress_ipv6.take_map(<span class="string">"EVENTS_IPV6"</span>).unwrap())<span class="question-mark">?</span>;
-    <span class="kw">let </span>dropped_packets_ingress_ipv6 = PerCpuArray::try_from(bpf_ingress_ipv6.take_map(<span class="string">"DROPPED_PACKETS"</span>).unwrap())<span class="question-mark">?</span>;
+    <span class="kw">let </span>dropped_packets_ingress_ipv6 =
+        PerCpuArray::try_from(bpf_ingress_ipv6.take_map(<span class="string">"DROPPED_PACKETS"</span>).unwrap())<span class="question-mark">?</span>;
     <span class="kw">let </span>event_sources_v4;
     <span class="kw">let </span>event_sources_v6;
     <span class="kw">let </span>dropped_packet_counters;
@@ -303,13 +336,22 @@
     <span class="kw">if </span>!ingress_only {
         <span class="kw">let </span><span class="kw-2">mut </span>bpf_egress_ipv4 = load_ebpf_ipv4(interface, TcAttachType::Egress)<span class="question-mark">?</span>;
         <span class="kw">let </span><span class="kw-2">mut </span>bpf_egress_ipv6 = load_ebpf_ipv6(interface, TcAttachType::Egress)<span class="question-mark">?</span>;
-        <span class="kw">let </span>events_egress_ipv4 = RingBuf::try_from(bpf_egress_ipv4.take_map(<span class="string">"EVENTS_IPV4"</span>).unwrap())<span class="question-mark">?</span>;
-        <span class="kw">let </span>dropped_packets_egress_ipv4 = PerCpuArray::try_from(bpf_egress_ipv4.take_map(<span class="string">"DROPPED_PACKETS"</span>).unwrap())<span class="question-mark">?</span>;
-        <span class="kw">let </span>events_egress_ipv6 = RingBuf::try_from(bpf_egress_ipv6.take_map(<span class="string">"EVENTS_IPV6"</span>).unwrap())<span class="question-mark">?</span>;
-        <span class="kw">let </span>dropped_packets_egress_ipv6 = PerCpuArray::try_from(bpf_egress_ipv6.take_map(<span class="string">"DROPPED_PACKETS"</span>).unwrap())<span class="question-mark">?</span>;
+        <span class="kw">let </span>events_egress_ipv4 =
+            RingBuf::try_from(bpf_egress_ipv4.take_map(<span class="string">"EVENTS_IPV4"</span>).unwrap())<span class="question-mark">?</span>;
+        <span class="kw">let </span>dropped_packets_egress_ipv4 =
+            PerCpuArray::try_from(bpf_egress_ipv4.take_map(<span class="string">"DROPPED_PACKETS"</span>).unwrap())<span class="question-mark">?</span>;
+        <span class="kw">let </span>events_egress_ipv6 =
+            RingBuf::try_from(bpf_egress_ipv6.take_map(<span class="string">"EVENTS_IPV6"</span>).unwrap())<span class="question-mark">?</span>;
+        <span class="kw">let </span>dropped_packets_egress_ipv6 =
+            PerCpuArray::try_from(bpf_egress_ipv6.take_map(<span class="string">"DROPPED_PACKETS"</span>).unwrap())<span class="question-mark">?</span>;
         event_sources_v4 = <span class="macro">vec!</span>[events_egress_ipv4, events_ingress_ipv4];
         event_sources_v6 = <span class="macro">vec!</span>[events_egress_ipv6, events_ingress_ipv6];
-        dropped_packet_counters = <span class="macro">vec!</span>[dropped_packets_egress_ipv4, dropped_packets_ingress_ipv4, dropped_packets_egress_ipv6, dropped_packets_ingress_ipv6];
+        dropped_packet_counters = <span class="macro">vec!</span>[
+            dropped_packets_egress_ipv4,
+            dropped_packets_ingress_ipv4,
+            dropped_packets_egress_ipv6,
+            dropped_packets_ingress_ipv6,
+        ];
     } <span class="kw">else </span>{
         event_sources_v4 = <span class="macro">vec!</span>[events_ingress_ipv4];
         event_sources_v6 = <span class="macro">vec!</span>[events_ingress_ipv6];
@@ -358,13 +400,17 @@
 
                 <span class="kw">let </span>ring_buf = guard.get_inner_mut();
                 <span class="kw">while let </span><span class="prelude-val">Some</span>(event) = ring_buf.next() {
-                    <span class="kw">let </span>ebpf_event_ipv4: EbpfEventIpv4 = <span class="kw">unsafe </span>{ std::ptr::read(event.as_ptr() <span class="kw">as </span><span class="kw-2">*const </span><span class="kw">_</span>) };
+                    <span class="kw">let </span>ebpf_event_ipv4: EbpfEventIpv4 =
+                        <span class="kw">unsafe </span>{ std::ptr::read(event.as_ptr() <span class="kw">as </span><span class="kw-2">*const </span><span class="kw">_</span>) };
                     <span class="kw">let </span>packet_features = PacketFeatures::from_ebpf_event_ipv4(<span class="kw-2">&amp;</span>ebpf_event_ipv4);
                     <span class="kw">let </span>flow_key = packet_features.biflow_key();
                     <span class="kw">let </span>shard_index = compute_shard_index(<span class="kw-2">&amp;</span>flow_key, num_threads);
 
                     <span class="kw">if let </span><span class="prelude-val">Err</span>(e) = shard_senders_clone[shard_index].send(packet_features).<span class="kw">await </span>{
-                        <span class="macro">error!</span>(<span class="string">"Failed to send packet_features to shard {}: {}"</span>, shard_index, e);
+                        <span class="macro">error!</span>(
+                            <span class="string">"Failed to send packet_features to shard {}: {}"</span>,
+                            shard_index, e
+                        );
                     }
                 }
 
@@ -376,7 +422,7 @@
 
     <span class="kw">for </span>ebpf_event_source <span class="kw">in </span>event_sources_v6 {
         <span class="kw">let </span>shard_senders_clone = shard_senders.clone();
-        
+
         handle_set.spawn(<span class="kw">async move </span>{
             <span class="comment">// Wrap the RingBuf in AsyncFd to poll it with tokio
             </span><span class="kw">let </span><span class="kw-2">mut </span>async_ring_buf = AsyncFd::new(ebpf_event_source).unwrap();
@@ -387,13 +433,17 @@
 
                 <span class="kw">let </span>ring_buf = guard.get_inner_mut();
                 <span class="kw">while let </span><span class="prelude-val">Some</span>(event) = ring_buf.next() {
-                    <span class="kw">let </span>ebpf_event_ipv6: EbpfEventIpv6 = <span class="kw">unsafe </span>{ std::ptr::read(event.as_ptr() <span class="kw">as </span><span class="kw-2">*const </span><span class="kw">_</span>) };
+                    <span class="kw">let </span>ebpf_event_ipv6: EbpfEventIpv6 =
+                        <span class="kw">unsafe </span>{ std::ptr::read(event.as_ptr() <span class="kw">as </span><span class="kw-2">*const </span><span class="kw">_</span>) };
                     <span class="kw">let </span>packet_features = PacketFeatures::from_ebpf_event_ipv6(<span class="kw-2">&amp;</span>ebpf_event_ipv6);
                     <span class="kw">let </span>flow_key = packet_features.biflow_key();
                     <span class="kw">let </span>shard_index = compute_shard_index(<span class="kw-2">&amp;</span>flow_key, num_threads);
 
                     <span class="kw">if let </span><span class="prelude-val">Err</span>(e) = shard_senders_clone[shard_index].send(packet_features).<span class="kw">await </span>{
-                        <span class="macro">error!</span>(<span class="string">"Failed to send packet_features to shard {}: {}"</span>, shard_index, e);
+                        <span class="macro">error!</span>(
+                            <span class="string">"Failed to send packet_features to shard {}: {}"</span>,
+                            shard_index, e
+                        );
                     }
                 }
 
@@ -475,18 +525,20 @@
     <span class="comment">// Attach the eBPF program function
     </span><span class="kw">let _ </span>= EbpfLogger::init(<span class="kw-2">&amp;mut </span>bpf_ipv4);
     <span class="kw">let _ </span>= tc::qdisc_add_clsact(interface);
-  
+
     <span class="kw">let </span>program_egress_ipv4: <span class="kw-2">&amp;mut </span>SchedClassifier =
         bpf_ipv4.program_mut(<span class="string">"tc_flow_track"</span>).unwrap().try_into()<span class="question-mark">?</span>;
     program_egress_ipv4.load().map_err(|e| {
         <span class="macro">error!</span>(<span class="string">"Failed to load eBPF program: {:?}"</span>, e);
         e
     })<span class="question-mark">?</span>;
-    program_egress_ipv4.attach(<span class="kw-2">&amp;</span>interface, tc_attach_type).map_err(|e| {
-        <span class="macro">error!</span>(<span class="string">"Failed to attach eBPF program: {:?}"</span>, e);
-        e
-    })<span class="question-mark">?</span>;
-    
+    program_egress_ipv4
+        .attach(<span class="kw-2">&amp;</span>interface, tc_attach_type)
+        .map_err(|e| {
+            <span class="macro">error!</span>(<span class="string">"Failed to attach eBPF program: {:?}"</span>, e);
+            e
+        })<span class="question-mark">?</span>;
+
     <span class="prelude-val">Ok</span>(bpf_ipv4)
 }
 
