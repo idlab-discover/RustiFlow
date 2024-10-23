@@ -1,21 +1,23 @@
-use log::error;
-use serde::{Deserialize, Serialize};
-use strum::VariantNames;
-use tui::text::{Span, Spans, Text};
-use std::error::Error;
-use std::io;
-use tui::backend::{Backend, CrosstermBackend};
-use tui::layout::{Alignment, Constraint, Direction, Layout, Rect};
-use tui::style::{Color, Modifier, Style};
-use tui::widgets::{Block, Borders, Clear, List, ListItem, ListState, Paragraph};
-use tui::{Frame, Terminal};
 use crossterm::event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode, KeyEvent};
 use crossterm::execute;
 use crossterm::terminal::{
     disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen,
 };
+use log::error;
+use serde::{Deserialize, Serialize};
+use std::error::Error;
+use std::io;
+use strum::VariantNames;
+use tui::backend::{Backend, CrosstermBackend};
+use tui::layout::{Alignment, Constraint, Direction, Layout, Rect};
+use tui::style::{Color, Modifier, Style};
+use tui::text::{Span, Spans, Text};
+use tui::widgets::{Block, Borders, Clear, List, ListItem, ListState, Paragraph};
+use tui::{Frame, Terminal};
 
 use crate::args::{Commands, ConfigFile, ExportConfig, ExportMethodType, FlowType, OutputConfig};
+
+const CONFIG_FILE_NAME: &str = "rustiflow.toml";
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Config {
@@ -24,8 +26,8 @@ pub struct Config {
     pub command: Commands,
 }
 
-impl Default for Config {
-    fn default() -> Self {
+impl Config {
+    fn reset() -> Self {
         Config {
             config: ExportConfig {
                 features: FlowType::Basic,
@@ -41,6 +43,44 @@ impl Default for Config {
                 header: false,
                 drop_contaminant_features: false,
             },
+            command: Commands::Realtime {
+                interface: String::from("eth0"),
+                ingress_only: false,
+            },
+        }
+    }
+}
+
+impl Default for Config {
+    fn default() -> Self {
+        let config: ConfigFile = match confy::load_path(CONFIG_FILE_NAME) {
+            Ok(config) => config,
+            Err(_) => {
+                return Config {
+                    config: ExportConfig {
+                        features: FlowType::Basic,
+                        active_timeout: 3600,
+                        idle_timeout: 120,
+                        early_export: None,
+                        threads: None,
+                        expiration_check_interval: 60,
+                    },
+                    output: OutputConfig {
+                        output: ExportMethodType::Print,
+                        export_path: None,
+                        header: false,
+                        drop_contaminant_features: false,
+                    },
+                    command: Commands::Realtime {
+                        interface: String::from("eth0"),
+                        ingress_only: false,
+                    },
+                };
+            }
+        };
+        Config {
+            config: config.config,
+            output: config.output,
             command: Commands::Realtime {
                 interface: String::from("eth0"),
                 ingress_only: false,
@@ -172,7 +212,7 @@ async fn run_app<B: Backend>(
                         if let Some(config) = handle_title_bar_input(key, app)? {
                             return Ok(Some(config));
                         }
-                    },
+                    }
                     AppFocus::Menu => handle_menu_input(key, app)?,
                     AppFocus::FlowType => handle_flow_type_input(key, app)?,
                     AppFocus::ActiveTimeoutInput
@@ -230,13 +270,13 @@ fn handle_title_bar_input(key: KeyEvent, app: &mut App) -> Result<Option<Config>
                     output: app.config.output.clone(),
                 };
 
-                if let Err(e) = confy::store_path("rustiflow.toml", config_file) {
+                if let Err(e) = confy::store_path(CONFIG_FILE_NAME, config_file) {
                     error!("Error saving configuration file: {:?}", e);
                 }
             }
             Some(3) => {
                 // Reset config
-                app.config = Config::default();
+                app.config = Config::reset();
             }
             _ => {}
         },
@@ -589,25 +629,13 @@ fn ui_main_screen<B: Backend>(f: &mut Frame<B>, app: &App) {
 
     let chunks = Layout::default()
         .direction(Direction::Vertical)
-        .constraints(
-            [
-                Constraint::Length(3),
-                Constraint::Min(0),
-            ]
-            .as_ref(),
-        )
+        .constraints([Constraint::Length(3), Constraint::Min(0)].as_ref())
         .split(size);
 
     // Title Bar
     let title_bar_layout = Layout::default()
         .direction(Direction::Horizontal)
-        .constraints(
-            [
-                Constraint::Percentage(50),
-                Constraint::Percentage(50),
-            ]
-            .as_ref(),
-        )
+        .constraints([Constraint::Percentage(50), Constraint::Percentage(50)].as_ref())
         .split(chunks[0]);
 
     let rustiflow_art = "
@@ -946,9 +974,7 @@ fn render_current_selections<B: Backend>(f: &mut Frame<B>, app: &App, area: Rect
             ),
         ])),
         ListItem::new(Text::from(vec![
-            Spans::from(vec![
-                Span::raw("Expiration Check"),
-            ]),
+            Spans::from(vec![Span::raw("Expiration Check")]),
             Spans::from(vec![
                 Span::raw("Interval: "),
                 Span::styled(
@@ -979,9 +1005,7 @@ fn render_current_selections<B: Backend>(f: &mut Frame<B>, app: &App, area: Rect
             ),
         ])),
         ListItem::new(Text::from(vec![
-            Spans::from(vec![
-                Span::raw("Drop Contaminant"),
-            ]),
+            Spans::from(vec![Span::raw("Drop Contaminant")]),
             Spans::from(vec![
                 Span::raw("Features: "),
                 Span::styled(
@@ -994,7 +1018,10 @@ fn render_current_selections<B: Backend>(f: &mut Frame<B>, app: &App, area: Rect
 
     // Build the Mode entry dynamically
     let mode_item = match &app.config.command {
-        Commands::Realtime { interface, ingress_only } => {
+        Commands::Realtime {
+            interface,
+            ingress_only,
+        } => {
             let mut text = Text::from(Spans::from(vec![
                 Span::raw("Mode: "),
                 Span::styled("Realtime", Style::default().fg(Color::Yellow)),
@@ -1063,22 +1090,21 @@ fn render_popups<B: Backend>(f: &mut Frame<B>, app: &App, size: Rect) {
             Commands::Realtime { ingress_only, .. } => *ingress_only,
             _ => false,
         };
-        
+
         let popup_area = centered_rect(50, 25, size);
         f.render_widget(Clear, popup_area);
-        
+
         let boolean_input_block = Block::default()
-        .title("Ingress Only?")
-        .borders(Borders::ALL)
-        .style(Style::default().bg(Color::Black))
-        .border_style(Style::default().fg(Color::Yellow));
+            .title("Ingress Only?")
+            .borders(Borders::ALL)
+            .style(Style::default().bg(Color::Black))
+            .border_style(Style::default().fg(Color::Yellow));
 
         let inner_area = boolean_input_block.inner(popup_area);
 
         f.render_widget(boolean_input_block, popup_area);
 
         render_boolean_choice(f, inner_area, is_true_selected);
-        
     }
 }
 
