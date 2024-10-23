@@ -10,7 +10,7 @@ use super::flow::Flow;
 enum FlowState {
     Established,
     FinSent,
-    FinAcked
+    FinAcked,
 }
 
 /// A basic flow that stores the basic features of a flow.
@@ -95,16 +95,24 @@ impl BasicFlow {
         if packet.fin_flag > 0 {
             if forward {
                 self.state_fwd = FlowState::FinSent;
-                self.expected_ack_seq_bwd = Some(packet.sequence_number + packet.data_length as u32 + 1);
+                self.expected_ack_seq_bwd =
+                    Some(packet.sequence_number + packet.data_length as u32 + 1);
             } else {
                 self.state_bwd = FlowState::FinSent;
-                self.expected_ack_seq_fwd = Some(packet.sequence_number + packet.data_length as u32 + 1);
+                self.expected_ack_seq_fwd =
+                    Some(packet.sequence_number + packet.data_length as u32 + 1);
             }
         }
 
-        if self.state_bwd == FlowState::FinSent && forward && Some(packet.sequence_number_ack) == self.expected_ack_seq_fwd {
+        if self.state_bwd == FlowState::FinSent
+            && forward
+            && Some(packet.sequence_number_ack) == self.expected_ack_seq_fwd
+        {
             self.state_bwd = FlowState::FinAcked;
-        } else if self.state_fwd == FlowState::FinSent && !forward && Some(packet.sequence_number_ack) == self.expected_ack_seq_bwd {
+        } else if self.state_fwd == FlowState::FinSent
+            && !forward
+            && Some(packet.sequence_number_ack) == self.expected_ack_seq_bwd
+        {
             self.state_fwd = FlowState::FinAcked;
         }
 

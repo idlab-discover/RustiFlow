@@ -8,7 +8,7 @@ use super::{basic_flow::BasicFlow, flow::Flow};
 /// Represents a Custom Flow, encapsulating various metrics and states of a network flow.
 ///
 /// As an example, this flow has one feature that represents the sum of the inter arrival times of the first 10 packets for both egress and ingress direction.
-/// 
+///
 /// This struct is made so you can define your own features.
 #[derive(Clone)]
 pub struct CustomFlow {
@@ -23,11 +23,11 @@ impl CustomFlow {
     fn update_inter_arrival_time_total(&mut self, packet: &PacketFeatures) {
         if (self.basic_flow.fwd_packet_count + self.basic_flow.bwd_packet_count) > 10 {
             let iat = packet
-            .timestamp
-            .signed_duration_since(self.basic_flow.last_timestamp)
-            .num_nanoseconds()
-            .unwrap() as f64
-            / 1000.0;
+                .timestamp
+                .signed_duration_since(self.basic_flow.last_timestamp)
+                .num_nanoseconds()
+                .unwrap() as f64
+                / 1000.0;
 
             self.inter_arrival_time_total += iat;
         }
@@ -74,7 +74,10 @@ impl Flow for CustomFlow {
 
     fn dump(&self) -> String {
         // Add here the dump of the custom flow.
-        format!("{},{}", self.basic_flow.flow_key, self.inter_arrival_time_total)
+        format!(
+            "{},{}",
+            self.basic_flow.flow_key, self.inter_arrival_time_total
+        )
     }
 
     fn get_features() -> String {

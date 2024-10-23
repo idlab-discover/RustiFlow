@@ -3,7 +3,15 @@ use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 use chrono::{DateTime, Utc};
 use common::{EbpfEventIpv4, EbpfEventIpv6};
 use log::debug;
-use pnet::packet::{icmp::IcmpPacket, ip::{IpNextHeaderProtocol, IpNextHeaderProtocols}, ipv4::Ipv4Packet, ipv6::Ipv6Packet, tcp::TcpPacket, udp::UdpPacket, Packet};
+use pnet::packet::{
+    icmp::IcmpPacket,
+    ip::{IpNextHeaderProtocol, IpNextHeaderProtocols},
+    ipv4::Ipv4Packet,
+    ipv6::Ipv6Packet,
+    tcp::TcpPacket,
+    udp::UdpPacket,
+    Packet,
+};
 
 // Define TCP flags
 const FIN_FLAG: u8 = 0b00000001;
@@ -92,10 +100,7 @@ impl PacketFeatures {
     }
 
     // Constructor to create PacketFeatures from an IPv4 packet
-    pub fn from_ipv4_packet(
-        packet: &Ipv4Packet,
-        timestamp: DateTime<Utc>,
-    ) -> Option<Self> {
+    pub fn from_ipv4_packet(packet: &Ipv4Packet, timestamp: DateTime<Utc>) -> Option<Self> {
         extract_packet_features_transport(
             packet.get_source().into(),
             packet.get_destination().into(),
@@ -107,10 +112,7 @@ impl PacketFeatures {
     }
 
     // Constructor to create PacketFeatures from an IPv6 packet
-    pub fn from_ipv6_packet(
-        packet: &Ipv6Packet,
-        timestamp: DateTime<Utc>,
-    ) -> Option<Self> {
+    pub fn from_ipv6_packet(packet: &Ipv6Packet, timestamp: DateTime<Utc>) -> Option<Self> {
         extract_packet_features_transport(
             packet.get_source().into(),
             packet.get_destination().into(),
@@ -233,8 +235,8 @@ fn extract_packet_features_transport(
                 data_length: udp_packet.payload().len() as u16,
                 header_length: 8, // Fixed header size for UDP
                 length: total_length,
-                window_size: 0, // No window size for UDP
-                sequence_number: 0, // No sequence number for UDP
+                window_size: 0,         // No window size for UDP
+                sequence_number: 0,     // No sequence number for UDP
                 sequence_number_ack: 0, // No sequence number ACK for UDP
             })
         }
@@ -258,8 +260,8 @@ fn extract_packet_features_transport(
                 data_length: icmp_packet.payload().len() as u16,
                 header_length: 8, // Fixed header size for ICMP
                 length: total_length,
-                window_size: 0, // No window size for ICMP
-                sequence_number: 0, // No sequence number for ICMP
+                window_size: 0,         // No window size for ICMP
+                sequence_number: 0,     // No sequence number for ICMP
                 sequence_number_ack: 0, // No sequence number ACK for ICMP
             })
         }

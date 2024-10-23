@@ -5,14 +5,19 @@ use crate::{flow_table::FlowTable, flows::flow::Flow, packet_features::PacketFea
 use aya::maps::PerCpuValues;
 use aya::{
     include_bytes_aligned,
-    maps::{RingBuf, PerCpuArray},
+    maps::{PerCpuArray, RingBuf},
     programs::{tc, SchedClassifier, TcAttachType},
     Ebpf,
 };
 use aya_log::EbpfLogger;
 use common::{EbpfEventIpv4, EbpfEventIpv6};
 use log::{error, info};
-use tokio::{io::unix::AsyncFd, signal, sync::mpsc::{self, Sender}, task::JoinSet};
+use tokio::{
+    io::unix::AsyncFd,
+    signal,
+    sync::mpsc::{self, Sender},
+    task::JoinSet,
+};
 
 /// Starts the realtime processing of packets on the given interface.
 /// The function will return the number of packets dropped by the eBPF program.
@@ -36,9 +41,11 @@ where
     let mut bpf_ingress_ipv4 = load_ebpf_ipv4(interface, TcAttachType::Ingress)?;
     let mut bpf_ingress_ipv6 = load_ebpf_ipv6(interface, TcAttachType::Ingress)?;
     let events_ingress_ipv4 = RingBuf::try_from(bpf_ingress_ipv4.take_map("EVENTS_IPV4").unwrap())?;
-    let dropped_packets_ingress_ipv4 = PerCpuArray::try_from(bpf_ingress_ipv4.take_map("DROPPED_PACKETS").unwrap())?;
+    let dropped_packets_ingress_ipv4 =
+        PerCpuArray::try_from(bpf_ingress_ipv4.take_map("DROPPED_PACKETS").unwrap())?;
     let events_ingress_ipv6 = RingBuf::try_from(bpf_ingress_ipv6.take_map("EVENTS_IPV6").unwrap())?;
-    let dropped_packets_ingress_ipv6 = PerCpuArray::try_from(bpf_ingress_ipv6.take_map("DROPPED_PACKETS").unwrap())?;
+    let dropped_packets_ingress_ipv6 =
+        PerCpuArray::try_from(bpf_ingress_ipv6.take_map("DROPPED_PACKETS").unwrap())?;
     let event_sources_v4;
     let event_sources_v6;
     let dropped_packet_counters;
@@ -46,13 +53,22 @@ where
     if !ingress_only {
         let mut bpf_egress_ipv4 = load_ebpf_ipv4(interface, TcAttachType::Egress)?;
         let mut bpf_egress_ipv6 = load_ebpf_ipv6(interface, TcAttachType::Egress)?;
-        let events_egress_ipv4 = RingBuf::try_from(bpf_egress_ipv4.take_map("EVENTS_IPV4").unwrap())?;
-        let dropped_packets_egress_ipv4 = PerCpuArray::try_from(bpf_egress_ipv4.take_map("DROPPED_PACKETS").unwrap())?;
-        let events_egress_ipv6 = RingBuf::try_from(bpf_egress_ipv6.take_map("EVENTS_IPV6").unwrap())?;
-        let dropped_packets_egress_ipv6 = PerCpuArray::try_from(bpf_egress_ipv6.take_map("DROPPED_PACKETS").unwrap())?;
+        let events_egress_ipv4 =
+            RingBuf::try_from(bpf_egress_ipv4.take_map("EVENTS_IPV4").unwrap())?;
+        let dropped_packets_egress_ipv4 =
+            PerCpuArray::try_from(bpf_egress_ipv4.take_map("DROPPED_PACKETS").unwrap())?;
+        let events_egress_ipv6 =
+            RingBuf::try_from(bpf_egress_ipv6.take_map("EVENTS_IPV6").unwrap())?;
+        let dropped_packets_egress_ipv6 =
+            PerCpuArray::try_from(bpf_egress_ipv6.take_map("DROPPED_PACKETS").unwrap())?;
         event_sources_v4 = vec![events_egress_ipv4, events_ingress_ipv4];
         event_sources_v6 = vec![events_egress_ipv6, events_ingress_ipv6];
-        dropped_packet_counters = vec![dropped_packets_egress_ipv4, dropped_packets_ingress_ipv4, dropped_packets_egress_ipv6, dropped_packets_ingress_ipv6];
+        dropped_packet_counters = vec![
+            dropped_packets_egress_ipv4,
+            dropped_packets_ingress_ipv4,
+            dropped_packets_egress_ipv6,
+            dropped_packets_ingress_ipv6,
+        ];
     } else {
         event_sources_v4 = vec![events_ingress_ipv4];
         event_sources_v6 = vec![events_ingress_ipv6];
@@ -101,13 +117,17 @@ where
 
                 let ring_buf = guard.get_inner_mut();
                 while let Some(event) = ring_buf.next() {
-                    let ebpf_event_ipv4: EbpfEventIpv4 = unsafe { std::ptr::read(event.as_ptr() as *const _) };
+                    let ebpf_event_ipv4: EbpfEventIpv4 =
+                        unsafe { std::ptr::read(event.as_ptr() as *const _) };
                     let packet_features = PacketFeatures::from_ebpf_event_ipv4(&ebpf_event_ipv4);
                     let flow_key = packet_features.biflow_key();
                     let shard_index = compute_shard_index(&flow_key, num_threads);
 
                     if let Err(e) = shard_senders_clone[shard_index].send(packet_features).await {
-                        error!("Failed to send packet_features to shard {}: {}", shard_index, e);
+                        error!(
+                            "Failed to send packet_features to shard {}: {}",
+                            shard_index, e
+                        );
                     }
                 }
 
@@ -119,7 +139,7 @@ where
 
     for ebpf_event_source in event_sources_v6 {
         let shard_senders_clone = shard_senders.clone();
-        
+
         handle_set.spawn(async move {
             // Wrap the RingBuf in AsyncFd to poll it with tokio
             let mut async_ring_buf = AsyncFd::new(ebpf_event_source).unwrap();
@@ -130,13 +150,17 @@ where
 
                 let ring_buf = guard.get_inner_mut();
                 while let Some(event) = ring_buf.next() {
-                    let ebpf_event_ipv6: EbpfEventIpv6 = unsafe { std::ptr::read(event.as_ptr() as *const _) };
+                    let ebpf_event_ipv6: EbpfEventIpv6 =
+                        unsafe { std::ptr::read(event.as_ptr() as *const _) };
                     let packet_features = PacketFeatures::from_ebpf_event_ipv6(&ebpf_event_ipv6);
                     let flow_key = packet_features.biflow_key();
                     let shard_index = compute_shard_index(&flow_key, num_threads);
 
                     if let Err(e) = shard_senders_clone[shard_index].send(packet_features).await {
-                        error!("Failed to send packet_features to shard {}: {}", shard_index, e);
+                        error!(
+                            "Failed to send packet_features to shard {}: {}",
+                            shard_index, e
+                        );
                     }
                 }
 
@@ -218,18 +242,20 @@ fn load_ebpf_ipv4(interface: &str, tc_attach_type: TcAttachType) -> Result<Ebpf,
     // Attach the eBPF program function
     let _ = EbpfLogger::init(&mut bpf_ipv4);
     let _ = tc::qdisc_add_clsact(interface);
-  
+
     let program_egress_ipv4: &mut SchedClassifier =
         bpf_ipv4.program_mut("tc_flow_track").unwrap().try_into()?;
     program_egress_ipv4.load().map_err(|e| {
         error!("Failed to load eBPF program: {:?}", e);
         e
     })?;
-    program_egress_ipv4.attach(&interface, tc_attach_type).map_err(|e| {
-        error!("Failed to attach eBPF program: {:?}", e);
-        e
-    })?;
-    
+    program_egress_ipv4
+        .attach(&interface, tc_attach_type)
+        .map_err(|e| {
+            error!("Failed to attach eBPF program: {:?}", e);
+            e
+        })?;
+
     Ok(bpf_ipv4)
 }
 
