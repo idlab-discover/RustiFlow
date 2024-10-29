@@ -1,6 +1,9 @@
 use std::hash::{DefaultHasher, Hash, Hasher};
+use std::sync::Arc;
 
 use crate::debug;
+use crate::flow_tui::launch_packet_tui;
+use crate::packet_counts::PacketCountPerSecond;
 use crate::{flow_table::FlowTable, flows::flow::Flow, packet_features::PacketFeatures};
 use aya::maps::PerCpuValues;
 use aya::{
@@ -12,10 +15,12 @@ use aya::{
 use aya_log::EbpfLogger;
 use common::{EbpfEventIpv4, EbpfEventIpv6};
 use log::{error, info};
+use tokio::sync::watch;
 use tokio::{
     io::unix::AsyncFd,
     signal,
     sync::mpsc::{self, Sender},
+    sync::Mutex,
     task::JoinSet,
 };
 
@@ -30,6 +35,7 @@ pub async fn handle_realtime<T>(
     early_export: Option<u64>,
     expiration_check_interval: u64,
     ingress_only: bool,
+    csv_export: bool,
 ) -> Result<u64, anyhow::Error>
 where
     T: Flow,
@@ -78,6 +84,9 @@ where
     let buffer_num_packets = 10_000;
     let mut shard_senders = Vec::with_capacity(num_threads as usize);
 
+    let (packet_tx, packet_rx) = watch::channel(Vec::new());
+    let packet_counter = Arc::new(Mutex::new(PacketCountPerSecond::new()));
+
     debug!("Creating {} sharded FlowTables...", num_threads);
     for _ in 0..num_threads {
         let (tx, mut rx) = mpsc::channel::<PacketFeatures>(buffer_num_packets);
@@ -107,6 +116,9 @@ where
 
     for ebpf_event_source in event_sources_v4 {
         let shard_senders_clone = shard_senders.clone();
+        let packet_counter_clone = Arc::clone(&packet_counter);
+        let packet_tx_clone = packet_tx.clone();
+
         handle_set.spawn(async move {
             // Wrap the RingBuf in AsyncFd to poll it with tokio
             let mut async_ring_buf = AsyncFd::new(ebpf_event_source).unwrap();
@@ -117,6 +129,13 @@ where
 
                 let ring_buf = guard.get_inner_mut();
                 while let Some(event) = ring_buf.next() {
+                    if csv_export {
+                        let mut counter = packet_counter_clone.lock().await;
+                        counter.increment();
+                        // Send the updated count to the TUI
+                        let recent_counts = counter.get_counts_for_last_intervals(100);
+                        let _ = packet_tx_clone.send(recent_counts);
+                    }
                     let ebpf_event_ipv4: EbpfEventIpv4 =
                         unsafe { std::ptr::read(event.as_ptr() as *const _) };
                     let packet_features = PacketFeatures::from_ebpf_event_ipv4(&ebpf_event_ipv4);
@@ -139,6 +158,8 @@ where
 
     for ebpf_event_source in event_sources_v6 {
         let shard_senders_clone = shard_senders.clone();
+        let packet_counter_clone = Arc::clone(&packet_counter);
+        let packet_tx_clone = packet_tx.clone();
 
         handle_set.spawn(async move {
             // Wrap the RingBuf in AsyncFd to poll it with tokio
@@ -150,6 +171,13 @@ where
 
                 let ring_buf = guard.get_inner_mut();
                 while let Some(event) = ring_buf.next() {
+                    if csv_export {
+                        let mut counter = packet_counter_clone.lock().await;
+                        counter.increment();
+                        // Send the updated count to the TUI
+                        let recent_counts = counter.get_counts_for_last_intervals(100);
+                        let _ = packet_tx_clone.send(recent_counts);
+                    }
                     let ebpf_event_ipv6: EbpfEventIpv6 =
                         unsafe { std::ptr::read(event.as_ptr() as *const _) };
                     let packet_features = PacketFeatures::from_ebpf_event_ipv6(&ebpf_event_ipv6);
@@ -171,6 +199,10 @@ where
     }
 
     info!("Waiting for Ctrl-C...");
+
+    if csv_export {
+        let _ = launch_packet_tui(packet_rx).await;
+    }
 
     signal::ctrl_c().await?;
 
