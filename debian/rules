@@ -1,0 +1,21 @@
+#!/usr/bin/make -f
+%:
+	dh $@ --buildsystem=cargo
+
+override_dh_auto_configure:
+	# Skip cargo-checksum.json as it's not needed
+	true
+
+override_dh_auto_build:
+	# Build eBPF programs
+	cargo xtask ebpf-ipv4 --release
+	cargo xtask ebpf-ipv6 --release
+	# Build the main project
+	cargo build --release
+
+override_dh_auto_install:
+	dh_install
+
+override_dh_auto_test:
+	# Skip tests during build
+	true
