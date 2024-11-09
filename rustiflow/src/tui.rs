@@ -205,10 +205,10 @@ async fn run_app<B: Backend>(
                     | AppFocus::HeaderInput
                     | AppFocus::DropContaminantFeaturesInput => {
                         handle_boolean_input(key, app, app.focus.clone())?
-                    },
+                    }
                     AppFocus::ConfigFileInput => {
                         handle_config_file_input(key, app)?;
-                    },
+                    }
                     AppFocus::ConfigFileSaveInput => {
                         handle_config_file_save_input(key, app)?;
                     }
@@ -502,6 +502,7 @@ fn handle_selection_input(
                 Some(0) => {
                     app.config.output.output = ExportMethodType::Print;
                     app.config.output.export_path = None;
+                    app.focus = AppFocus::Menu;
                 }
                 Some(1) => {
                     app.config.output.output = ExportMethodType::Csv;
@@ -605,19 +606,15 @@ fn handle_config_file_input(key: KeyEvent, app: &mut App) -> Result<(), Box<dyn 
             if fs::metadata(&app.config_file_input).is_ok() {
                 app.config_file = Some(app.config_file_input.clone());
                 let config = match confy::load_path::<ConfigFile>(app.config_file_input.clone()) {
-                    Ok(config_file) => {
-                        Config {
-                            config: config_file.config,
-                            output: config_file.output,
-                            command: Commands::Realtime {
-                                interface: String::from("eth0"),
-                                ingress_only: false,
-                            },
-                        }
-                    }
-                    Err(_) => {
-                        Config::reset()
-                    }
+                    Ok(config_file) => Config {
+                        config: config_file.config,
+                        output: config_file.output,
+                        command: Commands::Realtime {
+                            interface: String::from("eth0"),
+                            ingress_only: false,
+                        },
+                    },
+                    Err(_) => Config::reset(),
                 };
                 app.config = config;
                 app.focus = AppFocus::Menu;

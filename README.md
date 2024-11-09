@@ -240,6 +240,20 @@ Make sure that you don't use docker desktop and that you don't have it installed
 
   ```
 
+## Logging in both development or using the binary
+
+### Development
+
+```bash
+RUST_LOG=info cargo xtask run --
+```
+
+### Binary
+
+```bash
+sudo RUST_LOG=info rustiflow
+```
+
 **Note:** For specific logging levels, adjust `RUST_LOG` to `error` for error messages, and `debug` for debug messages. If you don't want any additional logs, just remove `RUST_LOG=info`.
 
 ---
