@@ -74,6 +74,7 @@ async fn main() {
                     export_path: cli.export_path,
                     header: cli.header,
                     drop_contaminant_features: cli.drop_contaminant_features,
+                    performance_mode: cli.performance_mode,
                 },
                 command: cli.command,
             }
@@ -93,8 +94,8 @@ async fn run_with_config(config: Config) {
             macro_rules! execute_realtime {
                 ($flow_ty:ty) => {{
                     // Create output writer and initialize it
-                    let csv_export = config.output.export_path.is_some() && !matches!(std::env::var("RUST_LOG"), Ok(ref val) if val.contains("debug"));
-                    
+                    let csv_export = config.output.export_path.is_some() && !matches!(std::env::var("RUST_LOG"), Ok(ref val) if val.contains("debug")) && !config.output.performance_mode;
+
                     let mut output_writer = OutputWriter::<$flow_ty>::new(
                         config.output.output,
                         config.output.header,

@@ -44,6 +44,10 @@ pub struct Cli {
     #[clap(long, group = "cli_group", required_if_eq("output", "Csv"))]
     pub export_path: Option<String>,
 
+    /// Disable the graph in TUI when exporting in CSV mode
+    #[clap(long, group = "cli_group", action = clap::ArgAction::SetTrue, required_if_eq("output", "Csv"))]
+    pub performance_mode: bool,
+
     /// Whether to export the feature header
     #[clap(long, action = clap::ArgAction::SetTrue, group = "cli_group")]
     pub header: bool,
@@ -129,6 +133,10 @@ pub struct OutputConfig {
     #[clap(required_if_eq("output", "csv"))]
     pub export_path: Option<String>,
 
+    /// Disable the graph in TUI when exporting in CSV mode
+    #[clap(long, action = clap::ArgAction::SetTrue, required_if_eq("output", "Csv"))]
+    pub performance_mode: bool,
+
     /// Whether to export the feature header
     #[clap(long, action = clap::ArgAction::SetTrue)]
     pub header: bool,
@@ -191,6 +199,7 @@ impl Default for ConfigFile {
                 export_path: None,
                 header: false,
                 drop_contaminant_features: false,
+                performance_mode: false,
             },
         }
     }
