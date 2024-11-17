@@ -21,7 +21,7 @@ pub struct NfFlow {
 }
 
 impl NfFlow {
-    fn get_bwd_duration(&self) -> i64 {
+    pub(crate) fn get_bwd_duration(&self) -> i64 {
         if self.bwd_first_timestamp.is_none() || self.bwd_last_timestamp.is_none() {
             return 0;
         }
@@ -33,7 +33,7 @@ impl NfFlow {
         .num_milliseconds()
     }
 
-    fn get_first_bwd_timestamp(&self) -> i64 {
+    pub(crate) fn get_first_bwd_timestamp(&self) -> i64 {
         if self.bwd_first_timestamp.is_none() {
             return 0;
         }

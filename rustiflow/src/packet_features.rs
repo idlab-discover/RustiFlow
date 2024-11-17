@@ -23,6 +23,33 @@ const URG_FLAG: u8 = 0b00100000;
 const ECE_FLAG: u8 = 0b01000000;
 const CWE_FLAG: u8 = 0b10000000;
 
+impl Default for PacketFeatures {
+    fn default() -> Self {
+        PacketFeatures {
+            source_ip: IpAddr::V4(Ipv4Addr::new(0, 0, 0, 0)),
+            destination_ip: IpAddr::V4(Ipv4Addr::new(0, 0, 0, 0)),
+            source_port: 0,
+            destination_port: 0,
+            protocol: 0,
+            timestamp: Utc::now(),
+            fin_flag: 0,
+            syn_flag: 0,
+            rst_flag: 0,
+            psh_flag: 0,
+            ack_flag: 0,
+            urg_flag: 0,
+            cwe_flag: 0,
+            ece_flag: 0,
+            data_length: 0,
+            header_length: 0,
+            length: 0,
+            window_size: 0,
+            sequence_number: 0,
+            sequence_number_ack: 0,
+        }
+    }
+}
+
 pub struct PacketFeatures {
     pub source_ip: IpAddr,
     pub destination_ip: IpAddr,

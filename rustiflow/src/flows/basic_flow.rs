@@ -6,8 +6,8 @@ use crate::packet_features::PacketFeatures;
 
 use super::flow::Flow;
 
-#[derive(Clone, PartialEq)]
-enum FlowState {
+#[derive(Clone, PartialEq, Debug)]
+pub(crate) enum FlowState {
     Established,
     FinSent,
     FinAcked,
@@ -71,8 +71,8 @@ pub struct BasicFlow {
     /// The number of packets in the backward direction.
     pub bwd_packet_count: u32,
     // Tracking TCP Flow Termination
-    state_fwd: FlowState,
-    state_bwd: FlowState,
+    pub(crate) state_fwd: FlowState,
+    pub(crate) state_bwd: FlowState,
     expected_ack_seq_fwd: Option<u32>,
     expected_ack_seq_bwd: Option<u32>,
 }

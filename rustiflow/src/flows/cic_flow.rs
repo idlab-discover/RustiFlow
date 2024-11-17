@@ -34,7 +34,7 @@ pub struct CicFlow {
     /// The maximum active period.
     pub active_max: f64,
     /// The minimum active period.
-    active_min: f64,
+    pub(crate) active_min: f64,
     /// The number of idle periods.
     pub idle_count: u32,
     /// The mean of idle periods.
@@ -44,13 +44,13 @@ pub struct CicFlow {
     /// The maximum idle period.
     pub idle_max: f64,
     /// The minimum idle period.
-    idle_min: f64,
+    pub(crate) idle_min: f64,
     /// The initial window size of the forward flow.
     pub fwd_init_win_bytes: u16,
     /// The number of data packets in the forward flow with more than one byte of data.
     pub fwd_act_data_pkt: u32,
     /// The minimum header length of the forward flow.
-    fwd_header_len_min: u32,
+    pub(crate) fwd_header_len_min: u32,
     /// The timestamp of the last packet in the forward flow.
     pub fwd_last_timestamp: Option<DateTime<Utc>>,
     /// The total length of packets in the forward flow.
@@ -60,7 +60,7 @@ pub struct CicFlow {
     /// The maximum length of packets in the forward flow.
     pub fwd_pkt_len_max: u32,
     /// The minimum length of packets in the forward flow.
-    fwd_pkt_len_min: u32,
+    pub(crate) fwd_pkt_len_min: u32,
     /// The mean length of packets in the forward flow.
     pub fwd_pkt_len_mean: f32,
     /// The standard deviation of the length of packets in the forward flow.
@@ -74,7 +74,7 @@ pub struct CicFlow {
     /// The maximum inter-arrival time of packets in the forward flow.
     pub fwd_iat_max: f64,
     /// The minimum inter-arrival time of packets in the forward flow.
-    fwd_iat_min: f64,
+    pub(crate) fwd_iat_min: f64,
     /// The total header length of the forward flow.
     pub fwd_header_length: u32,
     /// The total duration of bulk packets in the forward flow.
@@ -86,11 +86,11 @@ pub struct CicFlow {
     /// The number of bulk states in the forward flow.
     pub fwd_bulk_state_count: u64,
     /// Helper variable for bulk packet count.
-    fwd_bulk_packet_count_help: u64,
+    pub(crate) fwd_bulk_packet_count_help: u64,
     /// Helper variable for bulk start timestamp.
-    fwd_bulk_start_help: Option<DateTime<Utc>>,
+    pub(crate) fwd_bulk_start_help: Option<DateTime<Utc>>,
     /// Helper variable for bulk size.
-    fwd_bulk_size_help: u32,
+    pub(crate) fwd_bulk_size_help: u32,
     /// The timestamp of the last bulk packet in the forward flow.
     pub fwd_last_bulk_timestamp: Option<DateTime<Utc>>,
     /// The initial window size of the backward flow.
@@ -104,7 +104,7 @@ pub struct CicFlow {
     /// The maximum length of packets in the backward flow.
     pub bwd_pkt_len_max: u32,
     /// The minimum length of packets in the backward flow.
-    bwd_pkt_len_min: u32,
+    pub(crate) bwd_pkt_len_min: u32,
     /// The mean length of packets in the backward flow.
     pub bwd_pkt_len_mean: f32,
     /// The standard deviation of the length of packets in the backward flow.
@@ -118,7 +118,7 @@ pub struct CicFlow {
     /// The maximum inter-arrival time of packets in the backward flow.
     pub bwd_iat_max: f64,
     /// The minimum inter-arrival time of packets in the backward flow.
-    bwd_iat_min: f64,
+    pub(crate) bwd_iat_min: f64,
     /// The total header length of the backward flow.
     pub bwd_header_length: u32,
     /// The total duration of bulk packets in the backward flow.
@@ -130,13 +130,13 @@ pub struct CicFlow {
     /// The number of bulk states in the backward flow.
     pub bwd_bulk_state_count: u64,
     /// Helper variable for bulk packet count.
-    bwd_bulk_packet_count_help: u64,
+    pub(crate) bwd_bulk_packet_count_help: u64,
     /// Helper variable for bulk start timestamp.
-    bwd_bulk_start_help: Option<DateTime<Utc>>,
+    pub(crate) bwd_bulk_start_help: Option<DateTime<Utc>>,
     /// Helper variable for bulk size.
-    bwd_bulk_size_help: u32,
+    pub(crate) bwd_bulk_size_help: u32,
     /// The timestamp of the last bulk packet in the backward flow.
-    bwd_last_bulk_timestamp: Option<DateTime<Utc>>,
+    pub(crate) bwd_last_bulk_timestamp: Option<DateTime<Utc>>,
 }
 
 impl CicFlow {
@@ -148,7 +148,7 @@ impl CicFlow {
     /// ### Arguments
     ///
     /// * `len` - The length to be added to the forward header length.
-    fn increase_fwd_header_length(&mut self, len: u32) {
+    pub(crate) fn increase_fwd_header_length(&mut self, len: u32) {
         self.fwd_header_length += len;
     }
 
@@ -161,7 +161,7 @@ impl CicFlow {
     /// ### Arguments
     ///
     /// * `len` - The length to be added to the backward header length.
-    fn increase_bwd_header_length(&mut self, len: u32) {
+    pub(crate) fn increase_bwd_header_length(&mut self, len: u32) {
         self.bwd_header_length += len;
     }
 
@@ -173,7 +173,7 @@ impl CicFlow {
     /// ### Arguments
     ///
     /// * `len` - The length to compare against the current minimum forward header length.
-    fn update_fwd_header_len_min(&mut self, len: u32) {
+    pub(crate) fn update_fwd_header_len_min(&mut self, len: u32) {
         if len < self.fwd_header_len_min {
             self.fwd_header_len_min = len;
         }
@@ -188,7 +188,7 @@ impl CicFlow {
     /// ### Arguments
     ///
     /// * `len` - The length of the new packet to be incorporated into the statistics.
-    fn update_fwd_pkt_len_stats(&mut self, len: u32) {
+    pub(crate) fn update_fwd_pkt_len_stats(&mut self, len: u32) {
         // update max and min
         if len > self.fwd_pkt_len_max {
             self.fwd_pkt_len_max = len;
@@ -224,7 +224,7 @@ impl CicFlow {
     /// ### Arguments
     ///
     /// * `len` - The length of the new backward packet to be included in the stats.
-    fn update_bwd_pkt_len_stats(&mut self, len: u32) {
+    pub(crate) fn update_bwd_pkt_len_stats(&mut self, len: u32) {
         // update max and min
         if len > self.bwd_pkt_len_max {
             self.bwd_pkt_len_max = len;
@@ -260,7 +260,7 @@ impl CicFlow {
     /// ### Arguments
     ///
     /// * `iat` - The inter-arrival time to be added to the statistics.
-    fn update_fwd_iat_stats(&mut self, iat: f64) {
+    pub(crate) fn update_fwd_iat_stats(&mut self, iat: f64) {
         // update max and min
         if iat > self.fwd_iat_max {
             self.fwd_iat_max = iat;
@@ -295,7 +295,7 @@ impl CicFlow {
     /// ### Arguments
     ///
     /// * `iat` - The backward inter-arrival time to be incorporated into the stats.
-    fn update_bwd_iat_stats(&mut self, iat: f64) {
+    pub(crate) fn update_bwd_iat_stats(&mut self, iat: f64) {
         // update max and min
         if iat > self.bwd_iat_max {
             self.bwd_iat_max = iat;
@@ -330,7 +330,7 @@ impl CicFlow {
     /// ### Arguments
     ///
     /// * `duration` - The duration of the active period to be included in the stats.
-    fn update_active_flow(&mut self, duration: f64) {
+    pub(crate) fn update_active_flow(&mut self, duration: f64) {
         self.active_count += 1;
 
         // update max and min
@@ -361,7 +361,7 @@ impl CicFlow {
     /// ### Arguments
     ///
     /// * `duration` - The duration of the idle period to be added to the stats.
-    fn update_idle_flow(&mut self, duration: f64) {
+    pub(crate) fn update_idle_flow(&mut self, duration: f64) {
         self.idle_count += 1;
 
         // update max and min
@@ -394,7 +394,7 @@ impl CicFlow {
     ///
     /// * `timestamp` - The timestamp of the packet.
     /// * `len` - The length of the packet.
-    fn update_fwd_bulk_stats(&mut self, timestamp: &DateTime<Utc>, len: u32) {
+    pub(crate) fn update_fwd_bulk_stats(&mut self, timestamp: &DateTime<Utc>, len: u32) {
         if self.bwd_last_bulk_timestamp > self.fwd_bulk_start_help {
             self.fwd_bulk_start_help = None;
         }
@@ -454,7 +454,7 @@ impl CicFlow {
     ///
     /// * `timestamp` - The timestamp of the packet.
     /// * `len` - The length of the packet.
-    fn update_bwd_bulk_stats(&mut self, timestamp: &DateTime<Utc>, len: u32) {
+    pub(crate) fn update_bwd_bulk_stats(&mut self, timestamp: &DateTime<Utc>, len: u32) {
         if self.fwd_last_bulk_timestamp > self.bwd_bulk_start_help {
             self.bwd_bulk_start_help = None;
         }
@@ -513,7 +513,7 @@ impl CicFlow {
     /// ### Arguments
     ///
     /// * `timestamp` - The timestamp of the packet.
-    fn update_subflows(&mut self, timestamp: &DateTime<Utc>) {
+    pub(crate) fn update_subflows(&mut self, timestamp: &DateTime<Utc>) {
         if self.sf_last_packet_timestamp == None {
             self.sf_last_packet_timestamp = Some(*timestamp);
         }
@@ -539,7 +539,7 @@ impl CicFlow {
     ///
     /// * `timestamp` - The timestamp of the packet or event triggering the update.
     /// * `threshold` - The threshold in microseconds to determine state transitions between active and idle.
-    fn update_active_idle_time(&mut self, timestamp: &DateTime<Utc>, threshold: f64) {
+    pub(crate) fn update_active_idle_time(&mut self, timestamp: &DateTime<Utc>, threshold: f64) {
         if timestamp
             .signed_duration_since(self.end_active)
             .num_microseconds()
@@ -571,7 +571,7 @@ impl CicFlow {
     /// ### Returns
     ///
     /// The minimum length of the forward header or 0 if not set.
-    fn get_fwd_header_len_min(&self) -> u32 {
+    pub(crate) fn get_fwd_header_len_min(&self) -> u32 {
         if self.fwd_header_len_min == u32::MAX {
             0
         } else {
@@ -864,7 +864,7 @@ impl CicFlow {
     /// ### Returns
     ///
     /// Bytes per second rate of the flow.
-    fn get_flow_bytes_s(&self) -> f64 {
+    pub(crate) fn get_flow_bytes_s(&self) -> f64 {
         (self.fwd_pkt_len_tot + self.bwd_pkt_len_tot) as f64
             / self.basic_flow.get_flow_duration_usec()
             / 1_000_000.0
@@ -878,7 +878,7 @@ impl CicFlow {
     /// ### Returns
     ///
     /// Packets per second rate of the flow.
-    fn get_flow_packets_s(&self) -> f64 {
+    pub(crate) fn get_flow_packets_s(&self) -> f64 {
         (self.basic_flow.fwd_packet_count + self.basic_flow.bwd_packet_count) as f64
             / self.basic_flow.get_flow_duration_usec()
             / 1_000_000.0
