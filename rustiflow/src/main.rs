@@ -7,8 +7,8 @@ mod packet_counts;
 mod packet_features;
 mod pcap;
 mod realtime;
-mod tui;
 mod tests;
+mod tui;
 
 use crate::flows::{cic_flow::CicFlow, ntl_flow::NTLFlow};
 use crate::pcap::read_pcap_file;

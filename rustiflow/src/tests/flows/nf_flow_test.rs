@@ -222,7 +222,8 @@ mod tests {
         // Case 4: Update the last timestamp to reset idle timeout
         flow.cic_flow.basic_flow.last_timestamp = timestamp + chrono::Duration::seconds(40);
         flow.cic_flow.basic_flow.first_timestamp = flow.cic_flow.basic_flow.last_timestamp; // Reset first timestamp
-        let after_update_within_idle = flow.cic_flow.basic_flow.last_timestamp + chrono::Duration::seconds(29);
+        let after_update_within_idle =
+            flow.cic_flow.basic_flow.last_timestamp + chrono::Duration::seconds(29);
         let exp = flow.is_expired(after_update_within_idle, active_timeout, idle_timeout);
         assert!(!exp);
 

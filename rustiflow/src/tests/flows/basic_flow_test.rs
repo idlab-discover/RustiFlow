@@ -3,7 +3,13 @@ mod tests {
     use chrono::{Duration, Utc};
     use std::net::{IpAddr, Ipv4Addr};
 
-    use crate::{flows::{basic_flow::{BasicFlow, FlowState}, flow::Flow}, packet_features::PacketFeatures};
+    use crate::{
+        flows::{
+            basic_flow::{BasicFlow, FlowState},
+            flow::Flow,
+        },
+        packet_features::PacketFeatures,
+    };
 
     #[test]
     fn test_basic_flow_creation() {
