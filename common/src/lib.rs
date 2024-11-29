@@ -16,6 +16,7 @@ pub struct EbpfEventIpv4 {
     pub header_length: u8,
     pub sequence_number: u32,
     pub sequence_number_ack: u32,
+    pub _padding: [u8; 3],
 }
 
 impl EbpfEventIpv4 {
@@ -46,6 +47,7 @@ impl EbpfEventIpv4 {
             header_length,
             sequence_number,
             sequence_number_ack,
+            _padding: [0; 3],
         }
     }
 }
@@ -69,6 +71,7 @@ pub struct EbpfEventIpv6 {
     pub header_length: u8,
     pub sequence_number: u32,
     pub sequence_number_ack: u32,
+    pub _padding: [u8; 11],
 }
 
 impl EbpfEventIpv6 {
@@ -99,6 +102,7 @@ impl EbpfEventIpv6 {
             header_length,
             sequence_number,
             sequence_number_ack,
+            _padding: [0; 11],
         }
     }
 }
