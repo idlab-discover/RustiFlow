@@ -28,7 +28,7 @@ fn panic(_info: &core::panic::PanicInfo) -> ! {
 static DROPPED_PACKETS: PerCpuArray<u64> = PerCpuArray::with_max_entries(1, 0);
 
 #[map]
-static EVENTS_IPV6: RingBuf = RingBuf::with_byte_size(1024 * 1024 * 10, 0); // 10 MB
+static EVENTS_IPV6: RingBuf = RingBuf::with_byte_size(1024 * 1024 * 10 * 2, 0); // 10 MB
 
 #[classifier]
 pub fn tc_flow_track(ctx: TcContext) -> i32 {
