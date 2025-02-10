@@ -279,7 +279,7 @@ impl Flow for NTLFlow {
             {},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},\
             {},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},\
             {},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},\
-            {},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{}",
+            {},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{}",
             self.cic_flow.basic_flow.flow_key,
             self.cic_flow.basic_flow.ip_source,
             self.cic_flow.basic_flow.port_source,
@@ -407,7 +407,6 @@ impl Flow for NTLFlow {
             self.cic_flow.fwd_iat_std,
             self.cic_flow.fwd_iat_max,
             self.cic_flow.get_fwd_iat_min(),
-            self.cic_flow.fwd_iat_total,
             self.cic_flow.fwd_iat_total,
             self.cic_flow.bwd_iat_mean,
             self.cic_flow.bwd_iat_std,
