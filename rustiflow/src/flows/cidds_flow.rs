@@ -13,7 +13,7 @@ pub struct CiddsFlow {
     /// The basic flow information.
     pub basic_flow: BasicFlow,
     /// The number of bytes in the flow.
-    bytes: u32,
+    pub(crate) bytes: u32,
 }
 
 impl CiddsFlow {
@@ -25,7 +25,7 @@ impl CiddsFlow {
     /// ### Returns
     ///
     /// Returns a `String` containing the flags feature string of the flow.
-    fn get_flags_string(&self) -> String {
+    pub(crate) fn get_flags_string(&self) -> String {
         let mut flags = String::new();
 
         if self.basic_flow.fwd_urg_flag_count + self.basic_flow.bwd_urg_flag_count != 0 {
@@ -163,59 +163,5 @@ impl Flow for CiddsFlow {
 
     fn flow_key(&self) -> &String {
         &self.basic_flow.flow_key
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use std::net::{IpAddr, Ipv4Addr};
-
-    use crate::flows::flow::Flow;
-
-    use super::CiddsFlow;
-
-    fn setup_ciddsflow() -> CiddsFlow {
-        CiddsFlow::new(
-            "".to_string(),
-            IpAddr::V4(Ipv4Addr::from(1)),
-            80,
-            IpAddr::V4(Ipv4Addr::from(2)),
-            8080,
-            6,
-            chrono::Utc::now(),
-        )
-    }
-
-    #[test]
-    fn test_get_flags_string() {
-        let mut flow = setup_ciddsflow();
-        assert_eq!(flow.get_flags_string(), "......");
-
-        flow.basic_flow.fwd_urg_flag_count = 1;
-        assert_eq!(flow.get_flags_string(), "U.....");
-
-        flow.basic_flow.fwd_fin_flag_count = 1;
-        assert_eq!(flow.get_flags_string(), "U....F");
-
-        flow.basic_flow.fwd_ack_flag_count = 1;
-        assert_eq!(flow.get_flags_string(), "UA...F");
-
-        flow.basic_flow.fwd_psh_flag_count = 1;
-        assert_eq!(flow.get_flags_string(), "UAP..F");
-
-        flow.basic_flow.fwd_rst_flag_count = 1;
-        assert_eq!(flow.get_flags_string(), "UAPR.F");
-
-        flow.basic_flow.fwd_syn_flag_count = 1;
-        assert_eq!(flow.get_flags_string(), "UAPRSF");
-
-        flow.basic_flow.fwd_fin_flag_count = 1;
-        assert_eq!(flow.get_flags_string(), "UAPRSF");
-
-        flow.basic_flow.bwd_urg_flag_count = 1;
-        assert_eq!(flow.get_flags_string(), "UAPRSF");
-
-        flow.basic_flow.bwd_ack_flag_count = 1;
-        assert_eq!(flow.get_flags_string(), "UAPRSF");
     }
 }
