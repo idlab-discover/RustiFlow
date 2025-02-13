@@ -47,28 +47,15 @@ fn process_packet(ctx: &TcContext) -> Result<i32, ()> {
 
     let ipv4hdr = ctx.load::<Ipv4Hdr>(EthHdr::LEN).map_err(|_| ())?;
     let packet_info = PacketInfo::new(&ipv4hdr, ctx.data_end() - ctx.data())?;
+    let ip_header_length = (ipv4hdr.ihl() as usize) * 4;
+    let hdr_offset = EthHdr::LEN + ip_header_length;
 
     match ipv4hdr.proto {
-        IpProto::Tcp => process_transport_packet::<TcpHdr>(ctx, &packet_info),
-        IpProto::Udp => process_transport_packet::<UdpHdr>(ctx, &packet_info),
-        IpProto::Icmp => process_icmp_packet(ctx, &packet_info, &ipv4hdr),
+        IpProto::Tcp => process_transport_packet::<TcpHdr>(ctx, &packet_info, hdr_offset),
+        IpProto::Udp => process_transport_packet::<UdpHdr>(ctx, &packet_info, hdr_offset),
+        IpProto::Icmp => process_transport_packet::<IcmpHdr>(ctx, &packet_info, hdr_offset),
         _ => Ok(TC_ACT_PIPE),
     }
-}
-
-fn process_icmp_packet(
-    ctx: &TcContext,
-    packet_info: &PacketInfo,
-    ipv4hdr: &Ipv4Hdr,
-) -> Result<i32, ()> {
-    // Calculate actual IPv4 header length
-    let ip_header_length = (ipv4hdr.ihl() as usize) * 4;
-    let icmp_hdr_offset = EthHdr::LEN + ip_header_length;
-    let icmph = ctx.load::<IcmpHdr>(icmp_hdr_offset).map_err(|_| ())?;
-
-    let event = packet_info.to_packet_log(&icmph);
-    submit_ipv4_event(ctx, event);
-    Ok(TC_ACT_PIPE)
 }
 
 #[inline(always)]
@@ -87,8 +74,9 @@ fn submit_ipv4_event(ctx: &TcContext, event: EbpfEventIpv4) {
 fn process_transport_packet<T: NetworkHeader>(
     ctx: &TcContext,
     packet_info: &PacketInfo,
+    header_offset: usize,
 ) -> Result<i32, ()> {
-    let hdr = ctx.load::<T>(EthHdr::LEN + Ipv4Hdr::LEN).map_err(|_| ())?;
+    let hdr = ctx.load::<T>(header_offset).map_err(|_| ())?;
     let packet_log = packet_info.to_packet_log(&hdr);
 
     submit_ipv4_event(ctx, packet_log);
