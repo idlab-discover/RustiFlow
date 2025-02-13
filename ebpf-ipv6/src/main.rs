@@ -5,18 +5,19 @@
 use aya_ebpf::{
     bindings::TC_ACT_PIPE,
     macros::{classifier, map},
-    maps::{RingBuf, PerCpuArray},
+    maps::{PerCpuArray, RingBuf},
     programs::TcContext,
 };
 use aya_log_ebpf::error;
 
 use common::EbpfEventIpv6;
+use common::IcmpHdr;
+use common::NetworkHeader;
+use common::TcpHdr;
+use common::UdpHdr;
 use network_types::{
     eth::{EthHdr, EtherType},
     ip::{IpProto, Ipv6Hdr},
-    tcp::TcpHdr,
-    udp::UdpHdr,
-    icmp::IcmpHdr,
 };
 
 #[panic_handler]
@@ -43,40 +44,49 @@ fn process_packet(ctx: &TcContext) -> Result<i32, ()> {
     if ether_type != EtherType::Ipv6 {
         return Ok(TC_ACT_PIPE);
     }
-    
+
     let ipv6hdr = ctx.load::<Ipv6Hdr>(EthHdr::LEN).map_err(|_| ())?;
     let packet_info = PacketInfo::new(&ipv6hdr, ctx.data_end() - ctx.data())?;
 
     match ipv6hdr.next_hdr {
-        IpProto::Tcp => process_transport_packet::<TcpHdr>(ctx, packet_info),
-        IpProto::Udp => process_transport_packet::<UdpHdr>(ctx, packet_info),
-        IpProto::Icmp => process_transport_packet::<IcmpHdr>(ctx, packet_info),
+        IpProto::Tcp => process_transport_packet::<TcpHdr>(ctx, &packet_info),
+        IpProto::Udp => process_transport_packet::<UdpHdr>(ctx, &packet_info),
+        IpProto::Icmp => process_icmp_packet(ctx, &packet_info),
         _ => Ok(TC_ACT_PIPE),
     }
 }
 
-fn process_transport_packet<T: NetworkHeader>(
-    ctx: &TcContext, 
-    packet_info: PacketInfo
-) -> Result<i32, ()> {
-    let tcphdr = ctx
-        .load::<T>(EthHdr::LEN + Ipv6Hdr::LEN)
-        .map_err(|_| ())?;
-    let packet_log = packet_info.to_packet_log(&tcphdr);
+fn process_icmp_packet(ctx: &TcContext, packet_info: &PacketInfo) -> Result<i32, ()> {
+    // Calculate actual IPv4 header length
+    let icmp_hdr_offset = EthHdr::LEN + Ipv6Hdr::LEN;
+    let icmph = ctx.load::<IcmpHdr>(icmp_hdr_offset).map_err(|_| ())?;
 
-    // Reserve memory in the ring buffer for the event
+    let event = packet_info.to_packet_log(&icmph);
+    submit_ipv6_event(ctx, event);
+    Ok(TC_ACT_PIPE)
+}
+
+#[inline(always)]
+fn submit_ipv6_event(ctx: &TcContext, event: EbpfEventIpv6) {
     if let Some(mut entry) = EVENTS_IPV6.reserve::<EbpfEventIpv6>(0) {
-        // Use MaybeUninit to write the packet_log data into the reserved memory
-        *entry = core::mem::MaybeUninit::new(packet_log);
-        // Submit the entry to make it visible to userspace
+        *entry = core::mem::MaybeUninit::new(event);
         entry.submit(0);
     } else {
-        // Handle the case where the ring buffer is full
         if let Some(counter) = DROPPED_PACKETS.get_ptr_mut(0) {
-            unsafe { *counter += 1; }
+            unsafe { *counter += 1 };
         }
-        error!(ctx, "Failed to reserve entry in ring buffer, buffer might be full.");
+        error!(ctx, "Failed to reserve entry in ring buffer.");
     }
+}
+
+fn process_transport_packet<T: NetworkHeader>(
+    ctx: &TcContext,
+    packet_info: &PacketInfo,
+) -> Result<i32, ()> {
+    let hdr = ctx.load::<T>(EthHdr::LEN + Ipv6Hdr::LEN).map_err(|_| ())?;
+    let packet_log = packet_info.to_packet_log(&hdr);
+
+    submit_ipv6_event(ctx, packet_log);
 
     Ok(TC_ACT_PIPE)
 }
@@ -113,95 +123,7 @@ impl PacketInfo {
             header.header_length(),
             header.sequence_number(),
             header.sequence_number_ack(),
+            header.icmp_type(),
         )
-    }
-}
-
-trait NetworkHeader {
-    fn source_port(&self) -> u16;
-    fn destination_port(&self) -> u16;
-    fn window_size(&self) -> u16;
-    fn combined_flags(&self) -> u8;
-    fn header_length(&self) -> u8;
-    fn sequence_number(&self) -> u32;
-    fn sequence_number_ack(&self) -> u32;
-}
-
-impl NetworkHeader for TcpHdr {
-    fn source_port(&self) -> u16 {
-        self.source
-    }
-    fn destination_port(&self) -> u16 {
-        self.dest
-    }
-    fn window_size(&self) -> u16 {
-        self.window as u16
-    }
-    fn combined_flags(&self) -> u8 {
-        ((self.fin() as u8) << 0)
-            | ((self.syn() as u8) << 1)
-            | ((self.rst() as u8) << 2)
-            | ((self.psh() as u8) << 3)
-            | ((self.ack() as u8) << 4)
-            | ((self.urg() as u8) << 5)
-            | ((self.ece() as u8) << 6)
-            | ((self.cwr() as u8) << 7)
-    }
-    fn header_length(&self) -> u8 {
-        TcpHdr::LEN as u8
-    }
-    fn sequence_number(&self) -> u32 {
-        self.seq
-    }
-    fn sequence_number_ack(&self) -> u32 {
-        self.ack_seq
-    }
-}
-
-impl NetworkHeader for UdpHdr {
-    fn source_port(&self) -> u16 {
-        self.source
-    }
-    fn destination_port(&self) -> u16 {
-        self.dest
-    }
-    fn window_size(&self) -> u16 {
-        0
-    }
-    fn combined_flags(&self) -> u8 {
-        0
-    }
-    fn header_length(&self) -> u8 {
-        UdpHdr::LEN as u8
-    }
-    fn sequence_number(&self) -> u32 {
-        0
-    }
-    fn sequence_number_ack(&self) -> u32 {
-        0
-    }
-}
-
-impl NetworkHeader for IcmpHdr {
-    fn source_port(&self) -> u16 {
-        0
-    }
-    fn destination_port(&self) -> u16 {
-        0
-    }
-    fn window_size(&self) -> u16 {
-        0
-    }
-    fn combined_flags(&self) -> u8 {
-        0
-    }
-    fn header_length(&self) -> u8 {
-        IcmpHdr::LEN as u8
-    }
-    fn sequence_number(&self) -> u32 {
-        0
-    }
-    fn sequence_number_ack(&self) -> u32 {
-        0
     }
 }
