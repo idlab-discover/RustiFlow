@@ -10,11 +10,7 @@ use aya_ebpf::{
 };
 use aya_log_ebpf::error;
 
-use common::EbpfEventIpv6;
-use common::IcmpHdr;
-use common::NetworkHeader;
-use common::TcpHdr;
-use common::UdpHdr;
+use common::{EbpfEventIpv6, IcmpHdr, NetworkHeader, TcpHdr, UdpHdr};
 use network_types::{
     eth::{EthHdr, EtherType},
     ip::{IpProto, Ipv6Hdr},
@@ -106,16 +102,9 @@ fn process_packet(ctx: &TcContext) -> Result<i32, ()> {
 
     // 3) Dispatch on the final protocol
     match final_proto {
-        IpProto::Tcp => {
-            // For TCP, load `TcpHdr` at `offset_after_ext`
-            process_transport_packet::<TcpHdr>(ctx, &packet_info, offset_after_ext)
-        }
-        IpProto::Udp => {
-            // For UDP, load `UdpHdr` at `offset_after_ext`
-            process_transport_packet::<UdpHdr>(ctx, &packet_info, offset_after_ext)
-        }
+        IpProto::Tcp => process_transport_packet::<TcpHdr>(ctx, &packet_info, offset_after_ext),
+        IpProto::Udp => process_transport_packet::<UdpHdr>(ctx, &packet_info, offset_after_ext),
         IpProto::Ipv6Icmp => {
-            // For ICMPv6, load Icmpv6 at `offset_after_ext`
             process_transport_packet::<IcmpHdr>(ctx, &packet_info, offset_after_ext)
         }
         _ => Ok(TC_ACT_PIPE),
