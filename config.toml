@@ -1,5 +1,5 @@
 [config]
-features = "CIC"         # FlowType can be one of: Basic, CIC, CIDDS, Nfstream, NTL, Custom
+features = "CIC"         # FlowType can be one of: Basic, CIC, CIDDS, Nfstream, RustiFlow, Custom
 active_timeout = 3600    # Maximum time a flow is allowed to last in seconds
 idle_timeout = 120       # Maximum time with no packets for a flow in seconds
 early_export = 300       # Optional, print interval for open flows in seconds

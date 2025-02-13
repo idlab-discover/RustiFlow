@@ -35,7 +35,7 @@ pub async fn handle_realtime<T>(
     early_export: Option<u64>,
     expiration_check_interval: u64,
     ingress_only: bool,
-    csv_export: bool,
+    performance_mode_disabled: bool,
 ) -> Result<u64, anyhow::Error>
 where
     T: Flow,
@@ -129,7 +129,7 @@ where
 
                 let ring_buf = guard.get_inner_mut();
                 while let Some(event) = ring_buf.next() {
-                    if csv_export {
+                    if performance_mode_disabled {
                         let mut counter = packet_counter_clone.lock().await;
                         counter.increment();
                         // Send the updated count to the TUI
@@ -171,7 +171,7 @@ where
 
                 let ring_buf = guard.get_inner_mut();
                 while let Some(event) = ring_buf.next() {
-                    if csv_export {
+                    if performance_mode_disabled {
                         let mut counter = packet_counter_clone.lock().await;
                         counter.increment();
                         // Send the updated count to the TUI
@@ -200,7 +200,7 @@ where
 
     info!("Waiting for Ctrl-C...");
 
-    if csv_export {
+    if performance_mode_disabled {
         let _ = launch_packet_tui(packet_rx).await;
     }
 

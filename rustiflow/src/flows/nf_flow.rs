@@ -12,9 +12,6 @@ use super::{cic_flow::CicFlow, flow::Flow};
 #[derive(Clone)]
 pub struct NfFlow {
     pub cic_flow: CicFlow,
-    pub first_timestamp: DateTime<Utc>,
-    pub last_timestamp: DateTime<Utc>,
-    pub fwd_first_timestamp: DateTime<Utc>,
     pub fwd_last_timestamp: DateTime<Utc>,
     pub bwd_first_timestamp: Option<DateTime<Utc>>,
     pub bwd_last_timestamp: Option<DateTime<Utc>>,
@@ -70,9 +67,6 @@ impl Flow for NfFlow {
                 protocol,
                 timestamp,
             ),
-            first_timestamp: timestamp,
-            last_timestamp: timestamp,
-            fwd_first_timestamp: timestamp,
             fwd_last_timestamp: timestamp,
             bwd_first_timestamp: None,
             bwd_last_timestamp: None,
@@ -100,14 +94,14 @@ impl Flow for NfFlow {
             self.cic_flow.basic_flow.ip_destination,
             self.cic_flow.basic_flow.port_destination,
             self.cic_flow.basic_flow.protocol,
-            self.first_timestamp.timestamp_millis(),
-            self.last_timestamp.timestamp_millis(),
-            self.last_timestamp.signed_duration_since(self.first_timestamp).num_milliseconds(),
+            self.cic_flow.basic_flow.first_timestamp.timestamp_millis(),
+            self.cic_flow.basic_flow.last_timestamp.timestamp_millis(),
+            self.cic_flow.basic_flow.last_timestamp.signed_duration_since(self.cic_flow.basic_flow.first_timestamp).num_milliseconds(),
             self.cic_flow.basic_flow.fwd_packet_count + self.cic_flow.basic_flow.bwd_packet_count,
             self.cic_flow.fwd_pkt_len_tot + self.cic_flow.bwd_pkt_len_tot,
-            self.fwd_first_timestamp.timestamp_millis(),
+            self.cic_flow.basic_flow.first_timestamp.timestamp_millis(),
             self.fwd_last_timestamp.timestamp_millis(),
-            self.fwd_last_timestamp.signed_duration_since(self.fwd_first_timestamp).num_milliseconds(),
+            self.fwd_last_timestamp.signed_duration_since(self.cic_flow.basic_flow.first_timestamp).num_milliseconds(),
             self.cic_flow.basic_flow.fwd_packet_count,
             self.cic_flow.fwd_pkt_len_tot,
             self.get_first_bwd_timestamp(),
@@ -188,13 +182,15 @@ impl Flow for NfFlow {
         {},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},\
         {},{},{},{},{},{},{},{},{},{},{},{},{}",
             self.cic_flow.basic_flow.protocol,
-            self.last_timestamp
-                .signed_duration_since(self.first_timestamp)
+            self.cic_flow
+                .basic_flow
+                .last_timestamp
+                .signed_duration_since(self.cic_flow.basic_flow.first_timestamp)
                 .num_milliseconds(),
             self.cic_flow.basic_flow.fwd_packet_count + self.cic_flow.basic_flow.bwd_packet_count,
             self.cic_flow.fwd_pkt_len_tot + self.cic_flow.bwd_pkt_len_tot,
             self.fwd_last_timestamp
-                .signed_duration_since(self.fwd_first_timestamp)
+                .signed_duration_since(self.cic_flow.basic_flow.first_timestamp)
                 .num_milliseconds(),
             self.cic_flow.basic_flow.fwd_packet_count,
             self.cic_flow.fwd_pkt_len_tot,

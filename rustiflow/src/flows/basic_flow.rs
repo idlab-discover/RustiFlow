@@ -33,7 +33,7 @@ pub struct BasicFlow {
     /// The last timestamp of the flow.
     pub last_timestamp: DateTime<Utc>,
     /// The last ACK of the flow.
-    pub flow_end_of_flow_ack: u8,
+    pub tcp_normal_termination: u8,
     /// The number of FIN flags in the forward direction.
     pub fwd_fin_flag_count: u32,
     /// The number of SYN flags in the forward direction.
@@ -153,7 +153,7 @@ impl Flow for BasicFlow {
             protocol,
             first_timestamp,
             last_timestamp: first_timestamp,
-            flow_end_of_flow_ack: 0,
+            tcp_normal_termination: 0,
             fwd_fin_flag_count: 0,
             fwd_syn_flag_count: 0,
             fwd_rst_flag_count: 0,
@@ -183,7 +183,7 @@ impl Flow for BasicFlow {
         self.last_timestamp = packet.timestamp;
 
         if self.is_tcp_finished(packet, fwd) {
-            self.flow_end_of_flow_ack = 1;
+            self.tcp_normal_termination = 1;
         }
 
         if fwd {
@@ -208,7 +208,7 @@ impl Flow for BasicFlow {
             self.bwd_ece_flag_count += u32::from(packet.ece_flag);
         }
 
-        if self.flow_end_of_flow_ack > 0
+        if self.tcp_normal_termination > 0
             || self.fwd_rst_flag_count > 0
             || self.bwd_rst_flag_count > 0
         {
@@ -231,7 +231,7 @@ impl Flow for BasicFlow {
             self.first_timestamp,
             self.last_timestamp,
             self.get_flow_duration_usec(),
-            self.flow_end_of_flow_ack,
+            self.tcp_normal_termination,
             self.fwd_fin_flag_count,
             self.fwd_syn_flag_count,
             self.fwd_rst_flag_count,
@@ -256,7 +256,7 @@ impl Flow for BasicFlow {
     fn get_features() -> String {
         format!(
             "FLOW_ID,IP_SOURCE,PORT_SOURCE,IP_DESTINATION,PORT_DESTINATION,PROTOCOL,\
-            FIRST_TIMESTAMP,LAST_TIMESTAMP,DURATION,FLOW_END_OF_FLOW_ACK,\
+            FIRST_TIMESTAMP,LAST_TIMESTAMP,DURATION,TCP_NORMAL_TERMINATION,\
             FWD_FIN_FLAG_COUNT,FWD_SYN_FLAG_COUNT,FWD_RST_FLAG_COUNT,FWD_PSH_FLAG_COUNT,\
             FWD_ACK_FLAG_COUNT,FWD_URG_FLAG_COUNT,FWD_CWE_FLAG_COUNT,FWD_ECE_FLAG_COUNT,\
             FWD_PACKET_COUNT,BWD_FIN_FLAG_COUNT,BWD_SYN_FLAG_COUNT,BWD_RST_FLAG_COUNT,\
@@ -271,7 +271,7 @@ impl Flow for BasicFlow {
             {},{},{},{},{},{},{},{}",
             self.protocol,
             self.get_flow_duration_usec(),
-            self.flow_end_of_flow_ack,
+            self.tcp_normal_termination,
             self.fwd_fin_flag_count,
             self.fwd_syn_flag_count,
             self.fwd_rst_flag_count,
@@ -295,7 +295,7 @@ impl Flow for BasicFlow {
 
     fn get_features_without_contamination() -> String {
         format!(
-            "PROTOCOL,DURATION,FLOW_END_OF_FLOW_ACK,\
+            "PROTOCOL,DURATION,TCP_NORMAL_TERMINATION,\
             FWD_FIN_FLAG_COUNT,FWD_SYN_FLAG_COUNT,FWD_RST_FLAG_COUNT,FWD_PSH_FLAG_COUNT,\
             FWD_ACK_FLAG_COUNT,FWD_URG_FLAG_COUNT,FWD_CWE_FLAG_COUNT,FWD_ECE_FLAG_COUNT,\
             FWD_PACKET_COUNT,BWD_FIN_FLAG_COUNT,BWD_SYN_FLAG_COUNT,BWD_RST_FLAG_COUNT,\

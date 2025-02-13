@@ -170,8 +170,8 @@ pub enum FlowType {
     /// Represents a nfstream inspired flow, giving 69 features.
     Nfstream,
 
-    /// Represents the NTL Flow, giving 120 features.
-    NTL,
+    /// Represents the Rusti Flow, giving 120 features.
+    RustiFlow,
 
     /// Represents a flow that you can implement yourself.
     Custom,

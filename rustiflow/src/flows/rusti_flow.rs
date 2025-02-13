@@ -9,11 +9,11 @@ use super::{
     util::{calculate_mean, calculate_std},
 };
 
-/// Represents a NTL Flow, encapsulating various metrics and states of a network flow.
+/// Represents a Rusti Flow, encapsulating various metrics and states of a network flow.
 ///
-/// This flow represents the same flow as the NTLFlowLyzer does.
+/// This flow represents a superset of all supported features.
 #[derive(Clone)]
-pub struct NTLFlow {
+pub struct RustiFlow {
     /// The cic flow information.
     pub cic_flow: CicFlow,
     /// The minimum header length of the forward flow.
@@ -34,7 +34,7 @@ pub struct NTLFlow {
     pub(crate) bwd_header_len_std: f32,
 }
 
-impl NTLFlow {
+impl RustiFlow {
     /// Updates statistics for the header length of forward packets.
     ///
     /// This method updates the maximum, minimum, total, mean, and standard deviation
@@ -229,7 +229,7 @@ impl NTLFlow {
     }
 }
 
-impl Flow for NTLFlow {
+impl Flow for RustiFlow {
     fn new(
         flow_id: String,
         ipv4_source: IpAddr,
@@ -239,7 +239,7 @@ impl Flow for NTLFlow {
         protocol: u8,
         timestamp: DateTime<Utc>,
     ) -> Self {
-        NTLFlow {
+        RustiFlow {
             cic_flow: CicFlow::new(
                 flow_id,
                 ipv4_source,

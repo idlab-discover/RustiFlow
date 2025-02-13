@@ -10,7 +10,7 @@ mod realtime;
 mod tests;
 mod tui;
 
-use crate::flows::{cic_flow::CicFlow, ntl_flow::NTLFlow};
+use crate::flows::{cic_flow::CicFlow, rusti_flow::RustiFlow};
 use crate::pcap::read_pcap_file;
 use crate::realtime::handle_realtime;
 use args::{Cli, Commands, ConfigFile, ExportConfig, FlowType, OutputConfig};
@@ -95,7 +95,7 @@ async fn run_with_config(config: Config) {
             macro_rules! execute_realtime {
                 ($flow_ty:ty) => {{
                     // Create output writer and initialize it
-                    let csv_export = config.output.export_path.is_some() && !matches!(std::env::var("RUST_LOG"), Ok(ref val) if val.contains("debug")) && !config.output.performance_mode;
+                    let performance_mode_disabled = config.output.export_path.is_some() && !matches!(std::env::var("RUST_LOG"), Ok(ref val) if val.contains("debug")) && !config.output.performance_mode;
 
                     let mut output_writer = OutputWriter::<$flow_ty>::new(
                         config.output.output,
@@ -136,7 +136,7 @@ async fn run_with_config(config: Config) {
                         config.config.early_export,
                         config.config.expiration_check_interval,
                         ingress_only,
-                        csv_export,
+                        performance_mode_disabled,
                     )
                     .await;
 
@@ -170,7 +170,7 @@ async fn run_with_config(config: Config) {
                 FlowType::CIC => execute_realtime!(CicFlow),
                 FlowType::CIDDS => execute_realtime!(CiddsFlow),
                 FlowType::Nfstream => execute_realtime!(NfFlow),
-                FlowType::NTL => execute_realtime!(NTLFlow),
+                FlowType::RustiFlow => execute_realtime!(RustiFlow),
                 FlowType::Custom => execute_realtime!(CustomFlow),
             }
         }
@@ -240,7 +240,7 @@ async fn run_with_config(config: Config) {
                 FlowType::CIC => execute_offline!(CicFlow),
                 FlowType::CIDDS => execute_offline!(CiddsFlow),
                 FlowType::Nfstream => execute_offline!(NfFlow),
-                FlowType::NTL => execute_offline!(NTLFlow),
+                FlowType::RustiFlow => execute_offline!(RustiFlow),
                 FlowType::Custom => execute_offline!(CustomFlow),
             }
         }
