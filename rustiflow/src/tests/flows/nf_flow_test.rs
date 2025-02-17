@@ -27,7 +27,7 @@ mod tests {
             psh_flag: 0,
             ack_flag: 0,
             urg_flag: 0,
-            cwe_flag: 0,
+            cwr_flag: 0,
             ece_flag: 0,
             data_length: 100,
             header_length: 20,

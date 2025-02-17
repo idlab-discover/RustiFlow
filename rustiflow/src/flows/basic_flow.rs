@@ -2,7 +2,7 @@ use std::net::IpAddr;
 
 use chrono::{DateTime, Utc};
 
-use crate::packet_features::PacketFeatures;
+use crate::{flows::util::iana_port_mapping, packet_features::PacketFeatures};
 
 use super::flow::Flow;
 
@@ -34,42 +34,7 @@ pub struct BasicFlow {
     pub last_timestamp: DateTime<Utc>,
     /// The last ACK of the flow.
     pub tcp_normal_termination: u8,
-    /// The number of FIN flags in the forward direction.
-    pub fwd_fin_flag_count: u32,
-    /// The number of SYN flags in the forward direction.
-    pub fwd_syn_flag_count: u32,
-    /// The number of RST flags in the forward direction.
-    pub fwd_rst_flag_count: u32,
-    /// The number of PSH flags in the forward direction.
-    pub fwd_psh_flag_count: u32,
-    /// The number of ACK flags in the forward direction.
-    pub fwd_ack_flag_count: u32,
-    /// The number of URG flags in the forward direction.
-    pub fwd_urg_flag_count: u32,
-    /// The number of CWE flags in the forward direction.
-    pub fwd_cwe_flag_count: u32,
-    /// The number of ECE flags in the forward direction.
-    pub fwd_ece_flag_count: u32,
-    /// The number of packets in the forward direction.
-    pub fwd_packet_count: u32,
-    /// The number of FIN flags in the backward direction.
-    pub bwd_fin_flag_count: u32,
-    /// The number of SYN flags in the backward direction.
-    pub bwd_syn_flag_count: u32,
-    /// The number of RST flags in the backward direction.
-    pub bwd_rst_flag_count: u32,
-    /// The number of PSH flags in the backward direction.
-    pub bwd_psh_flag_count: u32,
-    /// The number of ACK flags in the backward direction.
-    pub bwd_ack_flag_count: u32,
-    /// The number of URG flags in the backward direction.
-    pub bwd_urg_flag_count: u32,
-    /// The number of CWE flags in the backward direction.
-    pub bwd_cwe_flag_count: u32,
-    /// The number of ECE flags in the backward direction.
-    pub bwd_ece_flag_count: u32,
-    /// The number of packets in the backward direction.
-    pub bwd_packet_count: u32,
+
     // Tracking TCP Flow Termination
     pub(crate) state_fwd: FlowState,
     pub(crate) state_bwd: FlowState,
@@ -132,6 +97,19 @@ impl BasicFlow {
             .num_microseconds()
             .unwrap() as f64
     }
+
+    /// Calculates the flow duration in milliseconds.
+    ///
+    /// Returns the difference between the last and first packet timestamps in milliseconds.
+    ///
+    /// ### Returns
+    ///
+    /// The duration of the flow in milliseconds.
+    pub fn get_flow_duration_msec(&self) -> f64 {
+        self.last_timestamp
+            .signed_duration_since(self.first_timestamp)
+            .num_milliseconds() as f64
+    }
 }
 
 impl Flow for BasicFlow {
@@ -154,24 +132,6 @@ impl Flow for BasicFlow {
             first_timestamp,
             last_timestamp: first_timestamp,
             tcp_normal_termination: 0,
-            fwd_fin_flag_count: 0,
-            fwd_syn_flag_count: 0,
-            fwd_rst_flag_count: 0,
-            fwd_psh_flag_count: 0,
-            fwd_ack_flag_count: 0,
-            fwd_urg_flag_count: 0,
-            fwd_cwe_flag_count: 0,
-            fwd_ece_flag_count: 0,
-            fwd_packet_count: 0,
-            bwd_fin_flag_count: 0,
-            bwd_syn_flag_count: 0,
-            bwd_rst_flag_count: 0,
-            bwd_psh_flag_count: 0,
-            bwd_ack_flag_count: 0,
-            bwd_urg_flag_count: 0,
-            bwd_cwe_flag_count: 0,
-            bwd_ece_flag_count: 0,
-            bwd_packet_count: 0,
             state_fwd: FlowState::Established,
             state_bwd: FlowState::Established,
             expected_ack_seq_fwd: None,
@@ -186,32 +146,7 @@ impl Flow for BasicFlow {
             self.tcp_normal_termination = 1;
         }
 
-        if fwd {
-            self.fwd_packet_count += 1;
-            self.fwd_fin_flag_count += u32::from(packet.fin_flag);
-            self.fwd_syn_flag_count += u32::from(packet.syn_flag);
-            self.fwd_rst_flag_count += u32::from(packet.rst_flag);
-            self.fwd_psh_flag_count += u32::from(packet.psh_flag);
-            self.fwd_ack_flag_count += u32::from(packet.ack_flag);
-            self.fwd_urg_flag_count += u32::from(packet.urg_flag);
-            self.fwd_cwe_flag_count += u32::from(packet.cwe_flag);
-            self.fwd_ece_flag_count += u32::from(packet.ece_flag);
-        } else {
-            self.bwd_packet_count += 1;
-            self.bwd_fin_flag_count += u32::from(packet.fin_flag);
-            self.bwd_syn_flag_count += u32::from(packet.syn_flag);
-            self.bwd_rst_flag_count += u32::from(packet.rst_flag);
-            self.bwd_psh_flag_count += u32::from(packet.psh_flag);
-            self.bwd_ack_flag_count += u32::from(packet.ack_flag);
-            self.bwd_urg_flag_count += u32::from(packet.urg_flag);
-            self.bwd_cwe_flag_count += u32::from(packet.cwe_flag);
-            self.bwd_ece_flag_count += u32::from(packet.ece_flag);
-        }
-
-        if self.tcp_normal_termination > 0
-            || self.fwd_rst_flag_count > 0
-            || self.bwd_rst_flag_count > 0
-        {
+        if self.tcp_normal_termination > 0 || packet.rst_flag > 0 {
             return true;
         }
 
@@ -220,8 +155,7 @@ impl Flow for BasicFlow {
 
     fn dump(&self) -> String {
         format!(
-            "{},{},{},{},{},{},{},{},{},{},{},{},{},\
-        {},{},{},{},{},{},{},{},{},{},{},{},{},{},{}",
+            "{},{},{},{},{},{},{},{},{},{}",
             self.flow_key,
             self.ip_source,
             self.port_source,
@@ -231,77 +165,30 @@ impl Flow for BasicFlow {
             self.first_timestamp,
             self.last_timestamp,
             self.get_flow_duration_usec(),
-            self.tcp_normal_termination,
-            self.fwd_fin_flag_count,
-            self.fwd_syn_flag_count,
-            self.fwd_rst_flag_count,
-            self.fwd_psh_flag_count,
-            self.fwd_ack_flag_count,
-            self.fwd_urg_flag_count,
-            self.fwd_cwe_flag_count,
-            self.fwd_ece_flag_count,
-            self.fwd_packet_count,
-            self.bwd_fin_flag_count,
-            self.bwd_syn_flag_count,
-            self.bwd_rst_flag_count,
-            self.bwd_psh_flag_count,
-            self.bwd_ack_flag_count,
-            self.bwd_urg_flag_count,
-            self.bwd_cwe_flag_count,
-            self.bwd_ece_flag_count,
-            self.bwd_packet_count
+            self.tcp_normal_termination
         )
     }
 
     fn get_features() -> String {
         format!(
-            "FLOW_ID,IP_SOURCE,PORT_SOURCE,IP_DESTINATION,PORT_DESTINATION,PROTOCOL,\
-            FIRST_TIMESTAMP,LAST_TIMESTAMP,DURATION,TCP_NORMAL_TERMINATION,\
-            FWD_FIN_FLAG_COUNT,FWD_SYN_FLAG_COUNT,FWD_RST_FLAG_COUNT,FWD_PSH_FLAG_COUNT,\
-            FWD_ACK_FLAG_COUNT,FWD_URG_FLAG_COUNT,FWD_CWE_FLAG_COUNT,FWD_ECE_FLAG_COUNT,\
-            FWD_PACKET_COUNT,BWD_FIN_FLAG_COUNT,BWD_SYN_FLAG_COUNT,BWD_RST_FLAG_COUNT,\
-            BWD_PSH_FLAG_COUNT,BWD_ACK_FLAG_COUNT,BWD_URG_FLAG_COUNT,BWD_CWE_FLAG_COUNT,\
-            BWD_ECE_FLAG_COUNT,BWD_PACKET_COUNT"
+            "flow_id,source_ip,source_port,destination_ip,destination_port,protocol,\
+            first_timestamp,last_timestamp,duration,normal_tcp_termination"
         )
     }
 
     fn dump_without_contamination(&self) -> String {
         format!(
-            "{},{},{},{},{},{},{},{},{},{},{},{},{},\
-            {},{},{},{},{},{},{},{}",
+            "{},{},{},{},{}",
+            iana_port_mapping(self.port_source),
+            iana_port_mapping(self.port_destination),
             self.protocol,
             self.get_flow_duration_usec(),
             self.tcp_normal_termination,
-            self.fwd_fin_flag_count,
-            self.fwd_syn_flag_count,
-            self.fwd_rst_flag_count,
-            self.fwd_psh_flag_count,
-            self.fwd_ack_flag_count,
-            self.fwd_urg_flag_count,
-            self.fwd_cwe_flag_count,
-            self.fwd_ece_flag_count,
-            self.fwd_packet_count,
-            self.bwd_fin_flag_count,
-            self.bwd_syn_flag_count,
-            self.bwd_rst_flag_count,
-            self.bwd_psh_flag_count,
-            self.bwd_ack_flag_count,
-            self.bwd_urg_flag_count,
-            self.bwd_cwe_flag_count,
-            self.bwd_ece_flag_count,
-            self.bwd_packet_count
         )
     }
 
     fn get_features_without_contamination() -> String {
-        format!(
-            "PROTOCOL,DURATION,TCP_NORMAL_TERMINATION,\
-            FWD_FIN_FLAG_COUNT,FWD_SYN_FLAG_COUNT,FWD_RST_FLAG_COUNT,FWD_PSH_FLAG_COUNT,\
-            FWD_ACK_FLAG_COUNT,FWD_URG_FLAG_COUNT,FWD_CWE_FLAG_COUNT,FWD_ECE_FLAG_COUNT,\
-            FWD_PACKET_COUNT,BWD_FIN_FLAG_COUNT,BWD_SYN_FLAG_COUNT,BWD_RST_FLAG_COUNT,\
-            BWD_PSH_FLAG_COUNT,BWD_ACK_FLAG_COUNT,BWD_URG_FLAG_COUNT,BWD_CWE_FLAG_COUNT,\
-            BWD_ECE_FLAG_COUNT,BWD_PACKET_COUNT"
-        )
+        format!("src_port_iana,dst_port_iana,protocol,duration,normal_tcp_termination")
     }
 
     fn get_first_timestamp(&self) -> DateTime<Utc> {

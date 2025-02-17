@@ -21,7 +21,7 @@ const PSH_FLAG: u8 = 0b00001000;
 const ACK_FLAG: u8 = 0b00010000;
 const URG_FLAG: u8 = 0b00100000;
 const ECE_FLAG: u8 = 0b01000000;
-const CWE_FLAG: u8 = 0b10000000;
+const CWR_FLAG: u8 = 0b10000000;
 
 impl Default for PacketFeatures {
     fn default() -> Self {
@@ -38,7 +38,7 @@ impl Default for PacketFeatures {
             psh_flag: 0,
             ack_flag: 0,
             urg_flag: 0,
-            cwe_flag: 0,
+            cwr_flag: 0,
             ece_flag: 0,
             data_length: 0,
             header_length: 0,
@@ -46,6 +46,8 @@ impl Default for PacketFeatures {
             window_size: 0,
             sequence_number: 0,
             sequence_number_ack: 0,
+            icmp_type: None,
+            icmp_code: None,
         }
     }
 }
@@ -63,7 +65,7 @@ pub struct PacketFeatures {
     pub psh_flag: u8,
     pub ack_flag: u8,
     pub urg_flag: u8,
-    pub cwe_flag: u8,
+    pub cwr_flag: u8,
     pub ece_flag: u8,
     pub data_length: u16,
     pub header_length: u8,
@@ -71,6 +73,8 @@ pub struct PacketFeatures {
     pub window_size: u16,
     pub sequence_number: u32,
     pub sequence_number_ack: u32,
+    pub icmp_type: Option<u8>,
+    pub icmp_code: Option<u8>,
 }
 
 impl PacketFeatures {
@@ -89,7 +93,7 @@ impl PacketFeatures {
             psh_flag: get_tcp_flag(event.combined_flags, PSH_FLAG),
             ack_flag: get_tcp_flag(event.combined_flags, ACK_FLAG),
             urg_flag: get_tcp_flag(event.combined_flags, URG_FLAG),
-            cwe_flag: get_tcp_flag(event.combined_flags, CWE_FLAG),
+            cwr_flag: get_tcp_flag(event.combined_flags, CWR_FLAG),
             ece_flag: get_tcp_flag(event.combined_flags, ECE_FLAG),
             data_length: event.data_length,
             header_length: event.header_length,
@@ -97,6 +101,16 @@ impl PacketFeatures {
             window_size: event.window_size,
             sequence_number: event.sequence_number,
             sequence_number_ack: event.sequence_number_ack,
+            icmp_type: if event.protocol == IpNextHeaderProtocols::Icmp.0 {
+                Some(event.icmp_type)
+            } else {
+                None
+            },
+            icmp_code: if event.protocol == IpNextHeaderProtocols::Icmp.0 {
+                Some(event.icmp_code)
+            } else {
+                None
+            },
         }
     }
 
@@ -115,7 +129,7 @@ impl PacketFeatures {
             psh_flag: get_tcp_flag(event.combined_flags, PSH_FLAG),
             ack_flag: get_tcp_flag(event.combined_flags, ACK_FLAG),
             urg_flag: get_tcp_flag(event.combined_flags, URG_FLAG),
-            cwe_flag: get_tcp_flag(event.combined_flags, CWE_FLAG),
+            cwr_flag: get_tcp_flag(event.combined_flags, CWR_FLAG),
             ece_flag: get_tcp_flag(event.combined_flags, ECE_FLAG),
             data_length: event.data_length,
             header_length: event.header_length,
@@ -123,6 +137,16 @@ impl PacketFeatures {
             window_size: event.window_size,
             sequence_number: event.sequence_number,
             sequence_number_ack: event.sequence_number_ack,
+            icmp_type: if event.protocol == IpNextHeaderProtocols::Icmpv6.0 {
+                Some(event.icmp_type)
+            } else {
+                None
+            },
+            icmp_code: if event.protocol == IpNextHeaderProtocols::Icmpv6.0 {
+                Some(event.icmp_code)
+            } else {
+                None
+            },
         }
     }
 
@@ -232,7 +256,7 @@ fn extract_packet_features_transport(
                 psh_flag: get_tcp_flag(tcp_packet.get_flags(), PSH_FLAG),
                 ack_flag: get_tcp_flag(tcp_packet.get_flags(), ACK_FLAG),
                 urg_flag: get_tcp_flag(tcp_packet.get_flags(), URG_FLAG),
-                cwe_flag: get_tcp_flag(tcp_packet.get_flags(), CWE_FLAG),
+                cwr_flag: get_tcp_flag(tcp_packet.get_flags(), CWR_FLAG),
                 ece_flag: get_tcp_flag(tcp_packet.get_flags(), ECE_FLAG),
                 data_length: tcp_packet.payload().len() as u16,
                 header_length: (tcp_packet.get_data_offset() * 4) as u8,
@@ -240,6 +264,8 @@ fn extract_packet_features_transport(
                 window_size: tcp_packet.get_window(),
                 sequence_number: tcp_packet.get_sequence(),
                 sequence_number_ack: tcp_packet.get_acknowledgement(),
+                icmp_type: None,
+                icmp_code: None,
             })
         }
         IpNextHeaderProtocols::Udp => {
@@ -257,7 +283,7 @@ fn extract_packet_features_transport(
                 psh_flag: 0,
                 ack_flag: 0,
                 urg_flag: 0,
-                cwe_flag: 0,
+                cwr_flag: 0,
                 ece_flag: 0,
                 data_length: udp_packet.payload().len() as u16,
                 header_length: 8, // Fixed header size for UDP
@@ -265,6 +291,8 @@ fn extract_packet_features_transport(
                 window_size: 0,         // No window size for UDP
                 sequence_number: 0,     // No sequence number for UDP
                 sequence_number_ack: 0, // No sequence number ACK for UDP
+                icmp_type: None,
+                icmp_code: None,
             })
         }
         IpNextHeaderProtocols::Icmp | IpNextHeaderProtocols::Icmpv6 => {
@@ -282,7 +310,7 @@ fn extract_packet_features_transport(
                 psh_flag: 0,
                 ack_flag: 0,
                 urg_flag: 0,
-                cwe_flag: 0,
+                cwr_flag: 0,
                 ece_flag: 0,
                 data_length: icmp_packet.payload().len() as u16,
                 header_length: 8, // Fixed header size for ICMP
@@ -290,6 +318,8 @@ fn extract_packet_features_transport(
                 window_size: 0,         // No window size for ICMP
                 sequence_number: 0,     // No sequence number for ICMP
                 sequence_number_ack: 0, // No sequence number ACK for ICMP
+                icmp_type: Some(icmp_packet.get_icmp_type().0),
+                icmp_code: Some(icmp_packet.get_icmp_code().0),
             })
         }
         _ => {
