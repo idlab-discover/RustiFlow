@@ -171,7 +171,7 @@ pub enum FlowType {
     Nfstream,
 
     /// Represents the Rusti Flow, giving 120 features.
-    RustiFlow,
+    Rustiflow,
 
     /// Represents a flow that you can implement yourself.
     Custom,

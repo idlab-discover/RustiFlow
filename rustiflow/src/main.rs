@@ -170,7 +170,7 @@ async fn run_with_config(config: Config) {
                 FlowType::CIC => execute_realtime!(CicFlow),
                 FlowType::CIDDS => execute_realtime!(CiddsFlow),
                 FlowType::Nfstream => execute_realtime!(NfFlow),
-                FlowType::RustiFlow => execute_realtime!(RustiFlow),
+                FlowType::Rustiflow => execute_realtime!(RustiFlow),
                 FlowType::Custom => execute_realtime!(CustomFlow),
             }
         }
@@ -240,7 +240,7 @@ async fn run_with_config(config: Config) {
                 FlowType::CIC => execute_offline!(CicFlow),
                 FlowType::CIDDS => execute_offline!(CiddsFlow),
                 FlowType::Nfstream => execute_offline!(NfFlow),
-                FlowType::RustiFlow => execute_offline!(RustiFlow),
+                FlowType::Rustiflow => execute_offline!(RustiFlow),
                 FlowType::Custom => execute_offline!(CustomFlow),
             }
         }
