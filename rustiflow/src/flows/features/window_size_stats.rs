@@ -1,6 +1,8 @@
-use crate::packet_features::PacketFeatures;
+use chrono::{DateTime, Utc};
 
-use super::util::FeatureStats;
+use crate::{flows::util::FlowExpireCause, packet_features::PacketFeatures};
+
+use super::util::{FeatureStats, FlowFeature};
 
 #[derive(Clone)]
 pub struct WindowSizeStats {
@@ -21,10 +23,17 @@ impl WindowSizeStats {
             bwd_window_size: FeatureStats::new(),
         }
     }
+}
 
-    pub fn update(&mut self, packet: &PacketFeatures, is_fwd: bool) {
+impl FlowFeature for WindowSizeStats {
+    fn update(
+        &mut self,
+        packet: &PacketFeatures,
+        is_forward: bool,
+        _last_timestamp: &DateTime<Utc>,
+    ) {
         self.window_size.add_value(packet.window_size as f64);
-        if is_fwd {
+        if is_forward {
             if self.fwd_window_size.get_count() == 0 {
                 self.fwd_init_window_size = packet.window_size;
             }
@@ -37,7 +46,11 @@ impl WindowSizeStats {
         }
     }
 
-    pub fn dump(&self) -> String {
+    fn close(&mut self, _last_timestamp: &DateTime<Utc>, _cause: FlowExpireCause) {
+        // No active state to close
+    }
+
+    fn dump(&self) -> String {
         format!(
             "{},{},{},{},{}",
             self.fwd_init_window_size,
@@ -48,7 +61,7 @@ impl WindowSizeStats {
         )
     }
 
-    pub fn header() -> String {
+    fn headers() -> String {
         format!(
             "{},{},{},{},{}",
             "fwd_init_window_size",

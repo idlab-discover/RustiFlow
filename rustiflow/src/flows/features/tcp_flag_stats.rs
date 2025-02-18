@@ -1,4 +1,8 @@
-use crate::packet_features::PacketFeatures;
+use chrono::{DateTime, Utc};
+
+use crate::{flows::util::FlowExpireCause, packet_features::PacketFeatures};
+
+use super::util::FlowFeature;
 
 #[derive(Clone)]
 pub struct TcpFlagStats {
@@ -44,8 +48,50 @@ impl TcpFlagStats {
         }
     }
 
-    pub fn update(&mut self, packet: &PacketFeatures, is_fwd: bool) {
-        if is_fwd {
+    pub fn get_flags(&self) -> String {
+        let mut flags = String::with_capacity(6);
+        if self.fwd_urg_flag_count + self.bwd_urg_flag_count != 0 {
+            flags.push('U');
+        } else {
+            flags.push('.');
+        }
+        if self.fwd_ack_flag_count + self.bwd_ack_flag_count != 0 {
+            flags.push('A');
+        } else {
+            flags.push('.');
+        }
+        if self.fwd_psh_flag_count + self.bwd_psh_flag_count != 0 {
+            flags.push('P');
+        } else {
+            flags.push('.');
+        }
+        if self.fwd_rst_flag_count + self.bwd_rst_flag_count != 0 {
+            flags.push('R');
+        } else {
+            flags.push('.');
+        }
+        if self.fwd_syn_flag_count + self.bwd_syn_flag_count != 0 {
+            flags.push('S');
+        } else {
+            flags.push('.');
+        }
+        if self.fwd_fin_flag_count + self.bwd_fin_flag_count != 0 {
+            flags.push('F');
+        } else {
+            flags.push('.');
+        }
+        flags
+    }
+}
+
+impl FlowFeature for TcpFlagStats {
+    fn update(
+        &mut self,
+        packet: &PacketFeatures,
+        is_forward: bool,
+        _last_timestamp: &DateTime<Utc>,
+    ) {
+        if is_forward {
             self.fwd_fin_flag_count += u32::from(packet.fin_flag);
             self.fwd_syn_flag_count += u32::from(packet.syn_flag);
             self.fwd_rst_flag_count += u32::from(packet.rst_flag);
@@ -66,7 +112,11 @@ impl TcpFlagStats {
         }
     }
 
-    pub fn dump(&self) -> String {
+    fn close(&mut self, _last_timestamp: &DateTime<Utc>, _cause: FlowExpireCause) {
+        // No active state to close
+    }
+
+    fn dump(&self) -> String {
         format!(
             "{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{}\
             ,{},{},{},{},{},{},{},{},{}",
@@ -100,7 +150,7 @@ impl TcpFlagStats {
         )
     }
 
-    pub fn header() -> String {
+    fn headers() -> String {
         [
             "fwd_fin_flag_count",
             "fwd_syn_flag_count",
@@ -131,40 +181,5 @@ impl TcpFlagStats {
             "flags",
         ]
         .join(",")
-    }
-
-    pub fn get_flags(&self) -> String {
-        let mut flags = String::new();
-        if self.fwd_urg_flag_count + self.bwd_urg_flag_count != 0 {
-            flags.push('U');
-        } else {
-            flags.push('.');
-        }
-        if self.fwd_ack_flag_count + self.bwd_ack_flag_count != 0 {
-            flags.push('A');
-        } else {
-            flags.push('.');
-        }
-        if self.fwd_psh_flag_count + self.bwd_psh_flag_count != 0 {
-            flags.push('P');
-        } else {
-            flags.push('.');
-        }
-        if self.fwd_rst_flag_count + self.bwd_rst_flag_count != 0 {
-            flags.push('R');
-        } else {
-            flags.push('.');
-        }
-        if self.fwd_syn_flag_count + self.bwd_syn_flag_count != 0 {
-            flags.push('S');
-        } else {
-            flags.push('.');
-        }
-        if self.fwd_fin_flag_count + self.bwd_fin_flag_count != 0 {
-            flags.push('F');
-        } else {
-            flags.push('.');
-        }
-        flags
     }
 }

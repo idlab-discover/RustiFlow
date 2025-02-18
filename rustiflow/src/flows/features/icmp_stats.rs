@@ -1,6 +1,8 @@
-use crate::packet_features::PacketFeatures;
+use chrono::{DateTime, Utc};
 
-const SUBFLOW_TIMEOUT: i64 = 1_000;
+use crate::{flows::util::FlowExpireCause, packet_features::PacketFeatures};
+
+use super::util::FlowFeature;
 
 #[derive(Clone)]
 pub struct IcmpStats {
@@ -18,7 +20,22 @@ impl IcmpStats {
         }
     }
 
-    pub fn update(&mut self, packet: &PacketFeatures) {
+    pub fn get_type(&self) -> u8 {
+        self.icmp_type.unwrap_or(0)
+    }
+
+    pub fn get_code(&self) -> u8 {
+        self.icmp_code.unwrap_or(0)
+    }
+}
+
+impl FlowFeature for IcmpStats {
+    fn update(
+        &mut self,
+        packet: &PacketFeatures,
+        _is_forward: bool,
+        _last_timestamp: &DateTime<Utc>,
+    ) {
         // Set ICMP type and code for the first packet
         if self.first_packet {
             self.icmp_type = packet.icmp_type;
@@ -27,19 +44,15 @@ impl IcmpStats {
         }
     }
 
-    pub fn get_type(&self) -> u8 {
-        self.icmp_type.unwrap_or(0)
+    fn close(&mut self, _last_timestamp: &DateTime<Utc>, _cause: FlowExpireCause) {
+        // No active state to close
     }
 
-    pub fn get_code(&self) -> u8 {
-        self.icmp_code.unwrap_or(0)
-    }
-
-    pub fn dump(&self) -> String {
+    fn dump(&self) -> String {
         format!("{},{}", self.get_type(), self.get_code())
     }
 
-    pub fn header() -> String {
+    fn headers() -> String {
         format!("{},{}", "icmp_type", "icmp_code")
     }
 }

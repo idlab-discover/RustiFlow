@@ -3,7 +3,12 @@ use std::net::IpAddr;
 
 use crate::packet_features::PacketFeatures;
 
-use super::{basic_flow::BasicFlow, features::icmp_stats::IcmpStats, flow::Flow};
+use super::{
+    basic_flow::BasicFlow,
+    features::{icmp_stats::IcmpStats, util::FlowFeature},
+    flow::Flow,
+    util::FlowExpireCause,
+};
 
 /// Represents a Custom Flow, encapsulating various metrics and states of a network flow.
 ///
@@ -45,13 +50,20 @@ impl Flow for CustomFlow {
 
     fn update_flow(&mut self, packet: &PacketFeatures, fwd: bool) -> bool {
         // Update the basic flow and returns true if the flow is terminated.
+        let last_timestamp = self.basic_flow.last_timestamp;
         let is_terminated = self.basic_flow.update_flow(packet, fwd);
 
         // Add here the update of the additional features.
-        self.icmp_stats.update(packet);
+        self.icmp_stats.update(packet, fwd, &last_timestamp);
 
         // Return the termination status of the flow.
         is_terminated
+    }
+
+    fn close_flow(&mut self, timestamp: &DateTime<Utc>, cause: FlowExpireCause) {
+        self.basic_flow.close_flow(timestamp, cause);
+
+        self.icmp_stats.close(timestamp, cause);
     }
 
     fn dump(&self) -> String {
@@ -87,7 +99,12 @@ impl Flow for CustomFlow {
         self.basic_flow.get_first_timestamp()
     }
 
-    fn is_expired(&self, timestamp: DateTime<Utc>, active_timeout: u64, idle_timeout: u64) -> bool {
+    fn is_expired(
+        &self,
+        timestamp: DateTime<Utc>,
+        active_timeout: u64,
+        idle_timeout: u64,
+    ) -> (bool, FlowExpireCause) {
         self.basic_flow
             .is_expired(timestamp, active_timeout, idle_timeout)
     }

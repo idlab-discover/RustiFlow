@@ -3,6 +3,8 @@ use std::net::IpAddr;
 
 use crate::packet_features::PacketFeatures;
 
+use super::util::FlowExpireCause;
+
 /// `Flow` defines the behavior of a network flow.
 ///
 /// This trait should be implemented by structures that represent
@@ -54,6 +56,17 @@ pub trait Flow: Send + Sync + 'static + Clone {
     ///
     /// Returns an `boolean` indicating if the flow is terminated.
     fn update_flow(&mut self, packet: &PacketFeatures, fwd: bool) -> bool;
+
+    /// Closes the flow and performs final calculations.
+    ///
+    /// This method is called when a flow is being terminated, either due to
+    /// timeouts, TCP termination, or exporter shutdown.
+    ///
+    /// ### Arguments
+    ///
+    /// * `timestamp` - The timestamp when the flow is being closed
+    /// * `cause` - The reason for closing the flow
+    fn close_flow(&mut self, timestamp: &DateTime<Utc>, cause: FlowExpireCause);
 
     /// Dumps the current state of the flow.
     ///
@@ -113,5 +126,10 @@ pub trait Flow: Send + Sync + 'static + Clone {
     /// ### Returns
     ///
     /// Returns a `boolean` indicating if the flow is expired.
-    fn is_expired(&self, timestamp: DateTime<Utc>, active_timeout: u64, idle_timeout: u64) -> bool;
+    fn is_expired(
+        &self,
+        timestamp: DateTime<Utc>,
+        active_timeout: u64,
+        idle_timeout: u64,
+    ) -> (bool, FlowExpireCause);
 }

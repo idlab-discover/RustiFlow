@@ -5,6 +5,8 @@ use chrono::{DateTime, Utc};
 use crate::flows::{features::timing_stats::TimingStats, util::iana_port_mapping};
 use crate::packet_features::PacketFeatures;
 
+use super::features::util::FlowFeature;
+use super::util::FlowExpireCause;
 use super::{
     basic_flow::BasicFlow,
     features::{
@@ -34,6 +36,16 @@ pub struct NfFlow {
     pub retransmission_stats: RetransmissionStats,
     pub window_size_stats: WindowSizeStats,
     pub timing_stats: TimingStats,
+}
+
+impl NfFlow {
+    pub fn get_expiration_id(&self) -> i8 {
+        match self.basic_flow.flow_expire_cause {
+            FlowExpireCause::ActiveTimeout => 1,
+            FlowExpireCause::IdleTimeout => 0,
+            _ => -1,
+        }
+    }
 }
 
 impl Flow for NfFlow {
@@ -75,20 +87,38 @@ impl Flow for NfFlow {
         let last_timestamp = self.basic_flow.last_timestamp;
         let is_terminated = self.basic_flow.update_flow(packet, fwd);
 
-        self.packet_len_stats.update(packet, fwd);
-        self.iat_stats.update(packet, fwd);
-        self.tcp_flags_stats.update(packet, fwd);
-        self.header_len_stats.update(packet, fwd);
-        self.payload_len_stats.update(packet, fwd);
-        self.bulk_stats.update(packet, fwd);
-        self.subflow_stats.update(packet, &last_timestamp);
-        self.active_idle_stats.update(packet);
-        self.icmp_stats.update(packet);
-        self.retransmission_stats.update(packet, fwd);
-        self.window_size_stats.update(packet, fwd);
-        self.timing_stats.update(packet, fwd);
+        self.packet_len_stats.update(packet, fwd, &last_timestamp);
+        self.iat_stats.update(packet, fwd, &last_timestamp);
+        self.tcp_flags_stats.update(packet, fwd, &last_timestamp);
+        self.header_len_stats.update(packet, fwd, &last_timestamp);
+        self.payload_len_stats.update(packet, fwd, &last_timestamp);
+        self.bulk_stats.update(packet, fwd, &last_timestamp);
+        self.subflow_stats.update(packet, fwd, &last_timestamp);
+        self.active_idle_stats.update(packet, fwd, &last_timestamp);
+        self.icmp_stats.update(packet, fwd, &last_timestamp);
+        self.retransmission_stats
+            .update(packet, fwd, &last_timestamp);
+        self.window_size_stats.update(packet, fwd, &last_timestamp);
+        self.timing_stats.update(packet, fwd, &last_timestamp);
 
         is_terminated
+    }
+
+    fn close_flow(&mut self, timestamp: &DateTime<Utc>, cause: FlowExpireCause) {
+        self.basic_flow.close_flow(timestamp, cause);
+
+        self.packet_len_stats.close(timestamp, cause);
+        self.iat_stats.close(timestamp, cause);
+        self.tcp_flags_stats.close(timestamp, cause);
+        self.header_len_stats.close(timestamp, cause);
+        self.payload_len_stats.close(timestamp, cause);
+        self.bulk_stats.close(timestamp, cause);
+        self.subflow_stats.close(timestamp, cause);
+        self.active_idle_stats.close(timestamp, cause);
+        self.icmp_stats.close(timestamp, cause);
+        self.retransmission_stats.close(timestamp, cause);
+        self.window_size_stats.close(timestamp, cause);
+        self.timing_stats.close(timestamp, cause);
     }
 
     fn dump(&self) -> String {
@@ -99,10 +129,11 @@ impl Flow for NfFlow {
             {},{},{},{},{},{},{},{},{},{},\
             {},{},{},{},{},{},{},{},{},{},\
             {},{},{},{},{},{},{},{},{},{},\
-            {},{},{},{},{},{},{},{},{},",
+            {},{},{},{},{},{},{},{},{},{}",
             // NFlow Core Features
-            // 8 features are missing: expiration_id, src_mac, src_oui, dst_mac, dst_oui, ip_version, vlan_id, tunner_id
+            // 7 features are missing: src_mac, src_oui, dst_mac, dst_oui, ip_version, vlan_id, tunner_id
             self.basic_flow.flow_key,
+            self.get_expiration_id(),
             self.basic_flow.ip_source,
             self.basic_flow.port_source,
             self.basic_flow.ip_destination,
@@ -195,8 +226,9 @@ impl Flow for NfFlow {
             {},{},{},{},{},{},{},{},{},{},\
             {},{},{},{},{},{},{},{},{},{},\
             {},{},{},{},{},{},{},{},{},{},\
-            {},{},{},{},{},{},{},{},{},",
+            {},{},{},{},{},{},{},{},{},{}",
             "id",
+            "expiration_id",
             "src_ip",
             "src_port",
             "dst_ip",
@@ -416,7 +448,12 @@ impl Flow for NfFlow {
         self.basic_flow.get_first_timestamp()
     }
 
-    fn is_expired(&self, timestamp: DateTime<Utc>, active_timeout: u64, idle_timeout: u64) -> bool {
+    fn is_expired(
+        &self,
+        timestamp: DateTime<Utc>,
+        active_timeout: u64,
+        idle_timeout: u64,
+    ) -> (bool, FlowExpireCause) {
         self.basic_flow
             .is_expired(timestamp, active_timeout, idle_timeout)
     }

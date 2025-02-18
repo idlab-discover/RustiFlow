@@ -4,6 +4,8 @@ use std::net::IpAddr;
 use crate::flows::util::iana_port_mapping;
 use crate::packet_features::PacketFeatures;
 
+use super::features::util::FlowFeature;
+use super::util::FlowExpireCause;
 use super::{basic_flow::BasicFlow, flow::Flow};
 
 use super::features::packet_stats::PacketLengthStats;
@@ -43,12 +45,20 @@ impl Flow for CiddsFlow {
     }
 
     fn update_flow(&mut self, packet: &PacketFeatures, is_fwd: bool) -> bool {
+        let last_timestamp = self.basic_flow.last_timestamp;
         let is_terminated: bool = self.basic_flow.update_flow(packet, is_fwd);
 
-        self.tcp_flag_stats.update(packet, is_fwd);
-        self.packet_stats.update(packet, is_fwd);
+        self.tcp_flag_stats.update(packet, is_fwd, &last_timestamp);
+        self.packet_stats.update(packet, is_fwd, &last_timestamp);
 
         is_terminated
+    }
+
+    fn close_flow(&mut self, timestamp: &DateTime<Utc>, cause: FlowExpireCause) {
+        self.basic_flow.close_flow(timestamp, cause);
+
+        self.tcp_flag_stats.close(timestamp, cause);
+        self.packet_stats.close(timestamp, cause);
     }
 
     fn dump(&self) -> String {
@@ -123,7 +133,12 @@ impl Flow for CiddsFlow {
         self.basic_flow.get_first_timestamp()
     }
 
-    fn is_expired(&self, timestamp: DateTime<Utc>, active_timeout: u64, idle_timeout: u64) -> bool {
+    fn is_expired(
+        &self,
+        timestamp: DateTime<Utc>,
+        active_timeout: u64,
+        idle_timeout: u64,
+    ) -> (bool, FlowExpireCause) {
         self.basic_flow
             .is_expired(timestamp, active_timeout, idle_timeout)
     }

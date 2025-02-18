@@ -1,8 +1,8 @@
 use chrono::{DateTime, Utc};
 
-use crate::packet_features::PacketFeatures;
+use crate::{flows::util::FlowExpireCause, packet_features::PacketFeatures};
 
-use super::util::FeatureStats;
+use super::util::{FeatureStats, FlowFeature};
 
 const MIN_BULK_PACKETS: u32 = 4;
 const BULK_IDLE_MS: i64 = 1000;
@@ -113,10 +113,17 @@ impl BulkStats {
             self.finalize_bulk(bulk, is_fwd);
         }
     }
+}
 
+impl FlowFeature for BulkStats {
     /// Update the bulk logic for a given packet and direction.
     /// Logic adopted from CICFlowMeter's bulk feature, but adjusted for capturing stats on bulk finish.
-    pub fn update(&mut self, packet: &PacketFeatures, is_fwd: bool) {
+    fn update(
+        &mut self,
+        packet: &PacketFeatures,
+        is_forward: bool,
+        _last_timestamp: &DateTime<Utc>,
+    ) {
         // 1. Skip zero-length packets
         let packet_len = packet.length;
         if packet_len <= 0 {
@@ -124,7 +131,7 @@ impl BulkStats {
         }
 
         // Pick which bulk_state Option we modify (fwd or bwd).
-        let bulk_opt = if is_fwd {
+        let bulk_opt = if is_forward {
             &mut self.fwd_bulk_state
         } else {
             &mut self.bwd_bulk_state
@@ -155,18 +162,24 @@ impl BulkStats {
             None => {
                 *bulk_opt = Some(BulkState::new(packet.timestamp, packet.length));
                 // Finalize bulk in the other direction since we're starting a new bulk in this direction
-                self.finalize_current_bulk(!is_fwd);
+                self.finalize_current_bulk(!is_forward);
             }
         }
 
         // 4. Now that we're done borrowing `bulk_opt`,
         //    we can safely finalize the old bulk.
         if let Some(bulk) = old_bulk {
-            self.finalize_bulk(bulk, is_fwd);
+            self.finalize_bulk(bulk, is_forward);
         }
     }
 
-    pub fn dump(&self) -> String {
+    fn close(&mut self, _last_timestamp: &DateTime<Utc>, _cause: FlowExpireCause) {
+        // Finalize any active bulks in both directions
+        self.finalize_current_bulk(true);
+        self.finalize_current_bulk(false);
+    }
+
+    fn dump(&self) -> String {
         format!(
             "{},{},{},{},{},{},{},{},{},{}",
             self.fwd_bulk_rate(),
@@ -182,7 +195,7 @@ impl BulkStats {
         )
     }
 
-    pub fn header() -> String {
+    fn headers() -> String {
         format!(
             "{},{},{},{},{},{},{},{},{},{}",
             "fwd_bulk_rate_s",

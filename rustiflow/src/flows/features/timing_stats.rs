@@ -1,5 +1,7 @@
-use crate::packet_features::PacketFeatures;
+use crate::{flows::util::FlowExpireCause, packet_features::PacketFeatures};
 use chrono::{DateTime, Utc};
+
+use super::util::FlowFeature;
 
 #[derive(Clone)]
 pub struct TimingStats {
@@ -16,20 +18,6 @@ impl TimingStats {
             first_timestamp_bwd: None,
             last_timestamp_fwd: None,
             last_timestamp_bwd: None,
-        }
-    }
-
-    pub fn update(&mut self, packet: &PacketFeatures, is_fwd: bool) {
-        if is_fwd {
-            if self.first_timestamp_fwd.is_none() {
-                self.first_timestamp_fwd = Some(packet.timestamp);
-            }
-            self.last_timestamp_fwd = Some(packet.timestamp);
-        } else {
-            if self.first_timestamp_bwd.is_none() {
-                self.first_timestamp_bwd = Some(packet.timestamp);
-            }
-            self.last_timestamp_bwd = Some(packet.timestamp);
         }
     }
 
@@ -57,28 +45,53 @@ impl TimingStats {
             0
         }
     }
+}
 
-    pub fn dump(&self) -> String {
+impl FlowFeature for TimingStats {
+    fn update(
+        &mut self,
+        packet: &PacketFeatures,
+        is_forward: bool,
+        _last_timestamp: &DateTime<Utc>,
+    ) {
+        if is_forward {
+            if self.first_timestamp_fwd.is_none() {
+                self.first_timestamp_fwd = Some(packet.timestamp);
+            }
+            self.last_timestamp_fwd = Some(packet.timestamp);
+        } else {
+            if self.first_timestamp_bwd.is_none() {
+                self.first_timestamp_bwd = Some(packet.timestamp);
+            }
+            self.last_timestamp_bwd = Some(packet.timestamp);
+        }
+    }
+
+    fn close(&mut self, _last_timestamp: &DateTime<Utc>, _cause: FlowExpireCause) {
+        // No active state to close
+    }
+
+    fn dump(&self) -> String {
         format!(
             "{},{},{},{},{},{}",
             self.first_timestamp_fwd
                 .map(|t| t.timestamp_millis())
-                .unwrap_or_else(|| 0),
+                .unwrap_or(0),
             self.first_timestamp_bwd
                 .map(|t| t.timestamp_millis())
-                .unwrap_or_else(|| 0),
+                .unwrap_or(0),
             self.last_timestamp_fwd
                 .map(|t| t.timestamp_millis())
-                .unwrap_or_else(|| 0),
+                .unwrap_or(0),
             self.last_timestamp_bwd
                 .map(|t| t.timestamp_millis())
-                .unwrap_or_else(|| 0),
+                .unwrap_or(0),
             self.get_fwd_duration(),
             self.get_bwd_duration()
         )
     }
 
-    pub fn header() -> String {
+    fn headers() -> String {
         format!(
             "{},{},{},{},{},{}",
             "first_timestamp_fwd",

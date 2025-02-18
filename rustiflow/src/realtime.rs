@@ -100,12 +100,16 @@ where
 
         // Spawn a task per shard
         tokio::spawn(async move {
+            let mut last_timestamp = None;
             while let Some(packet_features) = rx.recv().await {
+                last_timestamp = Some(packet_features.timestamp);
                 flow_table.process_packet(&packet_features).await;
             }
             debug!("Shard finished processing packets");
             // Handle flow exporting when the receiver is closed
-            flow_table.export_all_flows().await;
+            if let Some(timestamp) = last_timestamp {
+                flow_table.export_all_flows(timestamp).await;
+            }
         });
         shard_senders.push(tx);
     }

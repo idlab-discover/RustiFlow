@@ -1,8 +1,8 @@
 use chrono::{DateTime, Utc};
 
-use crate::packet_features::PacketFeatures;
+use crate::{flows::util::FlowExpireCause, packet_features::PacketFeatures};
 
-use super::util::FeatureStats;
+use super::util::{FeatureStats, FlowFeature};
 
 #[derive(Clone)]
 pub struct IATStats {
@@ -25,8 +25,15 @@ impl IATStats {
             last_timestamp: None,
         }
     }
+}
 
-    pub fn update(&mut self, packet: &PacketFeatures, is_fwd: bool) {
+impl FlowFeature for IATStats {
+    fn update(
+        &mut self,
+        packet: &PacketFeatures,
+        is_forward: bool,
+        _last_timestamp: &DateTime<Utc>,
+    ) {
         let duration = |last_timestamp: Option<DateTime<Utc>>| {
             last_timestamp.map(|ts| {
                 packet
@@ -43,7 +50,7 @@ impl IATStats {
         }
         self.last_timestamp = Some(packet.timestamp);
 
-        if is_fwd {
+        if is_forward {
             if let Some(dur) = duration(self.last_timestamp_fwd) {
                 self.fwd_iat.add_value(dur);
             }
@@ -56,7 +63,11 @@ impl IATStats {
         }
     }
 
-    pub fn dump(&self) -> String {
+    fn close(&mut self, _last_timestamp: &DateTime<Utc>, _cause: FlowExpireCause) {
+        // No active state to close
+    }
+
+    fn dump(&self) -> String {
         format!(
             "{},{},{}",
             self.iat.dump_values(),
@@ -65,7 +76,7 @@ impl IATStats {
         )
     }
 
-    pub fn header() -> String {
+    fn headers() -> String {
         format!(
             "{},{},{}",
             FeatureStats::dump_headers("iat"),

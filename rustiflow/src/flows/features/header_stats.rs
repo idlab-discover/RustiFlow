@@ -1,6 +1,8 @@
-use crate::packet_features::PacketFeatures;
+use chrono::{DateTime, Utc};
 
-use super::util::FeatureStats;
+use crate::{flows::util::FlowExpireCause, packet_features::PacketFeatures};
+
+use super::util::{FeatureStats, FlowFeature};
 
 #[derive(Clone)]
 pub struct HeaderLengthStats {
@@ -17,17 +19,28 @@ impl HeaderLengthStats {
             bwd_header_len: FeatureStats::new(),
         }
     }
+}
 
-    pub fn update(&mut self, packet: &PacketFeatures, is_fwd: bool) {
+impl FlowFeature for HeaderLengthStats {
+    fn update(
+        &mut self,
+        packet: &PacketFeatures,
+        is_forward: bool,
+        _last_timestamp: &DateTime<Utc>,
+    ) {
         self.header_len.add_value(packet.header_length as f64);
-        if is_fwd {
+        if is_forward {
             self.fwd_header_len.add_value(packet.header_length as f64);
         } else {
             self.bwd_header_len.add_value(packet.header_length as f64);
         }
     }
 
-    pub fn dump(&self) -> String {
+    fn close(&mut self, _last_timestamp: &DateTime<Utc>, _cause: FlowExpireCause) {
+        // No active state to close
+    }
+
+    fn dump(&self) -> String {
         format!(
             "{},{},{}",
             self.header_len.dump_values(),
@@ -36,7 +49,7 @@ impl HeaderLengthStats {
         )
     }
 
-    pub fn header() -> String {
+    fn headers() -> String {
         format!(
             "{},{},{}",
             FeatureStats::dump_headers("header_len"),

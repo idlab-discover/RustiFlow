@@ -1,8 +1,10 @@
 use std::collections::HashSet;
 
-use crate::packet_features::PacketFeatures;
+use chrono::{DateTime, Utc};
 
-const RETRA: i64 = 1_000;
+use crate::{flows::util::FlowExpireCause, packet_features::PacketFeatures};
+
+use super::util::FlowFeature;
 
 #[derive(Clone)]
 pub struct RetransmissionStats {
@@ -24,11 +26,18 @@ impl RetransmissionStats {
             bwd_seen_seqs: HashSet::new(),
         }
     }
+}
 
-    pub fn update(&mut self, packet: &PacketFeatures, is_fwd: bool) {
+impl FlowFeature for RetransmissionStats {
+    fn update(
+        &mut self,
+        packet: &PacketFeatures,
+        is_forward: bool,
+        _last_timestamp: &DateTime<Utc>,
+    ) {
         let seq = packet.sequence_number;
 
-        if is_fwd {
+        if is_forward {
             if !self.fwd_seen_seqs.insert(seq) {
                 self.fwd_retransmission_count += 1;
             }
@@ -39,7 +48,11 @@ impl RetransmissionStats {
         }
     }
 
-    pub fn dump(&self) -> String {
+    fn close(&mut self, _last_timestamp: &DateTime<Utc>, _cause: FlowExpireCause) {
+        // No active state to close
+    }
+
+    fn dump(&self) -> String {
         format!(
             "{},{},{}",
             self.fwd_retransmission_count + self.bwd_retransmission_count,
@@ -48,7 +61,7 @@ impl RetransmissionStats {
         )
     }
 
-    pub fn header() -> String {
+    fn headers() -> String {
         format!(
             "{},{},{}",
             "flow_retransmission_count", "fwd_retransmission_count", "bwd_retransmission_count"

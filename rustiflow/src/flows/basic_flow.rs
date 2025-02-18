@@ -4,7 +4,7 @@ use chrono::{DateTime, Utc};
 
 use crate::{flows::util::iana_port_mapping, packet_features::PacketFeatures};
 
-use super::flow::Flow;
+use super::{flow::Flow, util::FlowExpireCause};
 
 #[derive(Clone, PartialEq, Debug)]
 pub(crate) enum FlowState {
@@ -32,8 +32,8 @@ pub struct BasicFlow {
     pub first_timestamp: DateTime<Utc>,
     /// The last timestamp of the flow.
     pub last_timestamp: DateTime<Utc>,
-    /// The last ACK of the flow.
-    pub tcp_normal_termination: u8,
+    /// The reason this flow expired
+    pub flow_expire_cause: FlowExpireCause,
 
     // Tracking TCP Flow Termination
     pub(crate) state_fwd: FlowState,
@@ -131,7 +131,7 @@ impl Flow for BasicFlow {
             protocol,
             first_timestamp,
             last_timestamp: first_timestamp,
-            tcp_normal_termination: 0,
+            flow_expire_cause: FlowExpireCause::None,
             state_fwd: FlowState::Established,
             state_bwd: FlowState::Established,
             expected_ack_seq_fwd: None,
@@ -143,14 +143,20 @@ impl Flow for BasicFlow {
         self.last_timestamp = packet.timestamp;
 
         if self.is_tcp_finished(packet, fwd) {
-            self.tcp_normal_termination = 1;
+            self.flow_expire_cause = FlowExpireCause::TcpTermination;
+            return true;
         }
 
-        if self.tcp_normal_termination > 0 || packet.rst_flag > 0 {
+        if packet.rst_flag > 0 {
+            self.flow_expire_cause = FlowExpireCause::TcpReset;
             return true;
         }
 
         false
+    }
+
+    fn close_flow(&mut self, _timestamp: &DateTime<Utc>, _cause: FlowExpireCause) -> () {
+        // No active state to close
     }
 
     fn dump(&self) -> String {
@@ -165,14 +171,14 @@ impl Flow for BasicFlow {
             self.first_timestamp,
             self.last_timestamp,
             self.get_flow_duration_usec(),
-            self.tcp_normal_termination
+            self.flow_expire_cause.as_str()
         )
     }
 
     fn get_features() -> String {
         format!(
             "flow_id,source_ip,source_port,destination_ip,destination_port,protocol,\
-            first_timestamp,last_timestamp,duration,normal_tcp_termination"
+            first_timestamp,last_timestamp,duration,flow_expire_cause"
         )
     }
 
@@ -183,28 +189,37 @@ impl Flow for BasicFlow {
             iana_port_mapping(self.port_destination),
             self.protocol,
             self.get_flow_duration_usec(),
-            self.tcp_normal_termination,
+            self.flow_expire_cause.as_str(),
         )
     }
 
     fn get_features_without_contamination() -> String {
-        format!("src_port_iana,dst_port_iana,protocol,duration,normal_tcp_termination")
+        format!("src_port_iana,dst_port_iana,protocol,duration,flow_expire_cause")
     }
 
     fn get_first_timestamp(&self) -> DateTime<Utc> {
         self.first_timestamp
     }
 
-    fn is_expired(&self, timestamp: DateTime<Utc>, active_timeout: u64, idle_timeout: u64) -> bool {
+    fn is_expired(
+        &self,
+        timestamp: DateTime<Utc>,
+        active_timeout: u64,
+        idle_timeout: u64,
+    ) -> (bool, FlowExpireCause) {
+        if self.flow_expire_cause != FlowExpireCause::None {
+            return (true, self.flow_expire_cause);
+        }
+
         if (timestamp - self.first_timestamp).num_seconds() as u64 > active_timeout {
-            return true;
+            return (true, FlowExpireCause::ActiveTimeout);
         }
 
         if (timestamp - self.last_timestamp).num_seconds() as u64 > idle_timeout {
-            return true;
+            return (true, FlowExpireCause::IdleTimeout);
         }
 
-        false
+        (false, FlowExpireCause::None)
     }
 
     fn flow_key(&self) -> &String {

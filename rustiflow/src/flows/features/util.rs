@@ -1,3 +1,24 @@
+use chrono::{DateTime, Utc};
+
+use crate::{flows::util::FlowExpireCause, packet_features::PacketFeatures};
+
+/// Trait for network flow features that can be updated, closed, and dumped to CSV format
+pub trait FlowFeature: Send + Sync + Clone {
+    /// Updates the feature with a new packet
+    fn update(&mut self, packet: &PacketFeatures, is_forward: bool, last_timestamp: &DateTime<Utc>);
+
+    /// Finalizes any active state when the flow is terminated
+    fn close(&mut self, last_timestamp: &DateTime<Utc>, cause: FlowExpireCause);
+
+    /// Dumps the current state as a CSV string
+    fn dump(&self) -> String;
+
+    /// Returns the CSV headers for this feature
+    fn headers() -> String
+    where
+        Self: Sized;
+}
+
 #[derive(Clone)]
 pub struct FeatureStats {
     total: f64,
@@ -99,4 +120,27 @@ impl FeatureStats {
             self.get_min(),
         )
     }
+}
+
+/// Safely performs floating point division, returning 0.0 if denominator is 0
+pub fn safe_div(numerator: f64, denominator: f64) -> f64 {
+    if denominator == 0.0 {
+        0.0
+    } else {
+        numerator / denominator
+    }
+}
+
+/// Safely performs integer division, returning 0.0 if denominator is 0
+pub fn safe_div_int(numerator: u32, denominator: u32) -> f64 {
+    if denominator == 0 {
+        0.0
+    } else {
+        numerator as f64 / denominator as f64
+    }
+}
+
+/// Safely calculates per-second rate, handling zero duration
+pub fn safe_per_second_rate(value: f64, duration_usec: f64) -> f64 {
+    safe_div(value, duration_usec / 1_000_000.0)
 }

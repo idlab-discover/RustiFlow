@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use crate::{packet_features::PacketFeatures, Flow};
+use crate::{flows::util::FlowExpireCause, packet_features::PacketFeatures, Flow};
 use chrono::{DateTime, TimeDelta, Utc};
 use log::{debug, error};
 use tokio::sync::mpsc;
@@ -51,7 +51,10 @@ where
 
         // Update the flow if it exists, otherwise create a new flow
         if let Some(mut flow) = self.flow_map.remove(&flow_key) {
-            if flow.is_expired(packet.timestamp, self.active_timeout, self.idle_timeout) {
+            let (is_expired, cause) =
+                flow.is_expired(packet.timestamp, self.active_timeout, self.idle_timeout);
+            if is_expired {
+                flow.close_flow(&packet.timestamp, cause);
                 self.export_flow(flow).await;
                 self.create_and_insert_flow(packet).await;
             } else {
@@ -89,6 +92,7 @@ where
 
         if flow_terminated {
             // If terminated, export the flow
+            flow.close_flow(&packet.timestamp, FlowExpireCause::TcpTermination);
             self.export_flow(flow.clone()).await;
         } else if let Some(early_export) = self.early_export {
             // If flow duration is greater than early export, export the flow immediately (without deletion from the flow table)
@@ -100,7 +104,7 @@ where
     }
 
     /// Export all flows in the flow map in order of first packet arrival.
-    pub async fn export_all_flows(&mut self) {
+    pub async fn export_all_flows(&mut self, timestamp: DateTime<Utc>) {
         let mut flows_to_export: Vec<_> = self
             .flow_map
             .drain() // Drain all entries from the map
@@ -111,7 +115,8 @@ where
         flows_to_export.sort_by_key(|flow| flow.get_first_timestamp());
 
         // Export each flow in order of `first_timestamp`
-        for flow in flows_to_export {
+        for mut flow in flows_to_export {
+            flow.close_flow(&timestamp, FlowExpireCause::ExporterShutdown);
             self.export_flow(flow).await;
         }
     }
@@ -147,8 +152,10 @@ where
             .flow_map
             .iter()
             .filter_map(|(key, flow)| {
-                if flow.is_expired(timestamp, self.active_timeout, self.idle_timeout) {
-                    Some(key.clone())
+                let (is_expired, cause) =
+                    flow.is_expired(timestamp, self.active_timeout, self.idle_timeout);
+                if is_expired {
+                    Some((key.clone(), cause))
                 } else {
                     None
                 }
@@ -156,8 +163,9 @@ where
             .collect();
 
         debug!("Exporting {} expired flows", expired_flows.len());
-        for key in expired_flows {
-            if let Some(flow) = self.flow_map.remove(&key) {
+        for (key, cause) in expired_flows {
+            if let Some(mut flow) = self.flow_map.remove(&key) {
+                flow.close_flow(&timestamp, cause);
                 self.export_flow(flow).await;
             }
         }

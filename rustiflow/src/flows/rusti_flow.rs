@@ -1,7 +1,13 @@
 use chrono::{DateTime, Utc};
 use std::net::IpAddr;
 
-use crate::{flows::util::iana_port_mapping, packet_features::PacketFeatures};
+use crate::{
+    flows::{
+        features::util::{safe_div_int, safe_per_second_rate},
+        util::iana_port_mapping,
+    },
+    packet_features::PacketFeatures,
+};
 
 use super::{
     basic_flow::BasicFlow,
@@ -10,9 +16,10 @@ use super::{
         iat_stats::IATStats, icmp_stats::IcmpStats, packet_stats::PacketLengthStats,
         payload_stats::PayloadLengthStats, retransmission_stats::RetransmissionStats,
         subflow_stats::SubflowStats, tcp_flag_stats::TcpFlagStats, timing_stats::TimingStats,
-        window_size_stats::WindowSizeStats,
+        util::FlowFeature, window_size_stats::WindowSizeStats,
     },
     flow::Flow,
+    util::FlowExpireCause,
 };
 
 /// Represents a Rusti Flow, a super-set of features from CICFlowMeter, CIDDS, NFStream and more.
@@ -73,20 +80,38 @@ impl Flow for RustiFlow {
         let last_timestamp = self.basic_flow.last_timestamp;
         let is_terminated = self.basic_flow.update_flow(packet, fwd);
 
-        self.packet_len_stats.update(packet, fwd);
-        self.iat_stats.update(packet, fwd);
-        self.tcp_flags_stats.update(packet, fwd);
-        self.header_len_stats.update(packet, fwd);
-        self.payload_len_stats.update(packet, fwd);
-        self.bulk_stats.update(packet, fwd);
-        self.subflow_stats.update(packet, &last_timestamp);
-        self.active_idle_stats.update(packet);
-        self.icmp_stats.update(packet);
-        self.retransmission_stats.update(packet, fwd);
-        self.window_size_stats.update(packet, fwd);
-        self.timing_stats.update(packet, fwd);
+        self.packet_len_stats.update(packet, fwd, &last_timestamp);
+        self.iat_stats.update(packet, fwd, &last_timestamp);
+        self.tcp_flags_stats.update(packet, fwd, &last_timestamp);
+        self.header_len_stats.update(packet, fwd, &last_timestamp);
+        self.payload_len_stats.update(packet, fwd, &last_timestamp);
+        self.bulk_stats.update(packet, fwd, &last_timestamp);
+        self.subflow_stats.update(packet, fwd, &last_timestamp);
+        self.active_idle_stats.update(packet, fwd, &last_timestamp);
+        self.icmp_stats.update(packet, fwd, &last_timestamp);
+        self.retransmission_stats
+            .update(packet, fwd, &last_timestamp);
+        self.window_size_stats.update(packet, fwd, &last_timestamp);
+        self.timing_stats.update(packet, fwd, &last_timestamp);
 
         is_terminated
+    }
+
+    fn close_flow(&mut self, timestamp: &DateTime<Utc>, cause: FlowExpireCause) {
+        self.basic_flow.close_flow(timestamp, cause);
+
+        self.packet_len_stats.close(timestamp, cause);
+        self.iat_stats.close(timestamp, cause);
+        self.tcp_flags_stats.close(timestamp, cause);
+        self.header_len_stats.close(timestamp, cause);
+        self.payload_len_stats.close(timestamp, cause);
+        self.bulk_stats.close(timestamp, cause);
+        self.subflow_stats.close(timestamp, cause);
+        self.active_idle_stats.close(timestamp, cause);
+        self.icmp_stats.close(timestamp, cause);
+        self.retransmission_stats.close(timestamp, cause);
+        self.window_size_stats.close(timestamp, cause);
+        self.timing_stats.close(timestamp, cause);
     }
 
     fn dump(&self) -> String {
@@ -104,7 +129,7 @@ impl Flow for RustiFlow {
             self.basic_flow.first_timestamp,
             self.basic_flow.last_timestamp,
             self.basic_flow.get_flow_duration_usec(),
-            self.basic_flow.tcp_normal_termination,
+            self.basic_flow.flow_expire_cause.as_str(),
             // Timing Stats
             self.timing_stats.dump(),
             // IAT Stats
@@ -130,21 +155,35 @@ impl Flow for RustiFlow {
             // TCP Flag Stats
             self.tcp_flags_stats.dump(),
             // Rate Stats (per second)
-            self.packet_len_stats.flow_total()
-                / (self.basic_flow.get_flow_duration_usec() / 1_000_000.0),
-            self.packet_len_stats.flow_count() as f64
-                / (self.basic_flow.get_flow_duration_usec() / 1_000_000.0),
-            self.packet_len_stats.fwd_packet_len.get_total() as f64
-                / (self.basic_flow.get_flow_duration_usec() / 1_000_000.0),
-            self.packet_len_stats.fwd_packet_len.get_count() as f64
-                / (self.basic_flow.get_flow_duration_usec() / 1_000_000.0),
-            self.packet_len_stats.bwd_packet_len.get_total() as f64
-                / (self.basic_flow.get_flow_duration_usec() / 1_000_000.0),
-            self.packet_len_stats.bwd_packet_len.get_count() as f64
-                / (self.basic_flow.get_flow_duration_usec() / 1_000_000.0),
+            safe_per_second_rate(
+                self.packet_len_stats.flow_total(),
+                self.basic_flow.get_flow_duration_usec()
+            ),
+            safe_per_second_rate(
+                self.packet_len_stats.flow_count() as f64,
+                self.basic_flow.get_flow_duration_usec()
+            ),
+            safe_per_second_rate(
+                self.packet_len_stats.fwd_packet_len.get_total(),
+                self.basic_flow.get_flow_duration_usec()
+            ),
+            safe_per_second_rate(
+                self.packet_len_stats.fwd_packet_len.get_count() as f64,
+                self.basic_flow.get_flow_duration_usec()
+            ),
+            safe_per_second_rate(
+                self.packet_len_stats.bwd_packet_len.get_total(),
+                self.basic_flow.get_flow_duration_usec()
+            ),
+            safe_per_second_rate(
+                self.packet_len_stats.bwd_packet_len.get_count() as f64,
+                self.basic_flow.get_flow_duration_usec()
+            ),
             // UP/DOWN Ratio
-            self.packet_len_stats.bwd_packet_len.get_count() as f64
-                / self.packet_len_stats.fwd_packet_len.get_count() as f64,
+            safe_div_int(
+                self.packet_len_stats.bwd_packet_len.get_count(),
+                self.packet_len_stats.fwd_packet_len.get_count()
+            ),
         )
     }
 
@@ -163,31 +202,31 @@ impl Flow for RustiFlow {
             "timestamp_first",
             "timestamp_last",
             "flow_duration_us",
-            "normal_tcp_termination",
+            "flow_expire_cause",
             // Timing Stats
-            TimingStats::header(),
+            TimingStats::headers(),
             // IAT Stats
-            IATStats::header(),
+            IATStats::headers(),
             // Packet Length Stats
-            PacketLengthStats::header(),
+            PacketLengthStats::headers(),
             // Packet Header Length Stats
-            HeaderLengthStats::header(),
+            HeaderLengthStats::headers(),
             // Payload Length Stats
-            PayloadLengthStats::header(),
+            PayloadLengthStats::headers(),
             // Bulk Stats
-            BulkStats::header(),
+            BulkStats::headers(),
             // Subflow Stats
-            SubflowStats::header(),
+            SubflowStats::headers(),
             // Active Idle Stats
-            ActiveIdleStats::header(),
+            ActiveIdleStats::headers(),
             // ICMP Stats
-            IcmpStats::header(),
+            IcmpStats::headers(),
             // Retransmission Stats
-            RetransmissionStats::header(),
+            RetransmissionStats::headers(),
             // Window Size Stats
-            WindowSizeStats::header(),
+            WindowSizeStats::headers(),
             // TCP Flag Stats
-            TcpFlagStats::header(),
+            TcpFlagStats::headers(),
             // Rate Stats (per second)
             "flow_bytes_s",
             "flow_packets_s",
@@ -210,7 +249,7 @@ impl Flow for RustiFlow {
             iana_port_mapping(self.basic_flow.port_destination),
             self.basic_flow.protocol,
             self.basic_flow.get_flow_duration_usec(),
-            self.basic_flow.tcp_normal_termination,
+            self.basic_flow.flow_expire_cause.as_str(),
             // Timing Stats
             self.timing_stats.dump(),
             // IAT Stats
@@ -236,21 +275,35 @@ impl Flow for RustiFlow {
             // TCP Flag Stats
             self.tcp_flags_stats.dump(),
             // Rate Stats (per second)
-            self.packet_len_stats.flow_total()
-                / (self.basic_flow.get_flow_duration_usec() / 1_000_000.0),
-            self.packet_len_stats.flow_count() as f64
-                / (self.basic_flow.get_flow_duration_usec() / 1_000_000.0),
-            self.packet_len_stats.fwd_packet_len.get_total() as f64
-                / (self.basic_flow.get_flow_duration_usec() / 1_000_000.0),
-            self.packet_len_stats.fwd_packet_len.get_count() as f64
-                / (self.basic_flow.get_flow_duration_usec() / 1_000_000.0),
-            self.packet_len_stats.bwd_packet_len.get_total() as f64
-                / (self.basic_flow.get_flow_duration_usec() / 1_000_000.0),
-            self.packet_len_stats.bwd_packet_len.get_count() as f64
-                / (self.basic_flow.get_flow_duration_usec() / 1_000_000.0),
+            safe_per_second_rate(
+                self.packet_len_stats.flow_total(),
+                self.basic_flow.get_flow_duration_usec()
+            ),
+            safe_per_second_rate(
+                self.packet_len_stats.flow_count() as f64,
+                self.basic_flow.get_flow_duration_usec()
+            ),
+            safe_per_second_rate(
+                self.packet_len_stats.fwd_packet_len.get_total(),
+                self.basic_flow.get_flow_duration_usec()
+            ),
+            safe_per_second_rate(
+                self.packet_len_stats.fwd_packet_len.get_count() as f64,
+                self.basic_flow.get_flow_duration_usec()
+            ),
+            safe_per_second_rate(
+                self.packet_len_stats.bwd_packet_len.get_total(),
+                self.basic_flow.get_flow_duration_usec()
+            ),
+            safe_per_second_rate(
+                self.packet_len_stats.bwd_packet_len.get_count() as f64,
+                self.basic_flow.get_flow_duration_usec()
+            ),
             // UP/DOWN Ratio
-            self.packet_len_stats.bwd_packet_len.get_count() as f64
-                / self.packet_len_stats.fwd_packet_len.get_count() as f64,
+            safe_div_int(
+                self.packet_len_stats.bwd_packet_len.get_count(),
+                self.packet_len_stats.fwd_packet_len.get_count()
+            ),
         )
     }
 
@@ -264,31 +317,31 @@ impl Flow for RustiFlow {
             "destination_port_iana",
             "protocol",
             "flow_duration_us",
-            "normal_tcp_termination",
+            "flow_expire_cause",
             // Timing Stats
-            TimingStats::header(),
+            TimingStats::headers(),
             // IAT Stats
-            IATStats::header(),
+            IATStats::headers(),
             // Packet Length Stats
-            PacketLengthStats::header(),
+            PacketLengthStats::headers(),
             // Packet Header Length Stats
-            HeaderLengthStats::header(),
+            HeaderLengthStats::headers(),
             // Payload Length Stats
-            PayloadLengthStats::header(),
+            PayloadLengthStats::headers(),
             // Bulk Stats
-            BulkStats::header(),
+            BulkStats::headers(),
             // Subflow Stats
-            SubflowStats::header(),
+            SubflowStats::headers(),
             // Active Idle Stats
-            ActiveIdleStats::header(),
+            ActiveIdleStats::headers(),
             // ICMP Stats
-            IcmpStats::header(),
+            IcmpStats::headers(),
             // Retransmission Stats
-            RetransmissionStats::header(),
+            RetransmissionStats::headers(),
             // Window Size Stats
-            WindowSizeStats::header(),
+            WindowSizeStats::headers(),
             // TCP Flag Stats
-            TcpFlagStats::header(),
+            TcpFlagStats::headers(),
             // Rate Stats (per second)
             "flow_bytes_s",
             "flow_packets_s",
@@ -305,7 +358,12 @@ impl Flow for RustiFlow {
         self.basic_flow.get_first_timestamp()
     }
 
-    fn is_expired(&self, timestamp: DateTime<Utc>, active_timeout: u64, idle_timeout: u64) -> bool {
+    fn is_expired(
+        &self,
+        timestamp: DateTime<Utc>,
+        active_timeout: u64,
+        idle_timeout: u64,
+    ) -> (bool, FlowExpireCause) {
         self.basic_flow
             .is_expired(timestamp, active_timeout, idle_timeout)
     }
