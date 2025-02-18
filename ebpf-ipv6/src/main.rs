@@ -170,6 +170,7 @@ impl PacketInfo {
             header.sequence_number(),
             header.sequence_number_ack(),
             header.icmp_type(),
+            header.icmp_code(),
         )
     }
 }
