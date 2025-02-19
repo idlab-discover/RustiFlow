@@ -130,7 +130,7 @@ async fn run_with_config(config: Config) {
                     let result = handle_realtime::<$flow_ty>(
                         &interface,
                         sender,
-                        config.config.threads.unwrap_or(num_cpus::get() as u8),
+                        std::cmp::min(config.config.threads.unwrap_or(5), num_cpus::get() as u8),
                         config.config.active_timeout,
                         config.config.idle_timeout,
                         config.config.early_export,
@@ -211,7 +211,7 @@ async fn run_with_config(config: Config) {
                     if let Err(err) = read_pcap_file::<$flow_ty>(
                         &path,
                         sender,
-                        config.config.threads.unwrap_or(num_cpus::get() as u8),
+                        std::cmp::min(config.config.threads.unwrap_or(5), num_cpus::get() as u8),
                         config.config.active_timeout,
                         config.config.idle_timeout,
                         config.config.early_export,
