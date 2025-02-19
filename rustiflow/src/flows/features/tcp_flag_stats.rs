@@ -1,5 +1,3 @@
-use chrono::{DateTime, Utc};
-
 use crate::{flows::util::FlowExpireCause, packet_features::PacketFeatures};
 
 use super::util::FlowFeature;
@@ -85,12 +83,7 @@ impl TcpFlagStats {
 }
 
 impl FlowFeature for TcpFlagStats {
-    fn update(
-        &mut self,
-        packet: &PacketFeatures,
-        is_forward: bool,
-        _last_timestamp: &DateTime<Utc>,
-    ) {
+    fn update(&mut self, packet: &PacketFeatures, is_forward: bool, _last_timestamp_us: i64) {
         if is_forward {
             self.fwd_fin_flag_count += u32::from(packet.fin_flag);
             self.fwd_syn_flag_count += u32::from(packet.syn_flag);
@@ -112,7 +105,7 @@ impl FlowFeature for TcpFlagStats {
         }
     }
 
-    fn close(&mut self, _last_timestamp: &DateTime<Utc>, _cause: FlowExpireCause) {
+    fn close(&mut self, _last_timestamp_us: i64, _cause: FlowExpireCause) {
         // No active state to close
     }
 

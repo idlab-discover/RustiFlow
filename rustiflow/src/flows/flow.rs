@@ -1,4 +1,3 @@
-use chrono::{DateTime, Utc};
 use std::net::IpAddr;
 
 use crate::packet_features::PacketFeatures;
@@ -36,7 +35,7 @@ pub trait Flow: Send + Sync + 'static + Clone {
         ipv4_destination: IpAddr,
         port_destination: u16,
         protocol: u8,
-        timestamp: DateTime<Utc>,
+        timestamp_us: i64,
     ) -> Self;
 
     /// Returns the flow key.
@@ -66,7 +65,7 @@ pub trait Flow: Send + Sync + 'static + Clone {
     ///
     /// * `timestamp` - The timestamp when the flow is being closed
     /// * `cause` - The reason for closing the flow
-    fn close_flow(&mut self, timestamp: &DateTime<Utc>, cause: FlowExpireCause);
+    fn close_flow(&mut self, timestamp_us: i64, cause: FlowExpireCause);
 
     /// Dumps the current state of the flow.
     ///
@@ -93,7 +92,7 @@ pub trait Flow: Send + Sync + 'static + Clone {
     /// ### Returns
     ///
     /// Returns a `DateTime<Utc>` representing the first timestamp of the flow.
-    fn get_first_timestamp(&self) -> DateTime<Utc>;
+    fn get_first_timestamp_us(&self) -> i64;
 
     /// Returns a first record with the features of the flow.
     ///
@@ -128,7 +127,7 @@ pub trait Flow: Send + Sync + 'static + Clone {
     /// Returns a `boolean` indicating if the flow is expired.
     fn is_expired(
         &self,
-        timestamp: DateTime<Utc>,
+        timestamp_us: i64,
         active_timeout: u64,
         idle_timeout: u64,
     ) -> (bool, FlowExpireCause);

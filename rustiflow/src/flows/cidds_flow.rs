@@ -1,4 +1,3 @@
-use chrono::{DateTime, Utc};
 use std::net::IpAddr;
 
 use crate::flows::util::iana_port_mapping;
@@ -27,7 +26,7 @@ impl Flow for CiddsFlow {
         ipv4_destination: IpAddr,
         port_destination: u16,
         protocol: u8,
-        ts_date: DateTime<Utc>,
+        timestamp_us: i64,
     ) -> Self {
         CiddsFlow {
             basic_flow: BasicFlow::new(
@@ -37,7 +36,7 @@ impl Flow for CiddsFlow {
                 ipv4_destination,
                 port_destination,
                 protocol,
-                ts_date,
+                timestamp_us,
             ),
             tcp_flag_stats: TcpFlagStats::new(),
             packet_stats: PacketLengthStats::new(),
@@ -45,20 +44,21 @@ impl Flow for CiddsFlow {
     }
 
     fn update_flow(&mut self, packet: &PacketFeatures, is_fwd: bool) -> bool {
-        let last_timestamp = self.basic_flow.last_timestamp;
+        let last_timestamp_us = self.basic_flow.last_timestamp_us;
         let is_terminated: bool = self.basic_flow.update_flow(packet, is_fwd);
 
-        self.tcp_flag_stats.update(packet, is_fwd, &last_timestamp);
-        self.packet_stats.update(packet, is_fwd, &last_timestamp);
+        self.tcp_flag_stats
+            .update(packet, is_fwd, last_timestamp_us);
+        self.packet_stats.update(packet, is_fwd, last_timestamp_us);
 
         is_terminated
     }
 
-    fn close_flow(&mut self, timestamp: &DateTime<Utc>, cause: FlowExpireCause) {
-        self.basic_flow.close_flow(timestamp, cause);
+    fn close_flow(&mut self, timestamp_us: i64, cause: FlowExpireCause) {
+        self.basic_flow.close_flow(timestamp_us, cause);
 
-        self.tcp_flag_stats.close(timestamp, cause);
-        self.packet_stats.close(timestamp, cause);
+        self.tcp_flag_stats.close(timestamp_us, cause);
+        self.packet_stats.close(timestamp_us, cause);
     }
 
     fn dump(&self) -> String {
@@ -77,7 +77,7 @@ impl Flow for CiddsFlow {
             } else {
                 "OTHER"
             },
-            self.basic_flow.first_timestamp,
+            self.basic_flow.get_first_timestamp(),
             self.basic_flow.get_flow_duration_msec(),
             self.packet_stats.flow_total(),
             self.packet_stats.flow_count(),
@@ -129,18 +129,18 @@ impl Flow for CiddsFlow {
         )
     }
 
-    fn get_first_timestamp(&self) -> DateTime<Utc> {
-        self.basic_flow.get_first_timestamp()
+    fn get_first_timestamp_us(&self) -> i64 {
+        self.basic_flow.first_timestamp_us
     }
 
     fn is_expired(
         &self,
-        timestamp: DateTime<Utc>,
+        timestamp_us: i64,
         active_timeout: u64,
         idle_timeout: u64,
     ) -> (bool, FlowExpireCause) {
         self.basic_flow
-            .is_expired(timestamp, active_timeout, idle_timeout)
+            .is_expired(timestamp_us, active_timeout, idle_timeout)
     }
 
     fn flow_key(&self) -> &String {

@@ -1,5 +1,3 @@
-use chrono::{DateTime, Utc};
-
 use crate::{flows::util::FlowExpireCause, packet_features::PacketFeatures};
 
 use super::util::{FeatureStats, FlowFeature};
@@ -26,12 +24,7 @@ impl WindowSizeStats {
 }
 
 impl FlowFeature for WindowSizeStats {
-    fn update(
-        &mut self,
-        packet: &PacketFeatures,
-        is_forward: bool,
-        _last_timestamp: &DateTime<Utc>,
-    ) {
+    fn update(&mut self, packet: &PacketFeatures, is_forward: bool, _last_timestamp_us: i64) {
         self.window_size.add_value(packet.window_size as f64);
         if is_forward {
             if self.fwd_window_size.get_count() == 0 {
@@ -46,7 +39,7 @@ impl FlowFeature for WindowSizeStats {
         }
     }
 
-    fn close(&mut self, _last_timestamp: &DateTime<Utc>, _cause: FlowExpireCause) {
+    fn close(&mut self, _last_timestamp_us: i64, _cause: FlowExpireCause) {
         // No active state to close
     }
 

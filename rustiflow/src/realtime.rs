@@ -102,7 +102,7 @@ where
         tokio::spawn(async move {
             let mut last_timestamp = None;
             while let Some(packet_features) = rx.recv().await {
-                last_timestamp = Some(packet_features.timestamp);
+                last_timestamp = Some(packet_features.timestamp_us);
                 flow_table.process_packet(&packet_features).await;
             }
             debug!("Shard finished processing packets");

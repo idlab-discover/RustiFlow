@@ -1,5 +1,3 @@
-use chrono::{DateTime, Utc};
-
 use crate::{flows::util::FlowExpireCause, packet_features::PacketFeatures};
 
 use super::util::{FeatureStats, FlowFeature};
@@ -22,12 +20,7 @@ impl HeaderLengthStats {
 }
 
 impl FlowFeature for HeaderLengthStats {
-    fn update(
-        &mut self,
-        packet: &PacketFeatures,
-        is_forward: bool,
-        _last_timestamp: &DateTime<Utc>,
-    ) {
+    fn update(&mut self, packet: &PacketFeatures, is_forward: bool, _last_timestamp_us: i64) {
         self.header_len.add_value(packet.header_length as f64);
         if is_forward {
             self.fwd_header_len.add_value(packet.header_length as f64);
@@ -36,7 +29,7 @@ impl FlowFeature for HeaderLengthStats {
         }
     }
 
-    fn close(&mut self, _last_timestamp: &DateTime<Utc>, _cause: FlowExpireCause) {
+    fn close(&mut self, _last_timestamp_us: i64, _cause: FlowExpireCause) {
         // No active state to close
     }
 

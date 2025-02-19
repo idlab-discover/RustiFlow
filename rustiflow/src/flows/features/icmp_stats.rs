@@ -1,5 +1,3 @@
-use chrono::{DateTime, Utc};
-
 use crate::{flows::util::FlowExpireCause, packet_features::PacketFeatures};
 
 use super::util::FlowFeature;
@@ -30,12 +28,7 @@ impl IcmpStats {
 }
 
 impl FlowFeature for IcmpStats {
-    fn update(
-        &mut self,
-        packet: &PacketFeatures,
-        _is_forward: bool,
-        _last_timestamp: &DateTime<Utc>,
-    ) {
+    fn update(&mut self, packet: &PacketFeatures, _is_forward: bool, _last_timestamp_us: i64) {
         // Set ICMP type and code for the first packet
         if self.first_packet {
             self.icmp_type = packet.icmp_type;
@@ -44,7 +37,7 @@ impl FlowFeature for IcmpStats {
         }
     }
 
-    fn close(&mut self, _last_timestamp: &DateTime<Utc>, _cause: FlowExpireCause) {
+    fn close(&mut self, _last_timestamp_us: i64, _cause: FlowExpireCause) {
         // No active state to close
     }
 

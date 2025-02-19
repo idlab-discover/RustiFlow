@@ -1,7 +1,5 @@
 use std::collections::HashSet;
 
-use chrono::{DateTime, Utc};
-
 use crate::{flows::util::FlowExpireCause, packet_features::PacketFeatures};
 
 use super::util::FlowFeature;
@@ -29,12 +27,7 @@ impl RetransmissionStats {
 }
 
 impl FlowFeature for RetransmissionStats {
-    fn update(
-        &mut self,
-        packet: &PacketFeatures,
-        is_forward: bool,
-        _last_timestamp: &DateTime<Utc>,
-    ) {
+    fn update(&mut self, packet: &PacketFeatures, is_forward: bool, _last_timestamp_us: i64) {
         let seq = packet.sequence_number;
 
         if is_forward {
@@ -48,7 +41,7 @@ impl FlowFeature for RetransmissionStats {
         }
     }
 
-    fn close(&mut self, _last_timestamp: &DateTime<Utc>, _cause: FlowExpireCause) {
+    fn close(&mut self, _last_timestamp_us: i64, _cause: FlowExpireCause) {
         // No active state to close
     }
 

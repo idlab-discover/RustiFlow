@@ -1,4 +1,3 @@
-use chrono::{DateTime, Utc};
 use std::net::IpAddr;
 
 use crate::{
@@ -48,7 +47,7 @@ impl Flow for CicFlow {
         ipv4_destination: IpAddr,
         port_destination: u16,
         protocol: u8,
-        timestamp: DateTime<Utc>,
+        timestamp_us: i64,
     ) -> Self {
         CicFlow {
             basic_flow: BasicFlow::new(
@@ -58,7 +57,7 @@ impl Flow for CicFlow {
                 ipv4_destination,
                 port_destination,
                 protocol,
-                timestamp,
+                timestamp_us,
             ),
             packet_len_stats: PacketLengthStats::new(),
             iat_stats: IATStats::new(),
@@ -67,7 +66,7 @@ impl Flow for CicFlow {
             payload_len_stats: PayloadLengthStats::new(),
             bulk_stats: BulkStats::new(),
             subflow_stats: SubflowStats::new(),
-            active_idle_stats: ActiveIdleStats::new(&timestamp),
+            active_idle_stats: ActiveIdleStats::new(timestamp_us),
             icmp_stats: IcmpStats::new(),
             retransmission_stats: RetransmissionStats::new(),
             window_size_stats: WindowSizeStats::new(),
@@ -75,39 +74,42 @@ impl Flow for CicFlow {
     }
 
     fn update_flow(&mut self, packet: &PacketFeatures, fwd: bool) -> bool {
-        let last_timestamp = self.basic_flow.last_timestamp;
+        let last_timestamp_us = self.basic_flow.last_timestamp_us;
         let is_terminated = self.basic_flow.update_flow(packet, fwd);
 
-        self.packet_len_stats.update(packet, fwd, &last_timestamp);
-        self.iat_stats.update(packet, fwd, &last_timestamp);
-        self.tcp_flags_stats.update(packet, fwd, &last_timestamp);
-        self.header_len_stats.update(packet, fwd, &last_timestamp);
-        self.payload_len_stats.update(packet, fwd, &last_timestamp);
-        self.bulk_stats.update(packet, fwd, &last_timestamp);
-        self.subflow_stats.update(packet, fwd, &last_timestamp);
-        self.active_idle_stats.update(packet, fwd, &last_timestamp);
-        self.icmp_stats.update(packet, fwd, &last_timestamp);
+        self.packet_len_stats.update(packet, fwd, last_timestamp_us);
+        self.iat_stats.update(packet, fwd, last_timestamp_us);
+        self.tcp_flags_stats.update(packet, fwd, last_timestamp_us);
+        self.header_len_stats.update(packet, fwd, last_timestamp_us);
+        self.payload_len_stats
+            .update(packet, fwd, last_timestamp_us);
+        self.bulk_stats.update(packet, fwd, last_timestamp_us);
+        self.subflow_stats.update(packet, fwd, last_timestamp_us);
+        self.active_idle_stats
+            .update(packet, fwd, last_timestamp_us);
+        self.icmp_stats.update(packet, fwd, last_timestamp_us);
         self.retransmission_stats
-            .update(packet, fwd, &last_timestamp);
-        self.window_size_stats.update(packet, fwd, &last_timestamp);
+            .update(packet, fwd, last_timestamp_us);
+        self.window_size_stats
+            .update(packet, fwd, last_timestamp_us);
 
         is_terminated
     }
 
-    fn close_flow(&mut self, timestamp: &DateTime<Utc>, cause: FlowExpireCause) {
-        self.basic_flow.close_flow(timestamp, cause);
+    fn close_flow(&mut self, timestamp_us: i64, cause: FlowExpireCause) {
+        self.basic_flow.close_flow(timestamp_us, cause);
 
-        self.packet_len_stats.close(timestamp, cause);
-        self.iat_stats.close(timestamp, cause);
-        self.tcp_flags_stats.close(timestamp, cause);
-        self.header_len_stats.close(timestamp, cause);
-        self.payload_len_stats.close(timestamp, cause);
-        self.bulk_stats.close(timestamp, cause);
-        self.subflow_stats.close(timestamp, cause);
-        self.active_idle_stats.close(timestamp, cause);
-        self.icmp_stats.close(timestamp, cause);
-        self.retransmission_stats.close(timestamp, cause);
-        self.window_size_stats.close(timestamp, cause);
+        self.packet_len_stats.close(timestamp_us, cause);
+        self.iat_stats.close(timestamp_us, cause);
+        self.tcp_flags_stats.close(timestamp_us, cause);
+        self.header_len_stats.close(timestamp_us, cause);
+        self.payload_len_stats.close(timestamp_us, cause);
+        self.bulk_stats.close(timestamp_us, cause);
+        self.subflow_stats.close(timestamp_us, cause);
+        self.active_idle_stats.close(timestamp_us, cause);
+        self.icmp_stats.close(timestamp_us, cause);
+        self.retransmission_stats.close(timestamp_us, cause);
+        self.window_size_stats.close(timestamp_us, cause);
     }
 
     fn dump(&self) -> String {
@@ -129,7 +131,7 @@ impl Flow for CicFlow {
             self.basic_flow.ip_destination,
             self.basic_flow.port_destination,
             self.basic_flow.protocol,
-            self.basic_flow.first_timestamp,
+            self.basic_flow.get_first_timestamp(),
             self.basic_flow.get_flow_duration_usec(),
             // Packet Length Stats (fwd & bwd)
             self.packet_len_stats.fwd_packet_len.get_count(),
@@ -147,11 +149,11 @@ impl Flow for CicFlow {
             // Rate Stats (Flow)
             safe_per_second_rate(
                 self.packet_len_stats.flow_total(),
-                self.basic_flow.get_flow_duration_usec()
+                self.basic_flow.get_flow_duration_usec() as f64
             ),
             safe_per_second_rate(
                 self.packet_len_stats.flow_count() as f64,
-                self.basic_flow.get_flow_duration_usec()
+                self.basic_flow.get_flow_duration_usec() as f64
             ),
             // IAT Stats
             self.iat_stats.iat.get_mean(),
@@ -181,11 +183,11 @@ impl Flow for CicFlow {
             // Rate Stats (fwd & bwd packets)
             safe_per_second_rate(
                 self.packet_len_stats.fwd_packet_len.get_count() as f64,
-                self.basic_flow.get_flow_duration_usec()
+                self.basic_flow.get_flow_duration_usec() as f64
             ),
             safe_per_second_rate(
                 self.packet_len_stats.bwd_packet_len.get_count() as f64,
-                self.basic_flow.get_flow_duration_usec()
+                self.basic_flow.get_flow_duration_usec() as f64
             ),
             // Packet Length Stats (Flow)
             self.packet_len_stats.flow_min(),
@@ -405,10 +407,14 @@ impl Flow for CicFlow {
             self.packet_len_stats.bwd_packet_len.get_mean(),
             self.packet_len_stats.bwd_packet_len.get_std(),
             // Rate Stats (Flow)
-            self.packet_len_stats.flow_total()
-                / (self.basic_flow.get_flow_duration_usec() / 1_000_000.0),
-            self.packet_len_stats.flow_count() as f64
-                / (self.basic_flow.get_flow_duration_usec() / 1_000_000.0),
+            safe_per_second_rate(
+                self.packet_len_stats.flow_total(),
+                self.basic_flow.get_flow_duration_usec() as f64
+            ),
+            safe_per_second_rate(
+                self.packet_len_stats.flow_count() as f64,
+                self.basic_flow.get_flow_duration_usec() as f64
+            ),
             // IAT Stats
             self.iat_stats.iat.get_mean(),
             self.iat_stats.iat.get_std(),
@@ -435,10 +441,14 @@ impl Flow for CicFlow {
             self.header_len_stats.fwd_header_len.get_total(),
             self.header_len_stats.bwd_header_len.get_total(),
             // Rate Stats (fwd & bwd packets)
-            self.packet_len_stats.fwd_packet_len.get_count() as f64
-                / (self.basic_flow.get_flow_duration_usec() / 1_000_000.0),
-            self.packet_len_stats.bwd_packet_len.get_count() as f64
-                / (self.basic_flow.get_flow_duration_usec() / 1_000_000.0),
+            safe_per_second_rate(
+                self.packet_len_stats.fwd_packet_len.get_count() as f64,
+                self.basic_flow.get_flow_duration_usec() as f64
+            ),
+            safe_per_second_rate(
+                self.packet_len_stats.bwd_packet_len.get_count() as f64,
+                self.basic_flow.get_flow_duration_usec() as f64
+            ),
             // Packet Length Stats (Flow)
             self.packet_len_stats.flow_min(),
             self.packet_len_stats.flow_max(),
@@ -612,18 +622,18 @@ impl Flow for CicFlow {
         )
     }
 
-    fn get_first_timestamp(&self) -> DateTime<Utc> {
-        self.basic_flow.get_first_timestamp()
+    fn get_first_timestamp_us(&self) -> i64 {
+        self.basic_flow.first_timestamp_us
     }
 
     fn is_expired(
         &self,
-        timestamp: DateTime<Utc>,
+        timestamp_us: i64,
         active_timeout: u64,
         idle_timeout: u64,
     ) -> (bool, FlowExpireCause) {
         self.basic_flow
-            .is_expired(timestamp, active_timeout, idle_timeout)
+            .is_expired(timestamp_us, active_timeout, idle_timeout)
     }
 
     fn flow_key(&self) -> &String {

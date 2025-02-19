@@ -1,14 +1,12 @@
-use chrono::{DateTime, Utc};
-
 use crate::{flows::util::FlowExpireCause, packet_features::PacketFeatures};
 
 /// Trait for network flow features that can be updated, closed, and dumped to CSV format
 pub trait FlowFeature: Send + Sync + Clone {
     /// Updates the feature with a new packet
-    fn update(&mut self, packet: &PacketFeatures, is_forward: bool, last_timestamp: &DateTime<Utc>);
+    fn update(&mut self, packet: &PacketFeatures, is_forward: bool, last_timestamp: i64);
 
     /// Finalizes any active state when the flow is terminated
-    fn close(&mut self, last_timestamp: &DateTime<Utc>, cause: FlowExpireCause);
+    fn close(&mut self, last_timestamp: i64, cause: FlowExpireCause);
 
     /// Dumps the current state as a CSV string
     fn dump(&self) -> String;

@@ -1,5 +1,3 @@
-use chrono::{DateTime, Utc};
-
 use crate::{flows::util::FlowExpireCause, packet_features::PacketFeatures};
 
 use super::util::{FeatureStats, FlowFeature};
@@ -8,17 +6,17 @@ const ACTIVE_IDLE_TIMEOUT: i64 = 5_000; // 5s
 
 #[derive(Clone)]
 pub struct ActiveIdleStats {
-    active_start: DateTime<Utc>,
-    active_end: DateTime<Utc>,
+    active_start: i64, // Microseconds since epoch
+    active_end: i64,
     pub active_stats: FeatureStats,
     pub idle_stats: FeatureStats,
 }
 
 impl ActiveIdleStats {
-    pub fn new(timestamp: &DateTime<Utc>) -> Self {
+    pub fn new(timestamp_us: i64) -> Self {
         ActiveIdleStats {
-            active_start: *timestamp,
-            active_end: *timestamp,
+            active_start: timestamp_us,
+            active_end: timestamp_us,
             active_stats: FeatureStats::new(),
             idle_stats: FeatureStats::new(),
         }
@@ -26,46 +24,32 @@ impl ActiveIdleStats {
 }
 
 impl FlowFeature for ActiveIdleStats {
-    fn update(
-        &mut self,
-        packet: &PacketFeatures,
-        _is_forward: bool,
-        _last_timestamp: &DateTime<Utc>,
-    ) {
-        // If the packet is older than the active timeout, we consider it as a new active period
-        let duration_ms = packet
-            .timestamp
-            .signed_duration_since(self.active_end)
-            .num_milliseconds();
+    fn update(&mut self, packet: &PacketFeatures, _is_forward: bool, _last_timestamp_us: i64) {
+        let current_ts = packet.timestamp_us;
+        let duration_ms = (current_ts - self.active_end) / 1_000; // Convert to milliseconds
+
         if duration_ms > ACTIVE_IDLE_TIMEOUT {
-            // If the active period is not empty, we add it to the active stats
-            let active_duration = self.active_end.signed_duration_since(self.active_start);
-            if active_duration.num_milliseconds() > 0 {
-                self.active_stats
-                    .add_value(active_duration.num_milliseconds() as f64);
+            let active_duration = (self.active_end - self.active_start) / 1_000;
+            if active_duration > 0 {
+                self.active_stats.add_value(active_duration as f64);
             }
-            // We add the idle period to the idle stats
             self.idle_stats.add_value(duration_ms as f64);
-            self.active_start = packet.timestamp;
+            self.active_start = current_ts;
         }
-        self.active_end = packet.timestamp;
+        self.active_end = current_ts;
     }
 
-    fn close(&mut self, last_timestamp: &DateTime<Utc>, cause: FlowExpireCause) {
+    fn close(&mut self, last_timestamp_us: i64, cause: FlowExpireCause) {
         // If the active period is not empty, we add it to the active stats
-        let duration = self.active_end.signed_duration_since(self.active_start);
-        if duration.num_milliseconds() > 0 {
-            self.active_stats
-                .add_value(duration.num_milliseconds() as f64);
+        let duration = self.active_end - self.active_start;
+        if duration > 0 {
+            self.active_stats.add_value(duration as f64 / 1_000.0);
         }
 
         // If flow expired because of inactivity, we add the idle period to the idle stats
         if cause == FlowExpireCause::IdleTimeout {
-            self.idle_stats.add_value(
-                last_timestamp
-                    .signed_duration_since(self.active_end)
-                    .num_milliseconds() as f64,
-            );
+            self.idle_stats
+                .add_value((last_timestamp_us - self.active_end) as f64 / 1_000.0);
         }
     }
 

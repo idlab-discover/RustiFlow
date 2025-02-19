@@ -1,10 +1,8 @@
-use chrono::{DateTime, Utc};
-
 use crate::{flows::util::FlowExpireCause, packet_features::PacketFeatures};
 
 use super::util::FlowFeature;
 
-const SUBFLOW_TIMEOUT: i64 = 1_000;
+const SUBFLOW_TIMEOUT: i64 = 1_000_000; // 1s
 
 #[derive(Clone)]
 pub struct SubflowStats {
@@ -18,23 +16,14 @@ impl SubflowStats {
 }
 
 impl FlowFeature for SubflowStats {
-    fn update(
-        &mut self,
-        packet: &PacketFeatures,
-        _is_forward: bool,
-        last_timestamp: &DateTime<Utc>,
-    ) {
-        if packet
-            .timestamp
-            .signed_duration_since(last_timestamp)
-            .num_milliseconds()
-            > SUBFLOW_TIMEOUT
-        {
+    fn update(&mut self, packet: &PacketFeatures, _is_forward: bool, last_timestamp_us: i64) {
+        let current_ts = packet.timestamp_us;
+        if (current_ts - last_timestamp_us) > SUBFLOW_TIMEOUT {
             self.subflow_count += 1;
         }
     }
 
-    fn close(&mut self, _last_timestamp: &DateTime<Utc>, _cause: FlowExpireCause) {
+    fn close(&mut self, _last_timestamp: i64, _cause: FlowExpireCause) {
         // No active state to close
     }
 

@@ -2,7 +2,7 @@ use std::hash::{DefaultHasher, Hash, Hasher};
 
 use crate::Flow;
 use crate::{flow_table::FlowTable, packet_features::PacketFeatures};
-use chrono::{DateTime, Utc};
+use chrono::DateTime;
 use log::{debug, error};
 use pnet::packet::{
     ethernet::{EtherTypes, EthernetPacket},
@@ -54,11 +54,12 @@ where
     debug!("Reading the pcap file: {:?} ...", path);
     while let Ok(packet) = pcap_capture.next_packet() {
         // Convert TimeVal from packet capture to DateTime<Utc>
-        let timestamp = DateTime::from_timestamp(
+        let timestamp_us = DateTime::from_timestamp(
             packet.header.ts.tv_sec,
             (packet.header.ts.tv_usec * 1000) as u32,
         )
-        .unwrap();
+        .unwrap()
+        .timestamp_micros();
 
         if let Some(ethernet) = EthernetPacket::new(packet.data) {
             match ethernet.get_ethertype() {
@@ -66,7 +67,7 @@ where
                     if let Some(packet) = Ipv4Packet::new(ethernet.payload()) {
                         process_packet::<T, Ipv4Packet>(
                             &packet,
-                            timestamp,
+                            timestamp_us,
                             &shard_senders,
                             num_threads,
                             PacketFeatures::from_ipv4_packet,
@@ -78,7 +79,7 @@ where
                     if let Some(packet) = Ipv6Packet::new(ethernet.payload()) {
                         process_packet::<T, Ipv6Packet>(
                             &packet,
-                            timestamp,
+                            timestamp_us,
                             &shard_senders,
                             num_threads,
                             PacketFeatures::from_ipv6_packet,
@@ -94,7 +95,7 @@ where
                             if let Some(packet) = Ipv4Packet::new(&packet.data[16..]) {
                                 process_packet::<T, Ipv4Packet>(
                                     &packet,
-                                    timestamp,
+                                    timestamp_us,
                                     &shard_senders,
                                     num_threads,
                                     PacketFeatures::from_ipv4_packet,
@@ -106,7 +107,7 @@ where
                             if let Some(packet) = Ipv6Packet::new(&packet.data[16..]) {
                                 process_packet::<T, Ipv6Packet>(
                                     &packet,
-                                    timestamp,
+                                    timestamp_us,
                                     &shard_senders,
                                     num_threads,
                                     PacketFeatures::from_ipv6_packet,
@@ -129,15 +130,15 @@ where
 /// Processes and sends packet features to the appropriate shard.
 async fn process_packet<T, P>(
     packet: &P,
-    timestamp: DateTime<Utc>,
+    timestamp_us: i64,
     shard_senders: &Vec<mpsc::Sender<PacketFeatures>>,
     num_shards: u8,
-    extractor: fn(&P, DateTime<Utc>) -> Option<PacketFeatures>,
+    extractor: fn(&P, i64) -> Option<PacketFeatures>,
 ) where
     T: Flow,
     P: Packet,
 {
-    if let Some(packet_features) = extractor(packet, timestamp) {
+    if let Some(packet_features) = extractor(packet, timestamp_us) {
         let flow_key = packet_features.biflow_key();
         let shard_index = compute_shard_index(&flow_key, num_shards);
 
@@ -186,7 +187,7 @@ where
         tokio::spawn(async move {
             let mut last_timestamp = None;
             while let Some(packet_features) = rx.recv().await {
-                last_timestamp = Some(packet_features.timestamp);
+                last_timestamp = Some(packet_features.timestamp_us);
                 flow_table.process_packet(&packet_features).await;
             }
             // Handle flow exporting when the receiver is closed

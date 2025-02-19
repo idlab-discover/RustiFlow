@@ -1,6 +1,6 @@
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 
-use chrono::{DateTime, Utc};
+use chrono::Utc;
 use common::{EbpfEventIpv4, EbpfEventIpv6};
 use log::debug;
 use pnet::packet::{
@@ -31,7 +31,7 @@ impl Default for PacketFeatures {
             source_port: 0,
             destination_port: 0,
             protocol: 0,
-            timestamp: Utc::now(),
+            timestamp_us: Utc::now().timestamp_micros(),
             fin_flag: 0,
             syn_flag: 0,
             rst_flag: 0,
@@ -58,7 +58,7 @@ pub struct PacketFeatures {
     pub source_port: u16,
     pub destination_port: u16,
     pub protocol: u8,
-    pub timestamp: DateTime<Utc>,
+    pub timestamp_us: i64,
     pub fin_flag: u8,
     pub syn_flag: u8,
     pub rst_flag: u8,
@@ -86,7 +86,7 @@ impl PacketFeatures {
             source_port: event.port_source,
             destination_port: event.port_destination,
             protocol: event.protocol,
-            timestamp: chrono::Utc::now(),
+            timestamp_us: chrono::Utc::now().timestamp_micros(),
             fin_flag: get_tcp_flag(event.combined_flags, FIN_FLAG),
             syn_flag: get_tcp_flag(event.combined_flags, SYN_FLAG),
             rst_flag: get_tcp_flag(event.combined_flags, RST_FLAG),
@@ -122,7 +122,7 @@ impl PacketFeatures {
             source_port: event.port_source,
             destination_port: event.port_destination,
             protocol: event.protocol,
-            timestamp: chrono::Utc::now(),
+            timestamp_us: chrono::Utc::now().timestamp_micros(),
             fin_flag: get_tcp_flag(event.combined_flags, FIN_FLAG),
             syn_flag: get_tcp_flag(event.combined_flags, SYN_FLAG),
             rst_flag: get_tcp_flag(event.combined_flags, RST_FLAG),
@@ -151,24 +151,24 @@ impl PacketFeatures {
     }
 
     // Constructor to create PacketFeatures from an IPv4 packet
-    pub fn from_ipv4_packet(packet: &Ipv4Packet, timestamp: DateTime<Utc>) -> Option<Self> {
+    pub fn from_ipv4_packet(packet: &Ipv4Packet, timestamp_us: i64) -> Option<Self> {
         extract_packet_features_transport(
             packet.get_source().into(),
             packet.get_destination().into(),
             packet.get_next_level_protocol(),
-            timestamp,
+            timestamp_us,
             packet.get_total_length(),
             packet.payload(),
         )
     }
 
     // Constructor to create PacketFeatures from an IPv6 packet
-    pub fn from_ipv6_packet(packet: &Ipv6Packet, timestamp: DateTime<Utc>) -> Option<Self> {
+    pub fn from_ipv6_packet(packet: &Ipv6Packet, timestamp_us: i64) -> Option<Self> {
         extract_packet_features_transport(
             packet.get_source().into(),
             packet.get_destination().into(),
             packet.get_next_header(),
-            timestamp,
+            timestamp_us,
             packet.packet().len() as u16,
             packet.payload(),
         )
@@ -236,7 +236,7 @@ fn extract_packet_features_transport(
     source_ip: IpAddr,
     destination_ip: IpAddr,
     protocol: IpNextHeaderProtocol,
-    timestamp: DateTime<Utc>,
+    timestamp_us: i64,
     total_length: u16,
     packet: &[u8],
 ) -> Option<PacketFeatures> {
@@ -249,7 +249,7 @@ fn extract_packet_features_transport(
                 source_port: tcp_packet.get_source(),
                 destination_port: tcp_packet.get_destination(),
                 protocol: protocol.0,
-                timestamp,
+                timestamp_us,
                 fin_flag: get_tcp_flag(tcp_packet.get_flags(), FIN_FLAG),
                 syn_flag: get_tcp_flag(tcp_packet.get_flags(), SYN_FLAG),
                 rst_flag: get_tcp_flag(tcp_packet.get_flags(), RST_FLAG),
@@ -276,7 +276,7 @@ fn extract_packet_features_transport(
                 source_port: udp_packet.get_source(),
                 destination_port: udp_packet.get_destination(),
                 protocol: protocol.0,
-                timestamp,
+                timestamp_us,
                 fin_flag: 0,
                 syn_flag: 0,
                 rst_flag: 0,
@@ -303,7 +303,7 @@ fn extract_packet_features_transport(
                 source_port: 0,
                 destination_port: 0,
                 protocol: protocol.0,
-                timestamp,
+                timestamp_us,
                 fin_flag: 0,
                 syn_flag: 0,
                 rst_flag: 0,

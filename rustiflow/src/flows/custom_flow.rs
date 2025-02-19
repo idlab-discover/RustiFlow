@@ -1,4 +1,3 @@
-use chrono::{DateTime, Utc};
 use std::net::IpAddr;
 
 use crate::packet_features::PacketFeatures;
@@ -31,7 +30,7 @@ impl Flow for CustomFlow {
         ipv4_destination: IpAddr,
         port_destination: u16,
         protocol: u8,
-        ts_date: DateTime<Utc>,
+        timestamp_us: i64,
     ) -> Self {
         CustomFlow {
             basic_flow: BasicFlow::new(
@@ -41,7 +40,7 @@ impl Flow for CustomFlow {
                 ipv4_destination,
                 port_destination,
                 protocol,
-                ts_date,
+                timestamp_us,
             ),
             // Add here the initialization of the additional features, e.g. icmp stats.
             icmp_stats: IcmpStats::new(),
@@ -50,20 +49,20 @@ impl Flow for CustomFlow {
 
     fn update_flow(&mut self, packet: &PacketFeatures, fwd: bool) -> bool {
         // Update the basic flow and returns true if the flow is terminated.
-        let last_timestamp = self.basic_flow.last_timestamp;
+        let last_timestamp_us = self.basic_flow.last_timestamp_us;
         let is_terminated = self.basic_flow.update_flow(packet, fwd);
 
         // Add here the update of the additional features.
-        self.icmp_stats.update(packet, fwd, &last_timestamp);
+        self.icmp_stats.update(packet, fwd, last_timestamp_us);
 
         // Return the termination status of the flow.
         is_terminated
     }
 
-    fn close_flow(&mut self, timestamp: &DateTime<Utc>, cause: FlowExpireCause) {
-        self.basic_flow.close_flow(timestamp, cause);
+    fn close_flow(&mut self, timestamp_us: i64, cause: FlowExpireCause) {
+        self.basic_flow.close_flow(timestamp_us, cause);
 
-        self.icmp_stats.close(timestamp, cause);
+        self.icmp_stats.close(timestamp_us, cause);
     }
 
     fn dump(&self) -> String {
@@ -95,18 +94,18 @@ impl Flow for CustomFlow {
         format!("icmp_type,icmp_code")
     }
 
-    fn get_first_timestamp(&self) -> DateTime<Utc> {
-        self.basic_flow.get_first_timestamp()
+    fn get_first_timestamp_us(&self) -> i64 {
+        self.basic_flow.first_timestamp_us
     }
 
     fn is_expired(
         &self,
-        timestamp: DateTime<Utc>,
+        timestamp_us: i64,
         active_timeout: u64,
         idle_timeout: u64,
     ) -> (bool, FlowExpireCause) {
         self.basic_flow
-            .is_expired(timestamp, active_timeout, idle_timeout)
+            .is_expired(timestamp_us, active_timeout, idle_timeout)
     }
 
     fn flow_key(&self) -> &String {

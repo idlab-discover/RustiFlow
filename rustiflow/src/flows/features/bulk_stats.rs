@@ -1,5 +1,3 @@
-use chrono::{DateTime, Utc};
-
 use crate::{flows::util::FlowExpireCause, packet_features::PacketFeatures};
 
 use super::util::{FeatureStats, FlowFeature};
@@ -10,14 +8,14 @@ const BULK_IDLE_MS: i64 = 1000;
 #[derive(Clone)]
 pub struct BulkState {
     // Tracks "bulk in progress" state
-    pub start_time: DateTime<Utc>,
-    pub last_time: DateTime<Utc>,
+    pub start_time: i64,
+    pub last_time: i64,
     pub packet_count: u32,
     pub size: u32,
 }
 
 impl BulkState {
-    pub fn new(start_time: DateTime<Utc>, packet_len: u16) -> Self {
+    pub fn new(start_time: i64, packet_len: u16) -> Self {
         Self {
             start_time,
             last_time: start_time,
@@ -26,7 +24,7 @@ impl BulkState {
         }
     }
 
-    pub fn update(&mut self, packet_len: u16, timestamp: DateTime<Utc>) {
+    pub fn update(&mut self, packet_len: u16, timestamp: i64) {
         self.packet_count += 1;
         self.size += packet_len as u32;
         self.last_time = timestamp;
@@ -83,20 +81,16 @@ impl BulkStats {
     /// adding its stats to the appropriate FeatureStats.
     fn finalize_bulk(&mut self, bulk: BulkState, is_fwd: bool) {
         if bulk.packet_count >= MIN_BULK_PACKETS {
-            let duration_us = bulk
-                .last_time
-                .signed_duration_since(bulk.start_time)
-                .num_microseconds()
-                .unwrap_or(0) as f64;
+            let duration_ms = bulk.last_time - bulk.start_time;
 
             if is_fwd {
                 self.fwd_bulk_packets.add_value(bulk.packet_count as f64);
                 self.fwd_bulk_payload_size.add_value(bulk.size as f64);
-                self.fwd_bulk_duration.add_value(duration_us);
+                self.fwd_bulk_duration.add_value(duration_ms as f64);
             } else {
                 self.bwd_bulk_packets.add_value(bulk.packet_count as f64);
                 self.bwd_bulk_payload_size.add_value(bulk.size as f64);
-                self.bwd_bulk_duration.add_value(duration_us);
+                self.bwd_bulk_duration.add_value(duration_ms as f64);
             }
         }
     }
@@ -118,12 +112,8 @@ impl BulkStats {
 impl FlowFeature for BulkStats {
     /// Update the bulk logic for a given packet and direction.
     /// Logic adopted from CICFlowMeter's bulk feature, but adjusted for capturing stats on bulk finish.
-    fn update(
-        &mut self,
-        packet: &PacketFeatures,
-        is_forward: bool,
-        _last_timestamp: &DateTime<Utc>,
-    ) {
+    fn update(&mut self, packet: &PacketFeatures, is_forward: bool, _last_timestamp: i64) {
+        let current_ts = packet.timestamp_us / 1000;
         // 1. Skip zero-length packets
         let packet_len = packet.length;
         if packet_len <= 0 {
@@ -143,24 +133,21 @@ impl FlowFeature for BulkStats {
         match bulk_opt.as_mut() {
             // 2. If there's an existing bulk in progress:
             Some(current_bulk) => {
-                let gap_ms = packet
-                    .timestamp
-                    .signed_duration_since(current_bulk.last_time)
-                    .num_milliseconds();
+                let gap_ms = current_ts - current_bulk.last_time;
 
                 if gap_ms > BULK_IDLE_MS {
                     // The old bulk has ended -> remove it
                     old_bulk = bulk_opt.take();
                     // Start a fresh bulk with the current packet
-                    *bulk_opt = Some(BulkState::new(packet.timestamp, packet.length));
+                    *bulk_opt = Some(BulkState::new(current_ts, packet.length));
                 } else {
                     // Continue the same bulk
-                    current_bulk.update(packet.length, packet.timestamp);
+                    current_bulk.update(packet.length, current_ts);
                 }
             }
             // 3. If there's no bulk in progress, start one
             None => {
-                *bulk_opt = Some(BulkState::new(packet.timestamp, packet.length));
+                *bulk_opt = Some(BulkState::new(current_ts, packet.length));
                 // Finalize bulk in the other direction since we're starting a new bulk in this direction
                 self.finalize_current_bulk(!is_forward);
             }
@@ -173,7 +160,7 @@ impl FlowFeature for BulkStats {
         }
     }
 
-    fn close(&mut self, _last_timestamp: &DateTime<Utc>, _cause: FlowExpireCause) {
+    fn close(&mut self, _last_timestamp: i64, _cause: FlowExpireCause) {
         // Finalize any active bulks in both directions
         self.finalize_current_bulk(true);
         self.finalize_current_bulk(false);

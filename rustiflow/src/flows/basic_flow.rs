@@ -29,9 +29,9 @@ pub struct BasicFlow {
     /// The protocol of the flow.
     pub protocol: u8,
     /// The first timestamp of the flow.
-    pub first_timestamp: DateTime<Utc>,
+    pub first_timestamp_us: i64, // Microseconds since epoch
     /// The last timestamp of the flow.
-    pub last_timestamp: DateTime<Utc>,
+    pub last_timestamp_us: i64,
     /// The reason this flow expired
     pub flow_expire_cause: FlowExpireCause,
 
@@ -92,10 +92,8 @@ impl BasicFlow {
     /// ### Returns
     ///
     /// The duration of the flow in microseconds.
-    pub fn get_flow_duration_usec(&self) -> f64 {
-        (self.last_timestamp - self.first_timestamp)
-            .num_microseconds()
-            .unwrap() as f64
+    pub fn get_flow_duration_usec(&self) -> i64 {
+        self.last_timestamp_us - self.first_timestamp_us
     }
 
     /// Calculates the flow duration in milliseconds.
@@ -105,10 +103,16 @@ impl BasicFlow {
     /// ### Returns
     ///
     /// The duration of the flow in milliseconds.
-    pub fn get_flow_duration_msec(&self) -> f64 {
-        self.last_timestamp
-            .signed_duration_since(self.first_timestamp)
-            .num_milliseconds() as f64
+    pub fn get_flow_duration_msec(&self) -> i64 {
+        (self.last_timestamp_us - self.first_timestamp_us) / 1_000
+    }
+
+    pub fn get_last_timestamp(&self) -> DateTime<Utc> {
+        DateTime::from_timestamp_micros(self.last_timestamp_us).unwrap()
+    }
+
+    pub fn get_first_timestamp(&self) -> DateTime<Utc> {
+        DateTime::from_timestamp_micros(self.first_timestamp_us).unwrap()
     }
 }
 
@@ -120,7 +124,7 @@ impl Flow for BasicFlow {
         ip_destination: IpAddr,
         port_destination: u16,
         protocol: u8,
-        first_timestamp: DateTime<Utc>,
+        first_timestamp_us: i64,
     ) -> Self {
         BasicFlow {
             flow_key: flow_id,
@@ -129,8 +133,8 @@ impl Flow for BasicFlow {
             port_destination,
             port_source,
             protocol,
-            first_timestamp,
-            last_timestamp: first_timestamp,
+            first_timestamp_us,
+            last_timestamp_us: first_timestamp_us,
             flow_expire_cause: FlowExpireCause::None,
             state_fwd: FlowState::Established,
             state_bwd: FlowState::Established,
@@ -140,7 +144,7 @@ impl Flow for BasicFlow {
     }
 
     fn update_flow(&mut self, packet: &PacketFeatures, fwd: bool) -> bool {
-        self.last_timestamp = packet.timestamp;
+        self.last_timestamp_us = packet.timestamp_us;
 
         if self.is_tcp_finished(packet, fwd) {
             self.flow_expire_cause = FlowExpireCause::TcpTermination;
@@ -155,7 +159,7 @@ impl Flow for BasicFlow {
         false
     }
 
-    fn close_flow(&mut self, _timestamp: &DateTime<Utc>, _cause: FlowExpireCause) -> () {
+    fn close_flow(&mut self, _timestamp_us: i64, _cause: FlowExpireCause) -> () {
         // No active state to close
     }
 
@@ -168,8 +172,8 @@ impl Flow for BasicFlow {
             self.ip_destination,
             self.port_destination,
             self.protocol,
-            self.first_timestamp,
-            self.last_timestamp,
+            self.get_first_timestamp(),
+            self.get_last_timestamp(),
             self.get_flow_duration_usec(),
             self.flow_expire_cause.as_str()
         )
@@ -197,13 +201,13 @@ impl Flow for BasicFlow {
         format!("src_port_iana,dst_port_iana,protocol,duration,flow_expire_cause")
     }
 
-    fn get_first_timestamp(&self) -> DateTime<Utc> {
-        self.first_timestamp
+    fn get_first_timestamp_us(&self) -> i64 {
+        self.first_timestamp_us
     }
 
     fn is_expired(
         &self,
-        timestamp: DateTime<Utc>,
+        timestamp_us: i64,
         active_timeout: u64,
         idle_timeout: u64,
     ) -> (bool, FlowExpireCause) {
@@ -211,11 +215,11 @@ impl Flow for BasicFlow {
             return (true, self.flow_expire_cause);
         }
 
-        if (timestamp - self.first_timestamp).num_seconds() as u64 > active_timeout {
+        if ((timestamp_us - self.first_timestamp_us) / 1_000_000) as u64 > active_timeout {
             return (true, FlowExpireCause::ActiveTimeout);
         }
 
-        if (timestamp - self.last_timestamp).num_seconds() as u64 > idle_timeout {
+        if ((timestamp_us - self.last_timestamp_us) / 1_000_000) as u64 > idle_timeout {
             return (true, FlowExpireCause::IdleTimeout);
         }
 
