@@ -2,7 +2,7 @@ use std::net::IpAddr;
 
 use crate::{
     flows::{
-        features::util::{safe_div_int, safe_per_second_rate},
+        features::util::{safe_div, safe_div_int, safe_per_second_rate},
         util::iana_port_mapping,
     },
     packet_features::PacketFeatures,
@@ -121,7 +121,8 @@ impl Flow for RustiFlow {
         format!(
             "{},{},{},{},{},{},{},{},{},{},\
             {},{},{},{},{},{},{},{},{},{},\
-            {},{},{},{},{},{},{},{},{}",
+            {},{},{},{},{},{},{},{},{},{},
+            {},{},{}",
             // Basic Info
             self.basic_flow.flow_key,
             self.basic_flow.ip_source,
@@ -179,6 +180,22 @@ impl Flow for RustiFlow {
                 self.packet_len_stats.bwd_packet_len.get_count() as f64,
                 duration_us as f64
             ),
+            safe_div_int(
+                self.packet_len_stats.fwd_packet_len.get_count(),
+                self.subflow_stats.subflow_count
+            ),
+            safe_div(
+                self.packet_len_stats.fwd_packet_len.get_total(),
+                self.subflow_stats.subflow_count as f64
+            ),
+            safe_div_int(
+                self.packet_len_stats.bwd_packet_len.get_count(),
+                self.subflow_stats.subflow_count
+            ),
+            safe_div(
+                self.packet_len_stats.bwd_packet_len.get_total(),
+                self.subflow_stats.subflow_count as f64
+            ),
             // UP/DOWN Ratio
             safe_div_int(
                 self.packet_len_stats.bwd_packet_len.get_count(),
@@ -191,7 +208,8 @@ impl Flow for RustiFlow {
         format!(
             "{},{},{},{},{},{},{},{},{},{},\
             {},{},{},{},{},{},{},{},{},{},\
-            {},{},{},{},{},{},{},{},{}",
+            {},{},{},{},{},{},{},{},{},{},
+            {},{},{}",
             // Basic Info
             "flow_id",
             "source_ip",
@@ -234,6 +252,10 @@ impl Flow for RustiFlow {
             "fwd_packets_s",
             "bwd_bytes_s",
             "bwd_packets_s",
+            "fwd_subflow_packets_mean",
+            "fwd_subflow_bytes_mean",
+            "bwd_subflow_packets_mean",
+            "bwd_subflow_bytes_mean",
             // UP/DOWN Ratio
             "up_down_ratio",
         )
@@ -244,7 +266,7 @@ impl Flow for RustiFlow {
         format!(
             "{},{},{},{},{},{},{},{},{},{},\
             {},{},{},{},{},{},{},{},{},{}\
-            ,{},{},{},{},{}",
+            ,{},{},{},{},{},{},{},{},{}",
             // Basic Info
             iana_port_mapping(self.basic_flow.port_source),
             iana_port_mapping(self.basic_flow.port_destination),
@@ -298,6 +320,22 @@ impl Flow for RustiFlow {
                 self.packet_len_stats.bwd_packet_len.get_count() as f64,
                 duration_us as f64
             ),
+            safe_div_int(
+                self.packet_len_stats.fwd_packet_len.get_count(),
+                self.subflow_stats.subflow_count
+            ),
+            safe_div(
+                self.packet_len_stats.fwd_packet_len.get_total(),
+                self.subflow_stats.subflow_count as f64
+            ),
+            safe_div_int(
+                self.packet_len_stats.bwd_packet_len.get_count(),
+                self.subflow_stats.subflow_count
+            ),
+            safe_div(
+                self.packet_len_stats.bwd_packet_len.get_total(),
+                self.subflow_stats.subflow_count as f64
+            ),
             // UP/DOWN Ratio
             safe_div_int(
                 self.packet_len_stats.bwd_packet_len.get_count(),
@@ -310,7 +348,7 @@ impl Flow for RustiFlow {
         format!(
             "{},{},{},{},{},{},{},{},{},{},\
             {},{},{},{},{},{},{},{},{},{}\
-            ,{},{},{},{},{}",
+            ,{},{},{},{},{},{},{},{},{}",
             // Basic Info
             "source_port_iana",
             "destination_port_iana",
@@ -349,6 +387,10 @@ impl Flow for RustiFlow {
             "fwd_packets_s",
             "bwd_bytes_s",
             "bwd_packets_s",
+            "fwd_subflow_packets_mean",
+            "fwd_subflow_bytes_mean",
+            "bwd_subflow_packets_mean",
+            "bwd_subflow_bytes_mean",
             // UP/DOWN Ratio
             "up_down_ratio",
         )
