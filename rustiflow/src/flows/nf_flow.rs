@@ -21,7 +21,6 @@ use super::{
 #[derive(Clone)]
 pub struct NfFlow {
     pub basic_flow: BasicFlow,
-
     pub packet_len_stats: PacketLengthStats,
     pub iat_stats: IATStats,
     pub tcp_flags_stats: TcpFlagStats,
@@ -220,14 +219,7 @@ impl Flow for NfFlow {
     }
 
     fn get_features() -> String {
-        format!(
-            "{},{},{},{},{},{},{},{},{},{},\
-            {},{},{},{},{},{},{},{},{},{},\
-            {},{},{},{},{},{},{},{},{},{},\
-            {},{},{},{},{},{},{},{},{},{},\
-            {},{},{},{},{},{},{},{},{},{},\
-            {},{},{},{},{},{},{},{},{},{},\
-            {},{},{},{},{},{},{},{},{},{}",
+        [
             "id",
             "expiration_id",
             "src_ip",
@@ -298,7 +290,8 @@ impl Flow for NfFlow {
             "dst2src_psh_packets",
             "dst2src_rst_packets",
             "dst2src_fin_packets",
-        )
+        ]
+        .join(",")
     }
 
     fn dump_without_contamination(&self) -> String {
@@ -375,13 +368,7 @@ impl Flow for NfFlow {
     }
 
     fn get_features_without_contamination() -> String {
-        format!(
-            "{},{},{},{},{},{},{},{},{},{},\
-            {},{},{},{},{},{},{},{},{},{},\
-            {},{},{},{},{},{},{},{},{},{},\
-            {},{},{},{},{},{},{},{},{},{},\
-            {},{},{},{},{},{},{},{},{},{},\
-            {},{},{},{},{},{},{},{},{},{}",
+        [
             "src_port_iana",
             "dst_port_iana",
             "protocol",
@@ -442,7 +429,8 @@ impl Flow for NfFlow {
             "dst2src_psh_packets",
             "dst2src_rst_packets",
             "dst2src_fin_packets",
-        )
+        ]
+        .join(",")
     }
 
     fn get_first_timestamp_us(&self) -> i64 {

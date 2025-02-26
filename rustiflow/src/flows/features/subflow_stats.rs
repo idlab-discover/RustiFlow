@@ -32,6 +32,6 @@ impl FlowFeature for SubflowStats {
     }
 
     fn headers() -> String {
-        format!("{}", "subflow_count")
+        "subflow_count".to_string()
     }
 }

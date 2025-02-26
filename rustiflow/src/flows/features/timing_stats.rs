@@ -70,14 +70,14 @@ impl FlowFeature for TimingStats {
     }
 
     fn headers() -> String {
-        format!(
-            "{},{},{},{},{},{}",
+        [
             "first_timestamp_fwd",
             "first_timestamp_bwd",
             "last_timestamp_fwd",
             "last_timestamp_bwd",
             "fwd_duration_ms",
-            "bwd_duration_ms"
-        )
+            "bwd_duration_ms",
+        ]
+        .join(",")
     }
 }

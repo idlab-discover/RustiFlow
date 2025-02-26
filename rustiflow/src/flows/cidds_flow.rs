@@ -1,5 +1,8 @@
 use std::net::IpAddr;
 
+use chrono::format;
+use pnet::packet::ip::IpNextHeaderProtocols;
+
 use crate::flows::util::iana_port_mapping;
 use crate::packet_features::PacketFeatures;
 
@@ -16,6 +19,19 @@ pub struct CiddsFlow {
     pub basic_flow: BasicFlow,
     pub tcp_flag_stats: TcpFlagStats,
     pub packet_stats: PacketLengthStats,
+}
+
+impl CiddsFlow {
+    fn format_protocol(&self, protocol: u8) -> &str {
+        match protocol {
+            p if p == IpNextHeaderProtocols::Tcp.0 => "TCP",
+            p if p == IpNextHeaderProtocols::Udp.0 => "UDP",
+            p if p == IpNextHeaderProtocols::Icmp.0 || p == IpNextHeaderProtocols::Icmpv6.0 => {
+                "ICMP"
+            }
+            _ => "OTHER",
+        }
+    }
 }
 
 impl Flow for CiddsFlow {
@@ -68,15 +84,7 @@ impl Flow for CiddsFlow {
             self.basic_flow.port_source,
             self.basic_flow.ip_destination,
             self.basic_flow.port_destination,
-            if self.basic_flow.protocol == 6 {
-                "TCP"
-            } else if self.basic_flow.protocol == 17 {
-                "UDP"
-            } else if self.basic_flow.protocol == 1 {
-                "ICMP"
-            } else {
-                "OTHER"
-            },
+            self.format_protocol(self.basic_flow.protocol),
             self.basic_flow.get_first_timestamp(),
             self.basic_flow.get_flow_duration_msec(),
             self.packet_stats.flow_total(),
@@ -86,8 +94,7 @@ impl Flow for CiddsFlow {
     }
 
     fn get_features() -> String {
-        format!(
-            "{},{},{},{},{},{},{},{},{},{}",
+        [
             "Src IP",
             "Src Port",
             "Dst IP",
@@ -97,22 +104,15 @@ impl Flow for CiddsFlow {
             "Duration",
             "Bytes",
             "Packets",
-            "Flags"
-        )
+            "Flags",
+        ]
+        .join(",")
     }
 
     fn dump_without_contamination(&self) -> String {
         format!(
             "{},{},{},{},{},{},{}",
-            if self.basic_flow.protocol == 6 {
-                "TCP"
-            } else if self.basic_flow.protocol == 17 {
-                "UDP"
-            } else if self.basic_flow.protocol == 1 {
-                "ICMP"
-            } else {
-                "OTHER"
-            },
+            self.format_protocol(self.basic_flow.protocol),
             iana_port_mapping(self.basic_flow.port_source),
             iana_port_mapping(self.basic_flow.port_destination),
             self.basic_flow.get_flow_duration_msec(),
@@ -123,10 +123,16 @@ impl Flow for CiddsFlow {
     }
 
     fn get_features_without_contamination() -> String {
-        format!(
-            "{},{},{},{},{},{},{}",
-            "Src Port (IANA)", "Dst Port (IANA)", "Proto", "Duration", "Bytes", "Packets", "Flags"
-        )
+        [
+            "Src Port (IANA)",
+            "Dst Port (IANA)",
+            "Proto",
+            "Duration",
+            "Bytes",
+            "Packets",
+            "Flags",
+        ]
+        .join(",")
     }
 
     fn get_first_timestamp_us(&self) -> i64 {

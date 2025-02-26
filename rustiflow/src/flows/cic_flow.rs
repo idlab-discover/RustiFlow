@@ -25,7 +25,6 @@ use super::{
 #[derive(Clone)]
 pub struct CicFlow {
     pub basic_flow: BasicFlow,
-
     pub packet_len_stats: PacketLengthStats,
     pub iat_stats: IATStats,
     pub tcp_flags_stats: TcpFlagStats,
@@ -270,17 +269,7 @@ impl Flow for CicFlow {
     }
 
     fn get_features() -> String {
-        format!(
-            "{},{},{},{},{},{},{},{},{},{},\
-            {},{},{},{},{},{},{},{},{},{},\
-            {},{},{},{},{},{},{},{},{},{},\
-            {},{},{},{},{},{},{},{},{},{},\
-            {},{},{},{},{},{},{},{},{},{},\
-            {},{},{},{},{},{},{},{},{},{},\
-            {},{},{},{},{},{},{},{},{},{},\
-            {},{},{},{},{},{},{},{},{},{},\
-            {},{},{},{},{},{},{},{},{},{},\
-            {},{},{}",
+        [
             "Flow ID",
             "Src IP",
             "Src Port",
@@ -374,7 +363,8 @@ impl Flow for CicFlow {
             "Bwd TCP Retrans. Count",
             "Total TCP Retrans. Count",
             "Total Connection Flow Time",
-        )
+        ]
+        .join(",")
     }
 
     fn dump_without_contamination(&self) -> String {
@@ -520,16 +510,7 @@ impl Flow for CicFlow {
     }
 
     fn get_features_without_contamination() -> String {
-        format!(
-            "{},{},{},{},{},{},{},{},{},{},\
-            {},{},{},{},{},{},{},{},{},{},\
-            {},{},{},{},{},{},{},{},{},{},\
-            {},{},{},{},{},{},{},{},{},{},\
-            {},{},{},{},{},{},{},{},{},{},\
-            {},{},{},{},{},{},{},{},{},{},\
-            {},{},{},{},{},{},{},{},{},{},\
-            {},{},{},{},{},{},{},{},{},{},\
-            {},{},{},{},{},{},{},{},{}",
+        [
             "Src Port (IANA)",
             "Dst Port (IANA)",
             "Protocol",
@@ -619,7 +600,8 @@ impl Flow for CicFlow {
             "Bwd TCP Retrans. Count",
             "Total TCP Retrans. Count",
             "Total Connection Flow Time",
-        )
+        ]
+        .join(",")
     }
 
     fn get_first_timestamp_us(&self) -> i64 {

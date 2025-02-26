@@ -55,9 +55,6 @@ impl FlowFeature for RetransmissionStats {
     }
 
     fn headers() -> String {
-        format!(
-            "{},{},{}",
-            "flow_retransmission_count", "fwd_retransmission_count", "bwd_retransmission_count"
-        )
+        "flow_retransmission_count,fwd_retransmission_count,bwd_retransmission_count".to_string()
     }
 }

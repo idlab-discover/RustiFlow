@@ -46,6 +46,6 @@ impl FlowFeature for IcmpStats {
     }
 
     fn headers() -> String {
-        format!("{},{}", "icmp_type", "icmp_code")
+        "icmp_type,icmp_code".to_string()
     }
 }

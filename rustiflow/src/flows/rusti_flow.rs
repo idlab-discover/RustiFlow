@@ -25,7 +25,6 @@ use super::{
 #[derive(Clone)]
 pub struct RustiFlow {
     pub basic_flow: BasicFlow,
-
     pub packet_len_stats: PacketLengthStats,
     pub iat_stats: IATStats,
     pub tcp_flags_stats: TcpFlagStats,
