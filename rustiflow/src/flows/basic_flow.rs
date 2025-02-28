@@ -2,9 +2,9 @@ use std::net::IpAddr;
 
 use chrono::{DateTime, Utc};
 
-use crate::packet_features::PacketFeatures;
+use crate::{flows::util::iana_port_mapping, packet_features::PacketFeatures};
 
-use super::flow::Flow;
+use super::{flow::Flow, util::FlowExpireCause};
 
 #[derive(Clone, PartialEq, Debug)]
 pub(crate) enum FlowState {
@@ -29,47 +29,12 @@ pub struct BasicFlow {
     /// The protocol of the flow.
     pub protocol: u8,
     /// The first timestamp of the flow.
-    pub first_timestamp: DateTime<Utc>,
+    pub first_timestamp_us: i64, // Microseconds since epoch
     /// The last timestamp of the flow.
-    pub last_timestamp: DateTime<Utc>,
-    /// The last ACK of the flow.
-    pub flow_end_of_flow_ack: u8,
-    /// The number of FIN flags in the forward direction.
-    pub fwd_fin_flag_count: u32,
-    /// The number of SYN flags in the forward direction.
-    pub fwd_syn_flag_count: u32,
-    /// The number of RST flags in the forward direction.
-    pub fwd_rst_flag_count: u32,
-    /// The number of PSH flags in the forward direction.
-    pub fwd_psh_flag_count: u32,
-    /// The number of ACK flags in the forward direction.
-    pub fwd_ack_flag_count: u32,
-    /// The number of URG flags in the forward direction.
-    pub fwd_urg_flag_count: u32,
-    /// The number of CWE flags in the forward direction.
-    pub fwd_cwe_flag_count: u32,
-    /// The number of ECE flags in the forward direction.
-    pub fwd_ece_flag_count: u32,
-    /// The number of packets in the forward direction.
-    pub fwd_packet_count: u32,
-    /// The number of FIN flags in the backward direction.
-    pub bwd_fin_flag_count: u32,
-    /// The number of SYN flags in the backward direction.
-    pub bwd_syn_flag_count: u32,
-    /// The number of RST flags in the backward direction.
-    pub bwd_rst_flag_count: u32,
-    /// The number of PSH flags in the backward direction.
-    pub bwd_psh_flag_count: u32,
-    /// The number of ACK flags in the backward direction.
-    pub bwd_ack_flag_count: u32,
-    /// The number of URG flags in the backward direction.
-    pub bwd_urg_flag_count: u32,
-    /// The number of CWE flags in the backward direction.
-    pub bwd_cwe_flag_count: u32,
-    /// The number of ECE flags in the backward direction.
-    pub bwd_ece_flag_count: u32,
-    /// The number of packets in the backward direction.
-    pub bwd_packet_count: u32,
+    pub last_timestamp_us: i64,
+    /// The reason this flow expired
+    pub flow_expire_cause: FlowExpireCause,
+
     // Tracking TCP Flow Termination
     pub(crate) state_fwd: FlowState,
     pub(crate) state_bwd: FlowState,
@@ -127,10 +92,27 @@ impl BasicFlow {
     /// ### Returns
     ///
     /// The duration of the flow in microseconds.
-    pub fn get_flow_duration_usec(&self) -> f64 {
-        (self.last_timestamp - self.first_timestamp)
-            .num_microseconds()
-            .unwrap() as f64
+    pub fn get_flow_duration_usec(&self) -> i64 {
+        self.last_timestamp_us - self.first_timestamp_us
+    }
+
+    /// Calculates the flow duration in milliseconds.
+    ///
+    /// Returns the difference between the last and first packet timestamps in milliseconds.
+    ///
+    /// ### Returns
+    ///
+    /// The duration of the flow in milliseconds.
+    pub fn get_flow_duration_msec(&self) -> i64 {
+        (self.last_timestamp_us - self.first_timestamp_us) / 1_000
+    }
+
+    pub fn get_last_timestamp(&self) -> DateTime<Utc> {
+        DateTime::from_timestamp_micros(self.last_timestamp_us).unwrap()
+    }
+
+    pub fn get_first_timestamp(&self) -> DateTime<Utc> {
+        DateTime::from_timestamp_micros(self.first_timestamp_us).unwrap()
     }
 }
 
@@ -142,7 +124,7 @@ impl Flow for BasicFlow {
         ip_destination: IpAddr,
         port_destination: u16,
         protocol: u8,
-        first_timestamp: DateTime<Utc>,
+        first_timestamp_us: i64,
     ) -> Self {
         BasicFlow {
             flow_key: flow_id,
@@ -151,27 +133,9 @@ impl Flow for BasicFlow {
             port_destination,
             port_source,
             protocol,
-            first_timestamp,
-            last_timestamp: first_timestamp,
-            flow_end_of_flow_ack: 0,
-            fwd_fin_flag_count: 0,
-            fwd_syn_flag_count: 0,
-            fwd_rst_flag_count: 0,
-            fwd_psh_flag_count: 0,
-            fwd_ack_flag_count: 0,
-            fwd_urg_flag_count: 0,
-            fwd_cwe_flag_count: 0,
-            fwd_ece_flag_count: 0,
-            fwd_packet_count: 0,
-            bwd_fin_flag_count: 0,
-            bwd_syn_flag_count: 0,
-            bwd_rst_flag_count: 0,
-            bwd_psh_flag_count: 0,
-            bwd_ack_flag_count: 0,
-            bwd_urg_flag_count: 0,
-            bwd_cwe_flag_count: 0,
-            bwd_ece_flag_count: 0,
-            bwd_packet_count: 0,
+            first_timestamp_us,
+            last_timestamp_us: first_timestamp_us,
+            flow_expire_cause: FlowExpireCause::None,
             state_fwd: FlowState::Established,
             state_bwd: FlowState::Established,
             expected_ack_seq_fwd: None,
@@ -180,144 +144,86 @@ impl Flow for BasicFlow {
     }
 
     fn update_flow(&mut self, packet: &PacketFeatures, fwd: bool) -> bool {
-        self.last_timestamp = packet.timestamp;
+        self.last_timestamp_us = packet.timestamp_us;
 
         if self.is_tcp_finished(packet, fwd) {
-            self.flow_end_of_flow_ack = 1;
+            self.flow_expire_cause = FlowExpireCause::TcpTermination;
+            return true;
         }
 
-        if fwd {
-            self.fwd_packet_count += 1;
-            self.fwd_fin_flag_count += u32::from(packet.fin_flag);
-            self.fwd_syn_flag_count += u32::from(packet.syn_flag);
-            self.fwd_rst_flag_count += u32::from(packet.rst_flag);
-            self.fwd_psh_flag_count += u32::from(packet.psh_flag);
-            self.fwd_ack_flag_count += u32::from(packet.ack_flag);
-            self.fwd_urg_flag_count += u32::from(packet.urg_flag);
-            self.fwd_cwe_flag_count += u32::from(packet.cwe_flag);
-            self.fwd_ece_flag_count += u32::from(packet.ece_flag);
-        } else {
-            self.bwd_packet_count += 1;
-            self.bwd_fin_flag_count += u32::from(packet.fin_flag);
-            self.bwd_syn_flag_count += u32::from(packet.syn_flag);
-            self.bwd_rst_flag_count += u32::from(packet.rst_flag);
-            self.bwd_psh_flag_count += u32::from(packet.psh_flag);
-            self.bwd_ack_flag_count += u32::from(packet.ack_flag);
-            self.bwd_urg_flag_count += u32::from(packet.urg_flag);
-            self.bwd_cwe_flag_count += u32::from(packet.cwe_flag);
-            self.bwd_ece_flag_count += u32::from(packet.ece_flag);
-        }
-
-        if self.flow_end_of_flow_ack > 0
-            || self.fwd_rst_flag_count > 0
-            || self.bwd_rst_flag_count > 0
-        {
+        if packet.rst_flag > 0 {
+            self.flow_expire_cause = FlowExpireCause::TcpReset;
             return true;
         }
 
         false
     }
 
+    fn close_flow(&mut self, _timestamp_us: i64, _cause: FlowExpireCause) -> () {
+        // No active state to close
+    }
+
     fn dump(&self) -> String {
         format!(
-            "{},{},{},{},{},{},{},{},{},{},{},{},{},\
-        {},{},{},{},{},{},{},{},{},{},{},{},{},{},{}",
+            "{},{},{},{},{},{},{},{},{},{}",
             self.flow_key,
             self.ip_source,
             self.port_source,
             self.ip_destination,
             self.port_destination,
             self.protocol,
-            self.first_timestamp,
-            self.last_timestamp,
+            self.get_first_timestamp(),
+            self.get_last_timestamp(),
             self.get_flow_duration_usec(),
-            self.flow_end_of_flow_ack,
-            self.fwd_fin_flag_count,
-            self.fwd_syn_flag_count,
-            self.fwd_rst_flag_count,
-            self.fwd_psh_flag_count,
-            self.fwd_ack_flag_count,
-            self.fwd_urg_flag_count,
-            self.fwd_cwe_flag_count,
-            self.fwd_ece_flag_count,
-            self.fwd_packet_count,
-            self.bwd_fin_flag_count,
-            self.bwd_syn_flag_count,
-            self.bwd_rst_flag_count,
-            self.bwd_psh_flag_count,
-            self.bwd_ack_flag_count,
-            self.bwd_urg_flag_count,
-            self.bwd_cwe_flag_count,
-            self.bwd_ece_flag_count,
-            self.bwd_packet_count
+            self.flow_expire_cause.as_str()
         )
     }
 
     fn get_features() -> String {
         format!(
-            "FLOW_ID,IP_SOURCE,PORT_SOURCE,IP_DESTINATION,PORT_DESTINATION,PROTOCOL,\
-            FIRST_TIMESTAMP,LAST_TIMESTAMP,DURATION,FLOW_END_OF_FLOW_ACK,\
-            FWD_FIN_FLAG_COUNT,FWD_SYN_FLAG_COUNT,FWD_RST_FLAG_COUNT,FWD_PSH_FLAG_COUNT,\
-            FWD_ACK_FLAG_COUNT,FWD_URG_FLAG_COUNT,FWD_CWE_FLAG_COUNT,FWD_ECE_FLAG_COUNT,\
-            FWD_PACKET_COUNT,BWD_FIN_FLAG_COUNT,BWD_SYN_FLAG_COUNT,BWD_RST_FLAG_COUNT,\
-            BWD_PSH_FLAG_COUNT,BWD_ACK_FLAG_COUNT,BWD_URG_FLAG_COUNT,BWD_CWE_FLAG_COUNT,\
-            BWD_ECE_FLAG_COUNT,BWD_PACKET_COUNT"
+            "flow_id,source_ip,source_port,destination_ip,destination_port,protocol,\
+            first_timestamp,last_timestamp,duration,flow_expire_cause"
         )
     }
 
     fn dump_without_contamination(&self) -> String {
         format!(
-            "{},{},{},{},{},{},{},{},{},{},{},{},{},\
-            {},{},{},{},{},{},{},{}",
+            "{},{},{},{},{}",
+            iana_port_mapping(self.port_source),
+            iana_port_mapping(self.port_destination),
             self.protocol,
             self.get_flow_duration_usec(),
-            self.flow_end_of_flow_ack,
-            self.fwd_fin_flag_count,
-            self.fwd_syn_flag_count,
-            self.fwd_rst_flag_count,
-            self.fwd_psh_flag_count,
-            self.fwd_ack_flag_count,
-            self.fwd_urg_flag_count,
-            self.fwd_cwe_flag_count,
-            self.fwd_ece_flag_count,
-            self.fwd_packet_count,
-            self.bwd_fin_flag_count,
-            self.bwd_syn_flag_count,
-            self.bwd_rst_flag_count,
-            self.bwd_psh_flag_count,
-            self.bwd_ack_flag_count,
-            self.bwd_urg_flag_count,
-            self.bwd_cwe_flag_count,
-            self.bwd_ece_flag_count,
-            self.bwd_packet_count
+            self.flow_expire_cause.as_str(),
         )
     }
 
     fn get_features_without_contamination() -> String {
-        format!(
-            "PROTOCOL,DURATION,FLOW_END_OF_FLOW_ACK,\
-            FWD_FIN_FLAG_COUNT,FWD_SYN_FLAG_COUNT,FWD_RST_FLAG_COUNT,FWD_PSH_FLAG_COUNT,\
-            FWD_ACK_FLAG_COUNT,FWD_URG_FLAG_COUNT,FWD_CWE_FLAG_COUNT,FWD_ECE_FLAG_COUNT,\
-            FWD_PACKET_COUNT,BWD_FIN_FLAG_COUNT,BWD_SYN_FLAG_COUNT,BWD_RST_FLAG_COUNT,\
-            BWD_PSH_FLAG_COUNT,BWD_ACK_FLAG_COUNT,BWD_URG_FLAG_COUNT,BWD_CWE_FLAG_COUNT,\
-            BWD_ECE_FLAG_COUNT,BWD_PACKET_COUNT"
-        )
+        format!("src_port_iana,dst_port_iana,protocol,duration,flow_expire_cause")
     }
 
-    fn get_first_timestamp(&self) -> DateTime<Utc> {
-        self.first_timestamp
+    fn get_first_timestamp_us(&self) -> i64 {
+        self.first_timestamp_us
     }
 
-    fn is_expired(&self, timestamp: DateTime<Utc>, active_timeout: u64, idle_timeout: u64) -> bool {
-        if (timestamp - self.first_timestamp).num_seconds() as u64 > active_timeout {
-            return true;
+    fn is_expired(
+        &self,
+        timestamp_us: i64,
+        active_timeout: u64,
+        idle_timeout: u64,
+    ) -> (bool, FlowExpireCause) {
+        if self.flow_expire_cause != FlowExpireCause::None {
+            return (true, self.flow_expire_cause);
         }
 
-        if (timestamp - self.last_timestamp).num_seconds() as u64 > idle_timeout {
-            return true;
+        if ((timestamp_us - self.first_timestamp_us) / 1_000_000) as u64 > active_timeout {
+            return (true, FlowExpireCause::ActiveTimeout);
         }
 
-        false
+        if ((timestamp_us - self.last_timestamp_us) / 1_000_000) as u64 > idle_timeout {
+            return (true, FlowExpireCause::IdleTimeout);
+        }
+
+        (false, FlowExpireCause::None)
     }
 
     fn flow_key(&self) -> &String {

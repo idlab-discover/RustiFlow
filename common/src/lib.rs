@@ -19,7 +19,8 @@ pub struct EbpfEventIpv4 {
     pub sequence_number: u32,
     pub sequence_number_ack: u32,
     pub icmp_type: u8,
-    pub _padding: [u8; 2],
+    pub icmp_code: u8,
+    pub _padding: [u8; 1],
 }
 
 impl EbpfEventIpv4 {
@@ -37,6 +38,7 @@ impl EbpfEventIpv4 {
         sequence_number: u32,
         sequence_number_ack: u32,
         icmp_type: u8,
+        icmp_code: u8,
     ) -> Self {
         EbpfEventIpv4 {
             ipv4_destination,
@@ -52,7 +54,8 @@ impl EbpfEventIpv4 {
             sequence_number,
             sequence_number_ack,
             icmp_type,
-            _padding: [0; 2],
+            icmp_code,
+            _padding: [0; 1],
         }
     }
 }
@@ -77,7 +80,8 @@ pub struct EbpfEventIpv6 {
     pub sequence_number: u32,
     pub sequence_number_ack: u32,
     pub icmp_type: u8,
-    pub _padding: [u8; 10],
+    pub icmp_code: u8,
+    pub _padding: [u8; 9],
 }
 
 impl EbpfEventIpv6 {
@@ -95,6 +99,7 @@ impl EbpfEventIpv6 {
         sequence_number: u32,
         sequence_number_ack: u32,
         icmp_type: u8,
+        icmp_code: u8,
     ) -> Self {
         EbpfEventIpv6 {
             ipv6_destination,
@@ -110,7 +115,8 @@ impl EbpfEventIpv6 {
             sequence_number,
             sequence_number_ack,
             icmp_type,
-            _padding: [0; 10],
+            icmp_code,
+            _padding: [0; 9],
         }
     }
 }
@@ -127,6 +133,7 @@ pub trait NetworkHeader {
     fn sequence_number(&self) -> u32;
     fn sequence_number_ack(&self) -> u32;
     fn icmp_type(&self) -> u8;
+    fn icmp_code(&self) -> u8;
 }
 
 impl NetworkHeader for TcpHdr {
@@ -161,6 +168,9 @@ impl NetworkHeader for TcpHdr {
     fn icmp_type(&self) -> u8 {
         0
     }
+    fn icmp_code(&self) -> u8 {
+        0
+    }
 }
 
 impl NetworkHeader for UdpHdr {
@@ -186,6 +196,9 @@ impl NetworkHeader for UdpHdr {
         0
     }
     fn icmp_type(&self) -> u8 {
+        0
+    }
+    fn icmp_code(&self) -> u8 {
         0
     }
 }
@@ -214,5 +227,9 @@ impl NetworkHeader for IcmpHdr {
     }
     fn icmp_type(&self) -> u8 {
         self.type_
+    }
+
+    fn icmp_code(&self) -> u8 {
+        self.code
     }
 }

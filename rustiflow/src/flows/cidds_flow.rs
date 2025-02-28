@@ -1,65 +1,36 @@
-use chrono::{DateTime, Utc};
 use std::net::IpAddr;
 
+use chrono::format;
+use pnet::packet::ip::IpNextHeaderProtocols;
+
+use crate::flows::util::iana_port_mapping;
 use crate::packet_features::PacketFeatures;
 
+use super::features::util::FlowFeature;
+use super::util::FlowExpireCause;
 use super::{basic_flow::BasicFlow, flow::Flow};
 
-/// Represents a CIDDS Flow, encapsulating various metrics and states of a network flow.
-///
-/// This struct includes detailed information about a flow.
+use super::features::packet_stats::PacketLengthStats;
+use super::features::tcp_flag_stats::TcpFlagStats;
+
+/// Represents a CIDDS Flow as exported by the like-named academic network traffic dataset.
 #[derive(Clone)]
 pub struct CiddsFlow {
-    /// The basic flow information.
     pub basic_flow: BasicFlow,
-    /// The number of bytes in the flow.
-    pub(crate) bytes: u32,
+    pub tcp_flag_stats: TcpFlagStats,
+    pub packet_stats: PacketLengthStats,
 }
 
 impl CiddsFlow {
-    /// Retrieves the flags feature string of the flow.
-    ///
-    /// Returns the flags feature string of the flow. If no flags were used
-    /// the function will return ......
-    ///
-    /// ### Returns
-    ///
-    /// Returns a `String` containing the flags feature string of the flow.
-    pub(crate) fn get_flags_string(&self) -> String {
-        let mut flags = String::new();
-
-        if self.basic_flow.fwd_urg_flag_count + self.basic_flow.bwd_urg_flag_count != 0 {
-            flags.push('U');
-        } else {
-            flags.push('.');
+    fn format_protocol(&self, protocol: u8) -> &str {
+        match protocol {
+            p if p == IpNextHeaderProtocols::Tcp.0 => "TCP",
+            p if p == IpNextHeaderProtocols::Udp.0 => "UDP",
+            p if p == IpNextHeaderProtocols::Icmp.0 || p == IpNextHeaderProtocols::Icmpv6.0 => {
+                "ICMP"
+            }
+            _ => "OTHER",
         }
-        if self.basic_flow.fwd_ack_flag_count + self.basic_flow.bwd_ack_flag_count != 0 {
-            flags.push('A');
-        } else {
-            flags.push('.');
-        }
-        if self.basic_flow.fwd_psh_flag_count + self.basic_flow.bwd_psh_flag_count != 0 {
-            flags.push('P');
-        } else {
-            flags.push('.');
-        }
-        if self.basic_flow.fwd_rst_flag_count + self.basic_flow.bwd_rst_flag_count != 0 {
-            flags.push('R');
-        } else {
-            flags.push('.');
-        }
-        if self.basic_flow.fwd_syn_flag_count + self.basic_flow.bwd_syn_flag_count != 0 {
-            flags.push('S');
-        } else {
-            flags.push('.');
-        }
-        if self.basic_flow.fwd_fin_flag_count + self.basic_flow.bwd_fin_flag_count != 0 {
-            flags.push('F');
-        } else {
-            flags.push('.');
-        }
-
-        flags
     }
 }
 
@@ -71,7 +42,7 @@ impl Flow for CiddsFlow {
         ipv4_destination: IpAddr,
         port_destination: u16,
         protocol: u8,
-        ts_date: DateTime<Utc>,
+        timestamp_us: i64,
     ) -> Self {
         CiddsFlow {
             basic_flow: BasicFlow::new(
@@ -81,84 +52,101 @@ impl Flow for CiddsFlow {
                 ipv4_destination,
                 port_destination,
                 protocol,
-                ts_date,
+                timestamp_us,
             ),
-            bytes: 0,
+            tcp_flag_stats: TcpFlagStats::new(),
+            packet_stats: PacketLengthStats::new(),
         }
     }
 
-    fn update_flow(&mut self, packet: &PacketFeatures, fwd: bool) -> bool {
-        self.bytes += packet.length as u32;
-        self.basic_flow.update_flow(packet, fwd)
+    fn update_flow(&mut self, packet: &PacketFeatures, is_fwd: bool) -> bool {
+        let last_timestamp_us = self.basic_flow.last_timestamp_us;
+        let is_terminated: bool = self.basic_flow.update_flow(packet, is_fwd);
+
+        self.tcp_flag_stats
+            .update(packet, is_fwd, last_timestamp_us);
+        self.packet_stats.update(packet, is_fwd, last_timestamp_us);
+
+        is_terminated
+    }
+
+    fn close_flow(&mut self, timestamp_us: i64, cause: FlowExpireCause) {
+        self.basic_flow.close_flow(timestamp_us, cause);
+
+        self.tcp_flag_stats.close(timestamp_us, cause);
+        self.packet_stats.close(timestamp_us, cause);
     }
 
     fn dump(&self) -> String {
         format!(
             "{},{},{},{},{},{},{},{},{},{}",
-            self.basic_flow.first_timestamp,
-            self.basic_flow
-                .last_timestamp
-                .signed_duration_since(self.basic_flow.first_timestamp)
-                .num_milliseconds(),
-            if self.basic_flow.protocol == 6 {
-                "TCP"
-            } else if self.basic_flow.protocol == 17 {
-                "UDP"
-            } else if self.basic_flow.protocol == 1 {
-                "ICMP"
-            } else {
-                "OTHER"
-            },
             self.basic_flow.ip_source,
             self.basic_flow.port_source,
             self.basic_flow.ip_destination,
             self.basic_flow.port_destination,
-            self.basic_flow.fwd_packet_count + self.basic_flow.bwd_packet_count,
-            self.bytes,
-            self.get_flags_string(),
+            self.format_protocol(self.basic_flow.protocol),
+            self.basic_flow.get_first_timestamp(),
+            self.basic_flow.get_flow_duration_msec(),
+            self.packet_stats.flow_total(),
+            self.packet_stats.flow_count(),
+            self.tcp_flag_stats.get_flags(),
         )
     }
 
     fn get_features() -> String {
-        format!(
-            "FIRST_TIMESTAMP,LAST_TIMESTAMP,PROTOCOL,SOURCE_IP,SOURCE_PORT,DESTINATION_IP,\
-            DESTINATION_PORT,PACKET_COUNT,BYTES,FLAGS"
-        )
+        [
+            "Src IP",
+            "Src Port",
+            "Dst IP",
+            "Dst Port",
+            "Proto",
+            "Date first seen",
+            "Duration",
+            "Bytes",
+            "Packets",
+            "Flags",
+        ]
+        .join(",")
     }
 
     fn dump_without_contamination(&self) -> String {
         format!(
-            "{},{},{},{},{}",
-            self.basic_flow
-                .last_timestamp
-                .signed_duration_since(self.basic_flow.first_timestamp)
-                .num_milliseconds(),
-            if self.basic_flow.protocol == 6 {
-                "TCP"
-            } else if self.basic_flow.protocol == 17 {
-                "UDP"
-            } else if self.basic_flow.protocol == 1 {
-                "ICMP"
-            } else {
-                "OTHER"
-            },
-            self.basic_flow.fwd_packet_count + self.basic_flow.bwd_packet_count,
-            self.bytes,
-            self.get_flags_string(),
+            "{},{},{},{},{},{},{}",
+            self.format_protocol(self.basic_flow.protocol),
+            iana_port_mapping(self.basic_flow.port_source),
+            iana_port_mapping(self.basic_flow.port_destination),
+            self.basic_flow.get_flow_duration_msec(),
+            self.packet_stats.flow_total(),
+            self.packet_stats.flow_count(),
+            self.tcp_flag_stats.get_flags(),
         )
     }
 
     fn get_features_without_contamination() -> String {
-        format!("DURATION,PROTOCOL,PACKET_COUNT,BYTES,FLAGS")
+        [
+            "Src Port (IANA)",
+            "Dst Port (IANA)",
+            "Proto",
+            "Duration",
+            "Bytes",
+            "Packets",
+            "Flags",
+        ]
+        .join(",")
     }
 
-    fn get_first_timestamp(&self) -> DateTime<Utc> {
-        self.basic_flow.get_first_timestamp()
+    fn get_first_timestamp_us(&self) -> i64 {
+        self.basic_flow.first_timestamp_us
     }
 
-    fn is_expired(&self, timestamp: DateTime<Utc>, active_timeout: u64, idle_timeout: u64) -> bool {
+    fn is_expired(
+        &self,
+        timestamp_us: i64,
+        active_timeout: u64,
+        idle_timeout: u64,
+    ) -> (bool, FlowExpireCause) {
         self.basic_flow
-            .is_expired(timestamp, active_timeout, idle_timeout)
+            .is_expired(timestamp_us, active_timeout, idle_timeout)
     }
 
     fn flow_key(&self) -> &String {

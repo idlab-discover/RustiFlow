@@ -27,7 +27,7 @@ mod tests {
             psh_flag: 0,
             ack_flag: 0,
             urg_flag: 0,
-            cwe_flag: 0,
+            cwr_flag: 0,
             ece_flag: 0,
             data_length: 100,
             header_length: 20,
@@ -58,9 +58,9 @@ mod tests {
         assert_eq!(flow.cic_flow.basic_flow.flow_key, flow_id);
         assert_eq!(flow.cic_flow.basic_flow.ip_source, ipv4_source);
         assert_eq!(flow.cic_flow.basic_flow.ip_destination, ipv4_destination);
-        assert_eq!(flow.first_timestamp, timestamp);
-        assert_eq!(flow.last_timestamp, timestamp);
-        assert_eq!(flow.fwd_first_timestamp, timestamp);
+        assert_eq!(flow.cic_flow.basic_flow.first_timestamp, timestamp);
+        assert_eq!(flow.cic_flow.basic_flow.last_timestamp, timestamp);
+        assert_eq!(flow.cic_flow.basic_flow.first_timestamp, timestamp);
         assert_eq!(flow.fwd_last_timestamp, timestamp);
         assert!(flow.bwd_first_timestamp.is_none());
         assert!(flow.bwd_last_timestamp.is_none());
@@ -229,7 +229,7 @@ mod tests {
 
         // Case 5: Idle timeout exceeded after update
         let after_update_idle_timeout_exceeded =
-            flow.last_timestamp + chrono::Duration::seconds(31);
+            flow.cic_flow.basic_flow.last_timestamp + chrono::Duration::seconds(31);
         assert!(flow.is_expired(
             after_update_idle_timeout_exceeded,
             active_timeout,

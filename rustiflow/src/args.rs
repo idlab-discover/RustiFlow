@@ -32,7 +32,7 @@ pub struct Cli {
     pub expiration_check_interval: u64,
 
     /// The numbers of threads to use for processing packets (optional)
-    /// (default: number of logical CPUs)
+    /// (default: 5, maximum: number of logical CPUs)
     #[clap(long, group = "cli_group")]
     pub threads: Option<u8>,
 
@@ -117,8 +117,8 @@ pub struct ExportConfig {
     #[clap(long, default_value_t = 60, group = "cli_group")]
     pub expiration_check_interval: u64,
 
-    /// The numbers of threads to use for processing packets
-    /// (default: number of logical CPUs)
+    /// The numbers of threads to use for processing packets (optional)
+    /// (default: 5, maximum: number of logical CPUs)
     #[clap(short, long)]
     pub threads: Option<u8>,
 }
@@ -170,8 +170,8 @@ pub enum FlowType {
     /// Represents a nfstream inspired flow, giving 69 features.
     Nfstream,
 
-    /// Represents the NTL Flow, giving 120 features.
-    NTL,
+    /// Represents the Rusti Flow, giving 120 features.
+    Rustiflow,
 
     /// Represents a flow that you can implement yourself.
     Custom,
