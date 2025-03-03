@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"fn":["main","run_with_config"],"mod":["args","flow_table","flows","output","packet_features","pcap","realtime","tui"]};
+window.SIDEBAR_ITEMS = {"fn":["main","run_with_config"],"mod":["args","flow_table","flow_tui","flows","output","packet_counts","packet_features","pcap","realtime","tests","tui"]};

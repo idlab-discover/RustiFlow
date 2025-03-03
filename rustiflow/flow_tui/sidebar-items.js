@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"fn":["launch_packet_tui","run_app","ui_main_screen"],"struct":["App","PacketData"]};

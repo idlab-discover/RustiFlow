@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"constant":["ACK_FLAG","CWE_FLAG","ECE_FLAG","FIN_FLAG","PSH_FLAG","RST_FLAG","SYN_FLAG","URG_FLAG"],"fn":["extract_packet_features_transport","get_tcp_flag"],"struct":["PacketFeatures"]};
+window.SIDEBAR_ITEMS = {"constant":["ACK_FLAG","CWR_FLAG","ECE_FLAG","FIN_FLAG","PSH_FLAG","RST_FLAG","SYN_FLAG","URG_FLAG"],"fn":["extract_packet_features_transport","get_tcp_flag"],"struct":["PacketFeatures"]};
