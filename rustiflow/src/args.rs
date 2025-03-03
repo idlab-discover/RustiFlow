@@ -32,7 +32,7 @@ pub struct Cli {
     pub expiration_check_interval: u64,
 
     /// The numbers of threads to use for processing packets (optional)
-    /// (default: number of logical CPUs)
+    /// (default: 5, maximum: number of logical CPUs)
     #[clap(long, group = "cli_group")]
     pub threads: Option<u8>,
 
@@ -43,6 +43,10 @@ pub struct Cli {
     /// File path for output (used if method is Csv)
     #[clap(long, group = "cli_group", required_if_eq("output", "Csv"))]
     pub export_path: Option<String>,
+
+    /// Disable the graph in TUI when exporting in CSV mode
+    #[clap(long, group = "cli_group", action = clap::ArgAction::SetTrue, required_if_eq("output", "Csv"))]
+    pub performance_mode: bool,
 
     /// Whether to export the feature header
     #[clap(long, action = clap::ArgAction::SetTrue, group = "cli_group")]
@@ -113,8 +117,8 @@ pub struct ExportConfig {
     #[clap(long, default_value_t = 60, group = "cli_group")]
     pub expiration_check_interval: u64,
 
-    /// The numbers of threads to use for processing packets
-    /// (default: number of logical CPUs)
+    /// The numbers of threads to use for processing packets (optional)
+    /// (default: 5, maximum: number of logical CPUs)
     #[clap(short, long)]
     pub threads: Option<u8>,
 }
@@ -128,6 +132,10 @@ pub struct OutputConfig {
     /// File path for output (used if method is Csv)
     #[clap(required_if_eq("output", "csv"))]
     pub export_path: Option<String>,
+
+    /// Disable the graph in TUI when exporting in CSV mode
+    #[clap(long, action = clap::ArgAction::SetTrue, required_if_eq("output", "Csv"))]
+    pub performance_mode: bool,
 
     /// Whether to export the feature header
     #[clap(long, action = clap::ArgAction::SetTrue)]
@@ -162,8 +170,8 @@ pub enum FlowType {
     /// Represents a nfstream inspired flow, giving 69 features.
     Nfstream,
 
-    /// Represents the NTL Flow, giving 120 features.
-    NTL,
+    /// Represents the Rusti Flow, giving 120 features.
+    Rustiflow,
 
     /// Represents a flow that you can implement yourself.
     Custom,
@@ -191,6 +199,7 @@ impl Default for ConfigFile {
                 export_path: None,
                 header: false,
                 drop_contaminant_features: false,
+                performance_mode: false,
             },
         }
     }

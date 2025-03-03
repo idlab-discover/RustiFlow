@@ -1,15 +1,15 @@
 ![banner](figures/banner.jpg)
+
 # A Network Traffic Feature Extraction Tool
 
 ## <img src="figures/RustiFlow_nobg.png" width="60px"/> Overview
 
 This tool is engineered for robust and efficient feature extraction, particularly for applications such as network intrusion detection systems, among others. Leveraging Rust language and eBPF, it excels in processing high volumes of network traffic with remarkable speed and throughput. (When your traffic is already captured, don't worry! It also has a build in pcap reader which is also amazingly fast.) With various pre-defined feature sets and the ability to create custom feature sets, RustiFlow offers a versatile solution for network security applications.
 
-<a href="https://github.com/idlab-discover/RustiFlow/actions">![Badge displaying GitHub Actions Workflow Status](https://img.shields.io/github/actions/workflow/status/idlab-discover/RustiFlow/rust.yml?logo=github)</a> 
+<a href="https://github.com/idlab-discover/RustiFlow/actions">![Badge displaying GitHub Actions Workflow Status](https://img.shields.io/github/actions/workflow/status/idlab-discover/RustiFlow/rust.yml?logo=github)</a>
 <a href="https://idlab-discover.github.io/RustiFlow"> ![Badge linking to the project documentation website](https://img.shields.io/website?url=https%3A%2F%2Fidlab-discover.github.io%2FRustiFlow&label=Documentation)</a> <a href="https://github.com/idlab-discover/RustiFlow/blob/main/LICENSE"> ![GitHub license](https://img.shields.io/github/license/idlab-discover/RustiFlow) </a>
 
-![Ubuntu 24](https://img.shields.io/badge/Tested%20on%20ubuntu-purple?logo=ubuntu) 
-
+![Ubuntu 24](https://img.shields.io/badge/Tested%20on%20ubuntu-purple?logo=ubuntu)
 
 ![Animated image showing network flows](figures/flows.gif)
 
@@ -27,9 +27,11 @@ See the [wiki](https://github.com/idlab-discover/RustiFlow/wiki) for the differe
 ## <img src="figures/RustiFlow_nobg.png" width="60px"/> Architecture
 
 ### Realtime processing
+
 ![RustiFlow Architecture Realtime](figures/realtime.png)
 
 ### Offline PCAP processing
+
 ![RustiFlow Architecture Offline](figures/offline.png)
 
 ## <img src="figures/RustiFlow_nobg.png" width="60px"/> Using the release binary:
@@ -47,21 +49,24 @@ You can then run the binary with the following commands displayed on the [help m
 
 ### Using the tui interface:
 
-If you want a more graphical interface, you can use the tui interface by just running `rustiflow` without any arguments. This will open the following interface:
+If you want a more graphical interface, you can use the tui interface by just running `rustiflow` without any arguments. This will open a field where you can enter a configuration file you want to edit or you can choose to start new. After that, the following interface will show up:
 
 ![The tui interface](figures/tui_rustiflow.GIF)
 
-> **NOTE:** When using the save button, the current selection will be saved to the `rustiflow.toml` file. You can reuse this file with following command:
-  ```bash
-  rustiflow --config-file rustiflow.toml realtime <interface> [--only-ingress]
-  ```
+> **NOTE:** When using the save button, you will be prompted for a filename. You can reuse this file with following command:
 
-  ```bash
-  rustiflow -c rustiflow.toml pcap <path to pcap file>
-  ```
+```bash
+rustiflow --config-file <filename> realtime <interface> [--only-ingress]
+```
+
+```bash
+rustiflow -c <filename> pcap <path to pcap file>
+```
+
 > After saving the configuration file, you can safely reset without changing the configuration file.
 
 ### Using the configuration file:
+
 This is an example of a configuration file that you can use to run the tool with the `--config-file` option.
 
 ```toml
@@ -78,7 +83,9 @@ export_path = "path/to/output.csv"
 header = false
 drop_contaminant_features = true
 ```
+
 Example 2:
+
 ```toml
 [config]
 features = "Nfstream"
@@ -118,6 +125,7 @@ Make sure that you don't use docker desktop and that you don't have it installed
 ## <img src="figures/RustiFlow_nobg.png" width="60px"/> Installation Guide for development
 
 ### Prerequisites:
+
 - **libpcap-dev**:
   ```sh
   sudo apt install libpcap-dev
@@ -133,6 +141,7 @@ Make sure that you don't use docker desktop and that you don't have it installed
   ```
 
 ### bpf Linker Installation:
+
 - **For Linux x86_64**:
   ```bash
   cargo install bpf-linker
@@ -162,83 +171,99 @@ Make sure that you don't use docker desktop and that you don't have it installed
 
 ## Running the Project in dev mode
 
-  ```bash
-  cargo xtask run -- [OPTIONS] <COMMAND>
-  ```
+```bash
+cargo xtask run -- [OPTIONS] <COMMAND>
+```
 
 ## <img src="figures/RustiFlow_nobg.png" width="60px"/> Usage Instructions
 
 ### Command Help:
-  ```bash
-  rustiflow help
-  ```
-  ```bash
-  Usage: rustiflow [OPTIONS] <COMMAND>
 
-  Commands:
-    realtime  Real-time feature extraction
-    pcap      Feature extraction from a pcap file
-    help      Print this message or the help of the given subcommand(s)
+```bash
+rustiflow help
+```
 
-  Options:
-    -c, --config-file <CONFIG_FILE>
-            Configuration file path
+```bash
+Usage: rustiflow [OPTIONS] <COMMAND>
 
-    -f, --features <FEATURES>
-            The feature set to use (required if no config file is provided)
+Commands:
+  realtime  Real-time feature extraction
+  pcap      Feature extraction from a pcap file
+  help      Print this message or the help of the given subcommand(s)
 
-            Possible values:
-            - basic:    A basic flow that stores the basic features of a flow
-            - cic:      Represents the CIC Flow, giving 83 features
-            - cidds:    Represents the CIDDS Flow, giving 10 features
-            - nfstream: Represents a nfstream inspired flow, giving 69 features
-            - ntl:      Represents the NTL Flow, giving 120 features
-            - custom:   Represents a flow that you can implement yourself
+Options:
+  -c, --config-file <CONFIG_FILE>
+          Configuration file path
 
-        --active-timeout <ACTIVE_TIMEOUT>
-            The maximum time a flow is allowed to last in seconds (optional)
-            
-            [default: 3600]
+  -f, --features <FEATURES>
+          The feature set to use (required if no config file is provided)
 
-        --idle-timeout <IDLE_TIMEOUT>
-            The maximum time with no packets for a flow in seconds (optional)
-            
-            [default: 120]
+          Possible values:
+          - basic:     A basic flow that stores the basic features of a flow
+          - cic:       Represents the CIC Flow, giving 83 features
+          - cidds:     Represents the CIDDS Flow, giving 10 features
+          - nfstream:  Represents a nfstream inspired flow, giving 69 features
+          - rustiflow: Represents the Rusti Flow, giving 120 features
+          - custom:    Represents a flow that you can implement yourself
 
-        --early-export <EARLY_EXPORT>
-            The print interval for open flows in seconds (optional)
+      --active-timeout <ACTIVE_TIMEOUT>
+          The maximum time a flow is allowed to last in seconds (optional)
 
-        --expiration-check-interval <EXPIRATION_CHECK_INTERVAL>
-            Interval (in seconds) for checking and expiring flows in the flowtable. This represents how often the flowtable should be scanned to remove inactive flows
-            
-            [default: 60]
+          [default: 3600]
 
-        --threads <THREADS>
-            The numbers of threads to use for processing packets (optional) (default: number of logical CPUs)
+      --idle-timeout <IDLE_TIMEOUT>
+          The maximum time with no packets for a flow in seconds (optional)
 
-        -o, --output <OUTPUT>
-                Output method (required if no config file is provided)
+          [default: 120]
 
-                Possible values:
-                - print: The output will be printed to the console
-                - csv:   The output will be written to a CSV file
+      --early-export <EARLY_EXPORT>
+          The print interval for open flows in seconds (optional)
 
-            --export-path <EXPORT_PATH>
-                File path for output (used if method is Csv)
+      --expiration-check-interval <EXPIRATION_CHECK_INTERVAL>
+          Interval (in seconds) for checking and expiring flows in the flowtable. This represents how often the flowtable should be scanned to remove inactive flows
 
-            --header
-                Whether to export the feature header
+          [default: 60]
 
-            --drop-contaminant-features
-                Whether to drop contaminant features
+      --threads <THREADS>
+          The numbers of threads to use for processing packets (optional) (default: 5, maximum number of logical CPUs)
 
-        -h, --help
-                Print help (see a summary with '-h')
+      -o, --output <OUTPUT>
+              Output method (required if no config file is provided)
 
-        -V, --version
-                Print version
+              Possible values:
+              - print: The output will be printed to the console
+              - csv:   The output will be written to a CSV file
 
-  ```
+          --export-path <EXPORT_PATH>
+              File path for output (used if method is Csv)
+
+          --header
+              Whether to export the feature header
+
+          --drop-contaminant-features
+              Whether to drop contaminant features
+
+      -h, --help
+              Print help (see a summary with '-h')
+
+      -V, --version
+              Print version
+
+```
+
+## Logging in both development or using the binary
+
+### Development
+
+```bash
+RUST_LOG=info cargo xtask run --
+```
+
+### Binary
+
+```bash
+sudo RUST_LOG=info rustiflow
+```
 
 **Note:** For specific logging levels, adjust `RUST_LOG` to `error` for error messages, and `debug` for debug messages. If you don't want any additional logs, just remove `RUST_LOG=info`.
 

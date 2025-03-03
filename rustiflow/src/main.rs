@@ -1,13 +1,16 @@
 mod args;
 mod flow_table;
+mod flow_tui;
 mod flows;
 mod output;
+mod packet_counts;
 mod packet_features;
 mod pcap;
 mod realtime;
+mod tests;
 mod tui;
 
-use crate::flows::{cic_flow::CicFlow, ntl_flow::NTLFlow};
+use crate::flows::{cic_flow::CicFlow, rusti_flow::RustiFlow};
 use crate::pcap::read_pcap_file;
 use crate::realtime::handle_realtime;
 use args::{Cli, Commands, ConfigFile, ExportConfig, FlowType, OutputConfig};
@@ -72,6 +75,7 @@ async fn main() {
                     export_path: cli.export_path,
                     header: cli.header,
                     drop_contaminant_features: cli.drop_contaminant_features,
+                    performance_mode: cli.performance_mode,
                 },
                 command: cli.command,
             }
@@ -91,6 +95,8 @@ async fn run_with_config(config: Config) {
             macro_rules! execute_realtime {
                 ($flow_ty:ty) => {{
                     // Create output writer and initialize it
+                    let performance_mode_disabled = config.output.export_path.is_some() && !matches!(std::env::var("RUST_LOG"), Ok(ref val) if val.contains("debug")) && !config.output.performance_mode;
+
                     let mut output_writer = OutputWriter::<$flow_ty>::new(
                         config.output.output,
                         config.output.header,
@@ -124,12 +130,13 @@ async fn run_with_config(config: Config) {
                     let result = handle_realtime::<$flow_ty>(
                         &interface,
                         sender,
-                        config.config.threads.unwrap_or(num_cpus::get() as u8),
+                        std::cmp::min(config.config.threads.unwrap_or(5), num_cpus::get() as u8),
                         config.config.active_timeout,
                         config.config.idle_timeout,
                         config.config.early_export,
                         config.config.expiration_check_interval,
                         ingress_only,
+                        performance_mode_disabled,
                     )
                     .await;
 
@@ -163,7 +170,7 @@ async fn run_with_config(config: Config) {
                 FlowType::CIC => execute_realtime!(CicFlow),
                 FlowType::CIDDS => execute_realtime!(CiddsFlow),
                 FlowType::Nfstream => execute_realtime!(NfFlow),
-                FlowType::NTL => execute_realtime!(NTLFlow),
+                FlowType::Rustiflow => execute_realtime!(RustiFlow),
                 FlowType::Custom => execute_realtime!(CustomFlow),
             }
         }
@@ -204,7 +211,7 @@ async fn run_with_config(config: Config) {
                     if let Err(err) = read_pcap_file::<$flow_ty>(
                         &path,
                         sender,
-                        config.config.threads.unwrap_or(num_cpus::get() as u8),
+                        std::cmp::min(config.config.threads.unwrap_or(5), num_cpus::get() as u8),
                         config.config.active_timeout,
                         config.config.idle_timeout,
                         config.config.early_export,
@@ -233,7 +240,7 @@ async fn run_with_config(config: Config) {
                 FlowType::CIC => execute_offline!(CicFlow),
                 FlowType::CIDDS => execute_offline!(CiddsFlow),
                 FlowType::Nfstream => execute_offline!(NfFlow),
-                FlowType::NTL => execute_offline!(NTLFlow),
+                FlowType::Rustiflow => execute_offline!(RustiFlow),
                 FlowType::Custom => execute_offline!(CustomFlow),
             }
         }

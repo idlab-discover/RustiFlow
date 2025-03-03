@@ -1,8 +1,10 @@
 use std::hash::{DefaultHasher, Hash, Hasher};
+use std::sync::Arc;
 
 use crate::debug;
+use crate::flow_tui::launch_packet_tui;
+use crate::packet_counts::PacketCountPerSecond;
 use crate::{flow_table::FlowTable, flows::flow::Flow, packet_features::PacketFeatures};
-use aya::maps::PerCpuValues;
 use aya::{
     include_bytes_aligned,
     maps::{PerCpuArray, RingBuf},
@@ -12,10 +14,12 @@ use aya::{
 use aya_log::EbpfLogger;
 use common::{EbpfEventIpv4, EbpfEventIpv6};
 use log::{error, info};
+use tokio::sync::watch;
 use tokio::{
     io::unix::AsyncFd,
     signal,
     sync::mpsc::{self, Sender},
+    sync::Mutex,
     task::JoinSet,
 };
 
@@ -30,6 +34,7 @@ pub async fn handle_realtime<T>(
     early_export: Option<u64>,
     expiration_check_interval: u64,
     ingress_only: bool,
+    performance_mode_disabled: bool,
 ) -> Result<u64, anyhow::Error>
 where
     T: Flow,
@@ -41,10 +46,10 @@ where
     let mut bpf_ingress_ipv4 = load_ebpf_ipv4(interface, TcAttachType::Ingress)?;
     let mut bpf_ingress_ipv6 = load_ebpf_ipv6(interface, TcAttachType::Ingress)?;
     let events_ingress_ipv4 = RingBuf::try_from(bpf_ingress_ipv4.take_map("EVENTS_IPV4").unwrap())?;
-    let dropped_packets_ingress_ipv4 =
+    let dropped_packets_ingress_ipv4: PerCpuArray<_, u64> =
         PerCpuArray::try_from(bpf_ingress_ipv4.take_map("DROPPED_PACKETS").unwrap())?;
     let events_ingress_ipv6 = RingBuf::try_from(bpf_ingress_ipv6.take_map("EVENTS_IPV6").unwrap())?;
-    let dropped_packets_ingress_ipv6 =
+    let dropped_packets_ingress_ipv6: PerCpuArray<_, u64> =
         PerCpuArray::try_from(bpf_ingress_ipv6.take_map("DROPPED_PACKETS").unwrap())?;
     let event_sources_v4;
     let event_sources_v6;
@@ -55,11 +60,11 @@ where
         let mut bpf_egress_ipv6 = load_ebpf_ipv6(interface, TcAttachType::Egress)?;
         let events_egress_ipv4 =
             RingBuf::try_from(bpf_egress_ipv4.take_map("EVENTS_IPV4").unwrap())?;
-        let dropped_packets_egress_ipv4 =
+        let dropped_packets_egress_ipv4: PerCpuArray<_, u64> =
             PerCpuArray::try_from(bpf_egress_ipv4.take_map("DROPPED_PACKETS").unwrap())?;
         let events_egress_ipv6 =
             RingBuf::try_from(bpf_egress_ipv6.take_map("EVENTS_IPV6").unwrap())?;
-        let dropped_packets_egress_ipv6 =
+        let dropped_packets_egress_ipv6: PerCpuArray<_, u64> =
             PerCpuArray::try_from(bpf_egress_ipv6.take_map("DROPPED_PACKETS").unwrap())?;
         event_sources_v4 = vec![events_egress_ipv4, events_ingress_ipv4];
         event_sources_v6 = vec![events_egress_ipv6, events_ingress_ipv6];
@@ -78,6 +83,9 @@ where
     let buffer_num_packets = 10_000;
     let mut shard_senders = Vec::with_capacity(num_threads as usize);
 
+    let (packet_tx, packet_rx) = watch::channel(Vec::new());
+    let packet_counter = Arc::new(Mutex::new(PacketCountPerSecond::new()));
+
     debug!("Creating {} sharded FlowTables...", num_threads);
     for _ in 0..num_threads {
         let (tx, mut rx) = mpsc::channel::<PacketFeatures>(buffer_num_packets);
@@ -91,12 +99,16 @@ where
 
         // Spawn a task per shard
         tokio::spawn(async move {
+            let mut last_timestamp = None;
             while let Some(packet_features) = rx.recv().await {
+                last_timestamp = Some(packet_features.timestamp_us);
                 flow_table.process_packet(&packet_features).await;
             }
             debug!("Shard finished processing packets");
             // Handle flow exporting when the receiver is closed
-            flow_table.export_all_flows().await;
+            if let Some(timestamp) = last_timestamp {
+                flow_table.export_all_flows(timestamp).await;
+            }
         });
         shard_senders.push(tx);
     }
@@ -107,6 +119,9 @@ where
 
     for ebpf_event_source in event_sources_v4 {
         let shard_senders_clone = shard_senders.clone();
+        let packet_counter_clone = Arc::clone(&packet_counter);
+        let packet_tx_clone = packet_tx.clone();
+
         handle_set.spawn(async move {
             // Wrap the RingBuf in AsyncFd to poll it with tokio
             let mut async_ring_buf = AsyncFd::new(ebpf_event_source).unwrap();
@@ -117,6 +132,13 @@ where
 
                 let ring_buf = guard.get_inner_mut();
                 while let Some(event) = ring_buf.next() {
+                    if performance_mode_disabled {
+                        let mut counter = packet_counter_clone.lock().await;
+                        counter.increment();
+                        // Send the updated count to the TUI
+                        let recent_counts = counter.get_counts_for_last_intervals(100);
+                        let _ = packet_tx_clone.send(recent_counts);
+                    }
                     let ebpf_event_ipv4: EbpfEventIpv4 =
                         unsafe { std::ptr::read(event.as_ptr() as *const _) };
                     let packet_features = PacketFeatures::from_ebpf_event_ipv4(&ebpf_event_ipv4);
@@ -139,6 +161,8 @@ where
 
     for ebpf_event_source in event_sources_v6 {
         let shard_senders_clone = shard_senders.clone();
+        let packet_counter_clone = Arc::clone(&packet_counter);
+        let packet_tx_clone = packet_tx.clone();
 
         handle_set.spawn(async move {
             // Wrap the RingBuf in AsyncFd to poll it with tokio
@@ -150,6 +174,13 @@ where
 
                 let ring_buf = guard.get_inner_mut();
                 while let Some(event) = ring_buf.next() {
+                    if performance_mode_disabled {
+                        let mut counter = packet_counter_clone.lock().await;
+                        counter.increment();
+                        // Send the updated count to the TUI
+                        let recent_counts = counter.get_counts_for_last_intervals(100);
+                        let _ = packet_tx_clone.send(recent_counts);
+                    }
                     let ebpf_event_ipv6: EbpfEventIpv6 =
                         unsafe { std::ptr::read(event.as_ptr() as *const _) };
                     let packet_features = PacketFeatures::from_ebpf_event_ipv6(&ebpf_event_ipv6);
@@ -172,16 +203,29 @@ where
 
     info!("Waiting for Ctrl-C...");
 
+    if performance_mode_disabled {
+        let _ = launch_packet_tui(packet_rx).await;
+    }
+
     signal::ctrl_c().await?;
 
-    // Fetch the dropped packets counter from the eBPF program before terminating
+    // Fetch dropped packets counter from eBPF program before terminating
+    info!("Fetching dropped packet counters before exiting...");
     let mut total_dropped = 0;
     for dropped_packets_array in dropped_packet_counters {
-        let values: PerCpuValues<u64> = dropped_packets_array.get(&0, 0)?;
-        for cpu_val in values.iter() {
-            total_dropped += *cpu_val;
+        match dropped_packets_array.get(&0, 0) {
+            Ok(values) => {
+                for cpu_val in values.iter() {
+                    total_dropped += *cpu_val;
+                }
+            }
+            Err(e) => {
+                error!("Failed to read dropped packets counter: {:?}", e);
+            }
         }
     }
+
+    info!("Total dropped packets before exit: {}", total_dropped);
 
     // Cancel the tasks reading ebpf events
     handle_set.abort_all();

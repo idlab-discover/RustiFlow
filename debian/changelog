@@ -1,0 +1,12 @@
+rustiflow (0.1.0) unstable; urgency=low
+
+    * Initial release.
+    * Implemented basic flow feature extraction.
+    * Added support for CIC, CIDDS, Nfstream, and NTL flow types.
+    * Integrated TUI for configuration and monitoring.
+    * Enabled real-time and pcap file processing.
+    * Added CSV and console output methods.
+    * Included Docker support for containerized deployment.
+    * Provided comprehensive documentation and examples.
+
+ -- IDLab <miel.verkerken@ugent.be>  Mon, 30 Oct 2023 10:00:00 +0000

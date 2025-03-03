@@ -6,7 +6,7 @@ use crossterm::terminal::{
 use log::error;
 use serde::{Deserialize, Serialize};
 use std::error::Error;
-use std::io;
+use std::{fs, io};
 use strum::VariantNames;
 use tui::backend::{Backend, CrosstermBackend};
 use tui::layout::{Alignment, Constraint, Direction, Layout, Rect};
@@ -16,8 +16,6 @@ use tui::widgets::{Block, Borders, Clear, List, ListItem, ListState, Paragraph};
 use tui::{Frame, Terminal};
 
 use crate::args::{Commands, ConfigFile, ExportConfig, ExportMethodType, FlowType, OutputConfig};
-
-const CONFIG_FILE_NAME: &str = "rustiflow.toml";
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Config {
@@ -42,6 +40,7 @@ impl Config {
                 export_path: None,
                 header: false,
                 drop_contaminant_features: false,
+                performance_mode: false,
             },
             command: Commands::Realtime {
                 interface: String::from("eth0"),
@@ -53,57 +52,24 @@ impl Config {
 
 impl Default for Config {
     fn default() -> Self {
-        let config: ConfigFile = match confy::load_path(CONFIG_FILE_NAME) {
-            Ok(config) => config,
-            Err(_) => {
-                return Config {
-                    config: ExportConfig {
-                        features: FlowType::Basic,
-                        active_timeout: 3600,
-                        idle_timeout: 120,
-                        early_export: None,
-                        threads: None,
-                        expiration_check_interval: 60,
-                    },
-                    output: OutputConfig {
-                        output: ExportMethodType::Print,
-                        export_path: None,
-                        header: false,
-                        drop_contaminant_features: false,
-                    },
-                    command: Commands::Realtime {
-                        interface: String::from("eth0"),
-                        ingress_only: false,
-                    },
-                };
-            }
-        };
-        Config {
-            config: config.config,
-            output: config.output,
-            command: Commands::Realtime {
-                interface: String::from("eth0"),
-                ingress_only: false,
-            },
-        }
+        Config::reset()
     }
 }
 
 pub async fn launch_tui() -> Result<Option<Config>, Box<dyn Error>> {
-    // setup terminal
+    let config = Config::reset();
+
     enable_raw_mode()?;
     let mut stdout = io::stdout();
     execute!(stdout, EnterAlternateScreen, EnableMouseCapture)?;
     let backend = CrosstermBackend::new(stdout);
     let mut terminal = Terminal::new(backend)?;
 
-    // Create app state
-    let mut app = App::new();
+    let mut app = App::new(config);
+    app.focus = AppFocus::ConfigFileInput;
 
-    // Run the app
     let res = run_app(&mut terminal, &mut app).await;
 
-    // Restore terminal
     disable_raw_mode()?;
     execute!(
         terminal.backend_mut(),
@@ -117,6 +83,8 @@ pub async fn launch_tui() -> Result<Option<Config>, Box<dyn Error>> {
 
 struct App {
     config: Config,
+    config_file: Option<String>,
+    config_file_input: String,
     focus: AppFocus,
     title_bar_state: ListState,
     main_menu_state: ListState,
@@ -132,7 +100,7 @@ struct App {
 }
 
 impl App {
-    fn new() -> App {
+    fn new(config: Config) -> App {
         let mut main_menu_state = ListState::default();
         main_menu_state.select(Some(0));
 
@@ -148,6 +116,9 @@ impl App {
         let mut title_bar_state = ListState::default();
         title_bar_state.select(Some(0));
 
+        let mut config_file_focus = ListState::default();
+        config_file_focus.select(Some(0));
+
         let main_menu_items = vec![
             "Feature Set",
             "Mode",
@@ -162,7 +133,9 @@ impl App {
         ];
 
         App {
-            config: Config::default(),
+            config,
+            config_file: None,
+            config_file_input: String::new(),
             focus: AppFocus::Menu,
             title_bar_state,
             main_menu_state,
@@ -192,10 +165,13 @@ enum AppFocus {
     CommandArgumentInput,
     OutputArgumentInput,
     IngressOnlyInput,
+    PerformanceModeInput,
     ThreadsInput,
     EarlyExportInput,
     HeaderInput,
     DropContaminantFeaturesInput,
+    ConfigFileInput,
+    ConfigFileSaveInput,
 }
 
 async fn run_app<B: Backend>(
@@ -228,9 +204,16 @@ async fn run_app<B: Backend>(
                     AppFocus::CommandArgumentInput => handle_command_argument_input(key, app)?,
                     AppFocus::OutputArgumentInput => handle_output_argument_input(key, app)?,
                     AppFocus::IngressOnlyInput
+                    | AppFocus::PerformanceModeInput
                     | AppFocus::HeaderInput
                     | AppFocus::DropContaminantFeaturesInput => {
                         handle_boolean_input(key, app, app.focus.clone())?
+                    }
+                    AppFocus::ConfigFileInput => {
+                        handle_config_file_input(key, app)?;
+                    }
+                    AppFocus::ConfigFileSaveInput => {
+                        handle_config_file_save_input(key, app)?;
                     }
                 }
             }
@@ -265,14 +248,7 @@ fn handle_title_bar_input(key: KeyEvent, app: &mut App) -> Result<Option<Config>
             }
             Some(2) => {
                 // Save config to file
-                let config_file = ConfigFile {
-                    config: app.config.config.clone(),
-                    output: app.config.output.clone(),
-                };
-
-                if let Err(e) = confy::store_path(CONFIG_FILE_NAME, config_file) {
-                    error!("Error saving configuration file: {:?}", e);
-                }
+                app.focus = AppFocus::ConfigFileSaveInput;
             }
             Some(3) => {
                 // Reset config
@@ -449,6 +425,11 @@ fn handle_boolean_input(
                     *ingress_only = !*ingress_only;
                 }
             }
+            AppFocus::PerformanceModeInput => {
+                if let ExportMethodType::Csv = &app.config.output.output {
+                    app.config.output.performance_mode = !app.config.output.performance_mode;
+                }
+            }
             AppFocus::HeaderInput => {
                 app.config.output.header = !app.config.output.header;
             }
@@ -466,6 +447,11 @@ fn handle_boolean_input(
                 AppFocus::IngressOnlyInput => {
                     if let Commands::Realtime { ingress_only, .. } = &mut app.config.command {
                         *ingress_only = false;
+                    }
+                }
+                AppFocus::PerformanceModeInput => {
+                    if let ExportMethodType::Csv = &app.config.output.output {
+                        app.config.output.performance_mode = false;
                     }
                 }
                 AppFocus::HeaderInput => {
@@ -529,6 +515,7 @@ fn handle_selection_input(
                 Some(0) => {
                     app.config.output.output = ExportMethodType::Print;
                     app.config.output.export_path = None;
+                    app.focus = AppFocus::Menu;
                 }
                 Some(1) => {
                     app.config.output.output = ExportMethodType::Csv;
@@ -606,12 +593,79 @@ fn handle_output_argument_input(key: KeyEvent, app: &mut App) -> Result<(), Box<
             }
         }
         KeyCode::Enter => {
-            app.focus = AppFocus::Menu;
+            app.focus = AppFocus::PerformanceModeInput;
         }
         KeyCode::Left | KeyCode::Esc => {
             if let Some(ref mut export_path) = app.config.output.export_path {
                 export_path.clear();
             }
+            app.focus = AppFocus::Menu;
+        }
+        _ => {}
+    }
+    Ok(())
+}
+
+fn handle_config_file_input(key: KeyEvent, app: &mut App) -> Result<(), Box<dyn Error>> {
+    match key.code {
+        KeyCode::Char(c) => {
+            app.config_file_input.push(c); // Add character to input
+        }
+        KeyCode::Backspace => {
+            app.config_file_input.pop(); // Remove last character from input
+        }
+        KeyCode::Enter => {
+            // Attempt to load the configuration file
+            if fs::metadata(&app.config_file_input).is_ok() {
+                app.config_file = Some(app.config_file_input.clone());
+                let config = match confy::load_path::<ConfigFile>(app.config_file_input.clone()) {
+                    Ok(config_file) => Config {
+                        config: config_file.config,
+                        output: config_file.output,
+                        command: Commands::Realtime {
+                            interface: String::from("eth0"),
+                            ingress_only: false,
+                        },
+                    },
+                    Err(_) => Config::reset(),
+                };
+                app.config = config;
+                app.focus = AppFocus::Menu;
+            } else {
+                app.focus = AppFocus::Menu;
+            }
+        }
+        _ => {}
+    }
+    Ok(())
+}
+
+fn handle_config_file_save_input(key: KeyEvent, app: &mut App) -> Result<(), Box<dyn Error>> {
+    match key.code {
+        KeyCode::Char(c) => {
+            app.config_file_input.push(c);
+        }
+        KeyCode::Backspace => {
+            app.config_file_input.pop();
+        }
+        KeyCode::Enter => {
+            let config_file_name = app.config_file_input.clone();
+
+            if let Err(e) = confy::store_path(
+                &config_file_name,
+                ConfigFile {
+                    config: app.config.config.clone(),
+                    output: app.config.output.clone(),
+                },
+            ) {
+                error!(
+                    "Error saving configuration to file: {} \nError: {} \nPlease try again.",
+                    config_file_name, e
+                );
+            } else {
+                app.config_file = Some(config_file_name);
+            }
+
             app.focus = AppFocus::Menu;
         }
         _ => {}
@@ -626,6 +680,16 @@ fn ui_main_screen<B: Backend>(f: &mut Frame<B>, app: &App) {
 
     // Render the background block over the entire terminal area
     f.render_widget(background, size);
+
+    if matches!(app.focus, AppFocus::ConfigFileInput) {
+        render_config_file_input(f, app, centered_rect(80, 15, size));
+        return; // Skip the rest of the UI rendering for other elements
+    }
+
+    if matches!(app.focus, AppFocus::ConfigFileSaveInput) {
+        render_config_file_save(f, app, centered_rect(80, 15, size));
+        return;
+    }
 
     let chunks = Layout::default()
         .direction(Direction::Vertical)
@@ -960,6 +1024,13 @@ fn render_current_selections<B: Backend>(f: &mut Frame<B>, app: &App, area: Rect
             ),
         ])),
         ListItem::new(Spans::from(vec![
+            Span::raw("Performance Mode: "),
+            Span::styled(
+                format!("{:?}", app.config.output.performance_mode),
+                Style::default().fg(Color::Yellow),
+            ),
+        ])),
+        ListItem::new(Spans::from(vec![
             Span::raw("Active Timeout: "),
             Span::styled(
                 format!("{}", app.config.config.active_timeout),
@@ -1106,6 +1177,28 @@ fn render_popups<B: Backend>(f: &mut Frame<B>, app: &App, size: Rect) {
 
         render_boolean_choice(f, inner_area, is_true_selected);
     }
+
+    if matches!(app.focus, AppFocus::PerformanceModeInput) {
+        let is_true_selected = match &app.config.output.output {
+            ExportMethodType::Csv => app.config.output.performance_mode,
+            _ => false,
+        };
+
+        let popup_area = centered_rect(50, 25, size);
+        f.render_widget(Clear, popup_area);
+
+        let boolean_input_block = Block::default()
+            .title("Performance mode (no graph)?")
+            .borders(Borders::ALL)
+            .style(Style::default().bg(Color::Black))
+            .border_style(Style::default().fg(Color::Yellow));
+
+        let inner_area = boolean_input_block.inner(popup_area);
+
+        f.render_widget(boolean_input_block, popup_area);
+
+        render_boolean_choice(f, inner_area, is_true_selected);
+    }
 }
 
 fn render_popup_input<B: Backend>(f: &mut Frame<B>, size: Rect, input_text: &str, title: &str) {
@@ -1152,4 +1245,46 @@ fn centered_rect(percent_x: u16, percent_y: u16, r: Rect) -> Rect {
             .as_ref(),
         )
         .split(popup_layout[1])[1]
+}
+
+fn render_config_file_input<B: Backend>(f: &mut Frame<B>, app: &App, area: Rect) {
+    let config_file_input = Paragraph::new(app.config_file_input.as_ref())
+        .block(
+            Block::default()
+                .title("Enter Configuration File Path or press ENTER to start clean")
+                .borders(Borders::ALL)
+                .border_style(
+                    Style::default()
+                        .fg(if matches!(app.focus, AppFocus::ConfigFileInput) {
+                            Color::Yellow
+                        } else {
+                            Color::Cyan
+                        })
+                        .add_modifier(Modifier::BOLD),
+                ),
+        )
+        .style(Style::default().fg(Color::Yellow));
+
+    f.render_widget(config_file_input, area);
+}
+
+fn render_config_file_save<B: Backend>(f: &mut Frame<B>, app: &App, area: Rect) {
+    let config_file_save = Paragraph::new(app.config_file_input.as_ref())
+        .block(
+            Block::default()
+                .title("Enter Configuration File Path to Save")
+                .borders(Borders::ALL)
+                .border_style(
+                    Style::default()
+                        .fg(if matches!(app.focus, AppFocus::ConfigFileSaveInput) {
+                            Color::Yellow
+                        } else {
+                            Color::Cyan
+                        })
+                        .add_modifier(Modifier::BOLD),
+                ),
+        )
+        .style(Style::default().fg(Color::Yellow));
+
+    f.render_widget(config_file_save, area);
 }
