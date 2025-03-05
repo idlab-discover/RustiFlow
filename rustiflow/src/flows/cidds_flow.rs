@@ -1,6 +1,5 @@
 use std::net::IpAddr;
 
-use chrono::format;
 use pnet::packet::ip::IpNextHeaderProtocols;
 
 use crate::flows::util::iana_port_mapping;
