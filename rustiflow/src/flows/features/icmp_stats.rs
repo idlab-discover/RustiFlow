@@ -18,12 +18,12 @@ impl IcmpStats {
         }
     }
 
-    pub fn get_type(&self) -> u8 {
-        self.icmp_type.unwrap_or(0)
+    pub fn get_type(&self) -> i16 {
+        self.icmp_type.map(|v| v as i16).unwrap_or(-1)
     }
 
-    pub fn get_code(&self) -> u8 {
-        self.icmp_code.unwrap_or(0)
+    pub fn get_code(&self) -> i16 {
+        self.icmp_code.map(|v| v as i16).unwrap_or(-1)
     }
 }
 

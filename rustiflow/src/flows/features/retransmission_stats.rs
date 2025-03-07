@@ -1,4 +1,8 @@
+use std::collections::hash_map::DefaultHasher;
 use std::collections::HashSet;
+use std::hash::{Hash, Hasher};
+
+use pnet::packet::ip::IpNextHeaderProtocols;
 
 use crate::{flows::util::FlowExpireCause, packet_features::PacketFeatures};
 
@@ -29,13 +33,25 @@ impl RetransmissionStats {
 impl FlowFeature for RetransmissionStats {
     fn update(&mut self, packet: &PacketFeatures, is_forward: bool, _last_timestamp_us: i64) {
         let seq = packet.sequence_number;
+        let ack = packet.sequence_number_ack;
+
+        if packet.protocol != IpNextHeaderProtocols::Icmp.0
+            || packet.protocol == IpNextHeaderProtocols::Icmpv6.0
+        {
+            // Skip ICMP packets
+            return;
+        }
+
+        let mut hasher = DefaultHasher::new();
+        (seq, ack).hash(&mut hasher);
+        let hash = hasher.finish();
 
         if is_forward {
-            if !self.fwd_seen_seqs.insert(seq) {
+            if !self.fwd_seen_seqs.insert(hash as u32) {
                 self.fwd_retransmission_count += 1;
             }
         } else {
-            if !self.bwd_seen_seqs.insert(seq) {
+            if !self.bwd_seen_seqs.insert(hash as u32) {
                 self.bwd_retransmission_count += 1;
             }
         }

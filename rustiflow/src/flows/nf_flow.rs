@@ -40,6 +40,7 @@ impl NfFlow {
         match self.basic_flow.flow_expire_cause {
             FlowExpireCause::ActiveTimeout => 1,
             FlowExpireCause::IdleTimeout => 0,
+            FlowExpireCause::TcpTermination => 0,
             _ => -1,
         }
     }
@@ -145,24 +146,16 @@ impl Flow for NfFlow {
             self.packet_len_stats.flow_count(),
             self.packet_len_stats.flow_total(),
             self.timing_stats
-                .first_timestamp_fwd
-                .map(|t| t / 1000)
+                .first_timestamp_fwd_ms
                 .unwrap_or_else(|| 0),
-            self.timing_stats
-                .last_timestamp_fwd
-                .map(|t| t / 1000)
-                .unwrap_or_else(|| 0),
+            self.timing_stats.last_timestamp_fwd_ms.unwrap_or_else(|| 0),
             self.timing_stats.get_fwd_duration(),
             self.packet_len_stats.fwd_packet_len.get_count(),
             self.packet_len_stats.fwd_packet_len.get_total(),
             self.timing_stats
-                .first_timestamp_bwd
-                .map(|t| t / 1000)
+                .first_timestamp_bwd_ms
                 .unwrap_or_else(|| 0),
-            self.timing_stats
-                .last_timestamp_bwd
-                .map(|t| t / 1000)
-                .unwrap_or_else(|| 0),
+            self.timing_stats.last_timestamp_bwd_ms.unwrap_or_else(|| 0),
             self.timing_stats.get_bwd_duration(),
             self.packet_len_stats.bwd_packet_len.get_count(),
             self.packet_len_stats.bwd_packet_len.get_total(),
@@ -179,18 +172,18 @@ impl Flow for NfFlow {
             self.packet_len_stats.bwd_packet_len.get_mean(),
             self.packet_len_stats.bwd_packet_len.get_std(),
             self.packet_len_stats.bwd_packet_len.get_max(),
-            self.iat_stats.iat.get_min() / 1000.0,
-            self.iat_stats.iat.get_mean() / 1000.0,
-            self.iat_stats.iat.get_std() / 1000.0,
-            self.iat_stats.iat.get_max() / 1000.0,
-            self.iat_stats.fwd_iat.get_min() / 1000.0,
-            self.iat_stats.fwd_iat.get_mean() / 1000.0,
-            self.iat_stats.fwd_iat.get_std() / 1000.0,
-            self.iat_stats.fwd_iat.get_max() / 1000.0,
-            self.iat_stats.bwd_iat.get_min() / 1000.0,
-            self.iat_stats.bwd_iat.get_mean() / 1000.0,
-            self.iat_stats.bwd_iat.get_std() / 1000.0,
-            self.iat_stats.bwd_iat.get_max() / 1000.0,
+            self.iat_stats.iat.get_min(),
+            self.iat_stats.iat.get_mean(),
+            self.iat_stats.iat.get_std(),
+            self.iat_stats.iat.get_max(),
+            self.iat_stats.fwd_iat.get_min(),
+            self.iat_stats.fwd_iat.get_mean(),
+            self.iat_stats.fwd_iat.get_std(),
+            self.iat_stats.fwd_iat.get_max(),
+            self.iat_stats.bwd_iat.get_min(),
+            self.iat_stats.bwd_iat.get_mean(),
+            self.iat_stats.bwd_iat.get_std(),
+            self.iat_stats.bwd_iat.get_max(),
             self.tcp_flags_stats.fwd_syn_flag_count + self.tcp_flags_stats.bwd_syn_flag_count,
             self.tcp_flags_stats.fwd_cwr_flag_count + self.tcp_flags_stats.bwd_cwr_flag_count,
             self.tcp_flags_stats.fwd_ece_flag_count + self.tcp_flags_stats.bwd_ece_flag_count,
@@ -328,18 +321,18 @@ impl Flow for NfFlow {
             self.packet_len_stats.bwd_packet_len.get_mean(),
             self.packet_len_stats.bwd_packet_len.get_std(),
             self.packet_len_stats.bwd_packet_len.get_max(),
-            self.iat_stats.iat.get_min() / 1000.0,
-            self.iat_stats.iat.get_mean() / 1000.0,
-            self.iat_stats.iat.get_std() / 1000.0,
-            self.iat_stats.iat.get_max() / 1000.0,
-            self.iat_stats.fwd_iat.get_min() / 1000.0,
-            self.iat_stats.fwd_iat.get_mean() / 1000.0,
-            self.iat_stats.fwd_iat.get_std() / 1000.0,
-            self.iat_stats.fwd_iat.get_max() / 1000.0,
-            self.iat_stats.bwd_iat.get_min() / 1000.0,
-            self.iat_stats.bwd_iat.get_mean() / 1000.0,
-            self.iat_stats.bwd_iat.get_std() / 1000.0,
-            self.iat_stats.bwd_iat.get_max() / 1000.0,
+            self.iat_stats.iat.get_min(),
+            self.iat_stats.iat.get_mean(),
+            self.iat_stats.iat.get_std(),
+            self.iat_stats.iat.get_max(),
+            self.iat_stats.fwd_iat.get_min(),
+            self.iat_stats.fwd_iat.get_mean(),
+            self.iat_stats.fwd_iat.get_std(),
+            self.iat_stats.fwd_iat.get_max(),
+            self.iat_stats.bwd_iat.get_min(),
+            self.iat_stats.bwd_iat.get_mean(),
+            self.iat_stats.bwd_iat.get_std(),
+            self.iat_stats.bwd_iat.get_max(),
             self.tcp_flags_stats.fwd_syn_flag_count + self.tcp_flags_stats.bwd_syn_flag_count,
             self.tcp_flags_stats.fwd_cwr_flag_count + self.tcp_flags_stats.bwd_cwr_flag_count,
             self.tcp_flags_stats.fwd_ece_flag_count + self.tcp_flags_stats.bwd_ece_flag_count,
