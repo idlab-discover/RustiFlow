@@ -133,18 +133,18 @@ impl Flow for CicFlow {
             self.basic_flow.get_first_timestamp(),
             self.basic_flow.get_flow_duration_usec(),
             // Packet Length Stats (fwd & bwd)
-            self.packet_len_stats.fwd_packet_len.get_count(),
-            self.packet_len_stats.bwd_packet_len.get_count(),
-            self.packet_len_stats.fwd_packet_len.get_total(),
-            self.packet_len_stats.bwd_packet_len.get_total(),
-            self.packet_len_stats.fwd_packet_len.get_max(),
-            self.packet_len_stats.fwd_packet_len.get_min(),
-            self.packet_len_stats.fwd_packet_len.get_mean(),
-            self.packet_len_stats.fwd_packet_len.get_std(),
-            self.packet_len_stats.bwd_packet_len.get_max(),
-            self.packet_len_stats.bwd_packet_len.get_min(),
-            self.packet_len_stats.bwd_packet_len.get_mean(),
-            self.packet_len_stats.bwd_packet_len.get_std(),
+            self.payload_len_stats.fwd_payload_len.get_count(),
+            self.payload_len_stats.bwd_payload_len.get_count(),
+            self.payload_len_stats.fwd_payload_len.get_total(),
+            self.payload_len_stats.bwd_payload_len.get_total(),
+            self.payload_len_stats.fwd_payload_len.get_max(),
+            self.payload_len_stats.fwd_payload_len.get_min(),
+            self.payload_len_stats.fwd_payload_len.get_mean(),
+            self.payload_len_stats.fwd_payload_len.get_std(),
+            self.payload_len_stats.bwd_payload_len.get_max(),
+            self.payload_len_stats.bwd_payload_len.get_min(),
+            self.payload_len_stats.bwd_payload_len.get_mean(),
+            self.payload_len_stats.bwd_payload_len.get_std(),
             // Rate Stats (Flow)
             safe_per_second_rate(
                 self.packet_len_stats.flow_total(),
@@ -154,21 +154,21 @@ impl Flow for CicFlow {
                 self.packet_len_stats.flow_count() as f64,
                 self.basic_flow.get_flow_duration_usec() as f64
             ),
-            // IAT Stats
-            self.iat_stats.iat.get_mean(),
-            self.iat_stats.iat.get_std(),
-            self.iat_stats.iat.get_max(),
-            self.iat_stats.iat.get_min(),
-            self.iat_stats.fwd_iat.get_total(),
-            self.iat_stats.fwd_iat.get_mean(),
-            self.iat_stats.fwd_iat.get_std(),
-            self.iat_stats.fwd_iat.get_max(),
-            self.iat_stats.fwd_iat.get_min(),
-            self.iat_stats.bwd_iat.get_total(),
-            self.iat_stats.bwd_iat.get_mean(),
-            self.iat_stats.bwd_iat.get_std(),
-            self.iat_stats.bwd_iat.get_max(),
-            self.iat_stats.bwd_iat.get_min(),
+            // IAT Stats in us instead of ms
+            self.iat_stats.iat.get_mean() * 1000.0,
+            self.iat_stats.iat.get_std() * 1000.0,
+            self.iat_stats.iat.get_max() * 1000.0,
+            self.iat_stats.iat.get_min() * 1000.0,
+            self.iat_stats.fwd_iat.get_total() * 1000.0,
+            self.iat_stats.fwd_iat.get_mean() * 1000.0,
+            self.iat_stats.fwd_iat.get_std() * 1000.0,
+            self.iat_stats.fwd_iat.get_max() * 1000.0,
+            self.iat_stats.fwd_iat.get_min() * 1000.0,
+            self.iat_stats.bwd_iat.get_total() * 1000.0,
+            self.iat_stats.bwd_iat.get_mean() * 1000.0,
+            self.iat_stats.bwd_iat.get_std() * 1000.0,
+            self.iat_stats.bwd_iat.get_max() * 1000.0,
+            self.iat_stats.bwd_iat.get_min() * 1000.0,
             // TCP Flags Stats (fwd & bwd)
             self.tcp_flags_stats.fwd_psh_flag_count,
             self.tcp_flags_stats.bwd_psh_flag_count,
@@ -188,12 +188,12 @@ impl Flow for CicFlow {
                 self.packet_len_stats.bwd_packet_len.get_count() as f64,
                 self.basic_flow.get_flow_duration_usec() as f64
             ),
-            // Packet Length Stats (Flow)
-            self.packet_len_stats.flow_min(),
-            self.packet_len_stats.flow_max(),
-            self.packet_len_stats.flow_mean(),
-            self.packet_len_stats.flow_std(),
-            self.packet_len_stats.flow_variance(),
+            // Payload Length Stats (Flow)
+            self.payload_len_stats.payload_len.get_min(),
+            self.payload_len_stats.payload_len.get_max(),
+            self.payload_len_stats.payload_len.get_mean(),
+            self.payload_len_stats.payload_len.get_std(),
+            self.payload_len_stats.payload_len.get_std().powi(2),
             // TCP Flags Stats (Flow)
             self.tcp_flags_stats.fwd_fin_flag_count + self.tcp_flags_stats.bwd_fin_flag_count,
             self.tcp_flags_stats.fwd_syn_flag_count + self.tcp_flags_stats.bwd_syn_flag_count,
@@ -221,19 +221,19 @@ impl Flow for CicFlow {
             self.bulk_stats.bwd_bulk_rate(),
             // Subflow Stats
             safe_div_int(
-                self.packet_len_stats.fwd_packet_len.get_count(),
+                self.payload_len_stats.fwd_payload_len.get_count(),
                 self.subflow_stats.subflow_count
             ),
             safe_div(
-                self.packet_len_stats.fwd_packet_len.get_total(),
+                self.payload_len_stats.fwd_payload_len.get_total(),
                 self.subflow_stats.subflow_count as f64
             ),
             safe_div_int(
-                self.packet_len_stats.bwd_packet_len.get_count(),
+                self.payload_len_stats.bwd_payload_len.get_count(),
                 self.subflow_stats.subflow_count
             ),
             safe_div(
-                self.packet_len_stats.bwd_packet_len.get_total(),
+                self.payload_len_stats.bwd_payload_len.get_total(),
                 self.subflow_stats.subflow_count as f64
             ),
             // Window Size Stats
@@ -384,18 +384,18 @@ impl Flow for CicFlow {
             self.basic_flow.protocol,
             self.basic_flow.get_flow_duration_usec(),
             // Packet Length Stats (fwd & bwd)
-            self.packet_len_stats.fwd_packet_len.get_count(),
-            self.packet_len_stats.bwd_packet_len.get_count(),
-            self.packet_len_stats.fwd_packet_len.get_total(),
-            self.packet_len_stats.bwd_packet_len.get_total(),
-            self.packet_len_stats.fwd_packet_len.get_max(),
-            self.packet_len_stats.fwd_packet_len.get_min(),
-            self.packet_len_stats.fwd_packet_len.get_mean(),
-            self.packet_len_stats.fwd_packet_len.get_std(),
-            self.packet_len_stats.bwd_packet_len.get_max(),
-            self.packet_len_stats.bwd_packet_len.get_min(),
-            self.packet_len_stats.bwd_packet_len.get_mean(),
-            self.packet_len_stats.bwd_packet_len.get_std(),
+            self.payload_len_stats.fwd_payload_len.get_count(),
+            self.payload_len_stats.bwd_payload_len.get_count(),
+            self.payload_len_stats.fwd_payload_len.get_total(),
+            self.payload_len_stats.bwd_payload_len.get_total(),
+            self.payload_len_stats.fwd_payload_len.get_max(),
+            self.payload_len_stats.fwd_payload_len.get_min(),
+            self.payload_len_stats.fwd_payload_len.get_mean(),
+            self.payload_len_stats.fwd_payload_len.get_std(),
+            self.payload_len_stats.bwd_payload_len.get_max(),
+            self.payload_len_stats.bwd_payload_len.get_min(),
+            self.payload_len_stats.bwd_payload_len.get_mean(),
+            self.payload_len_stats.bwd_payload_len.get_std(),
             // Rate Stats (Flow)
             safe_per_second_rate(
                 self.packet_len_stats.flow_total(),
@@ -405,21 +405,21 @@ impl Flow for CicFlow {
                 self.packet_len_stats.flow_count() as f64,
                 self.basic_flow.get_flow_duration_usec() as f64
             ),
-            // IAT Stats
-            self.iat_stats.iat.get_mean(),
-            self.iat_stats.iat.get_std(),
-            self.iat_stats.iat.get_max(),
-            self.iat_stats.iat.get_min(),
-            self.iat_stats.fwd_iat.get_total(),
-            self.iat_stats.fwd_iat.get_mean(),
-            self.iat_stats.fwd_iat.get_std(),
-            self.iat_stats.fwd_iat.get_max(),
-            self.iat_stats.fwd_iat.get_min(),
-            self.iat_stats.bwd_iat.get_total(),
-            self.iat_stats.bwd_iat.get_mean(),
-            self.iat_stats.bwd_iat.get_std(),
-            self.iat_stats.bwd_iat.get_max(),
-            self.iat_stats.bwd_iat.get_min(),
+            // IAT Stats in us instead of ms
+            self.iat_stats.iat.get_mean() * 1000.0,
+            self.iat_stats.iat.get_std() * 1000.0,
+            self.iat_stats.iat.get_max() * 1000.0,
+            self.iat_stats.iat.get_min() * 1000.0,
+            self.iat_stats.fwd_iat.get_total() * 1000.0,
+            self.iat_stats.fwd_iat.get_mean() * 1000.0,
+            self.iat_stats.fwd_iat.get_std() * 1000.0,
+            self.iat_stats.fwd_iat.get_max() * 1000.0,
+            self.iat_stats.fwd_iat.get_min() * 1000.0,
+            self.iat_stats.bwd_iat.get_total() * 1000.0,
+            self.iat_stats.bwd_iat.get_mean() * 1000.0,
+            self.iat_stats.bwd_iat.get_std() * 1000.0,
+            self.iat_stats.bwd_iat.get_max() * 1000.0,
+            self.iat_stats.bwd_iat.get_min() * 1000.0,
             // TCP Flags Stats (fwd & bwd)
             self.tcp_flags_stats.fwd_psh_flag_count,
             self.tcp_flags_stats.bwd_psh_flag_count,
@@ -439,12 +439,12 @@ impl Flow for CicFlow {
                 self.packet_len_stats.bwd_packet_len.get_count() as f64,
                 self.basic_flow.get_flow_duration_usec() as f64
             ),
-            // Packet Length Stats (Flow)
-            self.packet_len_stats.flow_min(),
-            self.packet_len_stats.flow_max(),
-            self.packet_len_stats.flow_mean(),
-            self.packet_len_stats.flow_std(),
-            self.packet_len_stats.flow_variance(),
+            // Payload Length Stats (Flow)
+            self.payload_len_stats.payload_len.get_min(),
+            self.payload_len_stats.payload_len.get_max(),
+            self.payload_len_stats.payload_len.get_mean(),
+            self.payload_len_stats.payload_len.get_std(),
+            self.payload_len_stats.payload_len.get_std().powi(2),
             // TCP Flags Stats (Flow)
             self.tcp_flags_stats.fwd_fin_flag_count + self.tcp_flags_stats.bwd_fin_flag_count,
             self.tcp_flags_stats.fwd_syn_flag_count + self.tcp_flags_stats.bwd_syn_flag_count,
@@ -455,8 +455,10 @@ impl Flow for CicFlow {
             self.tcp_flags_stats.fwd_cwr_flag_count + self.tcp_flags_stats.bwd_cwr_flag_count,
             self.tcp_flags_stats.fwd_ece_flag_count + self.tcp_flags_stats.bwd_ece_flag_count,
             // UP/DOWN Ratio
-            self.packet_len_stats.bwd_packet_len.get_count() as f64
-                / self.packet_len_stats.fwd_packet_len.get_count() as f64,
+            safe_div_int(
+                self.packet_len_stats.bwd_packet_len.get_count(),
+                self.packet_len_stats.fwd_packet_len.get_count()
+            ),
             // Payload Length Stats
             self.payload_len_stats.payload_len.get_mean(),
             self.payload_len_stats.fwd_payload_len.get_mean(),
@@ -469,14 +471,22 @@ impl Flow for CicFlow {
             self.bulk_stats.bwd_bulk_packets.get_mean(),
             self.bulk_stats.bwd_bulk_rate(),
             // Subflow Stats
-            self.packet_len_stats.fwd_packet_len.get_count() as f64
-                / self.subflow_stats.subflow_count as f64,
-            self.packet_len_stats.fwd_packet_len.get_total()
-                / self.subflow_stats.subflow_count as f64,
-            self.packet_len_stats.bwd_packet_len.get_count() as f64
-                / self.subflow_stats.subflow_count as f64,
-            self.packet_len_stats.bwd_packet_len.get_total()
-                / self.subflow_stats.subflow_count as f64,
+            safe_div_int(
+                self.payload_len_stats.fwd_payload_len.get_count(),
+                self.subflow_stats.subflow_count
+            ),
+            safe_div(
+                self.payload_len_stats.fwd_payload_len.get_total(),
+                self.subflow_stats.subflow_count as f64
+            ),
+            safe_div_int(
+                self.payload_len_stats.bwd_payload_len.get_count(),
+                self.subflow_stats.subflow_count
+            ),
+            safe_div(
+                self.payload_len_stats.bwd_payload_len.get_total(),
+                self.subflow_stats.subflow_count as f64
+            ),
             // Window Size Stats
             self.window_size_stats.fwd_init_window_size,
             self.window_size_stats.bwd_init_window_size,
