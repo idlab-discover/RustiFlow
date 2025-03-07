@@ -45,8 +45,9 @@ impl FlowFeature for PayloadLengthStats {
 
     fn dump(&self) -> String {
         format!(
-            "{},{},{},{},{}",
+            "{},{},{},{},{},{}",
             self.payload_len.dump_values(),
+            self.payload_len.get_std().powi(2),
             self.fwd_payload_len.dump_values(),
             self.bwd_payload_len.dump_values(),
             self.fwd_non_zero_payload_packets,
@@ -56,8 +57,9 @@ impl FlowFeature for PayloadLengthStats {
 
     fn headers() -> String {
         format!(
-            "{},{},{},{},{}",
+            "{},{},{},{},{},{}",
             FeatureStats::dump_headers("payload_len"),
+            "payload_len_variance",
             FeatureStats::dump_headers("fwd_payload_len"),
             FeatureStats::dump_headers("bwd_payload_len"),
             "fwd_non_zero_payload_packets",

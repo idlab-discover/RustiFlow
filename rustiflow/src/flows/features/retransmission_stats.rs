@@ -1,10 +1,11 @@
-use std::collections::hash_map::DefaultHasher;
 use std::collections::HashSet;
-use std::hash::{Hash, Hasher};
 
 use pnet::packet::ip::IpNextHeaderProtocols;
 
-use crate::{flows::util::FlowExpireCause, packet_features::PacketFeatures};
+use crate::{
+    flows::util::FlowExpireCause,
+    packet_features::{PacketFeatures, ACK_FLAG},
+};
 
 use super::util::FlowFeature;
 
@@ -33,25 +34,25 @@ impl RetransmissionStats {
 impl FlowFeature for RetransmissionStats {
     fn update(&mut self, packet: &PacketFeatures, is_forward: bool, _last_timestamp_us: i64) {
         let seq = packet.sequence_number;
-        let ack = packet.sequence_number_ack;
 
-        if packet.protocol != IpNextHeaderProtocols::Icmp.0
+        if packet.protocol == IpNextHeaderProtocols::Icmp.0
             || packet.protocol == IpNextHeaderProtocols::Icmpv6.0
         {
             // Skip ICMP packets
             return;
         }
 
-        let mut hasher = DefaultHasher::new();
-        (seq, ack).hash(&mut hasher);
-        let hash = hasher.finish();
+        // Exclude pure ACKs (ACK flag set, no data length)
+        if (packet.flags & ACK_FLAG) != 0 && packet.data_length == 0 {
+            return;
+        }
 
         if is_forward {
-            if !self.fwd_seen_seqs.insert(hash as u32) {
+            if !self.fwd_seen_seqs.insert(seq) {
                 self.fwd_retransmission_count += 1;
             }
         } else {
-            if !self.bwd_seen_seqs.insert(hash as u32) {
+            if !self.bwd_seen_seqs.insert(seq) {
                 self.bwd_retransmission_count += 1;
             }
         }

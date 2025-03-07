@@ -114,14 +114,13 @@ impl FlowFeature for PacketLengthStats {
 
     fn dump(&self) -> String {
         format!(
-            "{},{},{},{},{},{},{},{},{},{},{}",
+            "{},{},{},{},{},{},{},{},{},{}",
             self.flow_count(),
             self.flow_total(),
             self.flow_mean(),
             self.flow_max(),
             self.flow_min(),
             self.flow_std(),
-            self.flow_variance(),
             self.fwd_packet_len.get_count(),
             self.bwd_packet_len.get_count(),
             self.fwd_packet_len.dump_values(),
@@ -131,14 +130,13 @@ impl FlowFeature for PacketLengthStats {
 
     fn headers() -> String {
         format!(
-            "{},{},{},{},{},{},{},{},{},{},{}",
+            "{},{},{},{},{},{},{},{},{},{}",
             "packet_count",
             "packet_len_total",
             "packet_len_mean",
             "packet_len_max",
             "packet_len_min",
             "packet_len_std",
-            "packet_len_variance",
             "fwd_packet_count",
             "bwd_packet_count",
             FeatureStats::dump_headers("fwd_packet_len"),

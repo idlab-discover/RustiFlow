@@ -14,14 +14,14 @@ use pnet::packet::{
 };
 
 // Define TCP flags
-const FIN_FLAG: u8 = 0b00000001;
-const SYN_FLAG: u8 = 0b00000010;
-const RST_FLAG: u8 = 0b00000100;
-const PSH_FLAG: u8 = 0b00001000;
-const ACK_FLAG: u8 = 0b00010000;
-const URG_FLAG: u8 = 0b00100000;
-const ECE_FLAG: u8 = 0b01000000;
-const CWR_FLAG: u8 = 0b10000000;
+pub const FIN_FLAG: u8 = 0b00000001;
+pub const SYN_FLAG: u8 = 0b00000010;
+pub const RST_FLAG: u8 = 0b00000100;
+pub const PSH_FLAG: u8 = 0b00001000;
+pub const ACK_FLAG: u8 = 0b00010000;
+pub const URG_FLAG: u8 = 0b00100000;
+pub const ECE_FLAG: u8 = 0b01000000;
+pub const CWR_FLAG: u8 = 0b10000000;
 
 impl Default for PacketFeatures {
     fn default() -> Self {
@@ -48,6 +48,7 @@ impl Default for PacketFeatures {
             sequence_number_ack: 0,
             icmp_type: None,
             icmp_code: None,
+            flags: 0,
         }
     }
 }
@@ -75,6 +76,7 @@ pub struct PacketFeatures {
     pub sequence_number_ack: u32,
     pub icmp_type: Option<u8>,
     pub icmp_code: Option<u8>,
+    pub flags: u8,
 }
 
 impl PacketFeatures {
@@ -111,6 +113,7 @@ impl PacketFeatures {
             } else {
                 None
             },
+            flags: event.combined_flags,
         }
     }
 
@@ -147,6 +150,7 @@ impl PacketFeatures {
             } else {
                 None
             },
+            flags: event.combined_flags,
         }
     }
 
@@ -266,6 +270,7 @@ fn extract_packet_features_transport(
                 sequence_number_ack: tcp_packet.get_acknowledgement(),
                 icmp_type: None,
                 icmp_code: None,
+                flags: tcp_packet.get_flags(),
             })
         }
         IpNextHeaderProtocols::Udp => {
@@ -293,6 +298,7 @@ fn extract_packet_features_transport(
                 sequence_number_ack: 0, // No sequence number ACK for UDP
                 icmp_type: None,
                 icmp_code: None,
+                flags: 0, // No flags for UDP
             })
         }
         IpNextHeaderProtocols::Icmp | IpNextHeaderProtocols::Icmpv6 => {
@@ -320,6 +326,7 @@ fn extract_packet_features_transport(
                 sequence_number_ack: 0, // No sequence number ACK for ICMP
                 icmp_type: Some(icmp_packet.get_icmp_type().0),
                 icmp_code: Some(icmp_packet.get_icmp_code().0),
+                flags: 0, // No flags for ICMP
             })
         }
         _ => {
