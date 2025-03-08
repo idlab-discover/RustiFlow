@@ -1,5 +1,7 @@
 use std::collections::HashSet;
 
+use pnet::packet::ip::IpNextHeaderProtocols;
+
 use crate::{
     flows::util::FlowExpireCause,
     packet_features::{PacketFeatures, ACK_FLAG},
