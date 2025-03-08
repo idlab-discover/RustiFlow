@@ -42,8 +42,8 @@ impl FlowFeature for RetransmissionStats {
             return;
         }
 
-        // Exclude pure ACKs (ACK flag set, no data length)
-        if (packet.flags & ACK_FLAG) != 0 && packet.data_length == 0 {
+        // Exclude pure ACKs (only ACK flag set, no data length)
+        if packet.flags == ACK_FLAG && packet.data_length == 0 {
             return;
         }
 
