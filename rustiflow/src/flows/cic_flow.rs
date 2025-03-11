@@ -12,10 +12,9 @@ use super::{
     basic_flow::BasicFlow,
     features::{
         active_idle_stats::ActiveIdleStats, bulk_stats::BulkStats, header_stats::HeaderLengthStats,
-        iat_stats::IATStats, icmp_stats::IcmpStats, packet_stats::PacketLengthStats,
-        payload_stats::PayloadLengthStats, retransmission_stats::RetransmissionStats,
-        subflow_stats::SubflowStats, tcp_flag_stats::TcpFlagStats, util::FlowFeature,
-        window_size_stats::WindowSizeStats,
+        iat_stats::IATStats, icmp_stats::IcmpStats, payload_stats::PayloadLengthStats,
+        retransmission_stats::RetransmissionStats, subflow_stats::SubflowStats,
+        tcp_flag_stats::TcpFlagStats, util::FlowFeature, window_size_stats::WindowSizeStats,
     },
     flow::Flow,
     util::FlowExpireCause,
@@ -25,7 +24,6 @@ use super::{
 #[derive(Clone)]
 pub struct CicFlow {
     pub basic_flow: BasicFlow,
-    pub packet_len_stats: PacketLengthStats,
     pub iat_stats: IATStats,
     pub tcp_flags_stats: TcpFlagStats,
     pub header_len_stats: HeaderLengthStats,
@@ -58,7 +56,6 @@ impl Flow for CicFlow {
                 protocol,
                 timestamp_us,
             ),
-            packet_len_stats: PacketLengthStats::new(),
             iat_stats: IATStats::new(),
             tcp_flags_stats: TcpFlagStats::new(),
             header_len_stats: HeaderLengthStats::new(),
@@ -76,7 +73,6 @@ impl Flow for CicFlow {
         let last_timestamp_us = self.basic_flow.last_timestamp_us;
         let is_terminated = self.basic_flow.update_flow(packet, fwd);
 
-        self.packet_len_stats.update(packet, fwd, last_timestamp_us);
         self.iat_stats.update(packet, fwd, last_timestamp_us);
         self.tcp_flags_stats.update(packet, fwd, last_timestamp_us);
         self.header_len_stats.update(packet, fwd, last_timestamp_us);
@@ -98,7 +94,6 @@ impl Flow for CicFlow {
     fn close_flow(&mut self, timestamp_us: i64, cause: FlowExpireCause) {
         self.basic_flow.close_flow(timestamp_us, cause);
 
-        self.packet_len_stats.close(timestamp_us, cause);
         self.iat_stats.close(timestamp_us, cause);
         self.tcp_flags_stats.close(timestamp_us, cause);
         self.header_len_stats.close(timestamp_us, cause);
@@ -147,11 +142,11 @@ impl Flow for CicFlow {
             self.payload_len_stats.bwd_payload_len.get_std(),
             // Rate Stats (Flow)
             safe_per_second_rate(
-                self.packet_len_stats.flow_total(),
+                self.payload_len_stats.payload_len.get_total(),
                 self.basic_flow.get_flow_duration_usec() as f64
             ),
             safe_per_second_rate(
-                self.packet_len_stats.flow_count() as f64,
+                self.payload_len_stats.payload_len.get_count() as f64,
                 self.basic_flow.get_flow_duration_usec() as f64
             ),
             // IAT Stats in us instead of ms
@@ -181,11 +176,11 @@ impl Flow for CicFlow {
             self.header_len_stats.bwd_header_len.get_total(),
             // Rate Stats (fwd & bwd packets)
             safe_per_second_rate(
-                self.packet_len_stats.fwd_packet_len.get_count() as f64,
+                self.payload_len_stats.fwd_payload_len.get_count() as f64,
                 self.basic_flow.get_flow_duration_usec() as f64
             ),
             safe_per_second_rate(
-                self.packet_len_stats.bwd_packet_len.get_count() as f64,
+                self.payload_len_stats.bwd_payload_len.get_count() as f64,
                 self.basic_flow.get_flow_duration_usec() as f64
             ),
             // Payload Length Stats (Flow)
@@ -205,8 +200,8 @@ impl Flow for CicFlow {
             self.tcp_flags_stats.fwd_ece_flag_count + self.tcp_flags_stats.bwd_ece_flag_count,
             // UP/DOWN Ratio
             safe_div_int(
-                self.packet_len_stats.bwd_packet_len.get_count(),
-                self.packet_len_stats.fwd_packet_len.get_count()
+                self.payload_len_stats.bwd_payload_len.get_count(),
+                self.payload_len_stats.fwd_payload_len.get_count()
             ),
             // Payload Length Stats
             self.payload_len_stats.payload_len.get_mean(),
@@ -398,11 +393,11 @@ impl Flow for CicFlow {
             self.payload_len_stats.bwd_payload_len.get_std(),
             // Rate Stats (Flow)
             safe_per_second_rate(
-                self.packet_len_stats.flow_total(),
+                self.payload_len_stats.payload_len.get_total(),
                 self.basic_flow.get_flow_duration_usec() as f64
             ),
             safe_per_second_rate(
-                self.packet_len_stats.flow_count() as f64,
+                self.payload_len_stats.payload_len.get_count() as f64,
                 self.basic_flow.get_flow_duration_usec() as f64
             ),
             // IAT Stats in us instead of ms
@@ -432,11 +427,11 @@ impl Flow for CicFlow {
             self.header_len_stats.bwd_header_len.get_total(),
             // Rate Stats (fwd & bwd packets)
             safe_per_second_rate(
-                self.packet_len_stats.fwd_packet_len.get_count() as f64,
+                self.payload_len_stats.fwd_payload_len.get_count() as f64,
                 self.basic_flow.get_flow_duration_usec() as f64
             ),
             safe_per_second_rate(
-                self.packet_len_stats.bwd_packet_len.get_count() as f64,
+                self.payload_len_stats.bwd_payload_len.get_count() as f64,
                 self.basic_flow.get_flow_duration_usec() as f64
             ),
             // Payload Length Stats (Flow)
@@ -456,8 +451,8 @@ impl Flow for CicFlow {
             self.tcp_flags_stats.fwd_ece_flag_count + self.tcp_flags_stats.bwd_ece_flag_count,
             // UP/DOWN Ratio
             safe_div_int(
-                self.packet_len_stats.bwd_packet_len.get_count(),
-                self.packet_len_stats.fwd_packet_len.get_count()
+                self.payload_len_stats.bwd_payload_len.get_count(),
+                self.payload_len_stats.fwd_payload_len.get_count()
             ),
             // Payload Length Stats
             self.payload_len_stats.payload_len.get_mean(),

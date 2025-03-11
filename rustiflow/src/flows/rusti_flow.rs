@@ -158,47 +158,50 @@ impl Flow for RustiFlow {
             // TCP Flag Stats
             self.tcp_flags_stats.dump(),
             // Rate Stats (per second)
-            safe_per_second_rate(self.packet_len_stats.flow_total(), duration_us as f64),
             safe_per_second_rate(
-                self.packet_len_stats.flow_count() as f64,
+                self.payload_len_stats.payload_len.get_total(),
                 duration_us as f64
             ),
             safe_per_second_rate(
-                self.packet_len_stats.fwd_packet_len.get_total(),
+                self.payload_len_stats.payload_len.get_count() as f64,
                 duration_us as f64
             ),
             safe_per_second_rate(
-                self.packet_len_stats.fwd_packet_len.get_count() as f64,
+                self.payload_len_stats.fwd_payload_len.get_total(),
                 duration_us as f64
             ),
             safe_per_second_rate(
-                self.packet_len_stats.bwd_packet_len.get_total(),
+                self.payload_len_stats.fwd_payload_len.get_count() as f64,
                 duration_us as f64
             ),
             safe_per_second_rate(
-                self.packet_len_stats.bwd_packet_len.get_count() as f64,
+                self.payload_len_stats.bwd_payload_len.get_total(),
+                duration_us as f64
+            ),
+            safe_per_second_rate(
+                self.payload_len_stats.bwd_payload_len.get_count() as f64,
                 duration_us as f64
             ),
             safe_div_int(
-                self.packet_len_stats.fwd_packet_len.get_count(),
+                self.payload_len_stats.fwd_payload_len.get_count(),
                 self.subflow_stats.subflow_count
             ),
             safe_div(
-                self.packet_len_stats.fwd_packet_len.get_total(),
+                self.payload_len_stats.fwd_payload_len.get_total(),
                 self.subflow_stats.subflow_count as f64
             ),
             safe_div_int(
-                self.packet_len_stats.bwd_packet_len.get_count(),
+                self.payload_len_stats.bwd_payload_len.get_count(),
                 self.subflow_stats.subflow_count
             ),
             safe_div(
-                self.packet_len_stats.bwd_packet_len.get_total(),
+                self.payload_len_stats.bwd_payload_len.get_total(),
                 self.subflow_stats.subflow_count as f64
             ),
             // UP/DOWN Ratio
             safe_div_int(
-                self.packet_len_stats.bwd_packet_len.get_count(),
-                self.packet_len_stats.fwd_packet_len.get_count()
+                self.payload_len_stats.bwd_payload_len.get_count(),
+                self.payload_len_stats.fwd_payload_len.get_count()
             ),
         )
     }
@@ -298,47 +301,50 @@ impl Flow for RustiFlow {
             // TCP Flag Stats
             self.tcp_flags_stats.dump(),
             // Rate Stats (per second)
-            safe_per_second_rate(self.packet_len_stats.flow_total(), duration_us as f64),
             safe_per_second_rate(
-                self.packet_len_stats.flow_count() as f64,
+                self.payload_len_stats.payload_len.get_total(),
                 duration_us as f64
             ),
             safe_per_second_rate(
-                self.packet_len_stats.fwd_packet_len.get_total(),
+                self.payload_len_stats.payload_len.get_count() as f64,
                 duration_us as f64
             ),
             safe_per_second_rate(
-                self.packet_len_stats.fwd_packet_len.get_count() as f64,
+                self.payload_len_stats.fwd_payload_len.get_total(),
                 duration_us as f64
             ),
             safe_per_second_rate(
-                self.packet_len_stats.bwd_packet_len.get_total(),
+                self.payload_len_stats.fwd_payload_len.get_count() as f64,
                 duration_us as f64
             ),
             safe_per_second_rate(
-                self.packet_len_stats.bwd_packet_len.get_count() as f64,
+                self.payload_len_stats.bwd_payload_len.get_total(),
+                duration_us as f64
+            ),
+            safe_per_second_rate(
+                self.payload_len_stats.bwd_payload_len.get_count() as f64,
                 duration_us as f64
             ),
             safe_div_int(
-                self.packet_len_stats.fwd_packet_len.get_count(),
+                self.payload_len_stats.fwd_payload_len.get_count(),
                 self.subflow_stats.subflow_count
             ),
             safe_div(
-                self.packet_len_stats.fwd_packet_len.get_total(),
+                self.payload_len_stats.fwd_payload_len.get_total(),
                 self.subflow_stats.subflow_count as f64
             ),
             safe_div_int(
-                self.packet_len_stats.bwd_packet_len.get_count(),
+                self.payload_len_stats.bwd_payload_len.get_count(),
                 self.subflow_stats.subflow_count
             ),
             safe_div(
-                self.packet_len_stats.bwd_packet_len.get_total(),
+                self.payload_len_stats.bwd_payload_len.get_total(),
                 self.subflow_stats.subflow_count as f64
             ),
             // UP/DOWN Ratio
             safe_div_int(
-                self.packet_len_stats.bwd_packet_len.get_count(),
-                self.packet_len_stats.fwd_packet_len.get_count()
+                self.payload_len_stats.bwd_payload_len.get_count(),
+                self.payload_len_stats.fwd_payload_len.get_count()
             ),
         )
     }
