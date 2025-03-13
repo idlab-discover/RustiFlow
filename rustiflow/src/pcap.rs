@@ -16,6 +16,8 @@ use tokio::sync::mpsc::Sender;
 // Define constants for Linux cooked capture EtherTypes
 const SLL_IPV4: u16 = 0x0800;
 const SLL_IPV6: u16 = 0x86DD;
+// Define constant for 802.1Q VLAN EtherType
+const ETHERTYPE_VLAN: u16 = 0x8100;
 
 pub async fn read_pcap_file<T>(
     path: &str,
@@ -87,6 +89,47 @@ where
                         .await;
                     }
                 }
+                EtherTypes::Vlan => {
+                    // Handle 802.1Q VLAN tagged packets
+                    // VLAN header is 4 bytes: 2 bytes for VLAN tag and 2 bytes for inner EtherType
+                    if ethernet.payload().len() >= 4 {
+                        let inner_ethertype =
+                            u16::from_be_bytes([ethernet.payload()[2], ethernet.payload()[3]]);
+
+                        match inner_ethertype {
+                            SLL_IPV4 => {
+                                if let Some(packet) = Ipv4Packet::new(&ethernet.payload()[4..]) {
+                                    process_packet::<T, Ipv4Packet>(
+                                        &packet,
+                                        timestamp_us,
+                                        &shard_senders,
+                                        num_threads,
+                                        PacketFeatures::from_ipv4_packet,
+                                    )
+                                    .await;
+                                }
+                            }
+                            SLL_IPV6 => {
+                                if let Some(packet) = Ipv6Packet::new(&ethernet.payload()[4..]) {
+                                    process_packet::<T, Ipv6Packet>(
+                                        &packet,
+                                        timestamp_us,
+                                        &shard_senders,
+                                        num_threads,
+                                        PacketFeatures::from_ipv6_packet,
+                                    )
+                                    .await;
+                                }
+                            }
+                            _ => debug!(
+                                "Unsupported inner EtherType in VLAN packet: 0x{:04x}",
+                                inner_ethertype
+                            ),
+                        }
+                    } else {
+                        debug!("VLAN packet too short to contain inner EtherType");
+                    }
+                }
                 _ => {
                     // Check if it is a Linux cooked capture
                     let ethertype = u16::from_be_bytes([packet.data[14], packet.data[15]]);
@@ -113,6 +156,47 @@ where
                                     PacketFeatures::from_ipv6_packet,
                                 )
                                 .await;
+                            }
+                        }
+                        ETHERTYPE_VLAN => {
+                            // Handle VLAN in Linux cooked capture
+                            if packet.data.len() >= 20 {
+                                // 16 bytes SLL header + 4 bytes VLAN header
+                                let inner_ethertype =
+                                    u16::from_be_bytes([packet.data[18], packet.data[19]]);
+
+                                match inner_ethertype {
+                                    SLL_IPV4 => {
+                                        if let Some(packet) = Ipv4Packet::new(&packet.data[20..]) {
+                                            process_packet::<T, Ipv4Packet>(
+                                                &packet,
+                                                timestamp_us,
+                                                &shard_senders,
+                                                num_threads,
+                                                PacketFeatures::from_ipv4_packet,
+                                            )
+                                            .await;
+                                        }
+                                    }
+                                    SLL_IPV6 => {
+                                        if let Some(packet) = Ipv6Packet::new(&packet.data[20..]) {
+                                            process_packet::<T, Ipv6Packet>(
+                                                &packet,
+                                                timestamp_us,
+                                                &shard_senders,
+                                                num_threads,
+                                                PacketFeatures::from_ipv6_packet,
+                                            )
+                                            .await;
+                                        }
+                                    }
+                                    _ => debug!(
+                                        "Unsupported inner EtherType in VLAN packet: 0x{:04x}",
+                                        inner_ethertype
+                                    ),
+                                }
+                            } else {
+                                debug!("VLAN packet in Linux cooked capture too short");
                             }
                         }
                         _ => debug!("Failed to parse packet as IPv4 or IPv6..."),
