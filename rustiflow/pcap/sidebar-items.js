@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"constant":["SLL_IPV4","SLL_IPV6"],"fn":["compute_shard_index","create_shard_senders","process_packet","read_pcap_file"]};
+window.SIDEBAR_ITEMS = {"constant":["ETHERTYPE_VLAN","SLL_IPV4","SLL_IPV6"],"fn":["compute_shard_index","create_shard_senders","process_packet","read_pcap_file"]};
