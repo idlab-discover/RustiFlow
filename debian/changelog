@@ -1,12 +1,18 @@
-rustiflow (0.1.0) unstable; urgency=low
+rustiflow (0.2.0-1) unstable; urgency=low
 
-    * Initial release.
-    * Implemented basic flow feature extraction.
-    * Added support for CIC, CIDDS, Nfstream, and NTL flow types.
-    * Integrated TUI for configuration and monitoring.
-    * Enabled real-time and pcap file processing.
-    * Added CSV and console output methods.
-    * Included Docker support for containerized deployment.
-    * Provided comprehensive documentation and examples.
+  * Updated the Dockerfile for improved logging.
+  * Added a slim Docker image.
+  * Fixed packet timestamp handling.
+  * Included headers in flow output.
+  * Changed flow termination to be based on packet time instead of machine time.
+  * Added ICMP traffic support.
+  * Enabled tool configuration via config file.
+  * Implemented graceful shutdown functionality.
+  * Introduced flow expiration interval as a configurable parameter.
+  * Added 'ingress only' processing option.
+  * Developed a terminal interface for configuration and monitoring.
+  * Incorporated sequence number handling for enhanced TCP termination.
+  * Introduced new RustiFlow feature set.
+  * Updated usage of packet sizes to refer to payload sizes.
 
- -- IDLab <miel.verkerken@ugent.be>  Mon, 30 Oct 2023 10:00:00 +0000
+ -- IDLab <miel.verkerken@ugent.be>  Mon, 14 Apr 2025 10:00:00 +0000
