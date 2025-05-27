@@ -40,5 +40,9 @@ strum = "0.26.3"
 strum_macros = "0.26.4"
 
 [[bin]]
-name = "rustiflow"
-path = "src/main.rs"
+name = "rustiflow_batch"
+path = "src/bin/rustiflow_batch.rs"
+
+# Ensure you have these dependencies in your Cargo.toml for the batch tool
+# [dependencies]
+# rayon = "1.5" # or newe
