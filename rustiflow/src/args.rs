@@ -1,6 +1,8 @@
 use clap::{ArgGroup, Args, Parser, Subcommand};
 use serde::{Deserialize, Serialize};
 use strum_macros::{EnumString, VariantNames};
+use strum_macros::{EnumString, VariantNames}; // Ensure this is imported for FlowType
+
 
 #[derive(Debug, Parser)]
 #[clap(author, version, about)]
@@ -77,6 +79,26 @@ pub enum Commands {
         /// The relative path to the pcap file
         path: String,
     },
+
+    /// Setup and run batch PCAP processing
+    BatchPcap, // New command for TUI navigation
+}
+
+// ... (FlowType enum already exists and can be used as FeatureSet) ...
+// Make sure FlowType derives or implements necessary traits if it doesn't already
+// For cycling through feature sets, ensure it has a way to get next/previous variant,
+// or implement that logic in the TUI event handler.
+// Strum's VariantNames and EnumString are good for this.
+// Example:
+// #[derive(Serialize, Deserialize, clap::ValueEnum, Clone, Debug, EnumString, VariantNames, PartialEq)]
+// #[strum(serialize_all = "kebab_case")]
+// pub enum FlowType { ... }
+
+// Add Default to FlowType if not present and needed by BatchProcessingState::new()
+impl Default for FlowType {
+    fn default() -> Self {
+        FlowType::Nfstream // Or any other default
+    }
 }
 
 impl ToString for Commands {
