@@ -38,6 +38,18 @@ crossterm = "0.28.1"
 tui = "0.19"
 strum = "0.26.3"
 strum_macros = "0.26.4"
+ratatui = { version = "0.26", features = ["crossterm"] } # Or your chosen tui-rs version
+crossterm = "0.27"
+serde = { version = "1.0", features = ["derive"] }
+log = "0.4"
+env_logger = "0.10"
+clap = { version = "4.0", features = ["derive", "string"] }
+confy = "0.5"
+strum = { version = "0.26", features = ["derive"] }
+strum_macros = "0.26"
+tokio = { version = "1", features = ["full"] }
+rayon = "1.8" # For parallel processing in batch
+num_cpus = "1.16"
 
 [[bin]]
 name = "rustiflow_batch"
