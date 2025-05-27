@@ -1,57 +1,91 @@
-// In idlab-discover/rustiflow/RustiFlow-bd550ae2db5923b49c3bfea5223945b1889a077b/rustiflow/src/tui.rs
-
-// Assuming you are switching to ratatui or making it compatible
-// Replace tui::... with ratatui::... if you adopt ratatui fully
-// For this example, I'll use the ratatui imports from your new code snippet for the new functions.
-// You'll need to make sure the rest of the file (existing TUI) is compatible.
-
 use crossterm::event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode, KeyEvent};
 use crossterm::execute;
 use crossterm::terminal::{
     disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen,
 };
-use log::error;
+use log::{error, info, warn};
 use serde::{Deserialize, Serialize};
 use std::error::Error;
-use std::{fs, io}; // fs might be needed for directory validation in TUI
-use strum::VariantNames; // if FlowType uses it
+use std::path::Path;
+use std::{fs, io, sync::Arc}; // fs for path validation, Arc for shared state
+use strum::{EnumString, VariantNames}; // For FlowType iteration
 
-// Use ratatui for new components
-use ratatui::backend::{Backend, CrosstermBackend as RatatuiCrosstermBackend}; // Alias if needed
+// Ratatui imports
+use ratatui::backend::{Backend, CrosstermBackend};
 use ratatui::layout::{Alignment, Constraint, Direction, Layout, Rect};
 use ratatui::style::{Color, Modifier, Style};
-use ratatui::text::{Line, Span, Spans, Text}; // Ratatui uses Line instead of Spans directly in some cases
+use ratatui::text::{Line, Span, Spans, Text};
 use ratatui::widgets::{Block, Borders, Clear, Gauge, List, ListItem, ListState, Paragraph};
-use ratatui::{Frame as RatatuiFrame, Terminal as RatatuiTerminal};
+use ratatui::{Frame, Terminal};
 
+// Tokio imports for async tasks and channels
+use tokio::sync::{mpsc, Mutex}; // Mutex for shared progress, mpsc for communication
+use tokio::task::JoinHandle;
 
-// Existing imports (adjust as needed)
-use tui::backend::Backend as TuiBackend; // Keep original if mixing
-use tui::layout::{/* existing */};
-use tui::style::{/* existing */};
-use tui::text::{/* existing */};
-use tui::widgets::{/* existing */};
-use tui::{Frame as TuiFrame, Terminal as TuiTerminal};
+// Project-specific imports
+use crate::args::{Cli, Commands, ConfigFile, ExportConfig, ExportMethodType, FlowType, OutputConfig};
+// This function would be in main.rs or another module, responsible for the actual batch work.
+// For this tui.rs, we'll define a placeholder signature.
+// use crate::batch_logic::run_actual_batch_processing; // Placeholder
 
+// --- Structs and Enums for TUI State ---
 
-use crate::args::{Cli, Commands, ConfigFile, ExportConfig, ExportMethodType, FlowType, OutputConfig}; // FlowType is our FeatureSet
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct Config {
+    pub config: ExportConfig,
+    pub output: OutputConfig,
+    pub command: Commands,
+}
 
-// --- New Structs and Enums from your provided code ---
-#[derive(Debug, Clone, Default)] // Added Default
+impl Config {
+    fn reset() -> Self {
+        Config {
+            config: ExportConfig {
+                features: FlowType::default(), // Assuming FlowType has Default
+                active_timeout: 3600,
+                idle_timeout: 120,
+                early_export: None,
+                threads: Some(num_cpus::get() as u8),
+                expiration_check_interval: 60,
+            },
+            output: OutputConfig {
+                output: ExportMethodType::Print, // Default output
+                export_path: None,
+                header: false,
+                drop_contaminant_features: false,
+                performance_mode: false,
+            },
+            command: Commands::Realtime { // Default command
+                interface: String::from("eth0"),
+                ingress_only: false,
+            },
+        }
+    }
+}
+
+impl Default for Config {
+    fn default() -> Self {
+        Config::reset()
+    }
+}
+
+// --- Batch Processing Specific Structs and Enums ---
+#[derive(Debug, Clone)]
 pub struct BatchProcessingState {
     pub input_directory: String,
     pub output_directory: String,
-    pub feature_set: FlowType, // Using existing FlowType
+    pub feature_set: FlowType,
     pub worker_count: usize,
     pub recursive: bool,
     pub active_timeout: u64,
     pub idle_timeout: u64,
     pub current_field: BatchField,
     pub processing: bool,
-    pub progress: Option<BatchProgress>,
+    pub progress: Arc<Mutex<BatchProgress>>, // Shared progress state
+    pub validation_error: Option<String>, // For displaying validation errors
 }
 
-#[derive(Debug, Clone, PartialEq)] // Added PartialEq
+#[derive(Debug, Clone, PartialEq)]
 pub enum BatchField {
     InputDirectory,
     OutputDirectory,
@@ -63,80 +97,82 @@ pub enum BatchField {
     StartProcessing,
 }
 
-impl Default for BatchField { // Added Default
-    fn default() -> Self { BatchField::InputDirectory }
+impl Default for BatchField {
+    fn default() -> Self {
+        BatchField::InputDirectory
+    }
 }
 
-
-#[derive(Debug, Clone, Default)] // Added Default
+#[derive(Debug, Clone, Default)]
 pub struct BatchProgress {
     pub total_files: usize,
     pub processed_files: usize,
     pub success_count: usize,
     pub error_count: usize,
     pub current_file: String,
-    pub estimated_remaining: String, // This would need a calculation logic
+    pub estimated_remaining: String,
+    pub last_error_message: Option<String>,
 }
 
 impl BatchProcessingState {
     pub fn new() -> Self {
         Self {
-            input_directory: String::new(),
-            output_directory: String::new(),
-            feature_set: FlowType::Nfstream, // Default feature set
+            input_directory: std::env::current_dir().map_or(String::new(), |p| p.to_string_lossy().into_owned()),
+            output_directory: std::env::current_dir().map_or(String::new(), |p| p.join("rustiflow_output").to_string_lossy().into_owned()),
+            feature_set: FlowType::default(),
             worker_count: num_cpus::get(),
             recursive: false,
             active_timeout: 3600,
             idle_timeout: 120,
             current_field: BatchField::InputDirectory,
             processing: false,
-            progress: None,
+            progress: Arc::new(Mutex::new(BatchProgress::default())),
+            validation_error: None,
         }
     }
 }
 
 #[derive(Debug, Clone)]
 pub enum AppTransition {
-    ToMainMenu, // Or to the previous screen
-    ToDirectoryPicker { field: String }, // Hypothetical screen for picking dirs
-    ToNumberInput { field: String, current_value: usize, min: usize, max: usize }, // Hypothetical
+    ToMainMenu,
+    ToBatchSetupScreen,
     StartBatchProcessing,
-    ToBatchProcessingSetup, // For navigating to the batch setup screen
+    // These are for more complex input handling, not fully implemented in this snippet
+    ToDirectoryPicker { field: String, current_path: String },
+    ToTextInput { field: String, current_value: String, title: String },
+    ToNumberInput { field: String, current_value: usize, min: usize, max: usize, title: String },
 }
 
-// TUIError would need to be defined, e.g.:
 #[derive(Debug)]
 pub enum TUIError {
     Io(io::Error),
     Crossterm(crossterm::ErrorKind),
     Other(String),
+    ChannelClosed,
 }
 impl From<io::Error> for TUIError { fn from(err: io::Error) -> Self { TUIError::Io(err) } }
 impl From<crossterm::ErrorKind> for TUIError { fn from(err: crossterm::ErrorKind) -> Self { TUIError::Crossterm(err) } }
-// --- End of New Structs and Enums ---
-
-
-#[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct Config {
-    pub config: ExportConfig,
-    pub output: OutputConfig,
-    pub command: Commands,
+impl<T> From<mpsc::error::SendError<T>> for TUIError {
+    fn from(_: mpsc::error::SendError<T>) -> Self {
+        TUIError::ChannelClosed
+    }
 }
-// ... (Config impl Default, reset, etc. remain) ...
 
-// Modify AppFocus
-#[derive(Clone, Copy, PartialEq, Debug)] // Added Debug
+
+// --- Main App Struct and Focus Enum ---
+#[derive(Clone, Copy, PartialEq, Debug)]
 enum AppFocus {
     TitleBar,
     Menu,
-    FlowType,
+    // General config fields
+    FlowTypeSelection, // For selecting app.config.config.features
     ActiveTimeoutInput,
     IdleTimeoutInput,
     ExpirationCheckIntervalInput,
-    CommandSelection,
-    OutputSelection,
-    CommandArgumentInput,
-    OutputArgumentInput,
+    CommandSelection, // For app.config.command
+    OutputSelection,  // For app.config.output.output
+    CommandArgumentInput, // For interface/pcap path
+    OutputArgumentInput,  // For CSV export path
     IngressOnlyInput,
     PerformanceModeInput,
     ThreadsInput,
@@ -145,240 +181,326 @@ enum AppFocus {
     DropContaminantFeaturesInput,
     ConfigFileInput,
     ConfigFileSaveInput,
-    BatchProcessingSetup, // New Focus
-    BatchProcessingProgress, // New Focus (if it's a separate focus state)
-    // Add other states if needed by ToDirectoryPicker, ToNumberInput
+    // Batch processing
+    BatchSetupScreen,
+    BatchProgressScreen,
+    // Generic input popups (if implemented)
+    TextInputPopup,
+    NumberInputPopup,
+    DirectoryPickerPopup,
 }
 
-
-// Modify App struct
 struct App {
-    config: Config,
+    config: Config, // General application config
     config_file: Option<String>,
-    config_file_input: String,
+    config_file_input: String, // For loading/saving config file path
     focus: AppFocus,
     title_bar_state: ListState,
     main_menu_state: ListState,
-    flow_type_state: ListState, // Corresponds to FeatureSet selection in general TUI
-    command_state: ListState,
-    output_state: ListState,
-    active_timeout_input: String,
-    idle_timeout_input: String,
-    expiration_check_interval_input: String,
-    threads_input: String,
-    early_export_input: String,
+    // States for general config UI elements
+    flow_type_selection_state: ListState, // For app.config.config.features
+    command_selection_state: ListState,   // For app.config.command
+    output_selection_state: ListState,    // For app.config.output.output
+    // Input buffers for general config
+    active_timeout_input_buffer: String,
+    idle_timeout_input_buffer: String,
+    expiration_check_interval_input_buffer: String,
+    threads_input_buffer: String,
+    early_export_input_buffer: String,
+    command_argument_input_buffer: String, // For interface/pcap path
+    output_argument_input_buffer: String,  // For CSV export path
+    // Batch processing state
+    batch_processing_state: BatchProcessingState,
+    // For generic text input popup
+    text_input_popup_title: String,
+    text_input_popup_buffer: String,
+    text_input_popup_target_field: Option<BatchField>, // To know which batch field to update
+    // Batch processing task
+    batch_task_handle: Option<JoinHandle<()>>,
+    progress_rx: Option<mpsc::Receiver<BatchProgress>>, // Receives progress from batch task
     main_menu_items: Vec<&'static str>,
-    batch_processing_state: BatchProcessingState, // New state field
 }
 
 impl App {
     fn new(config: Config) -> App {
-        // ... (existing initializations) ...
-        let mut main_menu_items = vec![
+        let main_menu_items = vec![
             "Feature Set", "Mode", "Output Method", "Active Timeout", "Idle Timeout",
             "Expiration Check Interval", "Threads", "Early Export", "Header",
-            "Drop Contaminant Features",
-            "Batch PCAP Processing", // New Menu Item
+            "Drop Contaminant Features", "Batch PCAP Processing",
         ];
 
         App {
-            // ... (existing assignments) ...
-            main_menu_items,
-            batch_processing_state: BatchProcessingState::new(), // Initialize new state
-            focus: AppFocus::ConfigFileInput, // Or whatever the initial focus is
-            // Initialize other fields as before
             config,
             config_file: None,
             config_file_input: String::new(),
+            focus: AppFocus::ConfigFileInput,
             title_bar_state: { let mut s = ListState::default(); s.select(Some(0)); s },
             main_menu_state: { let mut s = ListState::default(); s.select(Some(0)); s },
-            flow_type_state: { let mut s = ListState::default(); s.select(Some(0)); s },
-            command_state: { let mut s = ListState::default(); s.select(Some(0)); s },
-            output_state: { let mut s = ListState::default(); s.select(Some(0)); s },
-            active_timeout_input: String::new(),
-            idle_timeout_input: String::new(),
-            expiration_check_interval_input: String::new(),
-            threads_input: String::new(),
-            early_export_input: String::new(),
-
+            flow_type_selection_state: { let mut s = ListState::default(); s.select(Some(0)); s },
+            command_selection_state: { let mut s = ListState::default(); s.select(Some(0)); s },
+            output_selection_state: { let mut s = ListState::default(); s.select(Some(0)); s },
+            active_timeout_input_buffer: String::new(),
+            idle_timeout_input_buffer: String::new(),
+            expiration_check_interval_input_buffer: String::new(),
+            threads_input_buffer: String::new(),
+            early_export_input_buffer: String::new(),
+            command_argument_input_buffer: String::new(),
+            output_argument_input_buffer: String::new(),
+            batch_processing_state: BatchProcessingState::new(),
+            text_input_popup_title: String::new(),
+            text_input_popup_buffer: String::new(),
+            text_input_popup_target_field: None,
+            batch_task_handle: None,
+            progress_rx: None,
+            main_menu_items,
         }
     }
 }
 
-// Update launch_tui to potentially handle AppTransition
-pub async fn launch_tui() -> Result<Option<Config>, Box<dyn Error>> {
-    // ... (setup terminal as before, using RatatuiTerminal or TuiTerminal) ...
-    // For Ratatui:
+
+// --- TUI Entry Point and Main Loop ---
+pub async fn launch_tui(
+    // This function would be passed from main.rs
+    // It's responsible for the actual batch processing logic.
+    // For now, we use a placeholder type.
+    batch_processor: fn(BatchProcessingState, mpsc::Sender<BatchProgress>) -> JoinHandle<()>,
+) -> Result<Option<Config>, Box<dyn Error>> {
     enable_raw_mode()?;
     let mut stdout = io::stdout();
     execute!(stdout, EnterAlternateScreen, EnableMouseCapture)?;
-    let backend = RatatuiCrosstermBackend::new(stdout); // Use Ratatui backend
-    let mut terminal = RatatuiTerminal::new(backend)?;
+    let backend = CrosstermBackend::new(stdout);
+    let mut terminal = Terminal::new(backend)?;
 
+    let mut app = App::new(Config::default()); // Start with default config
 
-    let mut app = App::new(Config::default()); // Or load from somewhere
-    app.focus = AppFocus::ConfigFileInput; // Initial focus
+    let mut final_config: Option<Config> = None; // To store config if user "Starts"
 
-    loop { // Main TUI loop
+    'main_loop: loop {
+        // Draw UI
         terminal.draw(|f| ui_main_screen(f, &app))?;
 
-        if crossterm::event::poll(std::time::Duration::from_millis(100))? {
-            let event = event::read()?;
-            let transition = match app.focus {
-                AppFocus::BatchProcessingSetup => {
-                    // Pass ratatui::event::Event if that's what handle_batch_processing_events expects
-                    handle_batch_processing_events(event, &mut app.batch_processing_state)?
+        // Event handling with tokio::select for async progress updates
+        tokio::select! {
+            // Listen for progress updates from the batch task
+            Some(progress_update) = async {
+                if let Some(rx) = app.progress_rx.as_mut() {
+                    rx.recv().await
+                } else {
+                    // Sleep a bit if no receiver to prevent busy loop on this branch
+                    tokio::time::sleep(std::time::Duration::from_millis(1000)).await; // Infinite pending future
+                    None
                 }
-                // ... (other focus handlers) ...
-                AppFocus::Menu => { // Example: navigating from main menu to batch setup
-                    if let Event::Key(key) = event {
-                         match key.code {
-                            KeyCode::Enter => {
-                                if let Some(selected_index) = app.main_menu_state.selected() {
-                                    if app.main_menu_items[selected_index] == "Batch PCAP Processing" {
-                                        app.focus = AppFocus::BatchProcessingSetup;
+            } => {
+                if let Ok(mut progress_guard) = app.batch_processing_state.progress.try_lock() {
+                    *progress_guard = progress_update;
+                } else {
+                    warn!("Could not lock progress for update from batch task.");
+                }
+            },
+
+            // Check if batch task has finished
+            task_finished = async {
+                if let Some(handle) = &mut app.batch_task_handle {
+                    // Use poll_join here or a mechanism to check completion without blocking
+                    // For simplicity, let's assume we can check if it's finished.
+                    // A more robust way is for the task to send a "completion" message.
+                    // For now, this branch won't be hit effectively without more complex task management.
+                    // Let's assume the task sends a final progress update that signals completion.
+                    // Or, user Escapes from progress screen.
+                    false // Placeholder
+                } else {
+                    false
+                }
+            } => {
+                if task_finished {
+                    app.batch_task_handle = None;
+                    app.progress_rx = None;
+                    app.batch_processing_state.processing = false;
+                    app.focus = AppFocus::BatchSetupScreen; // Go back to setup
+                }
+            },
+
+            // Listen for user input
+            event_ready = tokio::task::spawn_blocking(|| crossterm::event::poll(std::time::Duration::from_millis(100))) => {
+                match event_ready {
+                    Ok(Ok(true)) => { // Event is ready
+                        let event = event::read()?;
+                        let mut transition: Option<AppTransition> = None;
+
+                        // Handle generic input popup first if active
+                        if app.focus == AppFocus::TextInputPopup {
+                            if let Event::Key(key) = event {
+                                match key.code {
+                                    KeyCode::Enter => {
+                                        if let Some(target_field) = &app.text_input_popup_target_field {
+                                            match target_field {
+                                                BatchField::InputDirectory => app.batch_processing_state.input_directory = app.text_input_popup_buffer.clone(),
+                                                BatchField::OutputDirectory => app.batch_processing_state.output_directory = app.text_input_popup_buffer.clone(),
+                                                _ => {}
+                                            }
+                                        }
+                                        app.focus = AppFocus::BatchSetupScreen; // Return to batch setup
+                                        app.text_input_popup_target_field = None;
                                     }
-                                    // ... other menu items
+                                    KeyCode::Esc => {
+                                        app.focus = AppFocus::BatchSetupScreen;
+                                        app.text_input_popup_target_field = None;
+                                    }
+                                    KeyCode::Char(c) => app.text_input_popup_buffer.push(c),
+                                    KeyCode::Backspace => { app.text_input_popup_buffer.pop(); }
+                                    _ => {}
                                 }
                             }
-                            // other key handling for menu
-                            _ => handle_menu_input(key, &mut app).unwrap_or_else(|e| error!("Menu input error: {:?}", e)),
-                         }
-                    }
-                    None // No transition by default
-                }
-                _ => {
-                    // Placeholder for existing event handling logic
-                    // This would call handle_title_bar_input, handle_menu_input, etc.
-                    // For brevity, not reproducing all existing handlers here.
-                    // You'll need to adapt them to return Option<AppTransition>.
-                    // If they return a Result<Option<Config>, Box<dyn Error>>,
-                    // wrap it: Ok(res.map(|_| AppTransition::ToMainMenu)) or similar based on outcome.
-                    // For errors, propagate them.
-                     if let Event::Key(key_event) = event {
-                        match app.focus {
-                            AppFocus::TitleBar => {
-                                if let Some(config) = handle_title_bar_input(key_event, &mut app)? {
-                                     // This indicates 'Start' was pressed
-                                    // If Config is returned, it means TUI should close and pass config to main logic
-                                    // For now, this structure doesn't handle returning Config from batch mode directly.
-                                    // This would typically exit the launch_tui function.
-                                    // How batch processing integrates with returning a single Config needs clarification.
-                                    // For now, let's assume batch processing runs internally and then might return to main menu.
-                                    return Ok(Some(config));
+                        } else { // Handle other focus states
+                            match app.focus {
+                                AppFocus::BatchSetupScreen => {
+                                    transition = handle_batch_processing_events(event, &mut app.batch_processing_state)?;
+                                }
+                                AppFocus::BatchProgressScreen => {
+                                    if let Event::Key(key) = event {
+                                        if key.code == KeyCode::Esc {
+                                            // Stop batch task (if running) and return to setup
+                                            if let Some(handle) = app.batch_task_handle.take() {
+                                                handle.abort(); // Attempt to abort
+                                            }
+                                            app.batch_processing_state.processing = false;
+                                            app.progress_rx = None;
+                                            // Reset progress
+                                             match app.batch_processing_state.progress.try_lock() {
+                                                Ok(mut p) => *p = BatchProgress::default(),
+                                                Err(_) => warn!("Could not reset progress on Esc from progress screen."),
+                                             }
+                                            app.focus = AppFocus::BatchSetupScreen;
+                                        }
+                                    }
+                                }
+                                AppFocus::TitleBar => {
+                                    if let Event::Key(key_event) = event {
+                                        if let Some(config_to_run) = handle_title_bar_input(key_event, &mut app)? {
+                                            final_config = Some(config_to_run);
+                                            break 'main_loop; // Exit TUI and run the command
+                                        }
+                                    }
+                                }
+                                AppFocus::Menu => {
+                                    if let Event::Key(key_event) = event {
+                                        transition = handle_menu_input(key_event, &mut app)?;
+                                    }
+                                }
+                                // ... (Simplified handlers for other general config options) ...
+                                AppFocus::ConfigFileInput => if let Event::Key(k) = event { handle_config_file_input(k, &mut app)?; },
+                                AppFocus::ConfigFileSaveInput => if let Event::Key(k) = event { handle_config_file_save_input(k, &mut app)?; },
+                                // Add more specific handlers here if needed, or a generic one
+                                _ => {
+                                    if let Event::Key(key) = event {
+                                        if key.code == KeyCode::Esc && app.focus != AppFocus::ConfigFileInput { // Allow Esc from most places to go to Menu
+                                            app.focus = AppFocus::Menu;
+                                        }
+                                        // Simplified: other inputs are not fully handled here to keep it concise
+                                    }
                                 }
                             }
-                            AppFocus::Menu => handle_menu_input(key_event, &mut app)?,
-                            AppFocus::FlowType => handle_flow_type_input(key_event, &mut app)?,
-                            AppFocus::ActiveTimeoutInput | AppFocus::IdleTimeoutInput | AppFocus::ExpirationCheckIntervalInput | AppFocus::ThreadsInput | AppFocus::EarlyExportInput => {
-                               handle_numeric_input(key_event, &mut app, app.focus.clone())?;
+                        }
+
+
+                        // Handle transitions
+                        if let Some(trans) = transition {
+                            match trans {
+                                AppTransition::ToMainMenu => app.focus = AppFocus::Menu,
+                                AppTransition::ToBatchSetupScreen => app.focus = AppFocus::BatchSetupScreen,
+                                AppTransition::StartBatchProcessing => {
+                                    app.batch_processing_state.processing = true;
+                                    app.batch_processing_state.validation_error = None; // Clear previous errors
+                                    app.focus = AppFocus::BatchProgressScreen;
+
+                                    // Reset progress before starting
+                                    if let Ok(mut p) = app.batch_processing_state.progress.try_lock() {
+                                        *p = BatchProgress::default();
+                                        p.total_files = 0; // Will be updated by the task
+                                    } else {
+                                        warn!("Could not lock progress to reset before batch start.");
+                                        // Potentially handle this error more gracefully
+                                    }
+
+
+                                    let (progress_tx, progress_rx_channel) = mpsc::channel(100);
+                                    app.progress_rx = Some(progress_rx_channel);
+
+                                    // Clone necessary state for the task
+                                    let state_for_task = app.batch_processing_state.clone(); // BatchProcessingState needs to be Clone
+
+                                    // Spawn the actual batch processing task
+                                    app.batch_task_handle = Some(batch_processor(state_for_task, progress_tx));
+                                }
+                                AppTransition::ToTextInput { field, current_value, title } => {
+                                    app.text_input_popup_title = title;
+                                    app.text_input_popup_buffer = current_value;
+                                    app.text_input_popup_target_field = Some(field.parse().unwrap_or_default()); // Assuming field can be parsed to BatchField
+                                    app.focus = AppFocus::TextInputPopup;
+                                }
+                                // Handle other transitions like ToDirectoryPicker, ToNumberInput if fully implemented
+                                _ => {}
                             }
-                            AppFocus::CommandSelection | AppFocus::OutputSelection => {
-                               handle_selection_input(key_event, &mut app, app.focus.clone())?;
-                            }
-                            AppFocus::CommandArgumentInput => handle_command_argument_input(key_event, &mut app)?,
-                            AppFocus::OutputArgumentInput => handle_output_argument_input(key_event, &mut app)?,
-                            AppFocus::IngressOnlyInput | AppFocus::PerformanceModeInput | AppFocus::HeaderInput | AppFocus::DropContaminantFeaturesInput => {
-                                handle_boolean_input(key_event, &mut app, app.focus.clone())?;
-                            }
-                            AppFocus::ConfigFileInput => {
-                                handle_config_file_input(key_event, &mut app)?;
-                            }
-                            AppFocus::ConfigFileSaveInput => {
-                                handle_config_file_save_input(key_event, &mut app)?;
-                            }
-                            _ => {}
                         }
                     }
-                    None // Default no transition
-                }
-            };
-
-            if let Some(trans) = transition {
-                match trans {
-                    AppTransition::ToMainMenu => app.focus = AppFocus::Menu, // Or previous focus
-                    AppTransition::ToBatchProcessingSetup => app.focus = AppFocus::BatchProcessingSetup,
-                    AppTransition::StartBatchProcessing => {
-                        // --- TRIGGER BATCH PROCESSING LOGIC HERE ---
-                        // This would call a function similar to the main() of your batch CLI script,
-                        // but adapted to run within this async Tokio context if needed.
-                        // For now, just set focus to progress.
-                        app.batch_processing_state.processing = true;
-                        app.focus = AppFocus::BatchProcessingProgress; // Or stay in BatchProcessingSetup and change render
-                        // Example: You might spawn a Tokio task here to run the batch job
-                        // and use channels to update app.batch_processing_state.progress.
-                        println!("Batch processing would start here with state: {:?}", app.batch_processing_state);
-                        // Simulate processing and returning to setup screen
-                        // In a real app, this would be asynchronous.
-                        // For now, we'll just switch focus to show the idea.
-                        // If batch processing is blocking, TUI will freeze. It should be async.
-                    }
-                    // Handle ToDirectoryPicker, ToNumberInput if you implement those screens
-                    _ => {}
+                    Ok(Ok(false)) => { /* Poll timed out, no event */ }
+                    Ok(Err(e)) => return Err(Box::new(TUIError::Crossterm(e))), // Crossterm error
+                    Err(e) => return Err(Box::new(TUIError::Other(format!("Task join error: {}", e)))), // Tokio task join error
                 }
             }
-        }
-         // Check if batch processing is done (simulated)
-        if app.focus == AppFocus::BatchProcessingProgress && app.batch_processing_state.processing {
-            // In a real app, a separate task would update `app.batch_processing_state.processing` to false
-            // and fill `app.batch_processing_state.progress`.
-            // For this example, let's assume it finishes and goes back to setup or main menu.
-            // For now, let the user manually exit the "progress" screen if it were a real one.
-            // Or, if processing is "done":
-            // app.batch_processing_state.processing = false;
-            // app.focus = AppFocus::BatchProcessingSetup; // or AppFocus::Menu
-        }
+        } // end tokio::select!
+    } // end 'main_loop: loop
 
-    } // end loop
+    // Cleanup
+    disable_raw_mode()?;
+    execute!(
+        terminal.backend_mut(),
+        LeaveAlternateScreen,
+        DisableMouseCapture
+    )?;
+    terminal.show_cursor()?;
 
-    // ... (cleanup terminal as before) ...
-    // For Ratatui
-    // disable_raw_mode()?;
-    // execute!(
-    //     terminal.backend_mut(),
-    //     LeaveAlternateScreen,
-    //     DisableMouseCapture
-    // )?;
-    // terminal.show_cursor()?;
-    // Ok(None) // Default if TUI exits without starting a command
+    Ok(final_config)
 }
 
-// Update ui_main_screen
-// Ensure Frame type matches the terminal (TuiFrame or RatatuiFrame)
-fn ui_main_screen<B: Backend>(f: &mut RatatuiFrame<B>, app: &App) { // Changed to RatatuiFrame
+
+// --- UI Rendering Functions ---
+fn ui_main_screen<B: Backend>(f: &mut Frame<B>, app: &App) {
     let size = f.size();
-    // Background
     let background = Block::default().style(Style::default().bg(Color::Black));
     f.render_widget(background, size);
 
-
     match app.focus {
-        AppFocus::BatchProcessingSetup => {
+        AppFocus::BatchSetupScreen => {
             render_batch_processing_setup(f, &app.batch_processing_state);
-            return;
         }
-        AppFocus::BatchProcessingProgress if app.batch_processing_state.processing => {
-             if let Some(progress) = &app.batch_processing_state.progress {
-                render_batch_progress(f, progress);
+        AppFocus::BatchProgressScreen => {
+            // Lock is fallible, handle gracefully if lock can't be acquired immediately
+            if let Ok(progress_guard) = app.batch_processing_state.progress.try_lock() {
+                 render_batch_progress(f, &progress_guard);
             } else {
-                // Placeholder if progress is None but processing is true
-                let p = Paragraph::new("Processing... (progress details not yet available)")
+                // Fallback or loading state if progress is contended
+                let p = Paragraph::new("Waiting for progress update...")
                     .block(Block::default().borders(Borders::ALL).title("Processing"));
                 f.render_widget(p, centered_rect(60, 20, size));
             }
-            return;
         }
-        // ... (existing screens like ConfigFileInput) ...
+        AppFocus::TextInputPopup => {
+            // First render the underlying screen (e.g., BatchSetupScreen)
+            // This part is tricky as it requires knowing the "previous" focus.
+            // For simplicity, let's assume BatchSetupScreen was the previous.
+            render_batch_processing_setup(f, &app.batch_processing_state); // Render background
+            render_text_input_popup(f, &app.text_input_popup_title, &app.text_input_popup_buffer, size);
+        }
         AppFocus::ConfigFileInput => {
-            render_config_file_input(f, app, centered_rect(80, 15, size));
+            render_config_file_input_popup(f, &app.config_file_input, size);
             return;
         }
         AppFocus::ConfigFileSaveInput => {
-            render_config_file_save(f, app, centered_rect(80, 15, size));
+            render_config_file_save_popup(f, &app.config_file_input, size);
             return;
         }
-        _ => {
-            // Render existing main UI
+        _ => { // General config UI
             let chunks = Layout::default()
                 .direction(Direction::Vertical)
                 .constraints([Constraint::Length(3), Constraint::Min(0)].as_ref())
@@ -389,11 +511,14 @@ fn ui_main_screen<B: Backend>(f: &mut RatatuiFrame<B>, app: &App) { // Changed t
                 .constraints([Constraint::Percentage(50), Constraint::Percentage(50)].as_ref())
                 .split(chunks[0]);
 
-            let rustiflow_art = ""
-
-
-
-
+            let rustiflow_art = "
+█▀█ █ █ █▀ ▀█▀ █ █▀▀ █   █▀█ █ █ █
+█▀▄ █▄█ ▄█  █  █ █▀  █▄▄ █▄█ ▀▄▀▄▀";
+            let art_paragraph = Paragraph::new(rustiflow_art)
+                .style(Style::default().fg(Color::Yellow))
+                .alignment(Alignment::Left);
+            f.render_widget(art_paragraph, title_bar_layout[0]);
+            render_title_buttons(f, app, title_bar_layout[1]);
 
             let columns = Layout::default()
                 .direction(Direction::Horizontal)
@@ -405,137 +530,182 @@ fn ui_main_screen<B: Backend>(f: &mut RatatuiFrame<B>, app: &App) { // Changed t
                 .split(chunks[1]);
 
             render_menu(f, app, columns[0]);
-            render_content(f, app, columns[1]);
-            render_current_selections(f, app, columns[2]);
-            render_popups(f, app, size);
+            render_content_general_config(f, app, columns[1]); // Renamed for clarity
+            render_current_selections_general_config(f, app, columns[2]); // Renamed
+            render_popups_general_config(f, app, size); // Renamed
         }
     }
 }
 
-// --- Add the new rendering and event handling functions from your snippet ---
-// Make sure to adjust them to use the `App` struct and `FlowType` correctly.
-// Also, ensure they use the same `Backend` and `Frame` types as the rest of your TUI.
-// The following are the functions you provided, slightly adapted to fit.
+// Placeholder for a generic text input popup
+fn render_text_input_popup<B: Backend>(f: &mut Frame<B>, title: &str, current_text: &str, screen_size: Rect) {
+    let popup_area = centered_rect(60, 20, screen_size);
+    f.render_widget(Clear, popup_area); // Clear the area
 
-// Render the batch processing setup screen
-pub fn render_batch_processing_setup<B: Backend>( // Use RatatuiFrame for consistency with ui_main_screen
-    f: &mut RatatuiFrame<B>,
+    let block = Block::default()
+        .title(title.to_string())
+        .borders(Borders::ALL)
+        .border_style(Style::default().fg(Color::Yellow))
+        .style(Style::default().bg(Color::DarkGray)); // Popup background
+
+    let text_widget = Paragraph::new(current_text)
+        .style(Style::default().fg(Color::White))
+        .block(block);
+
+    f.render_widget(text_widget, popup_area);
+}
+
+
+// --- Batch Processing UI Rendering and Event Handling ---
+pub fn render_batch_processing_setup<B: Backend>(
+    f: &mut Frame<B>,
     state: &BatchProcessingState,
 ) {
     let size = f.size();
-    let chunks = Layout::default()
+    let main_chunks = Layout::default()
         .direction(Direction::Vertical)
-        .margin(2)
-        .constraints([
-            Constraint::Length(3),
-            Constraint::Min(0),
-            Constraint::Length(3),
-        ])
+        .margin(1)
+        .constraints(
+            [
+                Constraint::Length(3), // Title
+                Constraint::Min(0),    // Form
+                Constraint::Length(1), // Validation Error (if any)
+                Constraint::Length(3), // Instructions
+            ]
+            .as_ref(),
+        )
         .split(size);
 
     let title = Paragraph::new("Batch PCAP Processing Setup")
         .style(Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD))
-        .block(Block::default().borders(Borders::ALL));
-    f.render_widget(title, chunks[0]);
+        .block(Block::default().borders(Borders::ALL).border_style(Style::default().fg(Color::Cyan)));
+    f.render_widget(title, main_chunks[0]);
 
     let form_chunks = Layout::default()
         .direction(Direction::Vertical)
+        .margin(1)
         .constraints([
             Constraint::Length(3), Constraint::Length(3), Constraint::Length(3),
             Constraint::Length(3), Constraint::Length(3), Constraint::Length(3),
             Constraint::Length(3),
         ].as_ref())
-        .split(chunks[1]);
+        .split(main_chunks[1]);
 
-    let input_style = if matches!(state.current_field, BatchField::InputDirectory) {
-        Style::default().fg(Color::Yellow)
-    } else { Style::default() };
-    let input_dir = Paragraph::new(state.input_directory.as_str())
-        .style(input_style)
-        .block(Block::default().borders(Borders::ALL).title("Input Directory (Enter to Edit)"));
-    f.render_widget(input_dir, form_chunks[0]);
+    let focused_style = Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD);
+    let default_style = Style::default().fg(Color::White);
+    let border_style_focused = Style::default().fg(Color::Yellow);
+    let border_style_default = Style::default().fg(Color::DarkGray);
 
-    let output_style = if matches!(state.current_field, BatchField::OutputDirectory) {
-        Style::default().fg(Color::Yellow)
-    } else { Style::default() };
-    let output_dir = Paragraph::new(state.output_directory.as_str())
-        .style(output_style)
-        .block(Block::default().borders(Borders::ALL).title("Output Directory (Enter to Edit)"));
-    f.render_widget(output_dir, form_chunks[1]);
+    // Input Directory
+    let input_dir_block = Block::default().borders(Borders::ALL).title("Input Directory (Enter to Edit)")
+        .border_style(if state.current_field == BatchField::InputDirectory { border_style_focused } else { border_style_default });
+    let input_dir_text = Paragraph::new(state.input_directory.as_str())
+        .style(if state.current_field == BatchField::InputDirectory { focused_style } else { default_style })
+        .block(input_dir_block);
+    f.render_widget(input_dir_text, form_chunks[0]);
 
-    let feature_style = if matches!(state.current_field, BatchField::FeatureSet) {
-        Style::default().fg(Color::Yellow)
-    } else { Style::default() };
-    let feature_text = format!("{:?}", state.feature_set); // Using FlowType
-    let feature_set_widget = Paragraph::new(feature_text) // Renamed variable
-        .style(feature_style)
-        .block(Block::default().borders(Borders::ALL).title("Feature Set (Enter to Cycle)"));
+    // Output Directory
+    let output_dir_block = Block::default().borders(Borders::ALL).title("Output Directory (Enter to Edit)")
+        .border_style(if state.current_field == BatchField::OutputDirectory { border_style_focused } else { border_style_default });
+    let output_dir_text = Paragraph::new(state.output_directory.as_str())
+        .style(if state.current_field == BatchField::OutputDirectory { focused_style } else { default_style })
+        .block(output_dir_block);
+    f.render_widget(output_dir_text, form_chunks[1]);
+
+    // Feature Set
+    let feature_set_block = Block::default().borders(Borders::ALL).title("Feature Set (Enter to Cycle)")
+        .border_style(if state.current_field == BatchField::FeatureSet { border_style_focused } else { border_style_default });
+    let feature_text = format!("{:?}", state.feature_set);
+    let feature_set_widget = Paragraph::new(feature_text)
+        .style(if state.current_field == BatchField::FeatureSet { focused_style } else { default_style })
+        .block(feature_set_block);
     f.render_widget(feature_set_widget, form_chunks[2]);
 
-    let worker_style = if matches!(state.current_field, BatchField::WorkerCount) {
-        Style::default().fg(Color::Yellow)
-    } else { Style::default() };
+    // Worker Count
+    let worker_count_block = Block::default().borders(Borders::ALL).title("Worker Threads (+/-)")
+        .border_style(if state.current_field == BatchField::WorkerCount { border_style_focused } else { border_style_default });
     let worker_text = format!("{}", state.worker_count);
-    let worker_count_widget = Paragraph::new(worker_text) // Renamed variable
-        .style(worker_style)
-        .block(Block::default().borders(Borders::ALL).title("Worker Threads (+/- or Enter to Edit)"));
+    let worker_count_widget = Paragraph::new(worker_text)
+        .style(if state.current_field == BatchField::WorkerCount { focused_style } else { default_style })
+        .block(worker_count_block);
     f.render_widget(worker_count_widget, form_chunks[3]);
 
-    let options_style = if matches!(state.current_field, BatchField::Recursive) {
-        Style::default().fg(Color::Yellow)
-    } else { Style::default() };
-    let recursive_text = if state.recursive { "Yes" } else { "No" };
-    let options = Paragraph::new(format!("Recursive Search: {}", recursive_text))
-        .style(options_style)
-        .block(Block::default().borders(Borders::ALL).title("Options (Enter/Tab to Toggle)"));
-    f.render_widget(options, form_chunks[4]);
+    // Recursive Option
+    let recursive_block = Block::default().borders(Borders::ALL).title("Options (Enter/Tab to Toggle)")
+        .border_style(if state.current_field == BatchField::Recursive { border_style_focused } else { border_style_default });
+    let recursive_text = if state.recursive { "Recursive: Yes" } else { "Recursive: No" };
+    let options_widget = Paragraph::new(recursive_text)
+        .style(if state.current_field == BatchField::Recursive { focused_style } else { default_style })
+        .block(recursive_block);
+    f.render_widget(options_widget, form_chunks[4]);
 
-    let timeout_style_active = if matches!(state.current_field, BatchField::ActiveTimeout) { Style::default().fg(Color::Yellow)} else {Style::default()};
-    let timeout_style_idle = if matches!(state.current_field, BatchField::IdleTimeout) { Style::default().fg(Color::Yellow)} else {Style::default()};
-
+    // Timeouts
+    let timeout_block = Block::default().borders(Borders::ALL).title("Timeouts (+/- to Adjust)")
+        .border_style(
+            if state.current_field == BatchField::ActiveTimeout || state.current_field == BatchField::IdleTimeout {
+                border_style_focused
+            } else {
+                border_style_default
+            }
+        );
     let timeout_spans = Spans::from(vec![
-        Span::styled(format!("Active: {}s", state.active_timeout), timeout_style_active),
+        Span::styled("Active: ", if state.current_field == BatchField::ActiveTimeout { focused_style } else { default_style }),
+        Span::styled(format!("{}s", state.active_timeout), if state.current_field == BatchField::ActiveTimeout { focused_style } else { default_style }),
         Span::raw(", "),
-        Span::styled(format!("Idle: {}s", state.idle_timeout), timeout_style_idle),
+        Span::styled("Idle: ", if state.current_field == BatchField::IdleTimeout { focused_style } else { default_style }),
+        Span::styled(format!("{}s", state.idle_timeout), if state.current_field == BatchField::IdleTimeout { focused_style } else { default_style }),
     ]);
-    let timeouts = Paragraph::new(timeout_spans)
-        .block(Block::default().borders(Borders::ALL).title("Timeouts (+/- to Adjust)"));
+    let timeouts_widget = Paragraph::new(timeout_spans).block(timeout_block);
+    f.render_widget(timeouts_widget, form_chunks[5]);
 
-    f.render_widget(timeouts, form_chunks[5]);
-
-
-    let start_style = if matches!(state.current_field, BatchField::StartProcessing) {
-        Style::default().fg(Color::Black).bg(Color::Green)
-    } else { Style::default().fg(Color::Green) };
+    // Start Processing Button
+    let start_button_style = if state.current_field == BatchField::StartProcessing {
+        Style::default().fg(Color::Black).bg(Color::Green).add_modifier(Modifier::BOLD)
+    } else {
+        Style::default().fg(Color::Green)
+    };
     let start_button = Paragraph::new("[ Start Processing ]")
-        .style(start_style)
+        .style(start_button_style)
         .alignment(Alignment::Center)
-        .block(Block::default().borders(Borders::ALL));
+        .block(Block::default().borders(Borders::ALL).border_style(if state.current_field == BatchField::StartProcessing {border_style_focused} else {Style::default().fg(Color::Green)}));
     f.render_widget(start_button, form_chunks[6]);
 
+    // Validation Error Message
+    if let Some(err_msg) = &state.validation_error {
+        let error_p = Paragraph::new(err_msg.as_str())
+            .style(Style::default().fg(Color::Red))
+            .alignment(Alignment::Center);
+        f.render_widget(error_p, main_chunks[2]);
+    }
+
+
     let instructions = Paragraph::new("↑↓: Navigate | Enter: Edit/Select/Cycle | Tab: Toggle Recursive | +/-: Adjust Workers/Timeouts | Esc: Back to Main Menu")
-        .style(Style::default().fg(Color::Gray));
-    f.render_widget(instructions, chunks[2]);
+        .style(Style::default().fg(Color::DarkGray))
+        .alignment(Alignment::Center);
+    f.render_widget(instructions, main_chunks[3]);
 }
 
-
-pub fn render_batch_progress<B: Backend>( // Use RatatuiFrame
-    f: &mut RatatuiFrame<B>,
-    progress: &BatchProgress,
+pub fn render_batch_progress<B: Backend>(
+    f: &mut Frame<B>,
+    progress: &BatchProgress, // Changed to take a direct reference
 ) {
     let size = f.size();
     let chunks = Layout::default()
         .direction(Direction::Vertical)
-        .margin(2)
+        .margin(1)
         .constraints([
-            Constraint::Length(3), Constraint::Length(3), Constraint::Length(7), // Increased for more stats
-            Constraint::Length(3), Constraint::Min(0),
+            Constraint::Length(3), // Title
+            Constraint::Length(3), // Progress Bar
+            Constraint::Length(7), // Statistics
+            Constraint::Length(3), // Current File
+            Constraint::Min(0),    // Log Area (placeholder)
+            Constraint::Length(1), // Error Message
         ])
         .split(size);
 
     let title = Paragraph::new("Processing PCAP Files...")
         .style(Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD))
-        .block(Block::default().borders(Borders::ALL));
+        .block(Block::default().borders(Borders::ALL).border_style(Style::default().fg(Color::Cyan)));
     f.render_widget(title, chunks[0]);
 
     let progress_ratio = if progress.total_files > 0 {
@@ -544,7 +714,7 @@ pub fn render_batch_progress<B: Backend>( // Use RatatuiFrame
     let progress_bar = Gauge::default()
         .block(Block::default().borders(Borders::ALL).title("Overall Progress"))
         .gauge_style(Style::default().fg(Color::Green).bg(Color::DarkGray))
-        .percent((progress_ratio * 100.0) as u16)
+        .percent((progress_ratio * 100.0).min(100.0) as u16) // Ensure percent doesn't exceed 100
         .label(format!("{}/{} files", progress.processed_files, progress.total_files));
     f.render_widget(progress_bar, chunks[1]);
 
@@ -553,7 +723,7 @@ pub fn render_batch_progress<B: Backend>( // Use RatatuiFrame
         Line::from(Span::raw(format!("Processed:   {}", progress.processed_files))),
         Line::from(Span::styled(format!("Succeeded:   {}", progress.success_count), Style::default().fg(Color::Green))),
         Line::from(Span::styled(format!("Failed:      {}", progress.error_count), Style::default().fg(Color::Red))),
-        Line::from(Span::raw(format!("Est. Time Remaining: {}", progress.estimated_remaining))), // Needs logic
+        Line::from(Span::raw(format!("Est. Time Remaining: {}", progress.estimated_remaining))),
     ];
     let stats = Paragraph::new(stats_text)
         .block(Block::default().borders(Borders::ALL).title("Statistics"));
@@ -564,30 +734,41 @@ pub fn render_batch_progress<B: Backend>( // Use RatatuiFrame
     } else {
         progress.current_file.clone()
     };
-    let current_file = Paragraph::new(current_file_text)
+    let current_file_widget = Paragraph::new(current_file_text)
         .block(Block::default().borders(Borders::ALL).title("Processing File"));
-    f.render_widget(current_file, chunks[3]);
-    
-    // Placeholder for Log area
-    let log_area = Paragraph::new("Log messages would appear here...\nUse 'Ctrl+C' to attempt to stop processing.")
-        .block(Block::default().borders(Borders::ALL).title("Log (Not Implemented)"));
+    f.render_widget(current_file_widget, chunks[3]);
+
+    let log_area_text = if progress.processed_files == progress.total_files && progress.total_files > 0 {
+        format!("Batch finished. Success: {}, Errors: {}.\nPress Esc to return.", progress.success_count, progress.error_count)
+    } else {
+        "Log messages (not fully implemented).\nPress Esc to attempt to cancel and return to setup.".to_string()
+    };
+    let log_area = Paragraph::new(log_area_text)
+        .block(Block::default().borders(Borders::ALL).title("Status / Log"));
     f.render_widget(log_area, chunks[4]);
+
+    if let Some(err_msg) = &progress.last_error_message {
+        let error_p = Paragraph::new(err_msg.as_str())
+            .style(Style::default().fg(Color::Red))
+            .alignment(Alignment::Center);
+        f.render_widget(error_p, chunks[5]);
+    }
 }
 
-// Event handling for batch processing screen
-// The Event type might need to be crossterm::event::Event
 pub fn handle_batch_processing_events(
-    event: crossterm::event::Event, // Explicitly crossterm event
+    event: crossterm::event::Event,
     state: &mut BatchProcessingState,
 ) -> Result<Option<AppTransition>, TUIError> {
     if let Event::Key(key) = event {
-        if state.processing { // If processing, only allow Esc or Ctrl-C (handled by OS/main loop)
+        // If processing, only allow Esc (handled by main loop to abort task)
+        if state.processing {
             if key.code == KeyCode::Esc {
-                 // Potentially offer to cancel processing, for now, just logs or does nothing
-                log::warn!("Attempted to ESC during batch processing. Ctrl-C to force quit.");
+                warn!("Batch processing in progress. Main loop handles Esc to abort task.");
             }
             return Ok(None);
         }
+        // Clear previous validation error on any key press if not processing
+        state.validation_error = None;
 
         match key.code {
             KeyCode::Esc => Ok(Some(AppTransition::ToMainMenu)),
@@ -604,7 +785,7 @@ pub fn handle_batch_processing_events(
                 };
                 Ok(None)
             }
-            KeyCode::Down => {
+            KeyCode::Down | KeyCode::Tab => { // Tab also navigates down
                 state.current_field = match state.current_field {
                     BatchField::InputDirectory => BatchField::OutputDirectory,
                     BatchField::OutputDirectory => BatchField::FeatureSet,
@@ -619,56 +800,52 @@ pub fn handle_batch_processing_events(
             }
             KeyCode::Enter => {
                 match state.current_field {
-                    BatchField::InputDirectory | BatchField::OutputDirectory => {
-                        // Here you would typically trigger a sub-TUI for path input
-                        // For now, we assume path is typed directly (needs App modification)
-                        // Or, signal to open a proper input box / directory picker
-                         log::info!("Path input for {:?} not fully implemented in this snippet.", state.current_field);
-                         Ok(Some(AppTransition::ToDirectoryPicker { // Placeholder
-                             field: if state.current_field == BatchField::InputDirectory { "input_directory".to_string() } else { "output_directory".to_string()},
-                         }))
+                    BatchField::InputDirectory => {
+                        Ok(Some(AppTransition::ToTextInput {
+                            field: "input_directory".to_string(), // This needs to map back to BatchField
+                            current_value: state.input_directory.clone(),
+                            title: "Input Directory Path".to_string(),
+                        }))
+                    }
+                    BatchField::OutputDirectory => {
+                         Ok(Some(AppTransition::ToTextInput {
+                            field: "output_directory".to_string(),
+                            current_value: state.output_directory.clone(),
+                            title: "Output Directory Path".to_string(),
+                        }))
                     }
                     BatchField::FeatureSet => {
-                        // Cycle through FlowType variants
-                        let variants = FlowType::VARIANTS; // Needs strum::VariantNames
-                        if let Some(pos) = variants.iter().position(|&s| s == state.feature_set.to_string().to_lowercase().as_str()) {
-                            let next_pos = (pos + 1) % variants.len();
-                            state.feature_set = variants[next_pos].parse().unwrap_or_default(); // Needs FromStr for FlowType
+                        let variants_str = FlowType::VARIANTS;
+                        let current_pos = variants_str.iter().position(|&s| s.eq_ignore_ascii_case(&state.feature_set.to_string()));
+                        if let Some(pos) = current_pos {
+                            let next_pos = (pos + 1) % variants_str.len();
+                            if let Ok(ft) = FlowType::from_str(variants_str[next_pos]) { // Requires FromStr for FlowType
+                                state.feature_set = ft;
+                            }
                         }
                         Ok(None)
-                    }
-                    BatchField::WorkerCount => {
-                         log::info!("Worker count input not fully implemented here.");
-                         Ok(Some(AppTransition::ToNumberInput {
-                            field: "worker_count".to_string(),
-                            current_value: state.worker_count,
-                            min: 1,
-                            max: num_cpus::get() * 2,
-                         }))
                     }
                     BatchField::Recursive => {
                         state.recursive = !state.recursive;
                         Ok(None)
                     }
                     BatchField::StartProcessing => {
-                        if validate_batch_inputs(state).is_ok() {
-                            Ok(Some(AppTransition::StartBatchProcessing))
-                        } else {
-                            // Error should be displayed to the user, e.g. via a popup or message area
-                            error!("Validation failed: {:?}", validate_batch_inputs(state).err().unwrap());
-                            Ok(None)
+                        match validate_batch_inputs(state) {
+                            Ok(_) => {
+                                state.validation_error = None;
+                                Ok(Some(AppTransition::StartBatchProcessing))
+                            }
+                            Err(e) => {
+                                state.validation_error = Some(e);
+                                Ok(None)
+                            }
                         }
                     }
+                    // WorkerCount, ActiveTimeout, IdleTimeout are adjusted with +/-
                     _ => Ok(None),
                 }
             }
-            KeyCode::Tab => {
-                if state.current_field == BatchField::Recursive {
-                    state.recursive = !state.recursive;
-                }
-                Ok(None)
-            }
-             KeyCode::Char('+') | KeyCode::Right => {
+            KeyCode::Char('+') | KeyCode::Right => {
                 match state.current_field {
                     BatchField::WorkerCount => {
                         if state.worker_count < num_cpus::get() * 2 { state.worker_count += 1; }
@@ -685,10 +862,10 @@ pub fn handle_batch_processing_events(
                         if state.worker_count > 1 { state.worker_count -= 1; }
                     }
                     BatchField::ActiveTimeout => {
-                        if state.active_timeout > 300 { state.active_timeout -= 300; } else { state.active_timeout = 0; }
+                        if state.active_timeout >= 300 { state.active_timeout -= 300; } else { state.active_timeout = 0; }
                     }
                     BatchField::IdleTimeout => {
-                        if state.idle_timeout > 30 { state.idle_timeout -= 30; } else { state.idle_timeout = 0; }
+                        if state.idle_timeout >= 30 { state.idle_timeout -= 30; } else { state.idle_timeout = 0; }
                     }
                     _ => {}
                 }
@@ -702,25 +879,311 @@ pub fn handle_batch_processing_events(
 }
 
 fn validate_batch_inputs(state: &BatchProcessingState) -> Result<(), String> {
-    if state.input_directory.is_empty() { return Err("Input directory is required".to_string()); }
-    if state.output_directory.is_empty() { return Err("Output directory is required".to_string()); }
-    if !Path::new(&state.input_directory).exists() { return Err(format!("Input directory '{}' does not exist", state.input_directory)); }
-    if !Path::new(&state.input_directory).is_dir() { return Err(format!("Input path '{}' is not a directory", state.input_directory));}
-    // Output directory will be created, but good to check if path is reasonable if needed
-    if state.worker_count == 0 { return Err("Worker count must be at least 1".to_string()); }
+    if state.input_directory.is_empty() { return Err("Input directory cannot be empty.".to_string()); }
+    if !Path::new(&state.input_directory).exists() { return Err(format!("Input directory '{}' does not exist.", state.input_directory)); }
+    if !Path::new(&state.input_directory).is_dir() { return Err(format!("Input path '{}' is not a directory.", state.input_directory)); }
+    if state.output_directory.is_empty() { return Err("Output directory cannot be empty.".to_string()); }
+    // Note: Output directory is created if it doesn't exist by the batch logic.
+    // Further validation (e.g., writability) could be added here or handled by the batch task.
+    if state.worker_count == 0 { return Err("Worker count must be at least 1.".to_string()); }
+    if state.worker_count > num_cpus::get() * 4 { return Err(format!("Worker count exceeds reasonable limit (max {}).", num_cpus::get() * 4));}
     Ok(())
 }
 
-// ... (rest of your existing tui.rs code, like handle_menu_input, render_menu, etc.)
-// Ensure that all input handlers and UI rendering functions are compatible with the
-// App struct and the chosen TUI library (tui-rs or ratatui).
-// The functions like `handle_title_bar_input`, `handle_menu_input`, etc.
-// should be adapted to fit into the new event loop structure if `launch_tui` is changed significantly.
-// They might need to return `Result<Option<AppTransition>, TUIError>` as well.
+// --- Helper functions and existing TUI components (abbreviated) ---
+fn centered_rect(percent_x: u16, percent_y: u16, r: Rect) -> Rect {
+    let popup_layout = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints(
+            [
+                Constraint::Percentage((100 - percent_y) / 2),
+                Constraint::Percentage(percent_y),
+                Constraint::Percentage((100 - percent_y) / 2),
+            ]
+            .as_ref(),
+        )
+        .split(r);
 
-// Remember to add num_cpus = "1.0" to your Cargo.toml dependencies.
-// And strum = { version = "0.24", features = ["derive"] } for FlowType cycling.
+    Layout::default()
+        .direction(Direction::Horizontal)
+        .constraints(
+            [
+                Constraint::Percentage((100 - percent_x) / 2),
+                Constraint::Percentage(percent_x),
+                Constraint::Percentage((100 - percent_x) / 2),
+            ]
+            .as_ref(),
+        )
+        .split(popup_layout[1])[1]
+}
+
+// --- Rendering for general config (abbreviated, from original tui.rs) ---
+fn render_title_buttons<B: Backend>(f: &mut Frame<B>, app: &App, area: Rect) {
+    let buttons_layout = Layout::default()
+        .direction(Direction::Horizontal)
+        .constraints(
+            [
+                Constraint::Percentage(24), Constraint::Length(1), Constraint::Percentage(24),
+                Constraint::Length(1), Constraint::Percentage(24), Constraint::Length(1),
+                Constraint::Percentage(24),
+            ].as_ref()
+        ).split(area);
+
+    let start_button = create_button(" Start ", app.title_bar_state.selected() == Some(0) && app.focus == AppFocus::TitleBar, Color::Green);
+    let quit_button = create_button(" Quit ", app.title_bar_state.selected() == Some(1) && app.focus == AppFocus::TitleBar, Color::Red);
+    let save_button = create_button(" Save ", app.title_bar_state.selected() == Some(2) && app.focus == AppFocus::TitleBar, Color::Blue);
+    let reset_button = create_button(" Reset ", app.title_bar_state.selected() == Some(3) && app.focus == AppFocus::TitleBar, Color::Yellow);
+
+    f.render_widget(start_button, buttons_layout[0]);
+    f.render_widget(quit_button, buttons_layout[2]);
+    f.render_widget(save_button, buttons_layout[4]);
+    f.render_widget(reset_button, buttons_layout[6]);
+}
+
+fn create_button<'a>(label: &'a str, selected: bool, color: Color) -> Paragraph<'a> {
+    Paragraph::new(label)
+        .style(if selected { Style::default().fg(color).add_modifier(Modifier::BOLD) } else { Style::default().fg(color) })
+        .block(
+            Block::default().borders(Borders::ALL)
+                .border_style(if selected { Style::default().fg(color).add_modifier(Modifier::BOLD) } else { Style::default().fg(color).add_modifier(Modifier::DIM) })
+        )
+        .alignment(Alignment::Center)
+}
+
+fn render_menu<B: Backend>(f: &mut Frame<B>, app: &App, area: Rect) {
+    let menu_items: Vec<ListItem> = app.main_menu_items.iter().map(|item| ListItem::new(*item)).collect();
+    let menu_list_widget = List::new(menu_items) // Renamed variable
+        .block(
+            Block::default().borders(Borders::ALL)
+                .border_style(Style::default().fg(if app.focus == AppFocus::Menu { Color::Yellow } else { Color::Cyan }).add_modifier(Modifier::BOLD))
+                .title("Menu")
+        )
+        .highlight_style(Style::default().fg(if app.focus == AppFocus::Menu { Color::Yellow } else { Color::White }).add_modifier(Modifier::BOLD))
+        .highlight_symbol(">> ");
+    f.render_stateful_widget(menu_list_widget, area, &mut app.main_menu_state.clone()); // Use cloned state
+}
+
+fn render_content_general_config<B: Backend>(f: &mut Frame<B>, app: &App, area: Rect) {
+    // This function would render content based on app.main_menu_state.selected()
+    // For brevity, not reproducing the full logic from the original file.
+    // It would call render_selectable_list, render_input_paragraph, render_boolean_choice etc.
+    // for general configuration items.
+    let placeholder = Paragraph::new("General config content area")
+        .block(Block::default().borders(Borders::ALL).title("Details"));
+    f.render_widget(placeholder, area);
+}
+
+fn render_current_selections_general_config<B: Backend>(f: &mut Frame<B>, app: &App, area: Rect) {
+    // This function would display the currently selected general configurations.
+    // For brevity, not reproducing the full logic.
+    let placeholder = Paragraph::new(format!("Current general config: {:?}", app.config))
+        .block(Block::default().borders(Borders::ALL).title("Current Selections"));
+    f.render_widget(placeholder, area);
+}
+
+fn render_popups_general_config<B: Backend>(f: &mut Frame<B>, app: &App, area: Rect) {
+    // This function would render popups for general configuration input.
+    // For brevity, not reproducing the full logic.
+    // Example: if app.focus == AppFocus::CommandArgumentInput ...
+}
+
+fn render_config_file_input_popup<B: Backend>(f: &mut Frame<B>, input_buffer: &str, screen_size: Rect) {
+    let popup_area = centered_rect(70, 20, screen_size);
+    f.render_widget(Clear, popup_area);
+    let block = Block::default()
+        .title("Load Config File (Enter path or press Enter for new)")
+        .borders(Borders::ALL)
+        .border_style(Style::default().fg(Color::Yellow))
+        .style(Style::default().bg(Color::DarkGray));
+    let p = Paragraph::new(input_buffer)
+        .style(Style::default().fg(Color::White))
+        .block(block);
+    f.render_widget(p, popup_area);
+}
+
+fn render_config_file_save_popup<B: Backend>(f: &mut Frame<B>, input_buffer: &str, screen_size: Rect) {
+    let popup_area = centered_rect(70, 20, screen_size);
+    f.render_widget(Clear, popup_area);
+     let block = Block::default()
+        .title("Save Config File (Enter path and press Enter)")
+        .borders(Borders::ALL)
+        .border_style(Style::default().fg(Color::Yellow))
+        .style(Style::default().bg(Color::DarkGray));
+    let p = Paragraph::new(input_buffer)
+        .style(Style::default().fg(Color::White))
+        .block(block);
+    f.render_widget(p, popup_area);
+}
 
 
-// In idlab-discover/rustiflow/RustiFlow-bd550ae2db5923b49c3bfea5223945b1889a077b/rustiflow/src/main.rs
-// ... other imports ...
+// --- Event Handlers for general config (abbreviated) ---
+fn handle_title_bar_input<B: Backend>(key: KeyEvent, app: &mut App) -> Result<Option<Config>, TUIError> {
+    match key.code {
+        KeyCode::Left => {
+            let i = match app.title_bar_state.selected() { Some(i) if i > 0 => i - 1, _ => 0 };
+            app.title_bar_state.select(Some(i));
+        }
+        KeyCode::Right => {
+            let i = match app.title_bar_state.selected() { Some(i) if i < 3 => i + 1, _ => 3 };
+            app.title_bar_state.select(Some(i));
+        }
+        KeyCode::Enter => match app.title_bar_state.selected() {
+            Some(0) => return Ok(Some(app.config.clone())), // Start
+            Some(1) => return Err(TUIError::Other("User quit".to_string())), // Quit
+            Some(2) => app.focus = AppFocus::ConfigFileSaveInput, // Save
+            Some(3) => app.config = Config::reset(), // Reset
+            _ => {}
+        },
+        KeyCode::Down => app.focus = AppFocus::Menu,
+        _ => {}
+    }
+    Ok(None)
+}
+
+fn handle_menu_input(key: KeyEvent, app: &mut App) -> Result<Option<AppTransition>, TUIError> {
+    match key.code {
+        KeyCode::Up => {
+            if app.main_menu_state.selected() == Some(0) {
+                app.focus = AppFocus::TitleBar;
+            } else {
+                let i = app.main_menu_state.selected().unwrap_or(0);
+                app.main_menu_state.select(Some(i.saturating_sub(1)));
+            }
+        }
+        KeyCode::Down => {
+            let i = match app.main_menu_state.selected() {
+                Some(i) if i < app.main_menu_items.len() - 1 => i + 1,
+                _ => app.main_menu_items.len() - 1,
+            };
+            app.main_menu_state.select(Some(i));
+        }
+        KeyCode::Enter | KeyCode::Right => {
+            if let Some(selected_index) = app.main_menu_state.selected() {
+                match app.main_menu_items[selected_index] {
+                    "Batch PCAP Processing" => return Ok(Some(AppTransition::ToBatchSetupScreen)),
+                    // ... map other menu items to AppFocus states for general config ...
+                    "Feature Set" => app.focus = AppFocus::FlowTypeSelection,
+                    "Mode" => app.focus = AppFocus::CommandSelection,
+                    // ... and so on for other general config items
+                    _ => {}
+                }
+            }
+        }
+        KeyCode::Esc => return Err(TUIError::Other("User quit".to_string())),
+        _ => {}
+    }
+    Ok(None)
+}
+
+// Placeholder for other input handlers from original tui.rs, adapt as needed
+fn handle_config_file_input(key: KeyEvent, app: &mut App) -> Result<(), TUIError> {
+    match key.code {
+        KeyCode::Char(c) => app.config_file_input.push(c),
+        KeyCode::Backspace => { app.config_file_input.pop(); }
+        KeyCode::Enter => {
+            if fs::metadata(&app.config_file_input).is_ok() {
+                app.config_file = Some(app.config_file_input.clone());
+                match confy::load_path::<ConfigFile>(&app.config_file_input) {
+                    Ok(cf) => app.config = Config {
+                        config: cf.config,
+                        output: cf.output,
+                        command: app.config.command.clone(), // Preserve command if not in file
+                    },
+                    Err(e) => {
+                        error!("Failed to load config file {}: {}", app.config_file_input, e);
+                        app.config = Config::reset(); // Reset on error
+                    }
+                }
+            } else if app.config_file_input.is_empty() {
+                 info!("Starting with a new default configuration.");
+                 app.config = Config::reset();
+            } else {
+                error!("Config file not found: {}", app.config_file_input);
+                // Optionally clear input or keep it for user to correct
+            }
+            app.config_file_input.clear();
+            app.focus = AppFocus::Menu;
+        }
+        KeyCode::Esc => { // Allow Esc to cancel config file input and go to menu
+            app.config_file_input.clear();
+            app.focus = AppFocus::Menu;
+        }
+        _ => {}
+    }
+    Ok(())
+}
+
+fn handle_config_file_save_input(key: KeyEvent, app: &mut App) -> Result<(), TUIError> {
+     match key.code {
+        KeyCode::Char(c) => app.config_file_input.push(c),
+        KeyCode::Backspace => { app.config_file_input.pop(); }
+        KeyCode::Enter => {
+            let path_to_save = app.config_file_input.clone();
+            if path_to_save.is_empty() {
+                error!("Save path cannot be empty.");
+            } else {
+                let config_to_save = ConfigFile {
+                    config: app.config.config.clone(),
+                    output: app.config.output.clone(),
+                };
+                if let Err(e) = confy::store_path(&path_to_save, config_to_save) {
+                    error!("Error saving config to {}: {}", path_to_save, e);
+                } else {
+                    info!("Config saved to {}", path_to_save);
+                    app.config_file = Some(path_to_save);
+                }
+            }
+            app.config_file_input.clear();
+            app.focus = AppFocus::Menu;
+        }
+        KeyCode::Esc => {
+            app.config_file_input.clear();
+            app.focus = AppFocus::Menu;
+        }
+        _ => {}
+    }
+    Ok(())
+}
+
+// Implement other handlers like handle_flow_type_input, handle_numeric_input etc.
+// These would modify app.config fields and switch app.focus.
+// Example (very simplified):
+// fn handle_flow_type_input(key: KeyEvent, app: &mut App) -> Result<(), TUIError> {
+//     // Logic to cycle app.config.config.features
+//     // On Enter or Esc, app.focus = AppFocus::Menu;
+//     Ok(())
+// }
+
+```
+
+**Notes on this generated `tui.rs`:**
+
+1.  **Dependencies:** Make sure your `Cargo.toml` for the `rustiflow` crate includes `ratatui`, `crossterm`, `serde`, `log`, `strum`, `strum_macros`, `tokio`, `num_cpus`, and `confy`.
+2.  **`batch_processor` Function:** The `launch_tui` function now takes a `batch_processor` function pointer. This function (which you'd implement in `main.rs` or a separate module) is responsible for the actual batch processing work. It receives the `BatchProcessingState` and a `mpsc::Sender<BatchProgress>` to send progress updates back to the TUI. It should return a `JoinHandle<()>`.
+3.  **Async Progress Updates:** The main TUI loop in `launch_tui` uses `tokio::select!` to listen for user input and for progress messages from the spawned batch task.
+4.  **Input Popups:** For directory and number input in the batch setup, I've used `AppTransition::ToTextInput`. A `render_text_input_popup` and basic handling in the main loop are added. A more robust solution would involve a dedicated input mode or widget.
+5.  **Error Handling:** The `TUIError` enum is basic. You can expand it. Validation errors in batch setup are now stored in `BatchProcessingState` and displayed.
+6.  **General Config UI:** The rendering and event handling for the general application configuration (non-batch parts) are kept abbreviated using placeholders like `render_content_general_config`. You would fill these in with your existing logic, adapted for the `App` struct and `AppFocus` enum.
+7.  **`FlowType` (FeatureSet):** For cycling through `FlowType` in the batch setup, it needs to derive `strum::VariantNames` and `std::str::FromStr` (or `strum::EnumString`).
+8.  **Stopping Batch Task:** Pressing `Esc` on the batch progress screen will now attempt to abort the task and return to the setup screen.
+9.  **Path Initialization:** Batch input/output directories are initialized to current dir and a subfolder.
+10. **Cloning `BatchProcessingState` for Task:** The `BatchProcessingState` now derives `Clone`. When spawning the batch task, a clone of the state is passed. The `Arc<Mutex<BatchProgress>>` within it is already designed for sharing.
+
+This file is quite extensive. You'll need to carefully review and adapt it to your existing codebase, especially the parts marked as abbreviated or requiring further implementation for full input functionality.Okay, I've generated the `tui.rs` file for you in the canvas.
+
+It includes the new batch processing TUI elements, integrates them with a main event loop, and sets up the structure for asynchronous batch processing with progress updates.
+
+**Key things to note about this version:**
+
+* **`ratatui`:** It uses `ratatui` for all TUI components.
+* **`batch_processor` function:** The `launch_tui` function now expects a function pointer `batch_processor`. This function (which you'll define in `main.rs` or another module) will contain the actual logic for performing the batch processing. It will receive the batch configuration and a channel sender to send `BatchProgress` updates back to the TUI.
+* **Asynchronous Updates:** The TUI loop uses `tokio::select!` to handle both user input and incoming progress messages from the batch task.
+* **Input Handling:**
+    * Basic text input popups are implemented for directory paths in the batch setup.
+    * Cycling through feature sets and toggling recursive search are handled.
+    * Adjusting worker count and timeouts with `+/-` keys is supported.
+* **Error Display:** Validation errors for batch inputs are now displayed on the setup screen. The progress screen can also show a `last_error_message`.
+* **Task Management:** Starting a batch process spawns a Tokio task. Pressing `Esc` on the progress screen attempts to abort this task.
+* **General Config UI:** The parts of the TUI related to the *original* single-file processing or real-time mode configuration are present but simplified in the rendering functions (`render_content_general_config`, etc.) to keep the example focused. You'll need to integrate your existing logic there.
+
+You'll need to ensure your `Cargo.toml` has all the necessary dependencies like `ratatui`, `crossterm`, `tokio`, `strum`, `num_cpus`, etc. The actual implementation of the `batch_processor` function in your `main.rs` will be crucial for the batch functionality to wo
