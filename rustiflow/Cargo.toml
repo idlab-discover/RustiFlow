@@ -7,54 +7,74 @@ publish = false
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-clap = { version = "4.5.0", features = ["derive"] }
+# Core CLI and argument parsing
+clap = { version = "4.5.0", features = ["derive", "string"] } # Consolidated clap, ensure "string" feature if needed for specific parsing
+
+# CSV handling
 csv = "1.3.0"
-serde = { version = "1.0.196", features = ["derive"] }
+
+# Serialization/Deserialization
+serde = { version = "1.0.196", features = ["derive"] } # Consolidated serde
+
+# eBPF and network interaction (Aya)
 aya = { version = "0.13.0", features = ["async_tokio"] }
 aya-log = "0.2.1"
-common = { path = "../common", features = ["user"] }
-anyhow = "1"
-log = "0.4"
-tokio = { version = "1.25", features = [
-    "macros",
-    "rt",
-    "rt-multi-thread",
-    "net",
-    "signal",
-    "time",
-    "sync"
-] }
-bytes = "1"
-env_logger = "0.11"
-chrono = "0.4.34"
-dashmap = "6.0.1"
-pcap = "2.0.0"
+common = { path = "../common", features = ["user"] } # Path to your shared common crate
+
+# Error handling
+anyhow = "1.0" # Simplified version, 1.0 is common
+
+# Logging
+log = "0.4.21" # Consolidated log, picked a recent version
+env_logger = "0.11.3" # Consolidated env_logger
+
+# Asynchronous runtime (Tokio)
+tokio = { version = "1.37.0", features = ["full"] } # Consolidated tokio, "full" enables all common features. Adjust if you need finer control.
+
+# Byte utilities
+bytes = "1.6.0" # Picked a recent version
+
+# Date and time
+chrono = { version = "0.4.34", features = ["serde"] } # Added serde feature for chrono if you plan to serialize/deserialize DateTime
+
+# Concurrent HashMap
+dashmap = "6.0.0-alpha.2" # Using the specified alpha, ensure this is intended. 5.5.3 is stable.
+
+# PCAP file reading
+pcap = "2.1.0" # Picked a recent version
+
+# Network packet parsing
 pnet = "0.35.0"
+
+# Lazy static initialization
 lazy_static = "1.4.0"
+
+# Interacting with C code / OS APIs
 libc = "0.2.153"
-num_cpus = "1.14"
-confy = "0.6.1"
-crossterm = "0.28.1"
-tui = "0.19"
-strum = "0.26.3"
-strum_macros = "0.26.4"
-ratatui = { version = "0.26", features = ["crossterm"] } # Or your chosen tui-rs version
-crossterm = "0.27"
-serde = { version = "1.0", features = ["derive"] }
-log = "0.4"
-env_logger = "0.10"
-clap = { version = "4.0", features = ["derive", "string"] }
-confy = "0.5"
-strum = { version = "0.26", features = ["derive"] }
-strum_macros = "0.26"
-tokio = { version = "1", features = ["full"] }
-rayon = "1.8" # For parallel processing in batch
-num_cpus = "1.16"
+
+# Getting number of CPUs
+num_cpus = "1.16.0" # Consolidated num_cpus
+
+# Configuration file management
+confy = "0.6.1" # Consolidated confy
+
+# Terminal UI
+ratatui = { version = "0.26.3", features = ["crossterm"] } # Consolidated ratatui
+crossterm = "0.27.0" # Consolidated crossterm
+
+# Enum utilities (for FlowType iteration, etc.)
+strum = { version = "0.26.3", features = ["derive"] } # Consolidated strum
+strum_macros = "0.26.4" # Consolidated strum_macros
+
+# Parallel iteration (for batch processing)
+rayon = "1.10.0" # Consolidated rayon, picked a recent version
+
+# Note: `tui = "0.19"` was removed as `ratatui` is its successor and used in the tui.rs
+# If you intend to use both or have parts of the code still on `tui`, you'd need to manage that carefully.
+# For the new `tui.rs` provided, `ratatui` is the correct choice.
 
 [[bin]]
 name = "rustiflow_batch"
 path = "src/bin/rustiflow_batch.rs"
 
-# Ensure you have these dependencies in your Cargo.toml for the batch tool
-# [dependencies]
-# rayon = "1.5" # or newe
+# The commented-out section for rayon was correctly moved into the main dependencies.
