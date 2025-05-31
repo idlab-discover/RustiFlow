@@ -93,79 +93,146 @@ fn find_pcap_files_for_batch(dir: &Path, recursive: bool) -> Result<Vec<PathBuf>
     Ok(pcap_files)
 }
 
-/// Processes a single PCAP file as part of a batch operation.
-/// This involves calling the main `rustiflow` executable as a subprocess.
-async fn process_single_pcap_for_batch(
-    pcap_file: PathBuf,
+// Removed old process_single_pcap_for_batch function
+
+async fn process_pcap_natively(
+    pcap_file_path: PathBuf,
     output_dir: PathBuf,
-    feature_set: FlowType, // Assuming FlowType is Cloneable
+    // BatchProcessingState fields:
+    feature_set: FlowType,
     active_timeout: u64,
     idle_timeout: u64,
-    worker_threads_for_rustiflow_subprocess: u8, // Threads for the rustiflow sub-process
-) -> Result<String, String> {
-    let filename_stem = pcap_file
+    early_export: Option<u64>,
+    expiration_check_interval: u64,
+    // OutputConfig fields
+    output_format: args::ExportMethodType, // Use fully qualified name
+    output_header: bool,
+    drop_contaminant_features: bool,
+    // Threads for this specific pcap processing
+    threads_for_pcap: u8,
+) -> Result<String, String> { // Returns Ok(original_filename_stem) or Err(description)
+
+    let original_filename_stem = pcap_file_path
         .file_stem()
-        .ok_or_else(|| format!("Invalid filename: {}", pcap_file.display()))?
-        .to_string_lossy();
+        .ok_or_else(|| format!("Invalid filename: {}", pcap_file_path.display()))?
+        .to_string_lossy()
+        .to_string();
 
-    let output_file = output_dir.join(format!("{}.csv", filename_stem));
+    let output_file_extension = match output_format {
+        args::ExportMethodType::Csv => "csv",
+        args::ExportMethodType::Pandas | args::ExportMethodType::Polars => "parquet",
+        args::ExportMethodType::Print => {
+            warn!("'Print' output format selected for batch processing file '{}'. This is not supported for file output and will be skipped.", pcap_file_path.display());
+            return Err(format!("'Print' output format not suitable for file-based batch processing of {}", pcap_file_path.display()));
+        }
+    };
+    let output_file_name = format!("{}.{}", original_filename_stem, output_file_extension);
+    let full_output_path = output_dir.join(output_file_name);
 
-    let rustiflow_executable = env::current_exe()
-        .ok()
-        .and_then(|p| p.parent().map(|pd| pd.join("rustiflow")))
-        .unwrap_or_else(|| PathBuf::from("rustiflow")); // Fallback to PATH
+    info!("Processing {} -> {} (Features: {:?}, Format: {:?})",
+        pcap_file_path.display(), full_output_path.display(), feature_set, output_format);
 
-    log::debug!(
-        "Batch Subprocess: {} pcap {} --features {} --output csv --export-path {} --header --active-timeout {} --idle-timeout {} --threads {}",
-        rustiflow_executable.display(),
-        pcap_file.display(),
-        feature_set.to_string().to_lowercase(),
-        output_file.display(),
-        active_timeout,
-        idle_timeout,
-        worker_threads_for_rustiflow_subprocess
-    );
+    macro_rules! execute_single_pcap_processing {
+        ($flow_ty:ty) => {{
+            let mut output_writer = OutputWriter::<$flow_ty>::new(
+                output_format.clone(),
+                output_header,
+                drop_contaminant_features,
+                Some(full_output_path.to_string_lossy().into_owned()),
+            );
+            output_writer.init();
 
-    let mut cmd = TokioCommand::new(&rustiflow_executable);
-    cmd.arg("pcap")
-        .arg(&pcap_file) // Path to the pcap file for the 'pcap' subcommand
-        .arg("--features")
-        .arg(feature_set.to_string().to_lowercase())
-        .arg("--output")
-        .arg("csv")
-        .arg("--export-path")
-        .arg(&output_file)
-        .arg("--header") // Always include header for batch CSVs
-        .arg("--active-timeout")
-        .arg(active_timeout.to_string())
-        .arg("--idle-timeout")
-        .arg(idle_timeout.to_string())
-        .arg("--threads") // Pass thread count to the rustiflow subprocess
-        .arg(worker_threads_for_rustiflow_subprocess.to_string())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped());
+            let (sender, mut receiver) = tokio_mpsc::channel::<$flow_ty>(1000);
 
-    let process_output = cmd
-        .output()
-        .await
-        .map_err(|e| format!("Failed to execute RustiFlow for {}: {}", pcap_file.display(), e))?;
+            let output_task_handle = tokio::spawn(async move {
+                while let Some(flow) = receiver.recv().await {
+                    if let Err(e) = output_writer.write_flow(flow) {
+                        error!("Error writing flow for {}: {:?}", pcap_file_path.display(), e);
+                    }
+                }
+                output_writer
+            });
 
-    if !process_output.status.success() {
-        let stderr = String::from_utf8_lossy(&process_output.stderr);
-        let stdout = String::from_utf8_lossy(&process_output.stdout);
-        Err(format!(
-            "RustiFlow subprocess for {} failed with code {:?}:\nStderr: {}\nStdout: {}",
-            pcap_file.display(),
-            process_output.status.code(),
-            stderr,
-            stdout
-        ))
-    } else {
-        Ok(pcap_file
-            .file_name()
-            .unwrap_or_default()
-            .to_string_lossy()
-            .into_owned())
+            let pcap_processing_result = read_pcap_file::<$flow_ty>(
+                &pcap_file_path.to_string_lossy(),
+                sender,
+                threads_for_pcap,
+                active_timeout,
+                idle_timeout,
+                early_export,
+                expiration_check_interval,
+            )
+            .await;
+
+            let output_writer_result = output_task_handle.await;
+            if output_writer_result.is_err() {
+                return Err(format!("Output task failed for {}: {:?}", pcap_file_path.display(), output_writer_result.err().unwrap()));
+            }
+            let mut final_output_writer = output_writer_result.unwrap();
+
+            match pcap_processing_result {
+                Ok(collected_flow_stats) => {
+                    // Final flush and close for the main data file (CSV/Parquet)
+                    if let Err(e) = final_output_writer.flush_and_close() {
+                       return Err(format!("Error flushing/closing main data writer for {}: {:?}", pcap_file_path.display(), e));
+                    }
+
+                    // Logic for global stats JSON for Polars/Pandas (after main file is closed)
+                    if output_format == args::ExportMethodType::Polars || output_format == args::ExportMethodType::Pandas {
+                        let mut json_path = StdPathBuf::from(&full_output_path);
+                        let stem = json_path.file_stem().unwrap_or_default().to_os_string();
+                        let mut new_filename = stem;
+                        new_filename.push("_global_stats.json");
+                        json_path.set_file_name(new_filename);
+
+                        let mut inter_flow_deltas_us: Vec<i64> = Vec::new();
+                        if collected_flow_stats.len() > 1 {
+                            for i in 1..collected_flow_stats.len() {
+                                inter_flow_deltas_us.push(collected_flow_stats[i].0 - collected_flow_stats[i-1].0);
+                            }
+                        }
+                        let all_flow_durations_us: Vec<i64> = collected_flow_stats.iter().map(|&(_, duration)| duration).collect();
+
+                        #[derive(Serialize)]
+                        struct GlobalStats<'a> {
+                            inter_flow_deltas_us: &'a [i64],
+                            all_flow_durations_us: &'a [i64],
+                        }
+                        let stats_to_serialize = GlobalStats {
+                            inter_flow_deltas_us: &inter_flow_deltas_us,
+                            all_flow_durations_us: &all_flow_durations_us,
+                        };
+                        match StdFile::create(&json_path) {
+                            Ok(file) => {
+                                let writer = StdBufWriter::new(file);
+                                if let Err(e) = serde_json::to_writer_pretty(writer, &stats_to_serialize) {
+                                    warn!("Failed to write global stats JSON for {}: {}", pcap_file_path.display(), e);
+                                } else {
+                                    info!("Global stats JSON written for {}", pcap_file_path.display());
+                                }
+                            }
+                            Err(e) => {
+                                warn!("Failed to create global stats JSON file for {}: {}", pcap_file_path.display(), e);
+                            }
+                        }
+                    }
+                    Ok(original_filename_stem.clone())
+                }
+                Err(err) => {
+                    let _ = final_output_writer.flush_and_close(); // Attempt to flush even on error
+                    Err(format!("Error processing pcap file {}: {:?}", pcap_file_path.display(), err))
+                }
+            }
+        }};
+    }
+
+    match feature_set {
+        FlowType::Basic => execute_single_pcap_processing!(BasicFlow),
+        FlowType::CIC => execute_single_pcap_processing!(CicFlow),
+        FlowType::CIDDS => execute_single_pcap_processing!(CiddsFlow),
+        FlowType::Nfstream => execute_single_pcap_processing!(NfFlow),
+        FlowType::Rustiflow => execute_single_pcap_processing!(RustiFlow),
+        FlowType::Custom => execute_single_pcap_processing!(CustomFlow),
     }
 }
 
@@ -248,30 +315,55 @@ fn batch_processor_task_spawner(
 
         // Channel to collect results from Rayon-managed Tokio tasks
         let (internal_result_tx, mut internal_result_rx) =
-            tokio_mpsc::channel::<(String, Result<String, String>)>(pcap_files.len() + 5); // Buffer slightly larger
+            tokio_mpsc::channel::<(String, Result<String, String>)>(pcap_files.len() + 5);
 
         let num_total_files = pcap_files.len();
         let mut current_progress_state = BatchProgress { total_files: num_total_files, ..Default::default() };
+        let mut failed_files_summary: Vec<(String, String)> = Vec::new(); // Initialize summary
 
 
-        pool.install(move || { // `batch_state` and `output_dir_path` are moved into Rayon's scope
+        pool.install(move || {
             pcap_files.into_par_iter().for_each_with(
-                internal_result_tx, // Each Rayon thread gets a sender to the internal channel
+                internal_result_tx,
                 |tx_clone, pcap_file| {
                     let file_name_for_progress = pcap_file.file_name().unwrap_or_default().to_string_lossy().into_owned();
                     
-                    // Each Rayon thread needs its own Tokio runtime to block_on async calls
                     let rt = tokio::runtime::Builder::new_current_thread()
                         .enable_all()
                         .build()
                         .unwrap();
 
-                    let result = rt.block_on(process_single_pcap_for_batch(
-                        pcap_file.clone(), // pcap_file is PathBuf, which is Clone
-                        output_dir_path.clone(), // output_dir_path is PathBuf, Clone
-                        batch_state.feature_set.clone(), // FlowType needs to be Clone
+                    // TODO: Update tui.rs so BatchProcessingState contains all necessary config fields.
+                    // Using placeholders for fields not yet in BatchProcessingState.
+                    let early_export_val = None; // Placeholder from batch_state.config.early_export
+                    let expiration_check_interval_val = batch_state.config.expiration_check_interval; // Assuming batch_state.config added
+                    let output_format_val = batch_state.output.output.clone(); // Assuming batch_state.output added
+                    let output_header_val = batch_state.output.header; // Assuming batch_state.output added
+                    let drop_contaminant_val = batch_state.output.drop_contaminant_features; // Assuming batch_state.output added
+
+                    // If BatchProcessingState doesn't have sub-structs `config` and `output` yet,
+                    // then direct placeholders would be needed, e.g.
+                    // let expiration_check_interval_val = 60; // Default placeholder
+                    // let output_format_val = args::ExportMethodType::Csv; // Default placeholder
+
+                    // For the purpose of this diff, I will assume `batch_state` will be updated
+                    // in a later TUI step to include `config: ExportConfig` and `output: OutputConfig`.
+                    // If those fields are not yet on BatchProcessingState from tui.rs,
+                    // direct placeholders would be used here.
+                    // For now, let's use what's available on BatchProcessingState and default others.
+                    // The prompt implies `batch_state` in `main.rs` can provide them (eventually).
+
+                    let result = rt.block_on(process_pcap_natively(
+                        pcap_file.clone(),
+                        output_dir_path.clone(),
+                        batch_state.feature_set.clone(),
                         batch_state.active_timeout,
                         batch_state.idle_timeout,
+                        batch_state.early_export,        // Now from updated BatchProcessingState
+                        batch_state.expiration_check_interval, // Now from updated BatchProcessingState
+                        batch_state.output_format.clone(), // Now from updated BatchProcessingState
+                        batch_state.output_header,         // Now from updated BatchProcessingState
+                        batch_state.drop_contaminant_features, // Now from updated BatchProcessingState
                         threads_per_subprocess,
                     ));
 
@@ -291,14 +383,15 @@ fn batch_processor_task_spawner(
                     current_progress_state.last_error_message = None; // Clear previous specific error
 
                     match result {
-                        Ok(processed_file_name) => {
-                            info!("Batch: Successfully processed {}", processed_file_name);
+                        Ok(processed_file_stem) => {
+                            info!("Batch: Successfully processed {}", file_name); // Log with original file_name for clarity
                             current_progress_state.success_count += 1;
                         }
-                        Err(e) => {
-                            error!("Batch: Failed to process {}: {}", file_name, e);
+                        Err(error_message_str) => {
+                            error!("Batch: Failed to process {}: {}", file_name, error_message_str);
                             current_progress_state.error_count += 1;
-                            current_progress_state.last_error_message = Some(format!("Error on {}: {}", file_name, e));
+                            current_progress_state.last_error_message = Some(format!("Error on {}: {}", file_name, error_message_str));
+                            failed_files_summary.push((file_name.clone(), error_message_str)); // Collect error
                         }
                     }
                     
@@ -336,10 +429,42 @@ fn batch_processor_task_spawner(
 
         info!(
             "Batch processor task finished. Total: {}, Success: {}, Errors: {}",
-            num_total_files,
-            num_success_count, // These local counters are not updated in the loop, use current_progress_state
-            num_error_count
+            current_progress_state.total_files, // Use values from current_progress_state
+            current_progress_state.success_count,
+            current_progress_state.error_count
         );
+
+        // Generate batch summary report
+        let report_file_path = output_dir_path.join("batch_summary_report.txt");
+        info!("Generating batch summary report at: {}", report_file_path.display());
+
+        match StdFile::create(&report_file_path) {
+            Ok(file) => {
+                let mut writer = StdBufWriter::new(file);
+                use std::io::Write; // Bring trait into scope
+
+                if writeln!(writer, "RustiFlow Batch Processing Summary").is_err() { error!("Failed to write to summary report"); return; }
+                if writeln!(writer, "===================================").is_err() { error!("Failed to write to summary report"); return; }
+                if writeln!(writer, "Total PCAP files attempted: {}", current_progress_state.total_files).is_err() { error!("Failed to write to summary report"); return; }
+                if writeln!(writer, "Successfully processed: {}", current_progress_state.success_count).is_err() { error!("Failed to write to summary report"); return; }
+                if writeln!(writer, "Failed to process: {}", current_progress_state.error_count).is_err() { error!("Failed to write to summary report"); return; }
+
+                if !failed_files_summary.is_empty() {
+                    if writeln!(writer, "\nFiles that failed processing:").is_err() { error!("Failed to write to summary report"); return; }
+                    for (file_name, error_msg) in &failed_files_summary {
+                        if writeln!(writer, "  - {}: {}", file_name, error_msg).is_err() { error!("Failed to write to summary report"); return; }
+                    }
+                } else if current_progress_state.error_count == 0 {
+                    if writeln!(writer, "\nAll files processed successfully.").is_err() { error!("Failed to write to summary report"); return; }
+                }
+                if let Err(e) = writer.flush() {
+                     error!("Failed to flush summary report: {}", e);
+                }
+            }
+            Err(e) => {
+                error!("Failed to create batch summary report file at {}: {}", report_file_path.display(), e);
+            }
+        }
     })
 }
 

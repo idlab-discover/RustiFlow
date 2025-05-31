@@ -79,10 +79,17 @@ pub struct BatchProcessingState {
     pub recursive: bool,
     pub active_timeout: u64,
     pub idle_timeout: u64,
+    // New fields for batch config
+    pub early_export: Option<u64>,
+    pub expiration_check_interval: u64,
+    pub output_format: ExportMethodType,
+    pub output_header: bool,
+    pub drop_contaminant_features: bool,
+    // End new fields
     pub current_field: BatchField,
     pub processing: bool,
-    pub progress: Arc<Mutex<BatchProgress>>, // Shared progress state
-    pub validation_error: Option<String>, // For displaying validation errors
+    pub progress: Arc<Mutex<BatchProgress>>,
+    pub validation_error: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -90,6 +97,11 @@ pub enum BatchField {
     InputDirectory,
     OutputDirectory,
     FeatureSet,
+    OutputFormat,
+    EarlyExport,
+    ExpirationCheckInterval,
+    OutputHeader,
+    DropContaminantFeatures,
     WorkerCount,
     Recursive,
     ActiveTimeout,
@@ -124,6 +136,13 @@ impl BatchProcessingState {
             recursive: false,
             active_timeout: 3600,
             idle_timeout: 120,
+            // Initialize new fields
+            early_export: None,
+            expiration_check_interval: 60, // Default from CLI
+            output_format: ExportMethodType::Csv, // Default to Csv for batch
+            output_header: true, // Default true for batch files
+            drop_contaminant_features: false, // Default
+            // End new fields initialization
             current_field: BatchField::InputDirectory,
             processing: false,
             progress: Arc::new(Mutex::new(BatchProgress::default())),
@@ -598,14 +617,16 @@ pub fn render_batch_processing_setup<B: Backend>(
         .block(Block::default().borders(Borders::ALL).border_style(Style::default().fg(Color::Cyan)));
     f.render_widget(title, main_chunks[0]);
 
+    let num_form_items = 12; // InputDir, OutputDir, FeatureSet, OutputFormat, EarlyExport, ExpCheckInterval, OutputHeader, DropContaminant, WorkerCount, Recursive, Timeouts, StartButton
+    let mut constraints = Vec::new();
+    for _ in 0..num_form_items {
+        constraints.push(Constraint::Length(3));
+    }
+
     let form_chunks = Layout::default()
         .direction(Direction::Vertical)
         .margin(1)
-        .constraints([
-            Constraint::Length(3), Constraint::Length(3), Constraint::Length(3),
-            Constraint::Length(3), Constraint::Length(3), Constraint::Length(3),
-            Constraint::Length(3),
-        ].as_ref())
+        .constraints(constraints)
         .split(main_chunks[1]);
 
     let focused_style = Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD);
@@ -654,10 +675,10 @@ pub fn render_batch_processing_setup<B: Backend>(
     let options_widget = Paragraph::new(recursive_text)
         .style(if state.current_field == BatchField::Recursive { focused_style } else { default_style })
         .block(recursive_block);
-    f.render_widget(options_widget, form_chunks[4]);
+    f.render_widget(options_widget, form_chunks[9]); // Adjusted index
 
     // Timeouts
-    let timeout_block = Block::default().borders(Borders::ALL).title("Timeouts (+/- to Adjust)")
+    let timeout_block = Block::default().borders(Borders::ALL).title("Timeouts (Active/Idle) (+/- to Adjust)")
         .border_style(
             if state.current_field == BatchField::ActiveTimeout || state.current_field == BatchField::IdleTimeout {
                 border_style_focused
@@ -673,9 +694,61 @@ pub fn render_batch_processing_setup<B: Backend>(
         Span::styled(format!("{}s", state.idle_timeout), if state.current_field == BatchField::IdleTimeout { focused_style } else { default_style }),
     ]);
     let timeouts_widget = Paragraph::new(timeout_spans).block(timeout_block);
-    f.render_widget(timeouts_widget, form_chunks[5]);
+    f.render_widget(timeouts_widget, form_chunks[10]); // Adjusted index
 
-    // Start Processing Button
+
+    // Output Format
+    let output_format_block = Block::default().borders(Borders::ALL).title("Output Format (Enter to Cycle)")
+        .border_style(if state.current_field == BatchField::OutputFormat { border_style_focused } else { border_style_default });
+    let output_format_text = match state.output_format {
+        ExportMethodType::Print => "Print to Console (Not recommended for batch)",
+        ExportMethodType::Csv => "CSV File",
+        ExportMethodType::Pandas => "Pandas (Parquet File)",
+        ExportMethodType::Polars => "Polars (Parquet File)",
+    };
+    let output_format_widget = Paragraph::new(output_format_text)
+        .style(if state.current_field == BatchField::OutputFormat { focused_style } else { default_style })
+        .block(output_format_block);
+    f.render_widget(output_format_widget, form_chunks[3]);
+
+    // Early Export
+    let early_export_block = Block::default().borders(Borders::ALL).title("Early Export (s, +/- or type, 0/empty=disable)")
+        .border_style(if state.current_field == BatchField::EarlyExport { border_style_focused } else { border_style_default });
+    let early_export_text = state.early_export.map_or("Disabled".to_string(), |v| format!("{}s", v));
+    let early_export_widget = Paragraph::new(early_export_text)
+        .style(if state.current_field == BatchField::EarlyExport { focused_style } else { default_style })
+        .block(early_export_block);
+    f.render_widget(early_export_widget, form_chunks[4]);
+
+    // Expiration Check Interval
+    let exp_check_block = Block::default().borders(Borders::ALL).title("Expiration Check Interval (s, +/-)")
+        .border_style(if state.current_field == BatchField::ExpirationCheckInterval { border_style_focused } else { border_style_default });
+    let exp_check_text = format!("{}s", state.expiration_check_interval);
+    let exp_check_widget = Paragraph::new(exp_check_text)
+        .style(if state.current_field == BatchField::ExpirationCheckInterval { focused_style } else { default_style })
+        .block(exp_check_block);
+    f.render_widget(exp_check_widget, form_chunks[5]);
+
+    // Output Header
+    let header_block = Block::default().borders(Borders::ALL).title("Output Header (Enter to Toggle)")
+        .border_style(if state.current_field == BatchField::OutputHeader { border_style_focused } else { border_style_default });
+    let header_text = if state.output_header { "Yes" } else { "No" };
+    let header_widget = Paragraph::new(header_text)
+        .style(if state.current_field == BatchField::OutputHeader { focused_style } else { default_style })
+        .block(header_block);
+    f.render_widget(header_widget, form_chunks[6]);
+
+    // Drop Contaminant Features
+    let drop_cont_block = Block::default().borders(Borders::ALL).title("Drop Contaminant Features (Enter to Toggle)")
+        .border_style(if state.current_field == BatchField::DropContaminantFeatures { border_style_focused } else { border_style_default });
+    let drop_cont_text = if state.drop_contaminant_features { "Yes" } else { "No" };
+    let drop_cont_widget = Paragraph::new(drop_cont_text)
+        .style(if state.current_field == BatchField::DropContaminantFeatures { focused_style } else { default_style })
+        .block(drop_cont_block);
+    f.render_widget(drop_cont_widget, form_chunks[7]);
+
+
+    // Start Processing Button (Adjusted index)
     let start_button_style = if state.current_field == BatchField::StartProcessing {
         Style::default().fg(Color::Black).bg(Color::Green).add_modifier(Modifier::BOLD)
     } else {
@@ -685,7 +758,8 @@ pub fn render_batch_processing_setup<B: Backend>(
         .style(start_button_style)
         .alignment(Alignment::Center)
         .block(Block::default().borders(Borders::ALL).border_style(if state.current_field == BatchField::StartProcessing {border_style_focused} else {Style::default().fg(Color::Green)}));
-    f.render_widget(start_button, form_chunks[6]);
+    f.render_widget(start_button, form_chunks[11]);
+
 
     // Validation Error Message
     if let Some(err_msg) = &state.validation_error {
@@ -696,7 +770,7 @@ pub fn render_batch_processing_setup<B: Backend>(
     }
 
 
-    let instructions = Paragraph::new("↑↓: Navigate | Enter: Edit/Select/Cycle | Tab: Toggle Recursive | +/-: Adjust Workers/Timeouts | Esc: Back to Main Menu")
+    let instructions = Paragraph::new("↑↓: Navigate | Enter: Edit/Select/Cycle | Tab: Toggle | +/-: Adjust Numeric Fields | Esc: Back")
         .style(Style::default().fg(Color::DarkGray))
         .alignment(Alignment::Center);
     f.render_widget(instructions, main_chunks[3]);
@@ -791,10 +865,15 @@ pub fn handle_batch_processing_events(
             KeyCode::Esc => Ok(Some(AppTransition::ToMainMenu)),
             KeyCode::Up => {
                 state.current_field = match state.current_field {
-                    BatchField::InputDirectory => BatchField::StartProcessing,
+                    BatchField::InputDirectory => BatchField::StartProcessing, // Loop around
                     BatchField::OutputDirectory => BatchField::InputDirectory,
                     BatchField::FeatureSet => BatchField::OutputDirectory,
-                    BatchField::WorkerCount => BatchField::FeatureSet,
+                    BatchField::OutputFormat => BatchField::FeatureSet,
+                    BatchField::EarlyExport => BatchField::OutputFormat,
+                    BatchField::ExpirationCheckInterval => BatchField::EarlyExport,
+                    BatchField::OutputHeader => BatchField::ExpirationCheckInterval,
+                    BatchField::DropContaminantFeatures => BatchField::OutputHeader,
+                    BatchField::WorkerCount => BatchField::DropContaminantFeatures,
                     BatchField::Recursive => BatchField::WorkerCount,
                     BatchField::ActiveTimeout => BatchField::Recursive,
                     BatchField::IdleTimeout => BatchField::ActiveTimeout,
@@ -802,44 +881,64 @@ pub fn handle_batch_processing_events(
                 };
                 Ok(None)
             }
-            KeyCode::Down | KeyCode::Tab => { // Tab also navigates down
+            KeyCode::Down | KeyCode::Tab => {
                 state.current_field = match state.current_field {
                     BatchField::InputDirectory => BatchField::OutputDirectory,
                     BatchField::OutputDirectory => BatchField::FeatureSet,
-                    BatchField::FeatureSet => BatchField::WorkerCount,
+                    BatchField::FeatureSet => BatchField::OutputFormat,
+                    BatchField::OutputFormat => BatchField::EarlyExport,
+                    BatchField::EarlyExport => BatchField::ExpirationCheckInterval,
+                    BatchField::ExpirationCheckInterval => BatchField::OutputHeader,
+                    BatchField::OutputHeader => BatchField::DropContaminantFeatures,
+                    BatchField::DropContaminantFeatures => BatchField::WorkerCount,
                     BatchField::WorkerCount => BatchField::Recursive,
                     BatchField::Recursive => BatchField::ActiveTimeout,
                     BatchField::ActiveTimeout => BatchField::IdleTimeout,
                     BatchField::IdleTimeout => BatchField::StartProcessing,
-                    BatchField::StartProcessing => BatchField::InputDirectory,
+                    BatchField::StartProcessing => BatchField::InputDirectory, // Loop around
                 };
                 Ok(None)
             }
             KeyCode::Enter => {
                 match state.current_field {
-                    BatchField::InputDirectory => {
-                        Ok(Some(AppTransition::ToTextInput {
-                            field: "input_directory".to_string(), // This needs to map back to BatchField
-                            current_value: state.input_directory.clone(),
-                            title: "Input Directory Path".to_string(),
-                        }))
-                    }
-                    BatchField::OutputDirectory => {
-                         Ok(Some(AppTransition::ToTextInput {
-                            field: "output_directory".to_string(),
-                            current_value: state.output_directory.clone(),
-                            title: "Output Directory Path".to_string(),
-                        }))
-                    }
+                    BatchField::InputDirectory => Ok(Some(AppTransition::ToTextInput {
+                        field: "input_directory".to_string(), current_value: state.input_directory.clone(), title: "Input Directory Path".to_string(),
+                    })),
+                    BatchField::OutputDirectory => Ok(Some(AppTransition::ToTextInput {
+                        field: "output_directory".to_string(), current_value: state.output_directory.clone(), title: "Output Directory Path".to_string(),
+                    })),
                     BatchField::FeatureSet => {
-                        let variants_str = FlowType::VARIANTS;
-                        let current_pos = variants_str.iter().position(|&s| s.eq_ignore_ascii_case(&state.feature_set.to_string()));
-                        if let Some(pos) = current_pos {
-                            let next_pos = (pos + 1) % variants_str.len();
-                            if let Ok(ft) = FlowType::from_str(variants_str[next_pos]) { // Requires FromStr for FlowType
-                                state.feature_set = ft;
-                            }
-                        }
+                        let variants = FlowType::value_variants();
+                        let current_idx = variants.iter().position(|v| v == &state.feature_set).unwrap_or(0);
+                        state.feature_set = variants[(current_idx + 1) % variants.len()].clone();
+                        Ok(None)
+                    }
+                    BatchField::OutputFormat => {
+                        let all_variants = ExportMethodType::value_variants();
+                        let applicable_variants: Vec<&ExportMethodType> = all_variants
+                            .iter()
+                            .filter(|&&v| v != ExportMethodType::Print) // Filter out Print
+                            .collect();
+
+                        if applicable_variants.is_empty() { return Ok(None); }
+
+                        let current_idx = applicable_variants
+                            .iter()
+                            .position(|&&v| v == state.output_format)
+                            .unwrap_or_else(|| { // If current is Print (should not happen if default is Csv)
+                                applicable_variants.iter().position(|&&v| v == ExportMethodType::Csv).unwrap_or(0)
+                            });
+
+                        let next_idx = (current_idx + 1) % applicable_variants.len();
+                        state.output_format = applicable_variants[next_idx].clone();
+                        Ok(None)
+                    }
+                    BatchField::OutputHeader => {
+                        state.output_header = !state.output_header;
+                        Ok(None)
+                    }
+                    BatchField::DropContaminantFeatures => {
+                        state.drop_contaminant_features = !state.drop_contaminant_features;
                         Ok(None)
                     }
                     BatchField::Recursive => {
@@ -848,42 +947,32 @@ pub fn handle_batch_processing_events(
                     }
                     BatchField::StartProcessing => {
                         match validate_batch_inputs(state) {
-                            Ok(_) => {
-                                state.validation_error = None;
-                                Ok(Some(AppTransition::StartBatchProcessing))
-                            }
-                            Err(e) => {
-                                state.validation_error = Some(e);
-                                Ok(None)
-                            }
+                            Ok(_) => { state.validation_error = None; Ok(Some(AppTransition::StartBatchProcessing)) }
+                            Err(e) => { state.validation_error = Some(e); Ok(None) }
                         }
                     }
-                    // WorkerCount, ActiveTimeout, IdleTimeout are adjusted with +/-
+                    // EarlyExport, ExpirationCheckInterval, WorkerCount, ActiveTimeout, IdleTimeout are adjusted with +/-
                     _ => Ok(None),
                 }
             }
             KeyCode::Char('+') | KeyCode::Right => {
                 match state.current_field {
-                    BatchField::WorkerCount => {
-                        if state.worker_count < num_cpus::get() * 2 { state.worker_count += 1; }
-                    }
+                    BatchField::WorkerCount => if state.worker_count < num_cpus::get() * 2 { state.worker_count += 1; },
                     BatchField::ActiveTimeout => state.active_timeout += 300,
                     BatchField::IdleTimeout => state.idle_timeout += 30,
+                    BatchField::EarlyExport => state.early_export = Some(state.early_export.unwrap_or(0) + 10),
+                    BatchField::ExpirationCheckInterval => state.expiration_check_interval += 5,
                     _ => {}
                 }
                 Ok(None)
             }
             KeyCode::Char('-') | KeyCode::Left => {
                 match state.current_field {
-                    BatchField::WorkerCount => {
-                        if state.worker_count > 1 { state.worker_count -= 1; }
-                    }
-                    BatchField::ActiveTimeout => {
-                        if state.active_timeout >= 300 { state.active_timeout -= 300; } else { state.active_timeout = 0; }
-                    }
-                    BatchField::IdleTimeout => {
-                        if state.idle_timeout >= 30 { state.idle_timeout -= 30; } else { state.idle_timeout = 0; }
-                    }
+                    BatchField::WorkerCount => if state.worker_count > 1 { state.worker_count -= 1; },
+                    BatchField::ActiveTimeout => if state.active_timeout >= 300 { state.active_timeout -= 300; } else { state.active_timeout = 0; },
+                    BatchField::IdleTimeout => if state.idle_timeout >= 30 { state.idle_timeout -= 30; } else { state.idle_timeout = 0; },
+                    BatchField::EarlyExport => state.early_export = Some(state.early_export.unwrap_or(10).saturating_sub(10)).filter(|&v| v > 0),
+                    BatchField::ExpirationCheckInterval => if state.expiration_check_interval > 5 { state.expiration_check_interval -=5; } else {state.expiration_check_interval = 1;},
                     _ => {}
                 }
                 Ok(None)
@@ -904,6 +993,9 @@ fn validate_batch_inputs(state: &BatchProcessingState) -> Result<(), String> {
     // Further validation (e.g., writability) could be added here or handled by the batch task.
     if state.worker_count == 0 { return Err("Worker count must be at least 1.".to_string()); }
     if state.worker_count > num_cpus::get() * 4 { return Err(format!("Worker count exceeds reasonable limit (max {}).", num_cpus::get() * 4));}
+    if state.expiration_check_interval == 0 {
+        return Err("Expiration Check Interval must be at least 1 second.".to_string());
+    }
     Ok(())
 }
 
