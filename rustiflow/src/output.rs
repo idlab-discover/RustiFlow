@@ -77,4 +77,22 @@ where
         };
         writeln!(self.writer, "{}", header)
     }
+
+    pub fn write_inter_flow_deltas(&mut self, deltas: &[i64]) -> std::io::Result<()> {
+        if deltas.is_empty() {
+            writeln!(self.writer, "INTER_FLOW_DELTAS_US,[]")
+        } else {
+            let deltas_str: Vec<String> = deltas.iter().map(|d| d.to_string()).collect();
+            writeln!(self.writer, "INTER_FLOW_DELTAS_US,[{}]", deltas_str.join(","))
+        }
+    }
+
+    pub fn write_all_flow_durations(&mut self, durations: &[i64]) -> std::io::Result<()> {
+        if durations.is_empty() {
+            writeln!(self.writer, "ALL_FLOW_DURATIONS_US,[]")
+        } else {
+            let durations_str: Vec<String> = durations.iter().map(|d| d.to_string()).collect();
+            writeln!(self.writer, "ALL_FLOW_DURATIONS_US,[{}]", durations_str.join(","))
+        }
+    }
 }

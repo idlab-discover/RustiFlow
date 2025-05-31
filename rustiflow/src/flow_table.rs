@@ -12,6 +12,7 @@ pub struct FlowTable<T> {
     export_channel: mpsc::Sender<T>,
     next_check_time_us: Option<i64>, // Track the next time we check for flow expirations
     expiration_check_interval_us: i64, // Check for expired flows every x seconds
+    pub collected_flow_stats: Vec<(i64, i64)>, // (first_timestamp_us, duration_us)
 }
 
 impl<T> FlowTable<T>
@@ -33,6 +34,7 @@ where
             export_channel,
             next_check_time_us: None,
             expiration_check_interval_us: (expiration_check_interval * 1_000_000) as i64,
+            collected_flow_stats: Vec::new(),
         }
     }
 
@@ -121,10 +123,15 @@ where
             flow.close_flow(timestamp_us, FlowExpireCause::ExporterShutdown);
             self.export_flow(flow).await;
         }
+        self.collected_flow_stats.sort_by_key(|k| k.0);
     }
 
     /// Exports a single flow.
-    pub async fn export_flow(&self, flow: T) {
+    pub async fn export_flow(&mut self, flow: T) {
+        let start_time = flow.get_first_timestamp_us();
+        let duration = flow.get_flow_duration_usec();
+        self.collected_flow_stats.push((start_time, duration));
+
         if self.export_channel.is_closed() {
             error!("Failed to send flow: export channel is closed");
         } else if let Err(e) = self.export_channel.send(flow).await {
@@ -145,6 +152,11 @@ where
                 self.next_check_time_us
             );
         }
+    }
+
+    /// Returns the collected flow statistics.
+    pub fn get_collected_flow_stats(&self) -> &Vec<(i64, i64)> {
+        &self.collected_flow_stats
     }
 
     /// Export all expired flows.

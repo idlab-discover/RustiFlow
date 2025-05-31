@@ -454,11 +454,8 @@ async fn run_with_config(config: TuiConfig) {
                                 error!("Error writing flow during realtime: {:?}", e);
                             }
                         }
-                        // Ensure writer is flushed on completion
-                        if let Err(e) = output_writer.flush_and_close() {
-                             error!("Error flushing/closing writer for realtime: {:?}", e);
-                        }
-                        debug!("OutputWriter task for realtime finished.");
+                        // output_writer.flush_and_close(); // Optionally flush here, or just return
+                        output_writer // Return the writer
                     });
 
                     info!("Starting realtime processing on interface: {}...", interface);
@@ -476,16 +473,43 @@ async fn run_with_config(config: TuiConfig) {
                     )
                     .await;
 
-                    // Wait for the output task to complete its work
-                    if let Err(e) = output_task_handle.await {
-                        error!("Realtime output task panicked or was cancelled: {:?}", e);
+                    info!("Realtime data processing completed in {:.3} seconds.", processing_start_time.elapsed().as_secs_f64());
+
+                    let output_writer_result = output_task_handle.await;
+                    if output_writer_result.is_err() {
+                        error!("Realtime output task panicked or was cancelled: {:?}", output_writer_result.err().unwrap());
+                        // Decide how to proceed if writer task fails
+                        return;
                     }
-                    info!("Realtime processing completed in {:.3} seconds.", processing_start_time.elapsed().as_secs_f64());
+                    let mut output_writer = output_writer_result.unwrap();
 
                     match processing_result {
-                        Ok(dropped_packets) => info!("Total eBPF dropped packets (realtime): {}", dropped_packets),
-                        Err(err) => error!("Error during realtime processing: {:?}", err),
+                        Ok((dropped_packets, flow_stats)) => {
+                            info!("Total eBPF dropped packets (realtime): {}", dropped_packets);
+                            let mut inter_flow_deltas_us: Vec<i64> = Vec::new();
+                            if flow_stats.len() > 1 {
+                                for i in 1..flow_stats.len() {
+                                    inter_flow_deltas_us.push(flow_stats[i].0 - flow_stats[i-1].0);
+                                }
+                            }
+                            let all_flow_durations_us: Vec<i64> = flow_stats.iter().map(|&(_, duration)| duration).collect();
+
+                            if let Err(e) = output_writer.write_inter_flow_deltas(&inter_flow_deltas_us) {
+                                error!("Error writing inter-flow deltas: {:?}", e);
+                            }
+                            if let Err(e) = output_writer.write_all_flow_durations(&all_flow_durations_us) {
+                                error!("Error writing all flow durations: {:?}", e);
+                            }
+                        }
+                        Err(err) => {
+                            error!("Error during realtime processing: {:?}", err);
+                        }
                     }
+                    // Final flush and close
+                    if let Err(e) = output_writer.flush_and_close() {
+                         error!("Error flushing/closing writer for realtime (final): {:?}", e);
+                    }
+                    info!("Realtime processing and output finished completely.");
                 }};
             }
             // Execute based on selected feature set
@@ -517,15 +541,13 @@ async fn run_with_config(config: TuiConfig) {
                                 error!("Error writing flow during pcap processing: {:?}", e);
                             }
                         }
-                        if let Err(e) = output_writer.flush_and_close() {
-                            error!("Error flushing/closing writer for pcap: {:?}", e);
-                        }
-                        debug!("OutputWriter task for pcap finished.");
+                        // output_writer.flush_and_close(); // Optionally flush here
+                        output_writer // Return the writer
                     });
 
                     info!("Starting offline PCAP processing for file: {}...", path);
                     let processing_start_time = Instant::now();
-                    if let Err(err) = read_pcap_file::<$flow_ty>(
+                    let pcap_processing_result = read_pcap_file::<$flow_ty>(
                         &path,
                         sender, // Sender for FlowTable to send exported flows
                         config.config.threads.unwrap_or_else(|| (num_cpus::get() / 2).max(1) as u8),
@@ -534,14 +556,43 @@ async fn run_with_config(config: TuiConfig) {
                         config.config.early_export,
                         config.config.expiration_check_interval,
                     )
-                    .await {
-                        error!("Error reading pcap file '{}': {:?}", path, err);
-                    }
+                    .await;
 
-                    if let Err(e) = output_task_handle.await {
-                        error!("PCAP output task panicked or was cancelled: {:?}", e);
+                    info!("Offline PCAP data processing for '{}' completed in {:.3} seconds.", path, processing_start_time.elapsed().as_secs_f64());
+
+                    let output_writer_result = output_task_handle.await;
+                    if output_writer_result.is_err() {
+                        error!("PCAP output task panicked or was cancelled: {:?}", output_writer_result.err().unwrap());
+                        return;
                     }
-                    info!("Offline PCAP processing for '{}' completed in {:.3} seconds.", path, processing_start_time.elapsed().as_secs_f64());
+                    let mut output_writer = output_writer_result.unwrap();
+
+                    match pcap_processing_result {
+                        Ok(flow_stats) => {
+                            let mut inter_flow_deltas_us: Vec<i64> = Vec::new();
+                            if flow_stats.len() > 1 {
+                                for i in 1..flow_stats.len() {
+                                    inter_flow_deltas_us.push(flow_stats[i].0 - flow_stats[i-1].0);
+                                }
+                            }
+                            let all_flow_durations_us: Vec<i64> = flow_stats.iter().map(|&(_, duration)| duration).collect();
+
+                            if let Err(e) = output_writer.write_inter_flow_deltas(&inter_flow_deltas_us) {
+                                error!("Error writing inter-flow deltas (pcap): {:?}", e);
+                            }
+                            if let Err(e) = output_writer.write_all_flow_durations(&all_flow_durations_us) {
+                                error!("Error writing all flow durations (pcap): {:?}", e);
+                            }
+                        }
+                        Err(err) => {
+                            error!("Error reading pcap file '{}': {:?}", path, err);
+                        }
+                    }
+                     // Final flush and close
+                    if let Err(e) = output_writer.flush_and_close() {
+                        error!("Error flushing/closing writer for pcap (final): {:?}", e);
+                    }
+                    info!("Offline PCAP processing and output for '{}' finished completely.", path);
                 }};
             }
             match config.config.features {

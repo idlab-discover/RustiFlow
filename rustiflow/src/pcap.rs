@@ -27,7 +27,7 @@ pub async fn read_pcap_file<T>(
     idle_timeout: u64,
     early_export: Option<u64>,
     expiration_check_interval: u64,
-) -> Result<(), anyhow::Error>
+) -> Result<Vec<(i64, i64)>, anyhow::Error>
 where
     T: Flow,
 {
@@ -43,7 +43,7 @@ where
 
     // Create sharded FlowTables each in their own task and returns channels to send packets to the shards
     let buffer_num_packets = 10_000;
-    let shard_senders = create_shard_senders::<T>(
+    let (shard_senders, mut shard_join_handles) = create_shard_senders::<T>(
         num_threads,
         buffer_num_packets,
         output_channel,
@@ -208,7 +208,25 @@ where
         }
     }
     debug!("Finished reading the pcap file: {:?}", path);
-    Ok(())
+
+    // Ensure shard_senders are dropped so shard tasks can complete their loops
+    drop(shard_senders);
+
+    let mut all_shards_stats: Vec<(i64, i64)> = Vec::new();
+    for handle in shard_join_handles {
+        match handle.await {
+            Ok(shard_stats) => {
+                all_shards_stats.extend(shard_stats);
+            }
+            Err(e) => {
+                error!("Shard task (pcap) panicked or failed: {:?}", e);
+                // Depending on requirements, might want to propagate this error
+            }
+        }
+    }
+    all_shards_stats.sort_by_key(|k| k.0); // Sort all collected stats by start time
+
+    Ok(all_shards_stats)
 }
 
 /// Processes and sends packet features to the appropriate shard.
@@ -252,12 +270,17 @@ fn create_shard_senders<T>(
     idle_timeout: u64,
     early_export: Option<u64>,
     expiration_check_interval: u64,
-) -> Vec<mpsc::Sender<PacketFeatures>>
+) -> (
+    Vec<mpsc::Sender<PacketFeatures>>,
+    Vec<tokio::task::JoinHandle<Vec<(i64, i64)>>>,
+)
 where
     T: Flow,
 {
     debug!("Creating {} sharded FlowTables...", num_shards);
     let mut shard_senders = Vec::with_capacity(num_shards as usize);
+    let mut shard_join_handles = Vec::with_capacity(num_shards as usize); // To collect JoinHandles
+
     for _ in 0..num_shards {
         let (tx, mut rx) = mpsc::channel::<PacketFeatures>(buffer_num_packets);
         let mut flow_table = FlowTable::new(
@@ -268,7 +291,7 @@ where
             expiration_check_interval,
         );
 
-        tokio::spawn(async move {
+        let handle = tokio::spawn(async move {
             let mut last_timestamp = None;
             while let Some(packet_features) = rx.recv().await {
                 last_timestamp = Some(packet_features.timestamp_us);
@@ -278,10 +301,12 @@ where
             if let Some(timestamp) = last_timestamp {
                 flow_table.export_all_flows(timestamp).await;
             }
+            flow_table.get_collected_flow_stats().clone() // Return stats
         });
+        shard_join_handles.push(handle);
         shard_senders.push(tx);
     }
     debug!("Sharded FlowTables created");
 
-    shard_senders
+    (shard_senders, shard_join_handles)
 }

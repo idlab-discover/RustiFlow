@@ -86,17 +86,6 @@ impl BasicFlow {
         self.state_fwd == FlowState::FinAcked && self.state_bwd == FlowState::FinAcked
     }
 
-    /// Calculates the flow duration in microseconds.
-    ///
-    /// Returns the difference between the last and first packet timestamps in microseconds.
-    ///
-    /// ### Returns
-    ///
-    /// The duration of the flow in microseconds.
-    pub fn get_flow_duration_usec(&self) -> i64 {
-        self.last_timestamp_us - self.first_timestamp_us
-    }
-
     /// Calculates the flow duration in milliseconds.
     ///
     /// Returns the difference between the last and first packet timestamps in milliseconds.
@@ -219,6 +208,17 @@ impl Flow for BasicFlow {
 
     fn get_first_timestamp_us(&self) -> i64 {
         self.first_timestamp_us
+    }
+
+    /// Calculates the flow duration in microseconds.
+    ///
+    /// Returns the difference between the last and first packet timestamps in microseconds.
+    ///
+    /// ### Returns
+    ///
+    /// The duration of the flow in microseconds.
+    fn get_flow_duration_usec(&self) -> i64 {
+        self.last_timestamp_us - self.first_timestamp_us
     }
 
     fn is_expired(

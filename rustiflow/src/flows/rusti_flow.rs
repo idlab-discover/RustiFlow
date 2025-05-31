@@ -405,6 +405,10 @@ impl Flow for RustiFlow {
         self.basic_flow.first_timestamp_us
     }
 
+    fn get_flow_duration_usec(&self) -> i64 {
+        self.basic_flow.get_flow_duration_usec()
+    }
+
     fn is_expired(
         &self,
         timestamp_us: i64,

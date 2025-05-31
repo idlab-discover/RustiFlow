@@ -94,6 +94,15 @@ pub trait Flow: Send + Sync + 'static + Clone {
     /// Returns a `DateTime<Utc>` representing the first timestamp of the flow.
     fn get_first_timestamp_us(&self) -> i64;
 
+    /// Calculates the flow duration in microseconds.
+    ///
+    /// Returns the difference between the last and first packet timestamps in microseconds.
+    ///
+    /// ### Returns
+    ///
+    /// The duration of the flow in microseconds.
+    fn get_flow_duration_usec(&self) -> i64;
+
     /// Returns a first record with the features of the flow.
     ///
     /// This method returns a string representation of the features of the flow.

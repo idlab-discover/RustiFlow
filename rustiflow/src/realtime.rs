@@ -35,7 +35,7 @@ pub async fn handle_realtime<T>(
     expiration_check_interval: u64,
     ingress_only: bool,
     performance_mode_disabled: bool,
-) -> Result<u64, anyhow::Error>
+) -> Result<(u64, Vec<(i64, i64)>), anyhow::Error>
 where
     T: Flow,
 {
@@ -82,6 +82,7 @@ where
 
     let buffer_num_packets = 10_000;
     let mut shard_senders = Vec::with_capacity(num_threads as usize);
+    let mut shard_join_handles = Vec::new(); // To collect JoinHandles for shard tasks
 
     let (packet_tx, packet_rx) = watch::channel(Vec::new());
     let packet_counter = Arc::new(Mutex::new(PacketCountPerSecond::new()));
@@ -98,7 +99,7 @@ where
         );
 
         // Spawn a task per shard
-        tokio::spawn(async move {
+        let handle = tokio::spawn(async move {
             let mut last_timestamp = None;
             while let Some(packet_features) = rx.recv().await {
                 last_timestamp = Some(packet_features.timestamp_us);
@@ -109,7 +110,9 @@ where
             if let Some(timestamp) = last_timestamp {
                 flow_table.export_all_flows(timestamp).await;
             }
+            flow_table.get_collected_flow_stats().clone() // Return stats
         });
+        shard_join_handles.push(handle);
         shard_senders.push(tx);
     }
     debug!("Sharded FlowTables created");
@@ -248,7 +251,24 @@ where
         }
     }
 
-    Ok(total_dropped)
+    // Ensure shard_senders are dropped so shard tasks can complete their loops
+    drop(shard_senders);
+
+    let mut all_shards_stats: Vec<(i64, i64)> = Vec::new();
+    for handle in shard_join_handles {
+        match handle.await {
+            Ok(shard_stats) => {
+                all_shards_stats.extend(shard_stats);
+            }
+            Err(e) => {
+                error!("Shard task panicked or failed: {:?}", e);
+                // Depending on requirements, might want to propagate this error
+            }
+        }
+    }
+    all_shards_stats.sort_by_key(|k| k.0); // Sort all collected stats by start time
+
+    Ok((total_dropped, all_shards_stats))
 }
 
 fn compute_shard_index(flow_key: &str, num_shards: u8) -> usize {
