@@ -1,8 +1,9 @@
 use crate::{flows::util::FlowExpireCause, packet_features::PacketFeatures};
+use serde::Serialize;
 
 use super::util::FlowFeature;
 
-#[derive(Clone)]
+#[derive(Serialize, Clone)]
 pub struct TcpFlagStats {
     /// The number of flags in the forward direction.
     pub fwd_fin_flag_count: u32,

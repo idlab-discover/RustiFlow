@@ -1,5 +1,6 @@
 use std::net::IpAddr;
 use polars::prelude::AnyValue;
+use serde_json;
 
 use crate::{
     flows::{
@@ -261,6 +262,19 @@ impl Flow for RustiFlow {
             "bwd_subflow_bytes_mean",
             // UP/DOWN Ratio
             "up_down_ratio",
+            // JSON string fields for sub-features
+            "timing_stats_json",
+            "iat_stats_json",
+            "packet_len_stats_json",
+            "header_len_stats_json",
+            "payload_len_stats_json",
+            "bulk_stats_json",
+            "subflow_stats_json",
+            "active_idle_stats_json",
+            "icmp_stats_json",
+            "retransmission_stats_json",
+            "window_size_stats_json",
+            "tcp_flag_stats_json"
         )
     }
 
@@ -467,42 +481,34 @@ impl Flow for RustiFlow {
         // These are typically u64 for totals/counts, f64 for mean/std/min/max.
         // Example for one field:
         // row.push(AnyValue::UInt64(self.packet_len_stats.flow_total_len.get_total())); // Assuming flow_total_len matches a header like "flow_pkt_len_tot"
-        // THIS SECTION NEEDS TO BE FILLED OUT COMPLETELY FOR ALL Stats STRUCTS
-        // For now, I'll add nulls as placeholders to match a hypothetical number of fields for remaining structs
-        // to avoid panic if column/data length mismatch occurs in Polars later.
-        // This is a temporary measure for this step.
+        // Remove the previous direct pushes for TimingStats and IATStats individual fields.
+        // The first 10 fields are from BasicFlow.
+        // The next fields will be JSON strings of the feature structs.
 
-        let num_packet_len_stats_fields = super::features::packet_stats::PacketLengthStats::headers().matches(',').count() + 1;
-        for _ in 0..num_packet_len_stats_fields { row.push(AnyValue::Null); }
+        // TimingStats (already part of the first 6 after basic flow, but now as JSON)
+        // The previous implementation added 6 AnyValues for TimingStats and 18 for IATStats.
+        // These will be replaced by single JSON strings.
+        // The `row` already contains 10 basic fields.
 
-        let num_header_len_stats_fields = super::features::header_stats::HeaderLengthStats::headers().matches(',').count() + 1;
-        for _ in 0..num_header_len_stats_fields { row.push(AnyValue::Null); }
+        // Add JSON string for TimingStats (replaces the 6 individual fields)
+        row.push(AnyValue::Utf8Owned(serde_json::to_string(&self.timing_stats).unwrap_or_else(|_| "{}".into()).into()));
 
-        let num_payload_len_stats_fields = super::features::payload_stats::PayloadLengthStats::headers().matches(',').count() + 1;
-        for _ in 0..num_payload_len_stats_fields { row.push(AnyValue::Null); }
+        // Add JSON string for IATStats (replaces the 18 individual fields)
+        row.push(AnyValue::Utf8Owned(serde_json::to_string(&self.iat_stats).unwrap_or_else(|_| "{}".into()).into()));
 
-        let num_bulk_stats_fields = super::features::bulk_stats::BulkStats::headers().matches(',').count() + 1;
-        for _ in 0..num_bulk_stats_fields { row.push(AnyValue::Null); }
+        // Add JSON strings for the rest of the feature structs
+        row.push(AnyValue::Utf8Owned(serde_json::to_string(&self.packet_len_stats).unwrap_or_else(|_| "{}".into()).into()));
+        row.push(AnyValue::Utf8Owned(serde_json::to_string(&self.header_len_stats).unwrap_or_else(|_| "{}".into()).into()));
+        row.push(AnyValue::Utf8Owned(serde_json::to_string(&self.payload_len_stats).unwrap_or_else(|_| "{}".into()).into()));
+        row.push(AnyValue::Utf8Owned(serde_json::to_string(&self.bulk_stats).unwrap_or_else(|_| "{}".into()).into()));
+        row.push(AnyValue::Utf8Owned(serde_json::to_string(&self.subflow_stats).unwrap_or_else(|_| "{}".into()).into()));
+        row.push(AnyValue::Utf8Owned(serde_json::to_string(&self.active_idle_stats).unwrap_or_else(|_| "{}".into()).into()));
+        row.push(AnyValue::Utf8Owned(serde_json::to_string(&self.icmp_stats).unwrap_or_else(|_| "{}".into()).into()));
+        row.push(AnyValue::Utf8Owned(serde_json::to_string(&self.retransmission_stats).unwrap_or_else(|_| "{}".into()).into()));
+        row.push(AnyValue::Utf8Owned(serde_json::to_string(&self.window_size_stats).unwrap_or_else(|_| "{}".into()).into()));
+        row.push(AnyValue::Utf8Owned(serde_json::to_string(&self.tcp_flags_stats).unwrap_or_else(|_| "{}".into()).into()));
 
-        let num_subflow_stats_fields = super::features::subflow_stats::SubflowStats::headers().matches(',').count() + 1;
-        for _ in 0..num_subflow_stats_fields { row.push(AnyValue::Null); }
-
-        let num_active_idle_stats_fields = super::features::active_idle_stats::ActiveIdleStats::headers().matches(',').count() + 1;
-        for _ in 0..num_active_idle_stats_fields { row.push(AnyValue::Null); }
-
-        let num_icmp_stats_fields = super::features::icmp_stats::IcmpStats::headers().matches(',').count() + 1;
-        for _ in 0..num_icmp_stats_fields { row.push(AnyValue::Null); }
-
-        let num_retransmission_stats_fields = super::features::retransmission_stats::RetransmissionStats::headers().matches(',').count() + 1;
-        for _ in 0..num_retransmission_stats_fields { row.push(AnyValue::Null); }
-
-        let num_window_size_stats_fields = super::features::window_size_stats::WindowSizeStats::headers().matches(',').count() + 1;
-        for _ in 0..num_window_size_stats_fields { row.push(AnyValue::Null); }
-
-        let num_tcp_flag_stats_fields = super::features::tcp_flag_stats::TcpFlagStats::headers().matches(',').count() + 1;
-        for _ in 0..num_tcp_flag_stats_fields { row.push(AnyValue::Null); }
-
-        // Final rate stats and ratio
+        // Final rate stats and ratio (These were already individual values and should remain so)
         let duration_us = self.basic_flow.get_flow_duration_usec();
         row.push(AnyValue::Float64(safe_per_second_rate(self.payload_len_stats.payload_len.get_total(), duration_us as f64)));
         row.push(AnyValue::Float64(safe_per_second_rate(self.payload_len_stats.payload_len.get_count() as f64, duration_us as f64)));

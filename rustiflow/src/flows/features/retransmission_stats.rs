@@ -1,4 +1,5 @@
 use std::collections::HashSet;
+use serde::Serialize;
 
 use pnet::packet::ip::IpNextHeaderProtocols;
 
@@ -9,7 +10,7 @@ use crate::{
 
 use super::util::FlowFeature;
 
-#[derive(Clone)]
+#[derive(Serialize, Clone)]
 pub struct RetransmissionStats {
     pub fwd_retransmission_count: u32,
     pub bwd_retransmission_count: u32,

@@ -1,11 +1,12 @@
 use crate::{flows::util::FlowExpireCause, packet_features::PacketFeatures};
+use serde::Serialize;
 
 use super::util::{FeatureStats, FlowFeature};
 
 const MIN_BULK_PACKETS: u32 = 4;
 const BULK_IDLE_MS: i64 = 1000;
 
-#[derive(Clone)]
+#[derive(Serialize, Clone)]
 pub struct BulkState {
     // Tracks "bulk in progress" state
     pub start_time: i64,
@@ -31,7 +32,7 @@ impl BulkState {
     }
 }
 
-#[derive(Clone)]
+#[derive(Serialize, Clone)]
 pub struct BulkStats {
     pub fwd_bulk_payload_size: FeatureStats,
     pub fwd_bulk_packets: FeatureStats,

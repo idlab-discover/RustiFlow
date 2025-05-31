@@ -261,7 +261,8 @@ When selecting `pandas` or `polars` as the output method, RustiFlow will generat
       - **Pandas:** `import pandas as pd; df = pd.read_parquet('your_export_path.parquet')`
       - **Polars:** `import polars as pl; df = pl.read_parquet('your_export_path.parquet')`
     - Timestamps are stored as datetime types with microsecond precision.
-    - The `packet_sizes` feature is stored as a list of integers.
+    - The `packet_sizes` feature (for `BasicFlow` and derived types that include it directly) is stored as a list of integers.
+    - **`RustiFlow` Feature Set Specifics:** When using the `RustiFlow` feature set, its highly detailed sub-features (such as IAT statistics, packet length statistics, header statistics, bulk statistics, etc.) are stored as JSON strings within their respective columns in the Parquet file (e.g., a column named `iat_stats_json` would contain a JSON string like `{"flow_iat_total": ..., "flow_iat_mean": ..., ...}`). This makes the main DataFrame schema more concise while preserving all detailed information for users who wish to parse these JSON strings. Basic flow information (IPs, ports, timestamps, etc.) and overall rates/ratios remain as direct columns.
 2.  A JSON file (e.g., `your_export_path_global_stats.json`) containing global statistics for the capture:
     - `inter_flow_deltas_us`: A list of time deltas (in microseconds) between the start times of consecutive flows.
     - `all_flow_durations_us`: A list of durations (in microseconds) for all flows in the capture, sorted by flow start time.

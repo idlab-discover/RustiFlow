@@ -1,4 +1,5 @@
 use crate::{flows::util::FlowExpireCause, packet_features::PacketFeatures};
+use serde::Serialize;
 
 use super::util::{FeatureStats, FlowFeature};
 

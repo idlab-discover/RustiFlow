@@ -1,4 +1,5 @@
 use crate::{flows::util::FlowExpireCause, packet_features::PacketFeatures};
+use serde::Serialize;
 
 /// Trait for network flow features that can be updated, closed, and dumped to CSV format
 pub trait FlowFeature: Send + Sync + Clone {
@@ -17,7 +18,7 @@ pub trait FlowFeature: Send + Sync + Clone {
         Self: Sized;
 }
 
-#[derive(Clone)]
+#[derive(Serialize, Clone, Debug)]
 pub struct FeatureStats {
     total: f64,
     min: f64,
