@@ -49,6 +49,7 @@ impl Default for PacketFeatures {
             icmp_type: None,
             icmp_code: None,
             flags: 0,
+            signed_length: 0,
         }
     }
 }
@@ -77,6 +78,7 @@ pub struct PacketFeatures {
     pub icmp_type: Option<u8>,
     pub icmp_code: Option<u8>,
     pub flags: u8,
+    pub signed_length: i32,
 }
 
 impl PacketFeatures {
@@ -100,6 +102,7 @@ impl PacketFeatures {
             data_length: event.data_length,
             header_length: event.header_length,
             length: event.length,
+            signed_length: event.length as i32,
             window_size: event.window_size,
             sequence_number: event.sequence_number,
             sequence_number_ack: event.sequence_number_ack,
@@ -137,6 +140,7 @@ impl PacketFeatures {
             data_length: event.data_length,
             header_length: event.header_length,
             length: event.length,
+            signed_length: event.length as i32,
             window_size: event.window_size,
             sequence_number: event.sequence_number,
             sequence_number_ack: event.sequence_number_ack,
@@ -163,6 +167,7 @@ impl PacketFeatures {
             timestamp_us,
             packet.get_total_length(),
             packet.payload(),
+            true, // Assuming is_forward is true for now
         )
     }
 
@@ -175,6 +180,7 @@ impl PacketFeatures {
             timestamp_us,
             packet.packet().len() as u16,
             packet.payload(),
+            true, // Assuming is_forward is true for now
         )
     }
 
@@ -243,6 +249,7 @@ fn extract_packet_features_transport(
     timestamp_us: i64,
     total_length: u16,
     packet: &[u8],
+    is_forward: bool,
 ) -> Option<PacketFeatures> {
     match protocol {
         IpNextHeaderProtocols::Tcp => {
@@ -265,6 +272,11 @@ fn extract_packet_features_transport(
                 data_length: tcp_packet.payload().len() as u16,
                 header_length: (tcp_packet.get_data_offset() * 4) as u8,
                 length: total_length,
+                signed_length: if is_forward {
+                    total_length as i32
+                } else {
+                    -(total_length as i32)
+                },
                 window_size: tcp_packet.get_window(),
                 sequence_number: tcp_packet.get_sequence(),
                 sequence_number_ack: tcp_packet.get_acknowledgement(),
@@ -293,6 +305,11 @@ fn extract_packet_features_transport(
                 data_length: udp_packet.payload().len() as u16,
                 header_length: 8, // Fixed header size for UDP
                 length: total_length,
+                signed_length: if is_forward {
+                    total_length as i32
+                } else {
+                    -(total_length as i32)
+                },
                 window_size: 0,         // No window size for UDP
                 sequence_number: 0,     // No sequence number for UDP
                 sequence_number_ack: 0, // No sequence number ACK for UDP
@@ -321,6 +338,11 @@ fn extract_packet_features_transport(
                 data_length: icmp_packet.payload().len() as u16,
                 header_length: 8, // Fixed header size for ICMP
                 length: total_length,
+                signed_length: if is_forward {
+                    total_length as i32
+                } else {
+                    -(total_length as i32)
+                },
                 window_size: 0,         // No window size for ICMP
                 sequence_number: 0,     // No sequence number for ICMP
                 sequence_number_ack: 0, // No sequence number ACK for ICMP

@@ -40,6 +40,7 @@ pub struct BasicFlow {
     pub(crate) state_bwd: FlowState,
     expected_ack_seq_fwd: Option<u32>,
     expected_ack_seq_bwd: Option<u32>,
+    pub packet_sizes: Vec<i32>,
 }
 
 impl BasicFlow {
@@ -140,11 +141,19 @@ impl Flow for BasicFlow {
             state_bwd: FlowState::Established,
             expected_ack_seq_fwd: None,
             expected_ack_seq_bwd: None,
+            packet_sizes: Vec::new(),
         }
     }
 
     fn update_flow(&mut self, packet: &PacketFeatures, fwd: bool) -> bool {
         self.last_timestamp_us = packet.timestamp_us;
+
+        let signed_length = if fwd {
+            packet.signed_length
+        } else {
+            -packet.signed_length
+        };
+        self.packet_sizes.push(signed_length);
 
         if self.is_tcp_finished(packet, fwd) {
             self.flow_expire_cause = FlowExpireCause::TcpTermination;
@@ -164,8 +173,14 @@ impl Flow for BasicFlow {
     }
 
     fn dump(&self) -> String {
+        let packet_sizes_str = self
+            .packet_sizes
+            .iter()
+            .map(|s| s.to_string())
+            .collect::<Vec<String>>()
+            .join(",");
         format!(
-            "{},{},{},{},{},{},{},{},{},{}",
+            "{},{},{},{},{},{},{},{},{},{},[{}]",
             self.flow_key,
             self.ip_source,
             self.port_source,
@@ -175,14 +190,15 @@ impl Flow for BasicFlow {
             self.get_first_timestamp(),
             self.get_last_timestamp(),
             self.get_flow_duration_usec(),
-            self.flow_expire_cause.as_str()
+            self.flow_expire_cause.as_str(),
+            packet_sizes_str
         )
     }
 
     fn get_features() -> String {
         format!(
             "flow_id,source_ip,source_port,destination_ip,destination_port,protocol,\
-            first_timestamp,last_timestamp,duration,flow_expire_cause"
+            first_timestamp,last_timestamp,duration,flow_expire_cause,packet_sizes"
         )
     }
 
