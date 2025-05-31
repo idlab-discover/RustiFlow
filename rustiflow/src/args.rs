@@ -43,7 +43,13 @@ pub struct Cli {
     pub output: Option<ExportMethodType>,
 
     /// File path for output (used if method is Csv)
-    #[clap(long, group = "cli_group", required_if_eq("output", "Csv"))]
+    #[clap(long, group = "cli_group",
+        required_if_eq_any([
+            ("output", "Csv"),
+            ("output", "Pandas"),
+            ("output", "Polars")
+        ])
+    )]
     pub export_path: Option<String>,
 
     /// Disable the graph in TUI when exporting in CSV mode
@@ -151,8 +157,8 @@ pub struct OutputConfig {
     #[clap(short, long, value_enum)]
     pub output: ExportMethodType,
 
-    /// File path for output (used if method is Csv)
-    #[clap(required_if_eq("output", "csv"))]
+    // Removed clap attribute for required_if_eq for export_path in OutputConfig
+    // Validation is primarily handled by Cli struct or programmatically
     pub export_path: Option<String>,
 
     /// Disable the graph in TUI when exporting in CSV mode
@@ -168,13 +174,16 @@ pub struct OutputConfig {
     pub drop_contaminant_features: bool,
 }
 
-#[derive(Serialize, Deserialize, clap::ValueEnum, Clone, Debug)]
+#[derive(Serialize, Deserialize, clap::ValueEnum, Clone, Debug, PartialEq)]
 pub enum ExportMethodType {
     /// The output will be printed to the console
     Print,
-
     /// The output will be written to a CSV file
     Csv,
+    /// The output will be written to a Parquet file for Pandas
+    Pandas,
+    /// The output will be written to a Parquet file for Polars
+    Polars,
 }
 
 #[derive(Serialize, Deserialize, clap::ValueEnum, Clone, Debug, EnumString, VariantNames)]

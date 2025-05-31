@@ -18,7 +18,7 @@ This tool is engineered for robust and efficient feature extraction, particularl
 - **High Throughput:** Utilizes Rust and the [Aya](https://aya-rs.dev/) library for eBPF program compilation and execution, ensuring exceptional performance and resource efficiency.
 - **Versatile Feature Sets:** Offers a variety of pre-defined feature sets (flows) and the flexibility to create custom feature sets tailored to specific requirements. An example of the custom flow is shown [here](https://github.com/idlab-discover/RustiFlow/blob/main/rustiflow/src/flows/custom_flow.rs).
 - **Pcap File Support:** Facilitates packet analysis from pcap files, compatible with both Linux and Windows generated files.
-- **Diverse Output Options:** Features can be outputted to the console, a CSV file, or other formats with minimal effort.
+- **Diverse Output Options:** Features can be outputted to the console, a CSV file, or as Parquet files suitable for use with Pandas and Polars.
 
 ## Feature sets
 
@@ -231,8 +231,10 @@ Options:
               Output method (required if no config file is provided)
 
               Possible values:
-              - print: The output will be printed to the console
-              - csv:   The output will be written to a CSV file
+              - print:           The output will be printed to the console
+              - csv:             The output will be written to a CSV file
+              - pandas (alias):  The output will be written to a Parquet file (optimized for Pandas)
+              - polars:          The output will be written to a Parquet file (optimized for Polars)
 
           --export-path <EXPORT_PATH>
               File path for output (used if method is Csv)
@@ -250,6 +252,21 @@ Options:
               Print version
 
 ```
+
+**Note on Parquet Output (for Pandas/Polars):**
+
+When selecting `pandas` or `polars` as the output method, RustiFlow will generate two files:
+1.  A Parquet file (e.g., `your_export_path.parquet`) containing the flow features.
+    - This file can be easily loaded into Python:
+      - **Pandas:** `import pandas as pd; df = pd.read_parquet('your_export_path.parquet')`
+      - **Polars:** `import polars as pl; df = pl.read_parquet('your_export_path.parquet')`
+    - Timestamps are stored as datetime types with microsecond precision.
+    - The `packet_sizes` feature is stored as a list of integers.
+2.  A JSON file (e.g., `your_export_path_global_stats.json`) containing global statistics for the capture:
+    - `inter_flow_deltas_us`: A list of time deltas (in microseconds) between the start times of consecutive flows.
+    - `all_flow_durations_us`: A list of durations (in microseconds) for all flows in the capture, sorted by flow start time.
+
+The `--export-path` option specifies the base path for these files.
 
 ## Logging in both development or using the binary
 

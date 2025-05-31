@@ -69,6 +69,11 @@ strum_macros = "0.26.4" # Consolidated strum_macros
 # Parallel iteration (for batch processing)
 rayon = "1.10.0" # Consolidated rayon, picked a recent version
 
+# Polars for Parquet output and data manipulation
+polars = { version = "0.37.0", features = ["lazy", "parquet", "list_eval", "json"] }
+serde_json = "1.0" # For writing global stats to JSON (alternative to Polars JSON)
+
+
 # Note: `tui = "0.19"` was removed as `ratatui` is its successor and used in the tui.rs
 # If you intend to use both or have parts of the code still on `tui`, you'd need to manage that carefully.
 # For the new `tui.rs` provided, `ratatui` is the correct choice.

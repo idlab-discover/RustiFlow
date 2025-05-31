@@ -1,4 +1,5 @@
 use std::net::IpAddr;
+use polars::prelude::AnyValue;
 
 use crate::flows::{features::timing_stats::TimingStats, util::iana_port_mapping};
 use crate::packet_features::PacketFeatures;
@@ -446,5 +447,87 @@ impl Flow for NfFlow {
 
     fn flow_key(&self) -> &String {
         &self.basic_flow.flow_key
+    }
+
+    fn to_polars_row(&self) -> Vec<AnyValue<'static>> {
+        vec![
+            // NFlow Core Features - First 22 as per get_features()
+            AnyValue::Utf8Owned(self.basic_flow.flow_key.clone().into()), // id
+            AnyValue::Int8(self.get_expiration_id()), // expiration_id
+            AnyValue::Utf8Owned(self.basic_flow.ip_source.to_string().into()), // src_ip
+            AnyValue::UInt16(self.basic_flow.port_source), // src_port
+            AnyValue::Utf8Owned(self.basic_flow.ip_destination.to_string().into()), // dst_ip
+            AnyValue::UInt16(self.basic_flow.port_destination), // dst_port
+            AnyValue::UInt8(self.basic_flow.protocol), // protocol
+            AnyValue::Int64(self.basic_flow.first_timestamp_us / 1000), // bidirectional_first_seen_ms
+            AnyValue::Int64(self.basic_flow.last_timestamp_us / 1000),   // bidirectional_last_seen_ms
+            AnyValue::Int64(self.basic_flow.get_flow_duration_msec()),   // bidirectional_duration_ms
+            AnyValue::UInt64(self.packet_len_stats.flow_count()),      // bidirectional_packets
+            AnyValue::UInt64(self.packet_len_stats.flow_total()),      // bidirectional_bytes
+            AnyValue::Int64(self.timing_stats.first_timestamp_fwd_ms.unwrap_or_else(|| 0)), // src2dst_first_seen_ms
+            AnyValue::Int64(self.timing_stats.last_timestamp_fwd_ms.unwrap_or_else(|| 0)),   // src2dst_last_seen_ms
+            AnyValue::Int64(self.timing_stats.get_fwd_duration()),     // src2dst_duration_ms
+            AnyValue::UInt64(self.packet_len_stats.fwd_packet_len.get_count()), // src2dst_packets
+            AnyValue::UInt64(self.packet_len_stats.fwd_packet_len.get_total()),  // src2dst_bytes
+            AnyValue::Int64(self.timing_stats.first_timestamp_bwd_ms.unwrap_or_else(|| 0)), // dst2src_first_seen_ms
+            AnyValue::Int64(self.timing_stats.last_timestamp_bwd_ms.unwrap_or_else(|| 0)),   // dst2src_last_seen_ms
+            AnyValue::Int64(self.timing_stats.get_bwd_duration()),     // dst2src_duration_ms
+            AnyValue::UInt64(self.packet_len_stats.bwd_packet_len.get_count()), // dst2src_packets
+            AnyValue::UInt64(self.packet_len_stats.bwd_packet_len.get_total()),  // dst2src_bytes
+
+            // Post-Mortem Statistical Features - Packet Length Stats (12 features)
+            AnyValue::Float64(self.packet_len_stats.flow_min()),
+            AnyValue::Float64(self.packet_len_stats.flow_mean()),
+            AnyValue::Float64(self.packet_len_stats.flow_std()),
+            AnyValue::Float64(self.packet_len_stats.flow_max()),
+            AnyValue::Float64(self.packet_len_stats.fwd_packet_len.get_min()),
+            AnyValue::Float64(self.packet_len_stats.fwd_packet_len.get_mean()),
+            AnyValue::Float64(self.packet_len_stats.fwd_packet_len.get_std()),
+            AnyValue::Float64(self.packet_len_stats.fwd_packet_len.get_max()),
+            AnyValue::Float64(self.packet_len_stats.bwd_packet_len.get_min()),
+            AnyValue::Float64(self.packet_len_stats.bwd_packet_len.get_mean()),
+            AnyValue::Float64(self.packet_len_stats.bwd_packet_len.get_std()),
+            AnyValue::Float64(self.packet_len_stats.bwd_packet_len.get_max()),
+
+            // IAT Stats (12 features) - these are already in ms from IATStats
+            AnyValue::Float64(self.iat_stats.iat.get_min()),
+            AnyValue::Float64(self.iat_stats.iat.get_mean()),
+            AnyValue::Float64(self.iat_stats.iat.get_std()),
+            AnyValue::Float64(self.iat_stats.iat.get_max()),
+            AnyValue::Float64(self.iat_stats.fwd_iat.get_min()),
+            AnyValue::Float64(self.iat_stats.fwd_iat.get_mean()),
+            AnyValue::Float64(self.iat_stats.fwd_iat.get_std()),
+            AnyValue::Float64(self.iat_stats.fwd_iat.get_max()),
+            AnyValue::Float64(self.iat_stats.bwd_iat.get_min()),
+            AnyValue::Float64(self.iat_stats.bwd_iat.get_mean()),
+            AnyValue::Float64(self.iat_stats.bwd_iat.get_std()),
+            AnyValue::Float64(self.iat_stats.bwd_iat.get_max()),
+
+            // TCP Flags (24 features: 8 bidirectional, 8 fwd, 8 bwd) - u32 counts
+            AnyValue::UInt32(self.tcp_flags_stats.fwd_syn_flag_count + self.tcp_flags_stats.bwd_syn_flag_count),
+            AnyValue::UInt32(self.tcp_flags_stats.fwd_cwr_flag_count + self.tcp_flags_stats.bwd_cwr_flag_count),
+            AnyValue::UInt32(self.tcp_flags_stats.fwd_ece_flag_count + self.tcp_flags_stats.bwd_ece_flag_count),
+            AnyValue::UInt32(self.tcp_flags_stats.fwd_urg_flag_count + self.tcp_flags_stats.bwd_urg_flag_count),
+            AnyValue::UInt32(self.tcp_flags_stats.fwd_ack_flag_count + self.tcp_flags_stats.bwd_ack_flag_count),
+            AnyValue::UInt32(self.tcp_flags_stats.fwd_psh_flag_count + self.tcp_flags_stats.bwd_psh_flag_count),
+            AnyValue::UInt32(self.tcp_flags_stats.fwd_rst_flag_count + self.tcp_flags_stats.bwd_rst_flag_count),
+            AnyValue::UInt32(self.tcp_flags_stats.fwd_fin_flag_count + self.tcp_flags_stats.bwd_fin_flag_count),
+            AnyValue::UInt32(self.tcp_flags_stats.fwd_syn_flag_count),
+            AnyValue::UInt32(self.tcp_flags_stats.fwd_cwr_flag_count),
+            AnyValue::UInt32(self.tcp_flags_stats.fwd_ece_flag_count),
+            AnyValue::UInt32(self.tcp_flags_stats.fwd_urg_flag_count),
+            AnyValue::UInt32(self.tcp_flags_stats.fwd_ack_flag_count),
+            AnyValue::UInt32(self.tcp_flags_stats.fwd_psh_flag_count),
+            AnyValue::UInt32(self.tcp_flags_stats.fwd_rst_flag_count),
+            AnyValue::UInt32(self.tcp_flags_stats.fwd_fin_flag_count),
+            AnyValue::UInt32(self.tcp_flags_stats.bwd_syn_flag_count),
+            AnyValue::UInt32(self.tcp_flags_stats.bwd_cwr_flag_count),
+            AnyValue::UInt32(self.tcp_flags_stats.bwd_ece_flag_count),
+            AnyValue::UInt32(self.tcp_flags_stats.bwd_urg_flag_count),
+            AnyValue::UInt32(self.tcp_flags_stats.bwd_ack_flag_count),
+            AnyValue::UInt32(self.tcp_flags_stats.bwd_psh_flag_count),
+            AnyValue::UInt32(self.tcp_flags_stats.bwd_rst_flag_count),
+            AnyValue::UInt32(self.tcp_flags_stats.bwd_fin_flag_count),
+        ]
     }
 }

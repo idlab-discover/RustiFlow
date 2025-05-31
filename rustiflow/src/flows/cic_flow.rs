@@ -1,4 +1,5 @@
 use std::net::IpAddr;
+use polars::prelude::AnyValue;
 
 use crate::{
     flows::{
@@ -629,5 +630,154 @@ impl Flow for CicFlow {
 
     fn flow_key(&self) -> &String {
         &self.basic_flow.flow_key
+    }
+
+    fn to_polars_row(&self) -> Vec<AnyValue<'static>> {
+        vec![
+            // Basic Info (8 features)
+            AnyValue::Utf8Owned(self.basic_flow.flow_key.clone().into()),
+            AnyValue::Utf8Owned(self.basic_flow.ip_source.to_string().into()),
+            AnyValue::UInt16(self.basic_flow.port_source),
+            AnyValue::Utf8Owned(self.basic_flow.ip_destination.to_string().into()),
+            AnyValue::UInt16(self.basic_flow.port_destination),
+            AnyValue::UInt8(self.basic_flow.protocol),
+            AnyValue::Int64(self.basic_flow.first_timestamp_us), // "Timestamp"
+            AnyValue::Int64(self.basic_flow.get_flow_duration_usec()), // "Flow Duration"
+            // Packet Length Stats (fwd & bwd counts and totals) (4 features)
+            AnyValue::UInt64(self.payload_len_stats.fwd_payload_len.get_count()), // "Total Fwd Packet"
+            AnyValue::UInt64(self.payload_len_stats.bwd_payload_len.get_count()), // "Total Bwd packets"
+            AnyValue::Float64(self.payload_len_stats.fwd_payload_len.get_total()), // "Total Length of Fwd Packet" - Note: dump uses float, likely for consistency if rates are float
+            AnyValue::Float64(self.payload_len_stats.bwd_payload_len.get_total()), // "Total Length of Bwd Packet"
+            // Fwd Packet Length Stats (Max, Min, Mean, Std) (4 features)
+            AnyValue::Float64(self.payload_len_stats.fwd_payload_len.get_max()),
+            AnyValue::Float64(self.payload_len_stats.fwd_payload_len.get_min()),
+            AnyValue::Float64(self.payload_len_stats.fwd_payload_len.get_mean()),
+            AnyValue::Float64(self.payload_len_stats.fwd_payload_len.get_std()),
+            // Bwd Packet Length Stats (Max, Min, Mean, Std) (4 features)
+            AnyValue::Float64(self.payload_len_stats.bwd_payload_len.get_max()),
+            AnyValue::Float64(self.payload_len_stats.bwd_payload_len.get_min()),
+            AnyValue::Float64(self.payload_len_stats.bwd_payload_len.get_mean()),
+            AnyValue::Float64(self.payload_len_stats.bwd_payload_len.get_std()),
+            // Rate Stats (Flow Bytes/s, Flow Packets/s) (2 features)
+            AnyValue::Float64(safe_per_second_rate(
+                self.payload_len_stats.payload_len.get_total(),
+                self.basic_flow.get_flow_duration_usec() as f64
+            )),
+            AnyValue::Float64(safe_per_second_rate(
+                self.payload_len_stats.payload_len.get_count() as f64,
+                self.basic_flow.get_flow_duration_usec() as f64
+            )),
+            // IAT Stats (Flow IAT Mean, Std, Max, Min) (4 features) - values are in us
+            AnyValue::Float64(self.iat_stats.iat.get_mean() * 1000.0),
+            AnyValue::Float64(self.iat_stats.iat.get_std() * 1000.0),
+            AnyValue::Float64(self.iat_stats.iat.get_max() * 1000.0),
+            AnyValue::Float64(self.iat_stats.iat.get_min() * 1000.0),
+            // Fwd IAT Stats (Total, Mean, Std, Max, Min) (5 features)
+            AnyValue::Float64(self.iat_stats.fwd_iat.get_total() * 1000.0),
+            AnyValue::Float64(self.iat_stats.fwd_iat.get_mean() * 1000.0),
+            AnyValue::Float64(self.iat_stats.fwd_iat.get_std() * 1000.0),
+            AnyValue::Float64(self.iat_stats.fwd_iat.get_max() * 1000.0),
+            AnyValue::Float64(self.iat_stats.fwd_iat.get_min() * 1000.0),
+            // Bwd IAT Stats (Total, Mean, Std, Max, Min) (5 features)
+            AnyValue::Float64(self.iat_stats.bwd_iat.get_total() * 1000.0),
+            AnyValue::Float64(self.iat_stats.bwd_iat.get_mean() * 1000.0),
+            AnyValue::Float64(self.iat_stats.bwd_iat.get_std() * 1000.0),
+            AnyValue::Float64(self.iat_stats.bwd_iat.get_max() * 1000.0),
+            AnyValue::Float64(self.iat_stats.bwd_iat.get_min() * 1000.0),
+            // TCP Flags Stats (Fwd PSH, Bwd PSH, Fwd URG, Bwd URG, Fwd RST, Bwd RST) (6 features) - counts are u32
+            AnyValue::UInt32(self.tcp_flags_stats.fwd_psh_flag_count),
+            AnyValue::UInt32(self.tcp_flags_stats.bwd_psh_flag_count),
+            AnyValue::UInt32(self.tcp_flags_stats.fwd_urg_flag_count),
+            AnyValue::UInt32(self.tcp_flags_stats.bwd_urg_flag_count),
+            AnyValue::UInt32(self.tcp_flags_stats.fwd_rst_flag_count),
+            AnyValue::UInt32(self.tcp_flags_stats.bwd_rst_flag_count),
+            // Header Length Stats (Fwd Total, Bwd Total) (2 features) - counts are u64
+            AnyValue::UInt64(self.header_len_stats.fwd_header_len.get_total()),
+            AnyValue::UInt64(self.header_len_stats.bwd_header_len.get_total()),
+            // Rate Stats (Fwd Packets/s, Bwd Packets/s) (2 features)
+            AnyValue::Float64(safe_per_second_rate(
+                self.payload_len_stats.fwd_payload_len.get_count() as f64,
+                self.basic_flow.get_flow_duration_usec() as f64
+            )),
+            AnyValue::Float64(safe_per_second_rate(
+                self.payload_len_stats.bwd_payload_len.get_count() as f64,
+                self.basic_flow.get_flow_duration_usec() as f64
+            )),
+            // Payload Length Stats (Flow Min, Max, Mean, Std, Variance) (5 features)
+            AnyValue::Float64(self.payload_len_stats.payload_len.get_min()),
+            AnyValue::Float64(self.payload_len_stats.payload_len.get_max()),
+            AnyValue::Float64(self.payload_len_stats.payload_len.get_mean()),
+            AnyValue::Float64(self.payload_len_stats.payload_len.get_std()),
+            AnyValue::Float64(self.payload_len_stats.payload_len.get_std().powi(2)), // Variance
+            // TCP Flags Stats (Total Counts: FIN, SYN, RST, PSH, ACK, URG, CWR, ECE) (8 features)
+            AnyValue::UInt32(self.tcp_flags_stats.fwd_fin_flag_count + self.tcp_flags_stats.bwd_fin_flag_count),
+            AnyValue::UInt32(self.tcp_flags_stats.fwd_syn_flag_count + self.tcp_flags_stats.bwd_syn_flag_count),
+            AnyValue::UInt32(self.tcp_flags_stats.fwd_rst_flag_count + self.tcp_flags_stats.bwd_rst_flag_count), // This was duplicated in get_features list, ensure it's the total one
+            AnyValue::UInt32(self.tcp_flags_stats.fwd_psh_flag_count + self.tcp_flags_stats.bwd_psh_flag_count), // This was duplicated
+            AnyValue::UInt32(self.tcp_flags_stats.fwd_ack_flag_count + self.tcp_flags_stats.bwd_ack_flag_count),
+            AnyValue::UInt32(self.tcp_flags_stats.fwd_urg_flag_count + self.tcp_flags_stats.bwd_urg_flag_count), // This was duplicated
+            AnyValue::UInt32(self.tcp_flags_stats.fwd_cwr_flag_count + self.tcp_flags_stats.bwd_cwr_flag_count),
+            AnyValue::UInt32(self.tcp_flags_stats.fwd_ece_flag_count + self.tcp_flags_stats.bwd_ece_flag_count),
+            // Down/Up Ratio (1 feature)
+            AnyValue::Float64(safe_div_int(
+                self.payload_len_stats.bwd_payload_len.get_count(),
+                self.payload_len_stats.fwd_payload_len.get_count()
+            )),
+            // Average Packet Sizes (Flow, Fwd, Bwd) (3 features) - these are means of payload length
+            AnyValue::Float64(self.payload_len_stats.payload_len.get_mean()), // Average Packet Size (overall)
+            AnyValue::Float64(self.payload_len_stats.fwd_payload_len.get_mean()), // Fwd Segment Size Avg
+            AnyValue::Float64(self.payload_len_stats.bwd_payload_len.get_mean()), // Bwd Segment Size Avg
+            // Bulk Stats (Fwd Bytes/Bulk Avg, Fwd Packet/Bulk Avg, Fwd Bulk Rate Avg, Bwd Bytes/Bulk Avg, Bwd Packet/Bulk Avg, Bwd Bulk Rate Avg) (6 features)
+            AnyValue::Float64(self.bulk_stats.fwd_bulk_payload_size.get_mean()),
+            AnyValue::Float64(self.bulk_stats.fwd_bulk_packets.get_mean()),
+            AnyValue::Float64(self.bulk_stats.fwd_bulk_rate()),
+            AnyValue::Float64(self.bulk_stats.bwd_bulk_payload_size.get_mean()),
+            AnyValue::Float64(self.bulk_stats.bwd_bulk_packets.get_mean()),
+            AnyValue::Float64(self.bulk_stats.bwd_bulk_rate()),
+            // Subflow Stats (Fwd Packets, Fwd Bytes, Bwd Packets, Bwd Bytes - all Avg per subflow) (4 features)
+            AnyValue::Float64(safe_div_int(
+                self.payload_len_stats.fwd_payload_len.get_count(),
+                self.subflow_stats.subflow_count
+            )),
+            AnyValue::Float64(safe_div(
+                self.payload_len_stats.fwd_payload_len.get_total(),
+                self.subflow_stats.subflow_count as f64
+            )),
+            AnyValue::Float64(safe_div_int(
+                self.payload_len_stats.bwd_payload_len.get_count(),
+                self.subflow_stats.subflow_count
+            )),
+            AnyValue::Float64(safe_div(
+                self.payload_len_stats.bwd_payload_len.get_total(),
+                self.subflow_stats.subflow_count as f64
+            )),
+            // Window Size Stats (FWD Init Win Bytes, Bwd Init Win Bytes) (2 features) - u16
+            AnyValue::UInt16(self.window_size_stats.fwd_init_window_size),
+            AnyValue::UInt16(self.window_size_stats.bwd_init_window_size),
+            // Non Zero Payload Packets (Fwd Act Data Pkts, Bwd Act Data Pkts) (2 features) - u64
+            AnyValue::UInt64(self.payload_len_stats.fwd_non_zero_payload_packets),
+            AnyValue::UInt64(self.payload_len_stats.bwd_non_zero_payload_packets),
+            // Segment Length Stats (Fwd Seg Size Min, Bwd Seg Size Min - refers to header length min) (2 features) - u64 from stats, but header len is u8 usually. Min is u64 in BasicStats.
+            AnyValue::UInt64(self.header_len_stats.fwd_header_len.get_min()),
+            AnyValue::UInt64(self.header_len_stats.bwd_header_len.get_min()),
+            // Active/Idle Stats (Mean, Std, Max, Min for Active; Mean, Std, Max, Min for Idle) (8 features)
+            AnyValue::Float64(self.active_idle_stats.active_stats.get_mean()),
+            AnyValue::Float64(self.active_idle_stats.active_stats.get_std()),
+            AnyValue::Float64(self.active_idle_stats.active_stats.get_max()),
+            AnyValue::Float64(self.active_idle_stats.active_stats.get_min()),
+            AnyValue::Float64(self.active_idle_stats.idle_stats.get_mean()),
+            AnyValue::Float64(self.active_idle_stats.idle_stats.get_std()),
+            AnyValue::Float64(self.active_idle_stats.idle_stats.get_max()),
+            AnyValue::Float64(self.active_idle_stats.idle_stats.get_min()),
+            // ICMP Stats (Code, Type) (2 features) - u8 from Option<u8>
+            AnyValue::UInt8(self.icmp_stats.get_code().unwrap_or(0)),
+            AnyValue::UInt8(self.icmp_stats.get_type().unwrap_or(0)),
+            // Retransmission Stats (Fwd Count, Bwd Count, Total Count) (3 features) - u64
+            AnyValue::UInt64(self.retransmission_stats.fwd_retransmission_count),
+            AnyValue::UInt64(self.retransmission_stats.bwd_retransmission_count),
+            AnyValue::UInt64(self.retransmission_stats.fwd_retransmission_count + self.retransmission_stats.bwd_retransmission_count),
+            // Total Connection Flow Time (1 feature) - same as "Flow Duration"
+            AnyValue::Int64(self.basic_flow.get_flow_duration_usec()),
+        ]
     }
 }

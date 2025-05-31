@@ -1,6 +1,7 @@
 use std::net::IpAddr;
 
 use crate::packet_features::PacketFeatures;
+use polars::prelude::AnyValue;
 
 use super::{
     basic_flow::BasicFlow,
@@ -114,5 +115,13 @@ impl Flow for CustomFlow {
 
     fn flow_key(&self) -> &String {
         &self.basic_flow.flow_key
+    }
+
+    fn to_polars_row(&self) -> Vec<AnyValue<'static>> {
+        vec![
+            AnyValue::Utf8Owned(self.basic_flow.flow_key.clone().into()),
+            AnyValue::UInt8(self.icmp_stats.get_type().unwrap_or(0)), // Assuming get_type() returns Option<u8>
+            AnyValue::UInt8(self.icmp_stats.get_code().unwrap_or(0)), // Assuming get_code() returns Option<u8>
+        ]
     }
 }

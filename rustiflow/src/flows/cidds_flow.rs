@@ -1,6 +1,7 @@
 use std::net::IpAddr;
 
 use pnet::packet::ip::IpNextHeaderProtocols;
+use polars::prelude::AnyValue;
 
 use crate::flows::util::iana_port_mapping;
 use crate::packet_features::PacketFeatures;
@@ -154,5 +155,20 @@ impl Flow for CiddsFlow {
 
     fn flow_key(&self) -> &String {
         &self.basic_flow.flow_key
+    }
+
+    fn to_polars_row(&self) -> Vec<AnyValue<'static>> {
+        vec![
+            AnyValue::Utf8Owned(self.basic_flow.ip_source.to_string().into()),
+            AnyValue::UInt16(self.basic_flow.port_source),
+            AnyValue::Utf8Owned(self.basic_flow.ip_destination.to_string().into()),
+            AnyValue::UInt16(self.basic_flow.port_destination),
+            AnyValue::Utf8Owned(self.format_protocol(self.basic_flow.protocol).to_string().into()),
+            AnyValue::Int64(self.basic_flow.first_timestamp_us), // "Date first seen"
+            AnyValue::Int64(self.basic_flow.get_flow_duration_usec()), // "Duration" in usec
+            AnyValue::UInt64(self.packet_stats.flow_total()), // "Bytes"
+            AnyValue::UInt64(self.packet_stats.flow_count()),  // "Packets"
+            AnyValue::Utf8Owned(self.tcp_flag_stats.get_flags().into()), // "Flags"
+        ]
     }
 }

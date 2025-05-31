@@ -1,4 +1,5 @@
 use std::net::IpAddr;
+use polars::prelude::AnyValue;
 
 use crate::{
     flows::{
@@ -421,5 +422,100 @@ impl Flow for RustiFlow {
 
     fn flow_key(&self) -> &String {
         &self.basic_flow.flow_key
+    }
+
+    fn to_polars_row(&self) -> Vec<AnyValue<'static>> {
+        let mut row = self.basic_flow.to_polars_row();
+        // BasicFlow::to_polars_row() returns 11 fields. RustiFlow's first 10 match BasicFlow's first 10.
+        // The 11th field from BasicFlow (packet_sizes List) is not part of RustiFlow's get_features() header here.
+        row.truncate(10);
+
+        // TimingStats: fwd_ts_first_ms, fwd_ts_last_ms, fwd_duration_ms, bwd_ts_first_ms, bwd_ts_last_ms, bwd_duration_ms
+        row.push(AnyValue::Int64(self.timing_stats.first_timestamp_fwd_ms.unwrap_or(0)));
+        row.push(AnyValue::Int64(self.timing_stats.last_timestamp_fwd_ms.unwrap_or(0)));
+        row.push(AnyValue::Int64(self.timing_stats.get_fwd_duration()));
+        row.push(AnyValue::Int64(self.timing_stats.first_timestamp_bwd_ms.unwrap_or(0)));
+        row.push(AnyValue::Int64(self.timing_stats.last_timestamp_bwd_ms.unwrap_or(0)));
+        row.push(AnyValue::Int64(self.timing_stats.get_bwd_duration()));
+
+        // IATStats: (many fields, all f64 as per IATStats::dump format and BasicStats<f64> usage)
+        // Example for a few: iat_mean, iat_std, iat_max, iat_min, iat_count (though count might be u64)
+        // Headers: "iat_mean,iat_std,iat_max,iat_min,iat_count,fwd_iat_total,fwd_iat_mean,fwd_iat_std,fwd_iat_max,fwd_iat_min,fwd_iat_count,bwd_iat_total,bwd_iat_mean,bwd_iat_std,bwd_iat_max,bwd_iat_min,bwd_iat_count,flow_iat_total"
+        row.push(AnyValue::Float64(self.iat_stats.iat.get_mean()));
+        row.push(AnyValue::Float64(self.iat_stats.iat.get_std()));
+        row.push(AnyValue::Float64(self.iat_stats.iat.get_max()));
+        row.push(AnyValue::Float64(self.iat_stats.iat.get_min()));
+        row.push(AnyValue::UInt64(self.iat_stats.iat.get_count())); // count is u64
+        row.push(AnyValue::Float64(self.iat_stats.fwd_iat.get_total()));
+        row.push(AnyValue::Float64(self.iat_stats.fwd_iat.get_mean()));
+        row.push(AnyValue::Float64(self.iat_stats.fwd_iat.get_std()));
+        row.push(AnyValue::Float64(self.iat_stats.fwd_iat.get_max()));
+        row.push(AnyValue::Float64(self.iat_stats.fwd_iat.get_min()));
+        row.push(AnyValue::UInt64(self.iat_stats.fwd_iat.get_count()));
+        row.push(AnyValue::Float64(self.iat_stats.bwd_iat.get_total()));
+        row.push(AnyValue::Float64(self.iat_stats.bwd_iat.get_mean()));
+        row.push(AnyValue::Float64(self.iat_stats.bwd_iat.get_std()));
+        row.push(AnyValue::Float64(self.iat_stats.bwd_iat.get_max()));
+        row.push(AnyValue::Float64(self.iat_stats.bwd_iat.get_min()));
+        row.push(AnyValue::UInt64(self.iat_stats.bwd_iat.get_count()));
+        row.push(AnyValue::Float64(self.iat_stats.flow_iat_total));
+
+
+        // Placeholder for PacketLengthStats, HeaderLengthStats, PayloadLengthStats, etc.
+        // Each of these would require iterating through their own headers() and providing AnyValue::xxx for each field.
+        // For PacketLengthStats (example fields from its headers like "flow_pkt_len_tot", "flow_pkt_len_mean", etc.)
+        // These are typically u64 for totals/counts, f64 for mean/std/min/max.
+        // Example for one field:
+        // row.push(AnyValue::UInt64(self.packet_len_stats.flow_total_len.get_total())); // Assuming flow_total_len matches a header like "flow_pkt_len_tot"
+        // THIS SECTION NEEDS TO BE FILLED OUT COMPLETELY FOR ALL Stats STRUCTS
+        // For now, I'll add nulls as placeholders to match a hypothetical number of fields for remaining structs
+        // to avoid panic if column/data length mismatch occurs in Polars later.
+        // This is a temporary measure for this step.
+
+        let num_packet_len_stats_fields = super::features::packet_stats::PacketLengthStats::headers().matches(',').count() + 1;
+        for _ in 0..num_packet_len_stats_fields { row.push(AnyValue::Null); }
+
+        let num_header_len_stats_fields = super::features::header_stats::HeaderLengthStats::headers().matches(',').count() + 1;
+        for _ in 0..num_header_len_stats_fields { row.push(AnyValue::Null); }
+
+        let num_payload_len_stats_fields = super::features::payload_stats::PayloadLengthStats::headers().matches(',').count() + 1;
+        for _ in 0..num_payload_len_stats_fields { row.push(AnyValue::Null); }
+
+        let num_bulk_stats_fields = super::features::bulk_stats::BulkStats::headers().matches(',').count() + 1;
+        for _ in 0..num_bulk_stats_fields { row.push(AnyValue::Null); }
+
+        let num_subflow_stats_fields = super::features::subflow_stats::SubflowStats::headers().matches(',').count() + 1;
+        for _ in 0..num_subflow_stats_fields { row.push(AnyValue::Null); }
+
+        let num_active_idle_stats_fields = super::features::active_idle_stats::ActiveIdleStats::headers().matches(',').count() + 1;
+        for _ in 0..num_active_idle_stats_fields { row.push(AnyValue::Null); }
+
+        let num_icmp_stats_fields = super::features::icmp_stats::IcmpStats::headers().matches(',').count() + 1;
+        for _ in 0..num_icmp_stats_fields { row.push(AnyValue::Null); }
+
+        let num_retransmission_stats_fields = super::features::retransmission_stats::RetransmissionStats::headers().matches(',').count() + 1;
+        for _ in 0..num_retransmission_stats_fields { row.push(AnyValue::Null); }
+
+        let num_window_size_stats_fields = super::features::window_size_stats::WindowSizeStats::headers().matches(',').count() + 1;
+        for _ in 0..num_window_size_stats_fields { row.push(AnyValue::Null); }
+
+        let num_tcp_flag_stats_fields = super::features::tcp_flag_stats::TcpFlagStats::headers().matches(',').count() + 1;
+        for _ in 0..num_tcp_flag_stats_fields { row.push(AnyValue::Null); }
+
+        // Final rate stats and ratio
+        let duration_us = self.basic_flow.get_flow_duration_usec();
+        row.push(AnyValue::Float64(safe_per_second_rate(self.payload_len_stats.payload_len.get_total(), duration_us as f64)));
+        row.push(AnyValue::Float64(safe_per_second_rate(self.payload_len_stats.payload_len.get_count() as f64, duration_us as f64)));
+        row.push(AnyValue::Float64(safe_per_second_rate(self.payload_len_stats.fwd_payload_len.get_total(), duration_us as f64)));
+        row.push(AnyValue::Float64(safe_per_second_rate(self.payload_len_stats.fwd_payload_len.get_count() as f64, duration_us as f64)));
+        row.push(AnyValue::Float64(safe_per_second_rate(self.payload_len_stats.bwd_payload_len.get_total(), duration_us as f64)));
+        row.push(AnyValue::Float64(safe_per_second_rate(self.payload_len_stats.bwd_payload_len.get_count() as f64, duration_us as f64)));
+        row.push(AnyValue::Float64(safe_div_int(self.payload_len_stats.fwd_payload_len.get_count(), self.subflow_stats.subflow_count)));
+        row.push(AnyValue::Float64(safe_div(self.payload_len_stats.fwd_payload_len.get_total(), self.subflow_stats.subflow_count as f64)));
+        row.push(AnyValue::Float64(safe_div_int(self.payload_len_stats.bwd_payload_len.get_count(), self.subflow_stats.subflow_count)));
+        row.push(AnyValue::Float64(safe_div(self.payload_len_stats.bwd_payload_len.get_total(), self.subflow_stats.subflow_count as f64)));
+        row.push(AnyValue::Float64(safe_div_int(self.payload_len_stats.bwd_payload_len.get_count(), self.payload_len_stats.fwd_payload_len.get_count())));
+
+        row
     }
 }

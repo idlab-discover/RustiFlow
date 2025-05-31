@@ -18,6 +18,11 @@ use std::path::{Path, PathBuf};
 use std::process::Stdio;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
+use serde::Serialize; // For the GlobalStats struct
+use std::fs::File as StdFile; // To avoid conflict with polars::io::File, if any
+use std::io::BufWriter as StdBufWriter; // If writing JSON buffered
+use std::path::PathBuf as StdPathBuf; // Explicit for path manipulation
+
 
 // Crate imports
 use clap::Parser;
@@ -494,20 +499,63 @@ async fn run_with_config(config: TuiConfig) {
                             }
                             let all_flow_durations_us: Vec<i64> = flow_stats.iter().map(|&(_, duration)| duration).collect();
 
+                            // OutputWriter's methods for these are now no-ops for Polars/Pandas
                             if let Err(e) = output_writer.write_inter_flow_deltas(&inter_flow_deltas_us) {
-                                error!("Error writing inter-flow deltas: {:?}", e);
+                                error!("Error writing inter-flow deltas (CSV/Print): {:?}", e);
                             }
                             if let Err(e) = output_writer.write_all_flow_durations(&all_flow_durations_us) {
-                                error!("Error writing all flow durations: {:?}", e);
+                                error!("Error writing all flow durations (CSV/Print): {:?}", e);
+                            }
+
+                            // This call now finalizes Parquet for Polars/Pandas, or flushes for CSV/Print
+                            if let Err(e) = output_writer.flush_and_close() {
+                                error!("Error during final flush/close for output type {:?}: {:?}", config.output.output, e);
+                            } else {
+                                // If output was Polars or Pandas, write global stats to JSON
+                                if config.output.output == ExportMethodType::Polars || config.output.output == ExportMethodType::Pandas {
+                                    if let Some(export_path_str) = &config.output.export_path {
+                                        let mut json_path = StdPathBuf::from(export_path_str);
+                                        let stem = json_path.file_stem().unwrap_or_default().to_os_string();
+                                        let mut new_filename = stem;
+                                        new_filename.push("_global_stats.json");
+                                        json_path.set_file_name(new_filename);
+
+                                        info!("Writing global stats to JSON: {}", json_path.display());
+
+                                        #[derive(Serialize)]
+                                        struct GlobalStats<'a> {
+                                            inter_flow_deltas_us: &'a [i64],
+                                            all_flow_durations_us: &'a [i64],
+                                        }
+                                        let stats_to_serialize = GlobalStats {
+                                            inter_flow_deltas_us: &inter_flow_deltas_us,
+                                            all_flow_durations_us: &all_flow_durations_us,
+                                        };
+
+                                        match StdFile::create(&json_path) {
+                                            Ok(file) => {
+                                                let writer = StdBufWriter::new(file);
+                                                if let Err(e) = serde_json::to_writer_pretty(writer, &stats_to_serialize) {
+                                                    error!("Failed to write global stats JSON to {}: {}", json_path.display(), e);
+                                                }
+                                            }
+                                            Err(e) => {
+                                                error!("Failed to create global stats JSON file {}: {}", json_path.display(), e);
+                                            }
+                                        }
+                                    } else {
+                                        warn!("Export path not available for Polars/Pandas global stats JSON output.");
+                                    }
+                                }
                             }
                         }
                         Err(err) => {
                             error!("Error during realtime processing: {:?}", err);
+                             // Still try to flush/close if output_writer was obtained
+                            if let Err(e) = output_writer.flush_and_close() {
+                                error!("Error flushing/closing writer for realtime (on error path): {:?}", e);
+                            }
                         }
-                    }
-                    // Final flush and close
-                    if let Err(e) = output_writer.flush_and_close() {
-                         error!("Error flushing/closing writer for realtime (final): {:?}", e);
                     }
                     info!("Realtime processing and output finished completely.");
                 }};
@@ -577,20 +625,63 @@ async fn run_with_config(config: TuiConfig) {
                             }
                             let all_flow_durations_us: Vec<i64> = flow_stats.iter().map(|&(_, duration)| duration).collect();
 
+                            // OutputWriter's methods for these are now no-ops for Polars/Pandas
                             if let Err(e) = output_writer.write_inter_flow_deltas(&inter_flow_deltas_us) {
-                                error!("Error writing inter-flow deltas (pcap): {:?}", e);
+                                error!("Error writing inter-flow deltas (pcap CSV/Print): {:?}", e);
                             }
                             if let Err(e) = output_writer.write_all_flow_durations(&all_flow_durations_us) {
-                                error!("Error writing all flow durations (pcap): {:?}", e);
+                                error!("Error writing all flow durations (pcap CSV/Print): {:?}", e);
+                            }
+
+                            // This call now finalizes Parquet for Polars/Pandas, or flushes for CSV/Print
+                            if let Err(e) = output_writer.flush_and_close() {
+                                error!("Error during final flush/close for PCAP output type {:?}: {:?}", config.output.output, e);
+                            } else {
+                                // If output was Polars or Pandas, write global stats to JSON
+                                if config.output.output == ExportMethodType::Polars || config.output.output == ExportMethodType::Pandas {
+                                    if let Some(export_path_str) = &config.output.export_path {
+                                        let mut json_path = StdPathBuf::from(export_path_str);
+                                        let stem = json_path.file_stem().unwrap_or_default().to_os_string();
+                                        let mut new_filename = stem;
+                                        new_filename.push("_global_stats.json");
+                                        json_path.set_file_name(new_filename);
+
+                                        info!("Writing global stats to JSON (pcap): {}", json_path.display());
+
+                                        #[derive(Serialize)]
+                                        struct GlobalStats<'a> {
+                                            inter_flow_deltas_us: &'a [i64],
+                                            all_flow_durations_us: &'a [i64],
+                                        }
+                                        let stats_to_serialize = GlobalStats {
+                                            inter_flow_deltas_us: &inter_flow_deltas_us,
+                                            all_flow_durations_us: &all_flow_durations_us,
+                                        };
+
+                                        match StdFile::create(&json_path) {
+                                            Ok(file) => {
+                                                let writer = StdBufWriter::new(file);
+                                                if let Err(e) = serde_json::to_writer_pretty(writer, &stats_to_serialize) {
+                                                    error!("Failed to write global stats JSON to {} (pcap): {}", json_path.display(), e);
+                                                }
+                                            }
+                                            Err(e) => {
+                                                error!("Failed to create global stats JSON file {} (pcap): {}", json_path.display(), e);
+                                            }
+                                        }
+                                    } else {
+                                        warn!("Export path not available for Polars/Pandas global stats JSON output (pcap).");
+                                    }
+                                }
                             }
                         }
                         Err(err) => {
                             error!("Error reading pcap file '{}': {:?}", path, err);
+                            // Still try to flush/close if output_writer was obtained
+                            if let Err(e) = output_writer.flush_and_close() {
+                                error!("Error flushing/closing writer for pcap (on error path): {:?}", e);
+                            }
                         }
-                    }
-                     // Final flush and close
-                    if let Err(e) = output_writer.flush_and_close() {
-                        error!("Error flushing/closing writer for pcap (final): {:?}", e);
                     }
                     info!("Offline PCAP processing and output for '{}' finished completely.", path);
                 }};

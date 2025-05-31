@@ -1,6 +1,10 @@
 use std::net::IpAddr;
 
 use chrono::{DateTime, Utc};
+use polars::prelude::{AnyValue, Series, DataType}; // Added DataType
+use polars::chunked_array::builder::ListPrimitiveChunkedBuilder;
+use polars::datatypes::Int32Type;
+
 
 use crate::{flows::util::iana_port_mapping, packet_features::PacketFeatures};
 
@@ -244,5 +248,32 @@ impl Flow for BasicFlow {
 
     fn flow_key(&self) -> &String {
         &self.flow_key
+    }
+
+    // "flow_id,source_ip,source_port,destination_ip,destination_port,protocol,first_timestamp,last_timestamp,duration,flow_expire_cause,packet_sizes"
+    fn to_polars_row(&self) -> Vec<AnyValue<'static>> {
+        vec![
+            AnyValue::Utf8Owned(self.flow_key.clone().into()),
+            AnyValue::Utf8Owned(self.ip_source.to_string().into()),
+            AnyValue::UInt16(self.port_source),
+            AnyValue::Utf8Owned(self.ip_destination.to_string().into()),
+            AnyValue::UInt16(self.port_destination),
+            AnyValue::UInt8(self.protocol),
+            AnyValue::Int64(self.first_timestamp_us), // Will be cast to Datetime[us] later
+            AnyValue::Int64(self.last_timestamp_us),   // Will be cast to Datetime[us] later
+            AnyValue::Int64(self.get_flow_duration_usec()),
+            AnyValue::Utf8Owned(self.flow_expire_cause.as_str().to_string().into()),
+            {
+               let mut list_builder = ListPrimitiveChunkedBuilder::<Int32Type>::new(
+                   "packet_sizes_temp",
+                   1,
+                   self.packet_sizes.len(),
+                   DataType::Int32
+               );
+               list_builder.append_slice(Some(self.packet_sizes.as_slice()));
+               let list_series = list_builder.finish().into_series();
+               AnyValue::List(list_series)
+            }
+        ]
     }
 }

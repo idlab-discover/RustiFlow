@@ -1,6 +1,7 @@
 use std::net::IpAddr;
 
 use crate::packet_features::PacketFeatures;
+use polars::prelude::AnyValue; // Add this use statement at the top of flow.rs
 
 use super::util::FlowExpireCause;
 
@@ -111,6 +112,10 @@ pub trait Flow: Send + Sync + 'static + Clone {
     ///
     /// Returns a `String` that represents the features of the flow.
     fn get_features() -> String;
+
+    /// Converts the flow's data to a row of Polars `AnyValue`s.
+    /// The order of values must match the order of headers from `get_features()`.
+    fn to_polars_row(&self) -> Vec<AnyValue<'static>>;
 
     /// Returns a first record with the features of the flow without contaminant features.
     ///

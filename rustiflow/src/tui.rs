@@ -390,13 +390,30 @@ pub async fn launch_tui(
                                 // ... (Simplified handlers for other general config options) ...
                                 AppFocus::ConfigFileInput => if let Event::Key(k) = event { handle_config_file_input(k, &mut app)?; },
                                 AppFocus::ConfigFileSaveInput => if let Event::Key(k) = event { handle_config_file_save_input(k, &mut app)?; },
+                                AppFocus::OutputSelection => if let Event::Key(k) = event { handle_output_selection_input(k, &mut app); },
+                                AppFocus::OutputArgumentInput => if let Event::Key(k) = event { handle_output_argument_input(k, &mut app); },
                                 // Add more specific handlers here if needed, or a generic one
-                                _ => {
+                                // For other general config text inputs (ActiveTimeout, IdleTimeout, etc.)
+                                // a generic handler could be used, or specific ones if validation is complex.
+                                // For now, let's assume they are handled by a generic key press if not covered above.
+                                AppFocus::ActiveTimeoutInput | AppFocus::IdleTimeoutInput |
+                                AppFocus::ExpirationCheckIntervalInput | AppFocus::ThreadsInput |
+                                AppFocus::EarlyExportInput | AppFocus::CommandArgumentInput => {
+                                    if let Event::Key(key_event) = event {
+                                        handle_generic_text_input(key_event, app);
+                                    }
+                                }
+                                // Boolean toggles and FlowType/Command selection are often handled directly in handle_menu_input
+                                // or would need their own handlers if input is taken in a popup.
+                                AppFocus::FlowTypeSelection => { /* Needs dedicated handler or handled by popup logic */ }
+                                AppFocus::CommandSelection => { /* Needs dedicated handler or handled by popup logic */ }
+
+                                _ => { // Default for other general config states or unhandled popups
                                     if let Event::Key(key) = event {
-                                        if key.code == KeyCode::Esc && app.focus != AppFocus::ConfigFileInput { // Allow Esc from most places to go to Menu
+                                        if key.code == KeyCode::Esc && app.focus != AppFocus::ConfigFileInput {
                                             app.focus = AppFocus::Menu;
                                         }
-                                        // Simplified: other inputs are not fully handled here to keep it concise
+                                        // Other generic input handling could go here if needed
                                     }
                                 }
                             }
@@ -968,24 +985,157 @@ fn render_content_general_config<B: Backend>(f: &mut Frame<B>, app: &App, area: 
     // For brevity, not reproducing the full logic from the original file.
     // It would call render_selectable_list, render_input_paragraph, render_boolean_choice etc.
     // for general configuration items.
+    // We need to ensure that when "Output Method" is selected in the menu,
+    // and focus shifts to AppFocus::OutputSelection, the correct list is rendered.
+    // This is typically handled in render_popups_general_config or a similar function.
     let placeholder = Paragraph::new("General config content area")
         .block(Block::default().borders(Borders::ALL).title("Details"));
     f.render_widget(placeholder, area);
 }
 
 fn render_current_selections_general_config<B: Backend>(f: &mut Frame<B>, app: &App, area: Rect) {
-    // This function would display the currently selected general configurations.
-    // For brevity, not reproducing the full logic.
-    let placeholder = Paragraph::new(format!("Current general config: {:?}", app.config))
-        .block(Block::default().borders(Borders::ALL).title("Current Selections"));
-    f.render_widget(placeholder, area);
+    let config = &app.config;
+    let mut lines = vec![
+        Line::from(Span::styled("Current Configuration:", Style::default().add_modifier(Modifier::BOLD))),
+    ];
+
+    // Feature Set
+    lines.push(Line::from(format!("  Feature Set: {:?}", config.config.features)));
+
+    // Mode (Command)
+    let command_str = match &config.command {
+        Commands::Realtime { interface, ingress_only } => format!("Realtime (Interface: {}, Ingress Only: {})", interface, ingress_only),
+        Commands::Pcap { path } => format!("Pcap (Path: {})", path),
+        Commands::BatchPcap => "Batch PCAP Processing".to_string(),
+    };
+    lines.push(Line::from(format!("  Mode: {}", command_str)));
+
+    // Output Method
+    let output_method_str = match config.output.output {
+        ExportMethodType::Print => "Print to Console",
+        ExportMethodType::Csv => "CSV File",
+        ExportMethodType::Pandas => "Pandas (Parquet File)",
+        ExportMethodType::Polars => "Polars (Parquet File)",
+    };
+    lines.push(Line::from(format!("  Output Method: {}", output_method_str)));
+    if config.output.export_path.is_some() &&
+       (config.output.output == ExportMethodType::Csv ||
+        config.output.output == ExportMethodType::Pandas ||
+        config.output.output == ExportMethodType::Polars) {
+        lines.push(Line::from(format!("    Export Path: {}", config.output.export_path.as_deref().unwrap_or("N/A"))));
+    }
+    if config.output.output == ExportMethodType::Csv {
+        lines.push(Line::from(format!("    Performance Mode (No TUI graph for CSV): {}", config.output.performance_mode)));
+    }
+
+
+    lines.push(Line::from(format!("  Active Timeout: {}s", config.config.active_timeout)));
+    lines.push(Line::from(format!("  Idle Timeout: {}s", config.config.idle_timeout)));
+    lines.push(Line::from(format!("  Expiration Check: {}s", config.config.expiration_check_interval)));
+    lines.push(Line::from(format!("  Threads: {}", config.config.threads.map_or("Auto".to_string(), |t| t.to_string()))));
+    lines.push(Line::from(format!("  Early Export: {}", config.config.early_export.map_or("Disabled".to_string(), |e| format!("{}s", e)))));
+    lines.push(Line::from(format!("  Header: {}", config.output.header)));
+    lines.push(Line::from(format!("  Drop Contaminant Features: {}", config.output.drop_contaminant_features)));
+
+    if let Some(file_path) = &app.config_file {
+        lines.push(Line::from(Span::raw(" "))); // Spacer
+        lines.push(Line::from(Span::styled(format!("Loaded from: {}", file_path), Style::default().fg(Color::DarkGray))));
+    }
+
+
+    let text_widget = Paragraph::new(lines)
+        .block(Block::default().borders(Borders::ALL).title("Current Selections"))
+        .wrap(ratatui::widgets::Wrap { trim: true });
+    f.render_widget(text_widget, area);
 }
 
-fn render_popups_general_config<B: Backend>(f: &mut Frame<B>, app: &App, area: Rect) {
+
+fn render_popups_general_config<B: Backend>(f: &mut Frame<B>, app: &App, screen_size: Rect) {
     // This function would render popups for general configuration input.
-    // For brevity, not reproducing the full logic.
     // Example: if app.focus == AppFocus::CommandArgumentInput ...
+    match app.focus {
+        AppFocus::FlowTypeSelection => {
+            let items: Vec<ListItem> = FlowType::value_variants()
+                .iter()
+                .map(|variant| ListItem::new(format!("{:?}", variant)))
+                .collect();
+            render_selection_popup(f, "Select Feature Set", items, &app.flow_type_selection_state, screen_size);
+        }
+        AppFocus::CommandSelection => {
+            let items = vec![
+                ListItem::new("Realtime Capture"),
+                ListItem::new("Pcap File"),
+            ];
+            render_selection_popup(f, "Select Mode", items, &app.command_selection_state, screen_size);
+        }
+        AppFocus::OutputSelection => {
+            let items: Vec<ListItem> = ExportMethodType::value_variants()
+                .iter()
+                .map(|variant| {
+                    let display_name = match variant {
+                        ExportMethodType::Print => "Print to Console",
+                        ExportMethodType::Csv => "CSV File",
+                        ExportMethodType::Pandas => "Pandas (Parquet File)",
+                        ExportMethodType::Polars => "Polars (Parquet File)",
+                    };
+                    ListItem::new(display_name)
+                })
+                .collect();
+            render_selection_popup(f, "Select Output Method", items, &app.output_selection_state, screen_size);
+        }
+        // ... other popups for text input, number input etc. ...
+        AppFocus::ActiveTimeoutInput => render_text_input_popup(f, "Active Timeout (seconds)", &app.active_timeout_input_buffer, screen_size),
+        AppFocus::IdleTimeoutInput => render_text_input_popup(f, "Idle Timeout (seconds)", &app.idle_timeout_input_buffer, screen_size),
+        AppFocus::ExpirationCheckIntervalInput => render_text_input_popup(f, "Expiration Check Interval (seconds)", &app.expiration_check_interval_input_buffer, screen_size),
+        AppFocus::ThreadsInput => render_text_input_popup(f, "Worker Threads (number, or empty for auto)", &app.threads_input_buffer, screen_size),
+        AppFocus::EarlyExportInput => render_text_input_popup(f, "Early Export Interval (seconds, or empty for disabled)", &app.early_export_input_buffer, screen_size),
+        AppFocus::CommandArgumentInput => {
+            let title = match app.config.command {
+                Commands::Realtime { .. } => "Network Interface (e.g., eth0)",
+                Commands::Pcap { .. } => "PCAP File Path",
+                _ => "Argument",
+            };
+            render_text_input_popup(f, title, &app.command_argument_input_buffer, screen_size);
+        }
+        AppFocus::OutputArgumentInput => {
+             let title = match app.config.output.output {
+                ExportMethodType::Csv => "CSV Export File Path",
+                ExportMethodType::Pandas => "Pandas Parquet Export File Path",
+                ExportMethodType::Polars => "Polars Parquet Export File Path",
+                _ => "Export Path", // Should not be reachable if logic is correct
+            };
+            render_text_input_popup(f, title, &app.output_argument_input_buffer, screen_size);
+        }
+        _ => {} // No popup for other focus states handled by main screen
+    }
 }
+
+
+// Helper function to render a generic selection popup (used for FlowType, Command, OutputMethod)
+fn render_selection_popup<B: Backend>(
+    f: &mut Frame<B>,
+    title: &str,
+    items: Vec<ListItem>,
+    list_state: &ListState, // Pass ListState as a reference
+    screen_size: Rect,
+) {
+    let popup_area = centered_rect(60, 50, screen_size); // Adjust size as needed
+    f.render_widget(Clear, popup_area);
+
+    let list_widget = List::new(items)
+        .block(
+            Block::default()
+                .title(title)
+                .borders(Borders::ALL)
+                .border_style(Style::default().fg(Color::Yellow))
+                .style(Style::default().bg(Color::DarkGray)),
+        )
+        .highlight_style(Style::default().fg(Color::Black).bg(Color::LightGreen).add_modifier(Modifier::BOLD))
+        .highlight_symbol(">> ");
+
+    f.render_stateful_widget(list_widget, popup_area, &mut list_state.clone()); // Clone state for rendering
+}
+
 
 fn render_config_file_input_popup<B: Backend>(f: &mut Frame<B>, input_buffer: &str, screen_size: Rect) {
     let popup_area = centered_rect(70, 20, screen_size);
@@ -1061,10 +1211,53 @@ fn handle_menu_input(key: KeyEvent, app: &mut App) -> Result<Option<AppTransitio
             if let Some(selected_index) = app.main_menu_state.selected() {
                 match app.main_menu_items[selected_index] {
                     "Batch PCAP Processing" => return Ok(Some(AppTransition::ToBatchSetupScreen)),
-                    // ... map other menu items to AppFocus states for general config ...
-                    "Feature Set" => app.focus = AppFocus::FlowTypeSelection,
-                    "Mode" => app.focus = AppFocus::CommandSelection,
-                    // ... and so on for other general config items
+                    "Feature Set" => {
+                        // Initialize selection state based on current config
+                        let current_idx = FlowType::value_variants().iter().position(|&v| v == app.config.config.features).unwrap_or(0);
+                        app.flow_type_selection_state.select(Some(current_idx));
+                        app.focus = AppFocus::FlowTypeSelection;
+                    }
+                    "Mode" => {
+                        let current_idx = match app.config.command {
+                            Commands::Realtime { .. } => 0,
+                            Commands::Pcap { .. } => 1,
+                            _ => 0, // Default or should not happen for this menu item
+                        };
+                        app.command_selection_state.select(Some(current_idx));
+                        app.focus = AppFocus::CommandSelection;
+                    }
+                    "Output Method" => {
+                        let current_idx = ExportMethodType::value_variants().iter().position(|&v| v == app.config.output.output).unwrap_or(0);
+                        app.output_selection_state.select(Some(current_idx));
+                        app.focus = AppFocus::OutputSelection;
+                    }
+                    "Active Timeout" => {
+                        app.active_timeout_input_buffer = app.config.config.active_timeout.to_string();
+                        app.focus = AppFocus::ActiveTimeoutInput;
+                    }
+                    "Idle Timeout" => {
+                        app.idle_timeout_input_buffer = app.config.config.idle_timeout.to_string();
+                        app.focus = AppFocus::IdleTimeoutInput;
+                    }
+                    "Expiration Check Interval" => {
+                        app.expiration_check_interval_input_buffer = app.config.config.expiration_check_interval.to_string();
+                        app.focus = AppFocus::ExpirationCheckIntervalInput;
+                    }
+                     "Threads" => {
+                        app.threads_input_buffer = app.config.config.threads.map_or(String::new(), |t| t.to_string());
+                        app.focus = AppFocus::ThreadsInput;
+                    }
+                    "Early Export" => {
+                        app.early_export_input_buffer = app.config.config.early_export.map_or(String::new(), |e| e.to_string());
+                        app.focus = AppFocus::EarlyExportInput;
+                    }
+                    "Header" => {
+                        app.config.output.header = !app.config.output.header; // Toggle directly
+                    }
+                    "Drop Contaminant Features" => {
+                        app.config.output.drop_contaminant_features = !app.config.output.drop_contaminant_features; // Toggle
+                    }
+                    // ... other general config items ...
                     _ => {}
                 }
             }
@@ -1074,6 +1267,45 @@ fn handle_menu_input(key: KeyEvent, app: &mut App) -> Result<Option<AppTransitio
     }
     Ok(None)
 }
+
+
+// Specific handler for AppFocus::OutputSelection
+fn handle_output_selection_input(key: KeyEvent, app: &mut App) {
+    let variants = ExportMethodType::value_variants();
+    let num_variants = variants.len();
+    let current_idx = app.output_selection_state.selected().unwrap_or(0);
+
+    match key.code {
+        KeyCode::Up => {
+            let new_idx = if current_idx == 0 { num_variants - 1 } else { current_idx - 1 };
+            app.output_selection_state.select(Some(new_idx));
+        }
+        KeyCode::Down => {
+            let new_idx = (current_idx + 1) % num_variants;
+            app.output_selection_state.select(Some(new_idx));
+        }
+        KeyCode::Enter => {
+            if let Some(selected_idx) = app.output_selection_state.selected() {
+                app.config.output.output = variants[selected_idx].clone();
+                // If a file-based output is selected, prepare for export_path input
+                match app.config.output.output {
+                    ExportMethodType::Csv | ExportMethodType::Pandas | ExportMethodType::Polars => {
+                        app.output_argument_input_buffer = app.config.output.export_path.clone().unwrap_or_default();
+                        app.focus = AppFocus::OutputArgumentInput;
+                    }
+                    _ => { // For Print, go back to menu
+                        app.focus = AppFocus::Menu;
+                    }
+                }
+            }
+        }
+        KeyCode::Esc => {
+            app.focus = AppFocus::Menu;
+        }
+        _ => {}
+    }
+}
+
 
 // Placeholder for other input handlers from original tui.rs, adapt as needed
 fn handle_config_file_input(key: KeyEvent, app: &mut App) -> Result<(), TUIError> {
@@ -1113,6 +1345,23 @@ fn handle_config_file_input(key: KeyEvent, app: &mut App) -> Result<(), TUIError
     Ok(())
 }
 
+
+fn handle_output_argument_input(key: KeyEvent, app: &mut App) {
+    match key.code {
+        KeyCode::Char(c) => app.output_argument_input_buffer.push(c),
+        KeyCode::Backspace => { app.output_argument_input_buffer.pop(); },
+        KeyCode::Enter => {
+            app.config.output.export_path = Some(app.output_argument_input_buffer.clone()).filter(|s| !s.is_empty());
+            app.focus = AppFocus::Menu; // Return to menu after setting
+        }
+        KeyCode::Esc => {
+            app.focus = AppFocus::Menu; // Cancel and return to menu
+        }
+        _ => {}
+    }
+}
+
+
 fn handle_config_file_save_input(key: KeyEvent, app: &mut App) -> Result<(), TUIError> {
      match key.code {
         KeyCode::Char(c) => app.config_file_input.push(c),
@@ -1147,12 +1396,59 @@ fn handle_config_file_save_input(key: KeyEvent, app: &mut App) -> Result<(), TUI
 
 // Implement other handlers like handle_flow_type_input, handle_numeric_input etc.
 // These would modify app.config fields and switch app.focus.
-// Example (very simplified):
-// fn handle_flow_type_input(key: KeyEvent, app: &mut App) -> Result<(), TUIError> {
-//     // Logic to cycle app.config.config.features
-//     // On Enter or Esc, app.focus = AppFocus::Menu;
-//     Ok(())
-// }
+
+// A new generic text input handler for simple text fields
+fn handle_generic_text_input(key: KeyEvent, app: &mut App) {
+    let buffer: &mut String = match app.focus {
+        AppFocus::ActiveTimeoutInput => &mut app.active_timeout_input_buffer,
+        AppFocus::IdleTimeoutInput => &mut app.idle_timeout_input_buffer,
+        AppFocus::ExpirationCheckIntervalInput => &mut app.expiration_check_interval_input_buffer,
+        AppFocus::ThreadsInput => &mut app.threads_input_buffer,
+        AppFocus::EarlyExportInput => &mut app.early_export_input_buffer,
+        AppFocus::CommandArgumentInput => &mut app.command_argument_input_buffer,
+        // AppFocus::OutputArgumentInput is handled by its own function due to specific logic.
+        _ => return, // Should not happen if called correctly
+    };
+
+    match key.code {
+        KeyCode::Char(c) => buffer.push(c),
+        KeyCode::Backspace => { buffer.pop(); },
+        KeyCode::Enter => {
+            // Apply the input and return to menu
+            match app.focus {
+                AppFocus::ActiveTimeoutInput => {
+                    if let Ok(val) = app.active_timeout_input_buffer.parse() { app.config.config.active_timeout = val; }
+                    else if app.active_timeout_input_buffer.is_empty() { /* Allow empty to reset to default or handle error */ }
+                }
+                AppFocus::IdleTimeoutInput => {
+                    if let Ok(val) = app.idle_timeout_input_buffer.parse() { app.config.config.idle_timeout = val; }
+                }
+                AppFocus::ExpirationCheckIntervalInput => {
+                    if let Ok(val) = app.expiration_check_interval_input_buffer.parse() { app.config.config.expiration_check_interval = val; }
+                }
+                AppFocus::ThreadsInput => {
+                     app.config.config.threads = app.threads_input_buffer.parse().ok();
+                }
+                AppFocus::EarlyExportInput => {
+                    app.config.config.early_export = app.early_export_input_buffer.parse().ok();
+                }
+                AppFocus::CommandArgumentInput => {
+                    match &mut app.config.command {
+                        Commands::Realtime { interface, .. } => *interface = app.command_argument_input_buffer.clone(),
+                        Commands::Pcap { path, .. } => *path = app.command_argument_input_buffer.clone(),
+                        _ => {}
+                    }
+                }
+                _ => {}
+            }
+            app.focus = AppFocus::Menu;
+        }
+        KeyCode::Esc => {
+            app.focus = AppFocus::Menu; // Cancel
+        }
+        _ => {}
+    }
+}
 
 ```
 
