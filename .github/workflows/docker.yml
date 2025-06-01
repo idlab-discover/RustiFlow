@@ -38,7 +38,7 @@ jobs:
             context: .
             file: Dockerfile
             push: true
-            tags: ghcr.io/idlab-discover/rustiflow:ubuntu-20
+            tags: ghcr.io/${{ github.repository }}:ubuntu-20
 
         - name: Build and push the slim Docker image
           uses: docker/build-push-action@v6
@@ -46,4 +46,4 @@ jobs:
             context: .
             file: Dockerfile-slim
             push: true
-            tags: ghcr.io/idlab-discover/rustiflow:slim
+            tags: ghcr.io/${{ github.repository }}:slim
