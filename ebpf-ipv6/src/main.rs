@@ -99,7 +99,8 @@ fn process_packet(ctx: &TcContext) -> Result<i32, ()> {
 
     // 2) Build packet_info for IPv6
     let ipv6hdr = ctx.load::<Ipv6Hdr>(EthHdr::LEN).map_err(|_| ())?;
-    let packet_info = PacketInfo::new(&ipv6hdr, ctx.data_end() - ctx.data(), final_proto)?;
+    let network_header_length = offset_after_ext - EthHdr::LEN;
+    let packet_info = PacketInfo::new(&ipv6hdr, final_proto, network_header_length)?;
 
     // 3) Dispatch on the final protocol
     match final_proto {
@@ -141,34 +142,45 @@ fn process_transport_packet<T: NetworkHeader>(
 struct PacketInfo {
     ipv6_source: u128,
     ipv6_destination: u128,
-    data_length: u16,
+    total_length: u16,
+    network_header_length: u16,
     protocol: u8,
 }
 
 impl PacketInfo {
-    fn new(ipv6hdr: &Ipv6Hdr, data_length: usize, protocol: IpProto) -> Result<Self, ()> {
+    fn new(
+        ipv6hdr: &Ipv6Hdr,
+        protocol: IpProto,
+        network_header_length: usize,
+    ) -> Result<Self, ()> {
         Ok(Self {
             ipv6_source: u128::from_be_bytes(unsafe { ipv6hdr.src_addr.in6_u.u6_addr8 }),
             ipv6_destination: u128::from_be_bytes(unsafe { ipv6hdr.dst_addr.in6_u.u6_addr8 }),
-            data_length: data_length as u16,
+            total_length: Ipv6Hdr::LEN as u16 + u16::from_be(ipv6hdr.payload_len),
+            network_header_length: network_header_length as u16,
             protocol: protocol as u8,
         })
     }
 
     #[inline(always)]
     fn to_packet_log<T: NetworkHeader>(&self, header: &T) -> EbpfEventIpv6 {
+        let header_length = header.header_length();
+        let data_length = self
+            .total_length
+            .saturating_sub(self.network_header_length + u16::from(header_length));
+
         EbpfEventIpv6::new(
             unsafe { bpf_ktime_get_ns() },
             self.ipv6_destination,
             self.ipv6_source,
             header.destination_port(),
             header.source_port(),
-            self.data_length,
-            self.data_length + header.header_length() as u16,
+            data_length,
+            self.total_length,
             header.window_size(),
             header.combined_flags(),
             self.protocol,
-            header.header_length(),
+            header_length,
             header.sequence_number(),
             header.sequence_number_ack(),
             header.icmp_type(),

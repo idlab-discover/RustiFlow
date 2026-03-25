@@ -47,8 +47,8 @@ fn process_packet(ctx: &TcContext) -> Result<i32, ()> {
     }
 
     let ipv4hdr = ctx.load::<Ipv4Hdr>(EthHdr::LEN).map_err(|_| ())?;
-    let packet_info = PacketInfo::new(&ipv4hdr, ctx.data_end() - ctx.data())?;
     let ip_header_length = (ipv4hdr.ihl() as usize) * 4;
+    let packet_info = PacketInfo::new(&ipv4hdr, ip_header_length)?;
     let hdr_offset = EthHdr::LEN + ip_header_length;
 
     match ipv4hdr.proto {
@@ -88,34 +88,41 @@ fn process_transport_packet<T: NetworkHeader>(
 struct PacketInfo {
     ipv4_source: u32,
     ipv4_destination: u32,
-    data_length: u16,
+    total_length: u16,
+    network_header_length: u16,
     protocol: u8,
 }
 
 impl PacketInfo {
-    fn new(ipv4hdr: &Ipv4Hdr, data_length: usize) -> Result<Self, ()> {
+    fn new(ipv4hdr: &Ipv4Hdr, network_header_length: usize) -> Result<Self, ()> {
         Ok(Self {
             ipv4_source: ipv4hdr.src_addr,
             ipv4_destination: ipv4hdr.dst_addr,
-            data_length: data_length as u16,
+            total_length: u16::from_be(ipv4hdr.tot_len),
+            network_header_length: network_header_length as u16,
             protocol: ipv4hdr.proto as u8,
         })
     }
 
     #[inline(always)]
     fn to_packet_log<T: NetworkHeader>(&self, header: &T) -> EbpfEventIpv4 {
+        let header_length = header.header_length();
+        let data_length = self
+            .total_length
+            .saturating_sub(self.network_header_length + u16::from(header_length));
+
         EbpfEventIpv4::new(
             unsafe { bpf_ktime_get_ns() },
             self.ipv4_destination,
             self.ipv4_source,
             header.destination_port(),
             header.source_port(),
-            self.data_length,
-            self.data_length + header.header_length() as u16,
+            data_length,
+            self.total_length,
             header.window_size(),
             header.combined_flags(),
             self.protocol,
-            header.header_length(),
+            header_length,
             header.sequence_number(),
             header.sequence_number_ack(),
             header.icmp_type(),
