@@ -117,7 +117,7 @@ impl Flow for CicFlow {
             {},{},{},{},{},{},{},{},{},{},\
             {},{},{},{},{},{},{},{},{},{},\
             {},{},{},{},{},{},{},{},{},{},\
-            {},{},{}",
+            {},{},{},{},{},{},{}",
             // Basic Info
             self.basic_flow.flow_key,
             self.basic_flow.ip_source,
@@ -252,6 +252,10 @@ impl Flow for CicFlow {
             // ICMP Stats
             self.icmp_stats.get_code(),
             self.icmp_stats.get_type(),
+            self.icmp_stats.echo_request_count,
+            self.icmp_stats.echo_reply_count,
+            self.icmp_stats.error_count,
+            self.icmp_stats.destination_unreachable_count,
             // Retransmission Stats
             self.retransmission_stats.fwd_retransmission_count,
             self.retransmission_stats.bwd_retransmission_count,
@@ -354,6 +358,10 @@ impl Flow for CicFlow {
             "Idle Min",
             "ICMP Code",
             "ICMP Type",
+            "ICMP Echo Request Count",
+            "ICMP Echo Reply Count",
+            "ICMP Error Count",
+            "ICMP Destination Unreachable Count",
             "Fwd TCP Retrans. Count",
             "Bwd TCP Retrans. Count",
             "Total TCP Retrans. Count",
@@ -372,7 +380,7 @@ impl Flow for CicFlow {
             {},{},{},{},{},{},{},{},{},{},\
             {},{},{},{},{},{},{},{},{},{},\
             {},{},{},{},{},{},{},{},{},{},\
-            {},{},{},{},{},{},{},{},{}",
+            {},{},{},{},{},{},{},{},{},{},{},{},{}",
             // Basic Info
             iana_port_mapping(self.basic_flow.port_source),
             iana_port_mapping(self.basic_flow.port_destination),
@@ -503,6 +511,10 @@ impl Flow for CicFlow {
             // ICMP Stats
             self.icmp_stats.get_code(),
             self.icmp_stats.get_type(),
+            self.icmp_stats.echo_request_count,
+            self.icmp_stats.echo_reply_count,
+            self.icmp_stats.error_count,
+            self.icmp_stats.destination_unreachable_count,
             // Retransmission Stats
             self.retransmission_stats.fwd_retransmission_count,
             self.retransmission_stats.bwd_retransmission_count,
@@ -601,6 +613,10 @@ impl Flow for CicFlow {
             "Idle Min",
             "ICMP Code",
             "ICMP Type",
+            "ICMP Echo Request Count",
+            "ICMP Echo Reply Count",
+            "ICMP Error Count",
+            "ICMP Destination Unreachable Count",
             "Fwd TCP Retrans. Count",
             "Bwd TCP Retrans. Count",
             "Total TCP Retrans. Count",

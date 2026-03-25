@@ -68,30 +68,38 @@ impl Flow for CustomFlow {
     fn dump(&self) -> String {
         // Add here the dump of the custom flow.
         format!(
-            "{},{},{}",
+            "{},{},{},{},{},{},{}",
             self.basic_flow.flow_key,
             self.icmp_stats.get_type(),
-            self.icmp_stats.get_code()
+            self.icmp_stats.get_code(),
+            self.icmp_stats.echo_request_count,
+            self.icmp_stats.echo_reply_count,
+            self.icmp_stats.error_count,
+            self.icmp_stats.destination_unreachable_count
         )
     }
 
     fn get_features() -> String {
         // Add here the features of the custom flow.
-        format!("flow_id,icmp_type,icmp_code")
+        format!("flow_id,icmp_type,icmp_code,icmp_echo_request_count,icmp_echo_reply_count,icmp_error_count,icmp_destination_unreachable_count")
     }
 
     fn dump_without_contamination(&self) -> String {
         // Add here the dump of the custom flow without contaminant features.
         format!(
-            "{},{}",
+            "{},{},{},{},{},{}",
             self.icmp_stats.get_type(),
-            self.icmp_stats.get_code()
+            self.icmp_stats.get_code(),
+            self.icmp_stats.echo_request_count,
+            self.icmp_stats.echo_reply_count,
+            self.icmp_stats.error_count,
+            self.icmp_stats.destination_unreachable_count
         )
     }
 
     fn get_features_without_contamination() -> String {
         // Add here the features of the custom flow without contaminant features.
-        format!("icmp_type,icmp_code")
+        format!("icmp_type,icmp_code,icmp_echo_request_count,icmp_echo_reply_count,icmp_error_count,icmp_destination_unreachable_count")
     }
 
     fn get_first_timestamp_us(&self) -> i64 {

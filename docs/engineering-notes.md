@@ -22,3 +22,6 @@ This file keeps short-lived design choices and execution notes that would make
 - Active/idle tracking now compares thresholds in microseconds before converting
   to exported millisecond values, and subflow counting now represents actual
   subflows instead of only counting gap boundaries after the first packet.
+- ICMP stats now keep the original first seen type and code, but also track
+  echo request and reply counts plus error and destination-unreachable counts
+  across ICMPv4 and ICMPv6 traffic.

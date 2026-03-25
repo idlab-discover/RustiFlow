@@ -217,10 +217,10 @@ Options:
 
           Possible values:
           - basic:     A basic flow that stores the basic features of a flow
-          - cic:       Represents the CIC Flow, giving 83 features
+          - cic:       Represents the CIC Flow, giving 87 features
           - cidds:     Represents the CIDDS Flow, giving 10 features
           - nfstream:  Represents a nfstream inspired flow, giving 69 features
-          - rustiflow: Represents the Rusti Flow, giving 120 features
+          - rustiflow: Represents the Rusti Flow, giving 124 features
           - custom:    Represents a flow that you can implement yourself
 
       --active-timeout <ACTIVE_TIMEOUT>
