@@ -258,3 +258,8 @@ What this does not fully prove:
   records repeated 400x, ~2.5 MB), warm-cache `--release` runs dropped from
   about `39.8 ms` to `19.7 ms` mean over 5 runs on this machine. Treat this as
   a local directional signal, not a Linux realtime substitute.
+- 2026-03-25: `FeatureStats` now uses a Welford-style running variance
+  accumulator and computes `std` at readout time. On the same local amplified
+  offline fixture, warm-cache `--release` runs moved from about `21.3 ms` to
+  `20.5 ms` mean over 5 runs on this machine. Smaller win than typed keys, but
+  still in the expected direction.

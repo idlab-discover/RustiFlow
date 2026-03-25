@@ -41,6 +41,10 @@ This file keeps short-lived design choices and execution notes that would make
 - Internal sharding and flow-table lookup now use typed `FlowKey` values
   instead of rebuilding formatted strings on the hot path. String flow ids are
   still created when a new flow is instantiated for export compatibility.
+- `FeatureStats` now keeps running variance state (`m2`) and derives standard
+  deviation on demand instead of updating `std` itself on every packet.
+  Dedicated tests now lock down population-std semantics, order invariance, and
+  merged directional variance behavior.
 - Current test-hardening focus is to add adversarial deterministic cases before
   more feature work: false handshake completion, teardown edge cases, parser
   rejection behavior, and tiny fixture assertions that prove exported

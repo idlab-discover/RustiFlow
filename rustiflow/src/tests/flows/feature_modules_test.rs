@@ -5,10 +5,17 @@ mod tests {
     use crate::{
         flows::{
             features::{
-                active_idle_stats::ActiveIdleStats, iat_stats::IATStats, icmp_stats::IcmpStats,
-                payload_stats::PayloadLengthStats, retransmission_stats::RetransmissionStats,
-                subflow_stats::SubflowStats, tcp_quality_stats::TcpQualityStats,
-                timing_stats::TimingStats, util::FlowFeature, window_size_stats::WindowSizeStats,
+                active_idle_stats::ActiveIdleStats,
+                iat_stats::IATStats,
+                icmp_stats::IcmpStats,
+                packet_stats::PacketLengthStats,
+                payload_stats::PayloadLengthStats,
+                retransmission_stats::RetransmissionStats,
+                subflow_stats::SubflowStats,
+                tcp_quality_stats::TcpQualityStats,
+                timing_stats::TimingStats,
+                util::{FeatureStats, FlowFeature},
+                window_size_stats::WindowSizeStats,
             },
             util::FlowExpireCause,
         },
@@ -20,6 +27,69 @@ mod tests {
             timestamp_us,
             ..Default::default()
         }
+    }
+
+    fn population_std(values: &[f64]) -> f64 {
+        let mean = values.iter().sum::<f64>() / values.len() as f64;
+        let variance = values
+            .iter()
+            .map(|value| (value - mean).powi(2))
+            .sum::<f64>()
+            / values.len() as f64;
+        variance.sqrt()
+    }
+
+    #[test]
+    fn feature_stats_match_population_statistics_and_are_order_invariant() {
+        let values = [100.0, 50.0, 0.0, 75.0, 200.0, 125.0];
+
+        let mut forward = FeatureStats::new();
+        for value in values {
+            forward.add_value(value);
+        }
+
+        let mut reverse = FeatureStats::new();
+        for value in values.into_iter().rev() {
+            reverse.add_value(value);
+        }
+
+        let expected_total = values.iter().sum::<f64>();
+        let expected_mean = expected_total / values.len() as f64;
+        let expected_std = population_std(&values);
+
+        for stats in [&forward, &reverse] {
+            assert_eq!(stats.get_count(), values.len() as u32);
+            assert!((stats.get_total() - expected_total).abs() < f64::EPSILON);
+            assert!((stats.get_mean() - expected_mean).abs() < f64::EPSILON);
+            assert!((stats.get_std() - expected_std).abs() < f64::EPSILON);
+            assert_eq!(stats.get_min(), 0.0);
+            assert_eq!(stats.get_max(), 200.0);
+        }
+    }
+
+    #[test]
+    fn packet_length_stats_merge_directional_variance_correctly() {
+        let mut stats = PacketLengthStats::new();
+
+        let mut fwd_first = packet(1_000_000);
+        fwd_first.length = 60;
+        stats.update(&fwd_first, true, fwd_first.timestamp_us);
+
+        let mut bwd_first = packet(1_000_500);
+        bwd_first.length = 30;
+        stats.update(&bwd_first, false, fwd_first.timestamp_us);
+
+        let mut fwd_second = packet(1_001_000);
+        fwd_second.length = 90;
+        stats.update(&fwd_second, true, bwd_first.timestamp_us);
+
+        let mut bwd_second = packet(1_001_500);
+        bwd_second.length = 150;
+        stats.update(&bwd_second, false, fwd_second.timestamp_us);
+
+        let expected = [60.0, 30.0, 90.0, 150.0];
+        assert!((stats.flow_mean() - 82.5).abs() < f64::EPSILON);
+        assert!((stats.flow_std() - population_std(&expected)).abs() < f64::EPSILON);
     }
 
     #[test]
