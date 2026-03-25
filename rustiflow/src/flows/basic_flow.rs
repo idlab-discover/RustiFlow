@@ -159,8 +159,8 @@ impl Flow for BasicFlow {
         false
     }
 
-    fn close_flow(&mut self, _timestamp_us: i64, _cause: FlowExpireCause) -> () {
-        // No active state to close
+    fn close_flow(&mut self, _timestamp_us: i64, cause: FlowExpireCause) -> () {
+        self.flow_expire_cause = cause;
     }
 
     fn dump(&self) -> String {
