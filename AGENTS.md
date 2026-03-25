@@ -127,7 +127,7 @@ Primary files:
 
 - [ ] Optional lightweight application-aware metadata: DNS, TLS, HTTP, QUIC.
 - [ ] Better contamination-free abstractions than only coarse IANA port buckets.
-- [ ] Fill `nf_flow` gaps such as `ip_version`, `vlan_id`, and `tunnel_id` once
+- [ ] Fill remaining `nf_flow` gaps such as `vlan_id` and `tunnel_id` once
   packet metadata exists in both ingestion modes.
 
 ### Working rule

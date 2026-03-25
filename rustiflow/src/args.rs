@@ -167,7 +167,7 @@ pub enum FlowType {
     /// Represents the CIDDS Flow, giving 10 features.
     CIDDS,
 
-    /// Represents a nfstream inspired flow, giving 69 features.
+    /// Represents a nfstream inspired flow, giving 71 features.
     Nfstream,
 
     /// Represents the Rusti Flow, giving 199 features.

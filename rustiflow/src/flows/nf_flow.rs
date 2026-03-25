@@ -44,6 +44,13 @@ impl NfFlow {
             _ => -1,
         }
     }
+
+    pub fn get_ip_version(&self) -> u8 {
+        match self.basic_flow.ip_source {
+            IpAddr::V4(_) => 4,
+            IpAddr::V6(_) => 6,
+        }
+    }
 }
 
 impl Flow for NfFlow {
@@ -124,7 +131,7 @@ impl Flow for NfFlow {
 
     fn dump(&self) -> String {
         format!(
-            "{},{},{},{},{},{},{},{},{},{},\
+            "{},{},{},{},{},{},{},{},{},{},{},\
             {},{},{},{},{},{},{},{},{},{},\
             {},{},{},{},{},{},{},{},{},{},\
             {},{},{},{},{},{},{},{},{},{},\
@@ -132,7 +139,7 @@ impl Flow for NfFlow {
             {},{},{},{},{},{},{},{},{},{},\
             {},{},{},{},{},{},{},{},{},{}",
             // NFlow Core Features
-            // 7 features are missing: src_mac, src_oui, dst_mac, dst_oui, ip_version, vlan_id, tunner_id
+            // 6 features are missing: src_mac, src_oui, dst_mac, dst_oui, vlan_id, tunner_id
             self.basic_flow.flow_key,
             self.get_expiration_id(),
             self.basic_flow.ip_source,
@@ -140,6 +147,7 @@ impl Flow for NfFlow {
             self.basic_flow.ip_destination,
             self.basic_flow.port_destination,
             self.basic_flow.protocol,
+            self.get_ip_version(),
             self.basic_flow.first_timestamp_us / 1000,
             self.basic_flow.last_timestamp_us / 1000,
             self.basic_flow.get_flow_duration_msec(),
@@ -216,6 +224,7 @@ impl Flow for NfFlow {
             "dst_ip",
             "dst_port",
             "protocol",
+            "ip_version",
             "bidirectional_first_seen_ms",
             "bidirectional_last_seen_ms",
             "bidirectional_duration_ms",
@@ -285,7 +294,7 @@ impl Flow for NfFlow {
 
     fn dump_without_contamination(&self) -> String {
         format!(
-            "{},{},{},{},{},{},{},{},{},{},\
+            "{},{},{},{},{},{},{},{},{},{},{},\
             {},{},{},{},{},{},{},{},{},{},\
             {},{},{},{},{},{},{},{},{},{},\
             {},{},{},{},{},{},{},{},{},{},\
@@ -295,6 +304,7 @@ impl Flow for NfFlow {
             iana_port_mapping(self.basic_flow.port_source),
             iana_port_mapping(self.basic_flow.port_destination),
             self.basic_flow.protocol,
+            self.get_ip_version(),
             self.basic_flow.get_flow_duration_msec(),
             self.packet_len_stats.flow_count(),
             self.packet_len_stats.flow_total(),
@@ -361,6 +371,7 @@ impl Flow for NfFlow {
             "src_port_iana",
             "dst_port_iana",
             "protocol",
+            "ip_version",
             "bidirectional_duration_ms",
             "bidirectional_packets",
             "bidirectional_bytes",

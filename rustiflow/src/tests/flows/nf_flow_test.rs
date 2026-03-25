@@ -1,8 +1,16 @@
 #[cfg(test)]
 mod tests {
-    use std::net::{IpAddr, Ipv4Addr};
+    use std::{
+        net::{IpAddr, Ipv4Addr, Ipv6Addr},
+        path::PathBuf,
+    };
 
-    use crate::flows::{flow::Flow, nf_flow::NfFlow, util::FlowExpireCause};
+    use tokio::sync::mpsc;
+
+    use crate::{
+        flows::{flow::Flow, nf_flow::NfFlow, util::FlowExpireCause},
+        pcap::read_pcap_file,
+    };
 
     fn setup_nf_flow() -> NfFlow {
         NfFlow::new(
@@ -18,6 +26,19 @@ mod tests {
 
     fn count_csv_fields(row: &str) -> usize {
         row.split(',').count()
+    }
+
+    fn csv_fields(row: &str) -> Vec<&str> {
+        row.split(',').collect()
+    }
+
+    fn fixture_path(name: &str) -> String {
+        PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("tests")
+            .join("data")
+            .join(name)
+            .to_string_lossy()
+            .into_owned()
     }
 
     #[test]
@@ -46,5 +67,52 @@ mod tests {
 
         flow.close_flow(4_000_000, FlowExpireCause::TcpReset);
         assert_eq!(flow.get_expiration_id(), -1);
+    }
+
+    #[test]
+    fn ip_version_is_exported_for_ipv4_and_ipv6_flows() {
+        let ipv4_flow = setup_nf_flow();
+        assert_eq!(ipv4_flow.get_ip_version(), 4);
+        assert_eq!(csv_fields(&ipv4_flow.dump())[7], "4");
+        assert_eq!(csv_fields(&ipv4_flow.dump_without_contamination())[3], "4");
+
+        let ipv6_flow = NfFlow::new(
+            "nf-flow-v6".to_string(),
+            IpAddr::V6(Ipv6Addr::LOCALHOST),
+            12345,
+            IpAddr::V6(Ipv6Addr::new(0x2001, 0xdb8, 0, 0, 0, 0, 0, 1)),
+            80,
+            6,
+            1_000_000,
+        );
+        assert_eq!(ipv6_flow.get_ip_version(), 6);
+        assert_eq!(csv_fields(&ipv6_flow.dump())[7], "6");
+        assert_eq!(csv_fields(&ipv6_flow.dump_without_contamination())[3], "6");
+    }
+
+    #[tokio::test]
+    async fn offline_fixture_exports_ipv4_version_for_all_flows() {
+        let (tx, mut rx) = mpsc::channel::<NfFlow>(64);
+
+        read_pcap_file::<NfFlow>(
+            &fixture_path("nmap_tcp_syn_version.pcap"),
+            tx,
+            1,
+            3600,
+            120,
+            None,
+            60,
+        )
+        .await
+        .expect("fixture pcap should parse successfully");
+
+        let mut flow_count = 0;
+        while let Some(flow) = rx.recv().await {
+            flow_count += 1;
+            assert_eq!(flow.get_ip_version(), 4);
+            assert_eq!(csv_fields(&flow.dump())[7], "4");
+        }
+
+        assert_eq!(flow_count, 17);
     }
 }
