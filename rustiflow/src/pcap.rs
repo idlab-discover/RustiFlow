@@ -132,6 +132,11 @@ where
                 }
                 _ => {
                     // Check if it is a Linux cooked capture
+                    if packet.data.len() < 16 {
+                        debug!("Packet too short for Linux cooked capture header");
+                        continue;
+                    }
+
                     let ethertype = u16::from_be_bytes([packet.data[14], packet.data[15]]);
                     match ethertype {
                         SLL_IPV4 => {

@@ -28,3 +28,11 @@ This file keeps short-lived design choices and execution notes that would make
 - TCP lifecycle export now distinguishes observed handshake completion from
   resets seen before or after that observed handshake, so richer flow schemas
   do not have to infer lifecycle quality from flag totals alone.
+- Current test-hardening focus is to add adversarial deterministic cases before
+  more feature work: false handshake completion, teardown edge cases, parser
+  rejection behavior, and tiny fixture assertions that prove exported
+  lifecycle semantics.
+- Test hardening already exposed two parser quirks worth locking down: short
+  unsupported offline frames must not panic the reader, and non-first IPv6
+  fragments should be dropped instead of being treated like fresh transport
+  headers.

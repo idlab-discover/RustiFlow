@@ -97,6 +97,7 @@ If a change touches shared code used by multiple crates, prefer checking the wor
 
 - Treat the current test suite carefully: some tests may be stale or incomplete relative to the active code.
 - When adding or repairing tests, prefer tests that reflect the current flow architecture and public behavior rather than resurrecting outdated internal field expectations.
+- Before adding more feature work, prefer adversarial deterministic tests around TCP lifecycle, parser edge cases, and tiny offline fixtures that prove exported semantics.
 
 ## Engineering Checklist
 

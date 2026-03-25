@@ -5,4 +5,5 @@ mod flow_table_test;
 mod nf_flow_test;
 mod packet_features_test;
 mod pcap_fixture_test;
+mod pcap_reader_test;
 mod rusti_flow_test;
