@@ -23,7 +23,7 @@ pub struct FeatureStats {
     min: f64,
     max: f64,
     mean: f64,
-    std: f64,
+    m2: f64,
     count: u32,
 }
 
@@ -34,7 +34,7 @@ impl FeatureStats {
             min: f64::MAX,
             max: f64::MIN,
             mean: 0.0,
-            std: 0.0,
+            m2: 0.0,
             count: 0,
         }
     }
@@ -64,22 +64,15 @@ impl FeatureStats {
     }
 
     pub fn get_std(&self) -> f64 {
-        self.std
+        if self.count == 0 {
+            0.0
+        } else {
+            (self.m2 / self.count as f64).sqrt()
+        }
     }
 
     pub fn get_count(&self) -> u32 {
         self.count
-    }
-
-    fn update_mean(&mut self, value: f64) {
-        self.mean = (((self.count - 1) as f64 * self.mean) + value) / self.count as f64;
-    }
-
-    fn update_std(&mut self, value: f64, old_mean: f64) {
-        self.std = ((((self.count - 1) as f64 * self.std.powf(2.0))
-            + ((value - old_mean) * (value - self.mean)))
-            / self.count as f64)
-            .sqrt();
     }
 
     fn update_min(&mut self, value: f64) {
@@ -95,13 +88,15 @@ impl FeatureStats {
     }
 
     pub fn add_value(&mut self, value: f64) {
-        self.count += 1;
         self.total += value;
         self.update_min(value);
         self.update_max(value);
-        let old_mean: f64 = self.mean;
-        self.update_mean(value);
-        self.update_std(value, old_mean);
+        self.count += 1;
+
+        let delta = value - self.mean;
+        self.mean += delta / self.count as f64;
+        let delta2 = value - self.mean;
+        self.m2 += delta * delta2;
     }
 
     pub fn dump_headers(prefix: &str) -> String {
