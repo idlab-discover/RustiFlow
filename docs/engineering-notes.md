@@ -49,6 +49,12 @@ This file keeps short-lived design choices and execution notes that would make
   disabled, RustiFlow no longer constructs the packet-count watch channel or
   mutex-protected counter state, so high-throughput runs skip that observability
   plumbing entirely instead of merely branching around it in the loop body.
+- RustiFlow now exports `ip_version`, `source_ip_scope`,
+  `destination_ip_scope`, and `path_locality` derived from the normalized
+  `IpAddr` endpoints already shared by offline and realtime ingestion. The
+  adversarial test matrix covers private/shared/link-local/loopback/multicast
+  cases across IPv4 and IPv6 so these coarse path signals do not depend on
+  extra kernel event fields.
 - Current test-hardening focus is to add adversarial deterministic cases before
   more feature work: false handshake completion, teardown edge cases, parser
   rejection behavior, and tiny fixture assertions that prove exported

@@ -1,18 +1,30 @@
 #[cfg(test)]
 mod tests {
-    use std::net::{IpAddr, Ipv4Addr};
+    use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 
     use crate::{
-        flows::{basic_flow::TcpCloseStyle, flow::Flow, rusti_flow::RustiFlow},
+        flows::{
+            basic_flow::TcpCloseStyle,
+            flow::Flow,
+            rusti_flow::RustiFlow,
+            util::{IpScope, PathLocality},
+        },
         packet_features::{PacketFeatures, ACK_FLAG, SYN_FLAG},
     };
 
     fn setup_rusti_flow() -> RustiFlow {
+        setup_rusti_flow_with_endpoints(
+            IpAddr::V4(Ipv4Addr::new(172, 16, 0, 1)),
+            IpAddr::V4(Ipv4Addr::new(172, 16, 0, 2)),
+        )
+    }
+
+    fn setup_rusti_flow_with_endpoints(source_ip: IpAddr, destination_ip: IpAddr) -> RustiFlow {
         RustiFlow::new(
             "rusti-flow".to_string(),
-            IpAddr::V4(Ipv4Addr::new(172, 16, 0, 1)),
+            source_ip,
             44444,
-            IpAddr::V4(Ipv4Addr::new(172, 16, 0, 2)),
+            destination_ip,
             443,
             6,
             1_000_000,
@@ -46,6 +58,7 @@ mod tests {
     fn dump_matches_feature_headers() {
         let flow = setup_rusti_flow();
 
+        assert_eq!(count_csv_fields(&RustiFlow::get_features()), 203);
         assert_eq!(
             count_csv_fields(&flow.dump()),
             count_csv_fields(&RustiFlow::get_features())
@@ -53,6 +66,141 @@ mod tests {
         assert_eq!(
             count_csv_fields(&flow.dump_without_contamination()),
             count_csv_fields(&RustiFlow::get_features_without_contamination())
+        );
+    }
+
+    #[test]
+    fn rusti_flow_classifies_ip_scope_and_path_locality_across_endpoint_types() {
+        let cases = [
+            (
+                IpAddr::V4(Ipv4Addr::new(10, 0, 0, 1)),
+                IpAddr::V4(Ipv4Addr::new(192, 168, 1, 20)),
+                4,
+                IpScope::Private,
+                IpScope::Private,
+                PathLocality::Private,
+            ),
+            (
+                IpAddr::V4(Ipv4Addr::new(100, 64, 0, 1)),
+                IpAddr::V4(Ipv4Addr::new(8, 8, 8, 8)),
+                4,
+                IpScope::Shared,
+                IpScope::Global,
+                PathLocality::Mixed,
+            ),
+            (
+                IpAddr::V4(Ipv4Addr::LOCALHOST),
+                IpAddr::V4(Ipv4Addr::LOCALHOST),
+                4,
+                IpScope::Loopback,
+                IpScope::Loopback,
+                PathLocality::Loopback,
+            ),
+            (
+                IpAddr::V4(Ipv4Addr::new(169, 254, 1, 1)),
+                IpAddr::V4(Ipv4Addr::new(169, 254, 1, 2)),
+                4,
+                IpScope::LinkLocal,
+                IpScope::LinkLocal,
+                PathLocality::LinkLocal,
+            ),
+            (
+                IpAddr::V6(Ipv6Addr::LOCALHOST),
+                IpAddr::V6(Ipv6Addr::LOCALHOST),
+                6,
+                IpScope::Loopback,
+                IpScope::Loopback,
+                PathLocality::Loopback,
+            ),
+            (
+                IpAddr::V6(Ipv6Addr::new(0xfd00, 0, 0, 0, 0, 0, 0, 1)),
+                IpAddr::V6(Ipv6Addr::new(0xfd00, 0, 0, 0, 0, 0, 0, 2)),
+                6,
+                IpScope::Private,
+                IpScope::Private,
+                PathLocality::Private,
+            ),
+            (
+                IpAddr::V6(Ipv6Addr::new(0xfe80, 0, 0, 0, 0, 0, 0, 1)),
+                IpAddr::V6(Ipv6Addr::new(0xfe80, 0, 0, 0, 0, 0, 0, 2)),
+                6,
+                IpScope::LinkLocal,
+                IpScope::LinkLocal,
+                PathLocality::LinkLocal,
+            ),
+            (
+                IpAddr::V6(Ipv6Addr::new(0xff02, 0, 0, 0, 0, 0, 0, 1)),
+                IpAddr::V6(Ipv6Addr::new(0x2001, 0x4860, 0, 0, 0, 0, 0, 8888)),
+                6,
+                IpScope::Multicast,
+                IpScope::Global,
+                PathLocality::Multicast,
+            ),
+        ];
+
+        for (
+            source_ip,
+            destination_ip,
+            ip_version,
+            source_scope,
+            destination_scope,
+            path_locality,
+        ) in cases
+        {
+            let flow = setup_rusti_flow_with_endpoints(source_ip, destination_ip);
+
+            assert_eq!(
+                (
+                    flow.basic_flow.get_ip_version(),
+                    flow.basic_flow.get_source_ip_scope(),
+                    flow.basic_flow.get_destination_ip_scope(),
+                    flow.basic_flow.get_path_locality(),
+                ),
+                (ip_version, source_scope, destination_scope, path_locality)
+            );
+        }
+    }
+
+    #[test]
+    fn rusti_flow_exports_endpoint_scope_and_path_locality_in_both_schemas() {
+        let flow = setup_rusti_flow_with_endpoints(
+            IpAddr::V4(Ipv4Addr::new(100, 64, 0, 1)),
+            IpAddr::V4(Ipv4Addr::new(8, 8, 8, 8)),
+        );
+
+        let full_fields: Vec<_> = flow.dump().split(',').map(str::to_string).collect();
+        let clean_fields: Vec<_> = flow
+            .dump_without_contamination()
+            .split(',')
+            .map(str::to_string)
+            .collect();
+
+        assert_eq!(
+            &full_fields[..10],
+            &[
+                "rusti-flow".to_string(),
+                "100.64.0.1".to_string(),
+                "44444".to_string(),
+                "8.8.8.8".to_string(),
+                "443".to_string(),
+                "6".to_string(),
+                "4".to_string(),
+                "shared".to_string(),
+                "global".to_string(),
+                "mixed".to_string(),
+            ]
+        );
+        assert_eq!(
+            &clean_fields[..7],
+            &[
+                "registered".to_string(),
+                "well-known".to_string(),
+                "6".to_string(),
+                "4".to_string(),
+                "shared".to_string(),
+                "global".to_string(),
+                "mixed".to_string(),
+            ]
         );
     }
 
