@@ -55,6 +55,11 @@ This file keeps short-lived design choices and execution notes that would make
   adversarial test matrix covers private/shared/link-local/loopback/multicast
   cases across IPv4 and IPv6 so these coarse path signals do not depend on
   extra kernel event fields.
+- `FlowTable` now keeps the ordinary existing-flow update path in place instead
+  of removing and reinserting the map entry on every packet. Table-level tests
+  now lock down two semantics that matter for that optimization: replacing an
+  expired flow with a fresh flow on the same key, and early export that keeps
+  the live flow resident for later final export.
 - Current test-hardening focus is to add adversarial deterministic cases before
   more feature work: false handshake completion, teardown edge cases, parser
   rejection behavior, and tiny fixture assertions that prove exported

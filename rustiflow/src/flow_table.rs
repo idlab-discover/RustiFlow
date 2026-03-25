@@ -6,6 +6,19 @@ use crate::{
 use log::{debug, error};
 use tokio::sync::mpsc;
 
+enum ExistingFlowUpdate<T> {
+    Updated,
+    EarlyExport(T),
+    Terminated(T),
+    Expired(FlowExpireCause),
+}
+
+enum FlowUpdate<T> {
+    Active,
+    EarlyExport(T),
+    Terminated(T),
+}
+
 pub struct FlowTable<T> {
     flow_map: HashMap<FlowKey, T>, // HashMap for fast flow access by key
     active_timeout: u64,
@@ -47,35 +60,15 @@ where
         let flow_key = packet.flow_key_value();
         let reverse_flow_key = flow_key.reverse();
 
-        if let Some(mut flow) = self.flow_map.remove(&flow_key) {
-            let (is_expired, cause) =
-                flow.is_expired(packet.timestamp_us, self.active_timeout, self.idle_timeout);
-            if is_expired {
-                flow.close_flow(packet.timestamp_us, cause);
-                self.export_flow(flow).await;
-                self.create_and_insert_flow(packet).await;
-            } else {
-                let is_terminated = self.update_flow_with_packet(&mut flow, packet, true).await;
-                if !is_terminated {
-                    self.flow_map.insert(flow_key, flow);
-                }
-            }
-        } else if let Some(mut flow) = self.flow_map.remove(&reverse_flow_key) {
-            let (is_expired, cause) =
-                flow.is_expired(packet.timestamp_us, self.active_timeout, self.idle_timeout);
-            if is_expired {
-                flow.close_flow(packet.timestamp_us, cause);
-                self.export_flow(flow).await;
-                self.create_and_insert_flow(packet).await;
-            } else {
-                let is_terminated = self.update_flow_with_packet(&mut flow, packet, false).await;
-                if !is_terminated {
-                    self.flow_map.insert(reverse_flow_key, flow);
-                }
-            }
-        } else {
-            self.create_and_insert_flow(packet).await;
+        if self.process_existing_flow(packet, flow_key, true).await
+            || self
+                .process_existing_flow(packet, reverse_flow_key, false)
+                .await
+        {
+            return;
         }
+
+        self.create_and_insert_flow(packet).await;
     }
 
     /// Create and insert a new flow for the given packet.
@@ -90,37 +83,90 @@ where
             packet.protocol,
             packet.timestamp_us,
         );
-        let is_terminated = self
-            .update_flow_with_packet(&mut new_flow, packet, true)
-            .await;
-        if !is_terminated {
-            self.flow_map.insert(flow_key, new_flow);
+        match Self::apply_packet_to_flow(&mut new_flow, packet, true, self.early_export) {
+            FlowUpdate::Active => {
+                self.flow_map.insert(flow_key, new_flow);
+            }
+            FlowUpdate::EarlyExport(flow) => {
+                self.export_flow(flow).await;
+                self.flow_map.insert(flow_key, new_flow);
+            }
+            FlowUpdate::Terminated(flow) => {
+                self.export_flow(flow).await;
+            }
         }
     }
 
-    /// Updates a flow with a packet and exports flow if terminated.
-    ///
-    /// Returns a boolean indicating if the flow is terminated.
-    async fn update_flow_with_packet(
+    async fn process_existing_flow(
         &mut self,
+        packet: &PacketFeatures,
+        flow_key: FlowKey,
+        is_forward: bool,
+    ) -> bool {
+        let Some(update) = self.inspect_existing_flow(&flow_key, packet, is_forward) else {
+            return false;
+        };
+
+        match update {
+            ExistingFlowUpdate::Updated => {}
+            ExistingFlowUpdate::EarlyExport(flow) => {
+                self.export_flow(flow).await;
+            }
+            ExistingFlowUpdate::Terminated(flow) => {
+                self.flow_map.remove(&flow_key);
+                self.export_flow(flow).await;
+            }
+            ExistingFlowUpdate::Expired(cause) => {
+                if let Some(mut flow) = self.flow_map.remove(&flow_key) {
+                    flow.close_flow(packet.timestamp_us, cause);
+                    self.export_flow(flow).await;
+                }
+                self.create_and_insert_flow(packet).await;
+            }
+        }
+
+        true
+    }
+
+    fn inspect_existing_flow(
+        &mut self,
+        flow_key: &FlowKey,
+        packet: &PacketFeatures,
+        is_forward: bool,
+    ) -> Option<ExistingFlowUpdate<T>> {
+        let flow = self.flow_map.get_mut(flow_key)?;
+        let (is_expired, cause) =
+            flow.is_expired(packet.timestamp_us, self.active_timeout, self.idle_timeout);
+
+        if is_expired {
+            Some(ExistingFlowUpdate::Expired(cause))
+        } else {
+            Some(
+                match Self::apply_packet_to_flow(flow, packet, is_forward, self.early_export) {
+                    FlowUpdate::Active => ExistingFlowUpdate::Updated,
+                    FlowUpdate::EarlyExport(flow) => ExistingFlowUpdate::EarlyExport(flow),
+                    FlowUpdate::Terminated(flow) => ExistingFlowUpdate::Terminated(flow),
+                },
+            )
+        }
+    }
+
+    fn apply_packet_to_flow(
         flow: &mut T,
         packet: &PacketFeatures,
         is_forward: bool,
-    ) -> bool {
-        let flow_terminated = flow.update_flow(&packet, is_forward);
-
-        if flow_terminated {
-            // If terminated, export the flow
-            self.export_flow(flow.clone()).await;
-        } else if let Some(early_export) = self.early_export {
-            // If flow duration is greater than early export, export the flow immediately (without deletion from the flow table)
-            if ((packet.timestamp_us - flow.get_first_timestamp_us()) / 1_000_000) as u64
+        early_export: Option<u64>,
+    ) -> FlowUpdate<T> {
+        if flow.update_flow(packet, is_forward) {
+            FlowUpdate::Terminated(flow.clone())
+        } else if early_export.is_some_and(|early_export| {
+            ((packet.timestamp_us - flow.get_first_timestamp_us()) / 1_000_000) as u64
                 > early_export
-            {
-                self.export_flow(flow.clone()).await;
-            }
+        }) {
+            FlowUpdate::EarlyExport(flow.clone())
+        } else {
+            FlowUpdate::Active
         }
-        flow_terminated
     }
 
     /// Export all flows in the flow map in order of first packet arrival.

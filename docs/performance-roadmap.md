@@ -86,9 +86,9 @@ High. Improves correctness and removes per-event userspace time acquisition.
 
 ### 4. FlowTable Access Patterns
 
-- [ ] Reduce repeated hashing and key rebuilding in flow lookup.
-- [ ] Avoid `contains_key` plus `remove` plus `insert` churn where possible.
-- [ ] Revisit direction resolution after typed keys are introduced.
+- [x] Reduce repeated hashing and key rebuilding in flow lookup.
+- [x] Avoid `contains_key` plus `remove` plus `insert` churn where possible.
+- [x] Revisit direction resolution after typed keys are introduced.
 
 Primary file:
 
@@ -268,3 +268,8 @@ What this does not fully prove:
   offline fixture, warm-cache `--release` runs moved from about `21.3 ms` to
   `20.5 ms` mean over 5 runs on this machine. Smaller win than typed keys, but
   still in the expected direction.
+- 2026-03-26: Existing-flow updates in `FlowTable` now stay in place on the
+  hot path instead of removing and reinserting map entries for every packet.
+  On the same local amplified offline fixture, warm-cache `--release` runs
+  moved from about `18.84 ms` to `18.30 ms` mean over 5 runs. This is still an
+  offline directional signal, not a Linux realtime benchmark.
