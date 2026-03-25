@@ -446,8 +446,4 @@ impl Flow for NfFlow {
         self.basic_flow
             .is_expired(timestamp_us, active_timeout, idle_timeout)
     }
-
-    fn flow_key(&self) -> &String {
-        &self.basic_flow.flow_key
-    }
 }

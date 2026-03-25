@@ -343,8 +343,4 @@ impl Flow for BasicFlow {
 
         (false, FlowExpireCause::None)
     }
-
-    fn flow_key(&self) -> &String {
-        &self.flow_key
-    }
 }

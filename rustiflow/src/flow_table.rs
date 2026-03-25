@@ -1,11 +1,13 @@
 use std::collections::HashMap;
 
-use crate::{flows::util::FlowExpireCause, packet_features::PacketFeatures, Flow};
+use crate::{
+    flow_key::FlowKey, flows::util::FlowExpireCause, packet_features::PacketFeatures, Flow,
+};
 use log::{debug, error};
 use tokio::sync::mpsc;
 
 pub struct FlowTable<T> {
-    flow_map: HashMap<String, T>, // HashMap for fast flow access by key
+    flow_map: HashMap<FlowKey, T>, // HashMap for fast flow access by key
     active_timeout: u64,
     idle_timeout: u64,
     early_export: Option<u64>,
@@ -42,14 +44,9 @@ where
         self.check_and_export_expired_flows(packet.timestamp_us)
             .await;
 
-        // Determine the flow direction and key
-        let flow_key = if self.flow_map.contains_key(&packet.flow_key_bwd()) {
-            packet.flow_key_bwd()
-        } else {
-            packet.flow_key()
-        };
+        let flow_key = packet.flow_key_value();
+        let reverse_flow_key = flow_key.reverse();
 
-        // Update the flow if it exists, otherwise create a new flow
         if let Some(mut flow) = self.flow_map.remove(&flow_key) {
             let (is_expired, cause) =
                 flow.is_expired(packet.timestamp_us, self.active_timeout, self.idle_timeout);
@@ -58,9 +55,22 @@ where
                 self.export_flow(flow).await;
                 self.create_and_insert_flow(packet).await;
             } else {
-                let is_terminated = self.update_flow_with_packet(&mut flow, packet).await;
+                let is_terminated = self.update_flow_with_packet(&mut flow, packet, true).await;
                 if !is_terminated {
                     self.flow_map.insert(flow_key, flow);
+                }
+            }
+        } else if let Some(mut flow) = self.flow_map.remove(&reverse_flow_key) {
+            let (is_expired, cause) =
+                flow.is_expired(packet.timestamp_us, self.active_timeout, self.idle_timeout);
+            if is_expired {
+                flow.close_flow(packet.timestamp_us, cause);
+                self.export_flow(flow).await;
+                self.create_and_insert_flow(packet).await;
+            } else {
+                let is_terminated = self.update_flow_with_packet(&mut flow, packet, false).await;
+                if !is_terminated {
+                    self.flow_map.insert(reverse_flow_key, flow);
                 }
             }
         } else {
@@ -70,8 +80,9 @@ where
 
     /// Create and insert a new flow for the given packet.
     async fn create_and_insert_flow(&mut self, packet: &PacketFeatures) {
+        let flow_key = packet.flow_key_value();
         let mut new_flow = T::new(
-            packet.flow_key(),
+            flow_key.to_string(),
             packet.source_ip,
             packet.source_port,
             packet.destination_ip,
@@ -79,17 +90,23 @@ where
             packet.protocol,
             packet.timestamp_us,
         );
-        let is_terminated = self.update_flow_with_packet(&mut new_flow, packet).await;
+        let is_terminated = self
+            .update_flow_with_packet(&mut new_flow, packet, true)
+            .await;
         if !is_terminated {
-            self.flow_map.insert(packet.flow_key(), new_flow);
+            self.flow_map.insert(flow_key, new_flow);
         }
     }
 
     /// Updates a flow with a packet and exports flow if terminated.
     ///
     /// Returns a boolean indicating if the flow is terminated.
-    async fn update_flow_with_packet(&mut self, flow: &mut T, packet: &PacketFeatures) -> bool {
-        let is_forward = *flow.flow_key() == packet.flow_key();
+    async fn update_flow_with_packet(
+        &mut self,
+        flow: &mut T,
+        packet: &PacketFeatures,
+        is_forward: bool,
+    ) -> bool {
         let flow_terminated = flow.update_flow(&packet, is_forward);
 
         if flow_terminated {
@@ -158,7 +175,7 @@ where
                 let (is_expired, cause) =
                     flow.is_expired(timestamp_us, self.active_timeout, self.idle_timeout);
                 if is_expired {
-                    Some((key.clone(), cause))
+                    Some((*key, cause))
                 } else {
                     None
                 }

@@ -38,6 +38,9 @@ This file keeps short-lived design choices and execution notes that would make
   The value is derived from the normalized `IpAddr` already shared by offline
   and realtime ingestion, and fixture-backed tests lock down the IPv4 path
   while direct flow construction locks down the IPv6 path.
+- Internal sharding and flow-table lookup now use typed `FlowKey` values
+  instead of rebuilding formatted strings on the hot path. String flow ids are
+  still created when a new flow is instantiated for export compatibility.
 - Current test-hardening focus is to add adversarial deterministic cases before
   more feature work: false handshake completion, teardown edge cases, parser
   rejection behavior, and tiny fixture assertions that prove exported
