@@ -111,4 +111,57 @@ mod tests {
         assert_eq!(exported_flow.packet_stats.bwd_packet_len.get_count(), 1);
         assert!(rx.try_recv().is_err());
     }
+
+    #[tokio::test]
+    async fn expired_flow_is_replaced_by_new_flow_for_the_same_key() {
+        let (tx, mut rx) = mpsc::channel::<BasicFlow>(4);
+        let mut flow_table = FlowTable::new(3600, 1, None, tx, 60);
+
+        let first_packet = build_packet(1_000_000);
+        let replacement_packet = build_packet(3_000_000);
+
+        flow_table.process_packet(&first_packet).await;
+        flow_table.process_packet(&replacement_packet).await;
+        flow_table.export_all_flows(4_000_000).await;
+
+        let first_export = rx.recv().await.expect("expected expired flow export");
+        let second_export = rx.recv().await.expect("expected replacement flow export");
+
+        assert_eq!(first_export.flow_expire_cause, FlowExpireCause::IdleTimeout);
+        assert_eq!(first_export.first_timestamp_us, 1_000_000);
+        assert_eq!(first_export.last_timestamp_us, 1_000_000);
+
+        assert_eq!(
+            second_export.flow_expire_cause,
+            FlowExpireCause::ExporterShutdown
+        );
+        assert_eq!(second_export.first_timestamp_us, 3_000_000);
+        assert_eq!(second_export.last_timestamp_us, 3_000_000);
+        assert!(rx.try_recv().is_err());
+    }
+
+    #[tokio::test]
+    async fn early_export_keeps_flow_active_for_later_final_export() {
+        let (tx, mut rx) = mpsc::channel::<BasicFlow>(4);
+        let mut flow_table = FlowTable::new(3600, 120, Some(1), tx, 60);
+
+        flow_table.process_packet(&build_packet(1_000_000)).await;
+        flow_table.process_packet(&build_packet(3_000_001)).await;
+
+        let early_export = rx.recv().await.expect("expected early export");
+        assert_eq!(early_export.flow_expire_cause, FlowExpireCause::None);
+        assert_eq!(early_export.first_timestamp_us, 1_000_000);
+        assert_eq!(early_export.last_timestamp_us, 3_000_001);
+
+        flow_table.export_all_flows(4_000_000).await;
+
+        let final_export = rx.recv().await.expect("expected final export");
+        assert_eq!(
+            final_export.flow_expire_cause,
+            FlowExpireCause::ExporterShutdown
+        );
+        assert_eq!(final_export.first_timestamp_us, 1_000_000);
+        assert_eq!(final_export.last_timestamp_us, 3_000_001);
+        assert!(rx.try_recv().is_err());
+    }
 }
