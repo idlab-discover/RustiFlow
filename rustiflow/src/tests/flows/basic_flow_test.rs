@@ -3,7 +3,11 @@ mod tests {
     use std::net::{IpAddr, Ipv4Addr};
 
     use crate::{
-        flows::{basic_flow::BasicFlow, flow::Flow, util::FlowExpireCause},
+        flows::{
+            basic_flow::{BasicFlow, TcpCloseStyle},
+            flow::Flow,
+            util::FlowExpireCause,
+        },
         packet_features::PacketFeatures,
     };
 
@@ -78,6 +82,7 @@ mod tests {
         ack_fwd.sequence_number_ack = 201;
         assert!(flow.update_flow(&ack_fwd, true));
         assert_eq!(flow.flow_expire_cause, FlowExpireCause::TcpTermination);
+        assert_eq!(flow.tcp_close_style, TcpCloseStyle::FourWayFin);
     }
 
     #[test]
@@ -142,6 +147,7 @@ mod tests {
         assert!(!flow.tcp_handshake_completed);
         assert!(flow.tcp_reset_before_handshake);
         assert!(!flow.tcp_reset_after_handshake);
+        assert_eq!(flow.tcp_close_style, TcpCloseStyle::Reset);
     }
 
     #[test]
@@ -181,6 +187,7 @@ mod tests {
         assert!(flow.tcp_handshake_completed);
         assert!(!flow.tcp_reset_before_handshake);
         assert!(flow.tcp_reset_after_handshake);
+        assert_eq!(flow.tcp_close_style, TcpCloseStyle::Reset);
     }
 
     #[test]
@@ -296,6 +303,8 @@ mod tests {
         assert!(!flow.tcp_handshake_completed);
         assert!(!flow.tcp_reset_before_handshake);
         assert!(!flow.tcp_reset_after_handshake);
+        flow.close_flow(2_000_000, FlowExpireCause::IdleTimeout);
+        assert_eq!(flow.tcp_close_style, TcpCloseStyle::NotApplicable);
     }
 
     #[test]
@@ -347,5 +356,31 @@ mod tests {
 
         assert_eq!(flow.flow_expire_cause, FlowExpireCause::TcpTermination);
         assert!(flow.tcp_handshake_completed);
+        assert_eq!(flow.tcp_close_style, TcpCloseStyle::SimultaneousFin);
+    }
+
+    #[test]
+    fn half_close_style_is_preserved_when_timeout_happens_after_single_fin() {
+        let ip_source = IpAddr::V4(Ipv4Addr::new(10, 0, 6, 1));
+        let ip_destination = IpAddr::V4(Ipv4Addr::new(10, 0, 6, 2));
+        let mut flow = BasicFlow::new(
+            "flow-11".to_string(),
+            ip_source,
+            50014,
+            ip_destination,
+            443,
+            6,
+            1_000_000,
+        );
+
+        let mut fin_fwd = build_packet(ip_source, 50014, ip_destination, 443, 1_000_100);
+        fin_fwd.fin_flag = 1;
+        fin_fwd.sequence_number = 100;
+        assert!(!flow.update_flow(&fin_fwd, true));
+
+        flow.close_flow(2_000_000, FlowExpireCause::IdleTimeout);
+
+        assert_eq!(flow.flow_expire_cause, FlowExpireCause::IdleTimeout);
+        assert_eq!(flow.tcp_close_style, TcpCloseStyle::HalfClose);
     }
 }

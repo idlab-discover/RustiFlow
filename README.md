@@ -19,6 +19,7 @@ This tool is engineered for robust and efficient feature extraction, particularl
 - **Versatile Feature Sets:** Offers a variety of pre-defined feature sets (flows) and the flexibility to create custom feature sets tailored to specific requirements. An example of the custom flow is shown [here](https://github.com/idlab-discover/RustiFlow/blob/main/rustiflow/src/flows/custom_flow.rs).
 - **Pcap File Support:** Facilitates packet analysis from pcap files, compatible with both Linux and Windows generated files.
 - **Diverse Output Options:** Features can be outputted to the console, a CSV file, or other formats with minimal effort.
+- **Richer TCP Quality Signals:** The RustiFlow feature set exports duplicate ACK counts, zero-window observations, and TCP close style in addition to the existing lifecycle and retransmission fields.
 
 ## Feature sets
 
@@ -220,7 +221,7 @@ Options:
           - cic:       Represents the CIC Flow, giving 90 features
           - cidds:     Represents the CIDDS Flow, giving 10 features
           - nfstream:  Represents a nfstream inspired flow, giving 69 features
-          - rustiflow: Represents the Rusti Flow, giving 127 features
+          - rustiflow: Represents the Rusti Flow, giving 199 features
           - custom:    Represents a flow that you can implement yourself
 
       --active-timeout <ACTIVE_TIMEOUT>

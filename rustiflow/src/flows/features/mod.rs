@@ -8,6 +8,7 @@ pub mod payload_stats;
 pub mod retransmission_stats;
 pub mod subflow_stats;
 pub mod tcp_flag_stats;
+pub mod tcp_quality_stats;
 pub mod timing_stats;
 pub mod util;
 pub mod window_size_stats;
