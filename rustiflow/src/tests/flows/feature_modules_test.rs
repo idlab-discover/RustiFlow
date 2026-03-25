@@ -23,7 +23,7 @@ mod tests {
     }
 
     #[test]
-    fn icmp_stats_only_keep_first_packet_type_and_code() {
+    fn icmp_stats_keep_first_type_code_and_track_behavior_counts() {
         let mut stats = IcmpStats::new();
 
         let mut first = packet(1_000_000);
@@ -38,8 +38,25 @@ mod tests {
         second.icmp_code = Some(1);
         stats.update(&second, false, first.timestamp_us);
 
+        let mut third = packet(3_000_000);
+        third.protocol = IpNextHeaderProtocols::Icmpv6.0;
+        third.icmp_type = Some(129);
+        third.icmp_code = Some(0);
+        stats.update(&third, true, second.timestamp_us);
+
+        let mut fourth = packet(4_000_000);
+        fourth.protocol = IpNextHeaderProtocols::Icmpv6.0;
+        fourth.icmp_type = Some(1);
+        fourth.icmp_code = Some(4);
+        stats.update(&fourth, false, third.timestamp_us);
+
         assert_eq!(stats.get_type(), 8);
         assert_eq!(stats.get_code(), 0);
+        assert_eq!(stats.echo_request_count, 1);
+        assert_eq!(stats.echo_reply_count, 1);
+        assert_eq!(stats.error_count, 2);
+        assert_eq!(stats.destination_unreachable_count, 2);
+        assert_eq!(stats.dump(), "8,0,1,1,2,2");
     }
 
     #[test]
