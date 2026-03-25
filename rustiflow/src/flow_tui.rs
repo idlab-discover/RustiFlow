@@ -41,7 +41,7 @@ impl App {
     fn get_bar_data(&self) -> Vec<u64> {
         self.packet_data
             .iter()
-            .map(|data| (data.count))
+            .map(|data| data.count)
             .take(self.max_visible_intervals)
             .collect()
     }
