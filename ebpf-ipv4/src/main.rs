@@ -4,6 +4,7 @@
 
 use aya_ebpf::{
     bindings::TC_ACT_PIPE,
+    helpers::gen::bpf_ktime_get_ns,
     macros::{classifier, map},
     maps::{PerCpuArray, RingBuf},
     programs::TcContext,
@@ -104,6 +105,7 @@ impl PacketInfo {
     #[inline(always)]
     fn to_packet_log<T: NetworkHeader>(&self, header: &T) -> EbpfEventIpv4 {
         EbpfEventIpv4::new(
+            unsafe { bpf_ktime_get_ns() },
             self.ipv4_destination,
             self.ipv4_source,
             header.destination_port(),

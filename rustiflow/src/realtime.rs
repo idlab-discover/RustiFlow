@@ -1,4 +1,5 @@
 use std::hash::{DefaultHasher, Hash, Hasher};
+use std::io;
 use std::path::PathBuf;
 use std::sync::Arc;
 
@@ -42,6 +43,8 @@ where
 {
     // Needed for older kernels
     bump_memlock_rlimit();
+
+    let realtime_offset_us = compute_realtime_offset_us()?;
 
     // Load the eBPF programs and attach to the event arrays
     let mut bpf_ingress_ipv4 = load_ebpf_ipv4(interface, TcAttachType::Ingress)?;
@@ -122,6 +125,7 @@ where
         let shard_senders_clone = shard_senders.clone();
         let packet_counter_clone = Arc::clone(&packet_counter);
         let packet_tx_clone = packet_tx.clone();
+        let realtime_offset_us = realtime_offset_us;
 
         handle_set.spawn(async move {
             // Wrap the RingBuf in AsyncFd to poll it with tokio
@@ -142,7 +146,8 @@ where
                     }
                     let ebpf_event_ipv4: EbpfEventIpv4 =
                         unsafe { std::ptr::read(event.as_ptr() as *const _) };
-                    let packet_features = PacketFeatures::from_ebpf_event_ipv4(&ebpf_event_ipv4);
+                    let packet_features =
+                        PacketFeatures::from_ebpf_event_ipv4(&ebpf_event_ipv4, realtime_offset_us);
                     let flow_key = packet_features.biflow_key();
                     let shard_index = compute_shard_index(&flow_key, num_threads);
 
@@ -164,6 +169,7 @@ where
         let shard_senders_clone = shard_senders.clone();
         let packet_counter_clone = Arc::clone(&packet_counter);
         let packet_tx_clone = packet_tx.clone();
+        let realtime_offset_us = realtime_offset_us;
 
         handle_set.spawn(async move {
             // Wrap the RingBuf in AsyncFd to poll it with tokio
@@ -184,7 +190,8 @@ where
                     }
                     let ebpf_event_ipv6: EbpfEventIpv6 =
                         unsafe { std::ptr::read(event.as_ptr() as *const _) };
-                    let packet_features = PacketFeatures::from_ebpf_event_ipv6(&ebpf_event_ipv6);
+                    let packet_features =
+                        PacketFeatures::from_ebpf_event_ipv6(&ebpf_event_ipv6, realtime_offset_us);
                     let flow_key = packet_features.biflow_key();
                     let shard_index = compute_shard_index(&flow_key, num_threads);
 
@@ -258,6 +265,25 @@ fn compute_shard_index(flow_key: &str, num_shards: u8) -> usize {
     flow_key.hash(&mut hasher);
     let hash = hasher.finish();
     (hash % num_shards as u64) as usize
+}
+
+fn compute_realtime_offset_us() -> Result<i64, anyhow::Error> {
+    let realtime_us = read_clock_us(libc::CLOCK_REALTIME)?;
+    let monotonic_us = read_clock_us(libc::CLOCK_MONOTONIC)?;
+    Ok(realtime_us - monotonic_us)
+}
+
+fn read_clock_us(clock_id: libc::clockid_t) -> Result<i64, anyhow::Error> {
+    let mut ts = libc::timespec {
+        tv_sec: 0,
+        tv_nsec: 0,
+    };
+
+    if unsafe { libc::clock_gettime(clock_id, &mut ts) } != 0 {
+        return Err(io::Error::last_os_error().into());
+    }
+
+    Ok(ts.tv_sec * 1_000_000 + ts.tv_nsec / 1_000)
 }
 
 fn bump_memlock_rlimit() {
