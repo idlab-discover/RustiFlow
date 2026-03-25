@@ -122,7 +122,7 @@ Primary files:
 
 - [x] Preserve sub-millisecond timing and IAT precision.
 - [x] Improve retransmission detection beyond exact duplicate TCP sequence numbers.
-- [ ] Revisit active/idle and subflow threshold behavior.
+- [x] Revisit active/idle and subflow threshold behavior.
 - [ ] Expand ICMP behavior beyond first seen type/code.
 - [ ] Make TCP lifecycle quality more explicit.
 
