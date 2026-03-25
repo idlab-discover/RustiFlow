@@ -1,6 +1,8 @@
 mod basic_flow_test;
 mod cidds_flow_test;
+mod feature_modules_test;
 mod flow_table_test;
 mod nf_flow_test;
 mod packet_features_test;
+mod pcap_fixture_test;
 mod rusti_flow_test;
