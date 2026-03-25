@@ -134,8 +134,11 @@ mod tests {
         assert_eq!(tcp_port_80_flow.packet_len_stats.flow_count(), 2);
         assert_eq!(
             tcp_port_80_flow.basic_flow.flow_expire_cause,
-            FlowExpireCause::TcpTermination
+            FlowExpireCause::TcpReset
         );
+        assert!(!tcp_port_80_flow.basic_flow.tcp_handshake_completed);
+        assert!(tcp_port_80_flow.basic_flow.tcp_reset_before_handshake);
+        assert!(!tcp_port_80_flow.basic_flow.tcp_reset_after_handshake);
         assert_eq!(tcp_port_80_flow.tcp_flags_stats.get_flags(), ".A.R..");
 
         let icmp_flow = flows

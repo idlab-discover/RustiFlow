@@ -79,8 +79,10 @@ where
             packet.protocol,
             packet.timestamp_us,
         );
-        self.update_flow_with_packet(&mut new_flow, packet).await;
-        self.flow_map.insert(packet.flow_key(), new_flow);
+        let is_terminated = self.update_flow_with_packet(&mut new_flow, packet).await;
+        if !is_terminated {
+            self.flow_map.insert(packet.flow_key(), new_flow);
+        }
     }
 
     /// Updates a flow with a packet and exports flow if terminated.
@@ -92,7 +94,6 @@ where
 
         if flow_terminated {
             // If terminated, export the flow
-            flow.close_flow(packet.timestamp_us, FlowExpireCause::TcpTermination);
             self.export_flow(flow.clone()).await;
         } else if let Some(early_export) = self.early_export {
             // If flow duration is greater than early export, export the flow immediately (without deletion from the flow table)
