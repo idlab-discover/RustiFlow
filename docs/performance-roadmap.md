@@ -11,6 +11,7 @@ Use this as an execution checklist, not as a design essay.
 - [ ] Prefer hot-path wins over broad rewrites.
 - [ ] Do not trade away feature correctness for speed without making that trade explicit.
 - [ ] Keep performance work in clean, bounded commits.
+- [ ] After recent ingestion-semantics fixes, stabilize and measure before expanding the eBPF event payload further.
 
 ## Phase 0: Baseline And Profiling
 
@@ -197,6 +198,34 @@ Medium. Important once export volume becomes the limiter.
 Why this matters:
 If RustiFlow is going to chase higher link rates, it needs good self-observability.
 
+## Deferred Stress Testing Notes
+
+- [ ] Remember that `10Gbps+` software-path testing is possible without a physical external link.
+- [ ] Prefer doing this on an actual Linux development machine instead of macOS.
+- [ ] Treat software-only stress testing as useful for RustiFlow and eBPF/userspace throughput, but not as a full substitute for real NIC validation.
+
+Practical options for later:
+
+- `veth` pair + network namespaces + RustiFlow on one side
+- Linux `pktgen` for high packet-rate stress
+- TRex for more realistic replay and traffic profiles
+- MoonGen for high-rate scripted generation
+
+What this is good for:
+
+- packet-rate pressure
+- flow-table pressure
+- eBPF event rate
+- userspace queueing and dropped packets
+- export throughput
+
+What this does not fully prove:
+
+- physical NIC behavior
+- PCIe and DMA effects
+- hardware offloads
+- real RSS / hardware queue behavior
+
 ## Not Early Priorities
 
 - [ ] Do not start with micro-optimizing individual feature modules before fixing keying and stats math.
@@ -222,3 +251,4 @@ If RustiFlow is going to chase higher link rates, it needs good self-observabili
 
 - Use short dated notes here when a measurement or optimization changes priorities.
 - If a planned optimization turns out not to matter, mark it done and note that it was ruled out.
+- 2026-03-25: Decision: stabilize and measure after the current timestamp and length/header-length alignment work before adding more packet metadata to eBPF events.
