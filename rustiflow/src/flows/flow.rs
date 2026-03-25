@@ -38,9 +38,6 @@ pub trait Flow: Send + Sync + 'static + Clone {
         timestamp_us: i64,
     ) -> Self;
 
-    /// Returns the flow key.
-    fn flow_key(&self) -> &String;
-
     /// Updates the flow with a new packet.
     ///
     /// This method processes a packet and updates the internal state of the flow

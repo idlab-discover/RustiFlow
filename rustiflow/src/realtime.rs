@@ -148,7 +148,7 @@ where
                         unsafe { std::ptr::read(event.as_ptr() as *const _) };
                     let packet_features =
                         PacketFeatures::from_ebpf_event_ipv4(&ebpf_event_ipv4, realtime_offset_us);
-                    let flow_key = packet_features.biflow_key();
+                    let flow_key = packet_features.biflow_key_value();
                     let shard_index = compute_shard_index(&flow_key, num_threads);
 
                     if let Err(e) = shard_senders_clone[shard_index].send(packet_features).await {
@@ -192,7 +192,7 @@ where
                         unsafe { std::ptr::read(event.as_ptr() as *const _) };
                     let packet_features =
                         PacketFeatures::from_ebpf_event_ipv6(&ebpf_event_ipv6, realtime_offset_us);
-                    let flow_key = packet_features.biflow_key();
+                    let flow_key = packet_features.biflow_key_value();
                     let shard_index = compute_shard_index(&flow_key, num_threads);
 
                     if let Err(e) = shard_senders_clone[shard_index].send(packet_features).await {
@@ -259,7 +259,7 @@ where
     Ok(total_dropped)
 }
 
-fn compute_shard_index(flow_key: &str, num_shards: u8) -> usize {
+fn compute_shard_index<H: Hash>(flow_key: &H, num_shards: u8) -> usize {
     assert!(num_shards > 0, "num_shards must be greater than 0");
     let mut hasher = DefaultHasher::new();
     flow_key.hash(&mut hasher);

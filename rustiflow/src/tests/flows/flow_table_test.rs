@@ -6,7 +6,7 @@ mod tests {
 
     use crate::{
         flow_table::FlowTable,
-        flows::{basic_flow::BasicFlow, util::FlowExpireCause},
+        flows::{basic_flow::BasicFlow, cidds_flow::CiddsFlow, util::FlowExpireCause},
         packet_features::PacketFeatures,
     };
 
@@ -75,6 +75,40 @@ mod tests {
 
         flow_table.export_all_flows(2_000_000).await;
 
+        assert!(rx.try_recv().is_err());
+    }
+
+    #[tokio::test]
+    async fn reverse_direction_packets_stay_in_one_bidirectional_flow() {
+        let (tx, mut rx) = mpsc::channel::<CiddsFlow>(4);
+        let mut flow_table = FlowTable::new(3600, 120, None, tx, 60);
+
+        let mut forward = build_packet(1_000_000);
+        forward.length = 120;
+        flow_table.process_packet(&forward).await;
+
+        let reverse = PacketFeatures {
+            source_ip: forward.destination_ip,
+            destination_ip: forward.source_ip,
+            source_port: forward.destination_port,
+            destination_port: forward.source_port,
+            protocol: forward.protocol,
+            timestamp_us: 1_000_500,
+            length: 80,
+            ..Default::default()
+        };
+        flow_table.process_packet(&reverse).await;
+
+        flow_table.export_all_flows(2_000_000).await;
+
+        let exported_flow = rx.recv().await.expect("expected exported flow");
+        assert_eq!(
+            exported_flow.basic_flow.flow_key,
+            forward.flow_key_value().to_string()
+        );
+        assert_eq!(exported_flow.packet_stats.flow_count(), 2);
+        assert_eq!(exported_flow.packet_stats.fwd_packet_len.get_count(), 1);
+        assert_eq!(exported_flow.packet_stats.bwd_packet_len.get_count(), 1);
         assert!(rx.try_recv().is_err());
     }
 }

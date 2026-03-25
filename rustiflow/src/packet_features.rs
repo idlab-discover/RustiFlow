@@ -15,6 +15,8 @@ use pnet::packet::{
     Packet,
 };
 
+use crate::flow_key::FlowKey;
+
 // Define TCP flags
 pub const FIN_FLAG: u8 = 0b00000001;
 pub const SYN_FLAG: u8 = 0b00000010;
@@ -187,57 +189,18 @@ impl PacketFeatures {
         )
     }
 
-    /// Generates a flow key based on IPs, ports, and protocol
-    pub fn flow_key(&self) -> String {
-        format!(
-            "{}:{}-{}:{}-{}",
+    pub fn flow_key_value(&self) -> FlowKey {
+        FlowKey::new(
             self.source_ip,
             self.source_port,
             self.destination_ip,
             self.destination_port,
-            self.protocol
+            self.protocol,
         )
     }
 
-    /// Generates a flow key based on IPs, ports, and protocol in the reverse direction
-    pub fn flow_key_bwd(&self) -> String {
-        format!(
-            "{}:{}-{}:{}-{}",
-            self.destination_ip,
-            self.destination_port,
-            self.source_ip,
-            self.source_port,
-            self.protocol
-        )
-    }
-
-    /// Generates a biflow key
-    pub fn biflow_key(&self) -> String {
-        // Create tuples of (IP, port) for comparison
-        let src = (&self.source_ip, self.source_port);
-        let dst = (&self.destination_ip, self.destination_port);
-
-        // Determine the correct order (src < dst)
-        if src < dst {
-            format!(
-                "{}:{}-{}:{}-{}",
-                self.source_ip,
-                self.source_port,
-                self.destination_ip,
-                self.destination_port,
-                self.protocol
-            )
-        } else {
-            // If destination IP/port is "smaller", swap the order
-            format!(
-                "{}:{}-{}:{}-{}",
-                self.destination_ip,
-                self.destination_port,
-                self.source_ip,
-                self.source_port,
-                self.protocol
-            )
-        }
+    pub fn biflow_key_value(&self) -> FlowKey {
+        self.flow_key_value().canonical()
     }
 }
 

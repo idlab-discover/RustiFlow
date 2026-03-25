@@ -30,7 +30,19 @@ mod tests {
         let forward = build_packet(client_ip, 55000, server_ip, 443);
         let backward = build_packet(server_ip, 443, client_ip, 55000);
 
-        assert_eq!(forward.biflow_key(), backward.biflow_key());
+        assert_eq!(forward.biflow_key_value(), backward.biflow_key_value());
+        assert_eq!(
+            forward.biflow_key_value().to_string(),
+            backward.biflow_key_value().to_string()
+        );
+        assert_eq!(
+            backward.flow_key_value().to_string(),
+            "192.168.0.20:443-192.168.0.10:55000-6"
+        );
+        assert_eq!(
+            forward.flow_key_value().to_string(),
+            "192.168.0.10:55000-192.168.0.20:443-6"
+        );
     }
 
     fn build_ipv6_packet(next_header: u8, payload: &[u8]) -> Vec<u8> {

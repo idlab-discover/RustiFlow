@@ -252,3 +252,9 @@ What this does not fully prove:
 - Use short dated notes here when a measurement or optimization changes priorities.
 - If a planned optimization turns out not to matter, mark it done and note that it was ruled out.
 - 2026-03-25: Decision: stabilize and measure after the current timestamp and length/header-length alignment work before adding more packet metadata to eBPF events.
+- 2026-03-25: Typed internal flow keys now replace string keys in sharding and
+  flow-table lookup while keeping string formatting only for exported flow ids.
+  On a locally amplified offline fixture (`nmap_udp_version.pcap` packet
+  records repeated 400x, ~2.5 MB), warm-cache `--release` runs dropped from
+  about `39.8 ms` to `19.7 ms` mean over 5 runs on this machine. Treat this as
+  a local directional signal, not a Linux realtime substitute.

@@ -1,4 +1,5 @@
 mod args;
+mod flow_key;
 mod flow_table;
 #[cfg(target_os = "linux")]
 mod flow_tui;
