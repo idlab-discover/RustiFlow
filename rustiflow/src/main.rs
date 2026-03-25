@@ -14,6 +14,7 @@ mod realtime;
 #[cfg(not(target_os = "linux"))]
 #[path = "realtime_stub.rs"]
 mod realtime;
+mod realtime_mode;
 mod tests;
 mod tui;
 
@@ -28,6 +29,7 @@ use flows::{
 };
 use log::{debug, error, info};
 use output::OutputWriter;
+use realtime_mode::packet_graph_mode;
 use std::time::Instant;
 use tokio::sync::mpsc;
 use tui::{launch_tui, Config};
@@ -102,7 +104,7 @@ async fn run_with_config(config: Config) {
             macro_rules! execute_realtime {
                 ($flow_ty:ty) => {{
                     // Create output writer and initialize it
-                    let performance_mode_disabled = config.output.export_path.is_some() && !matches!(std::env::var("RUST_LOG"), Ok(ref val) if val.contains("debug")) && !config.output.performance_mode;
+                    let packet_graph_mode = packet_graph_mode(&config.output);
 
                     let mut output_writer = OutputWriter::<$flow_ty>::new(
                         config.output.output,
@@ -143,7 +145,7 @@ async fn run_with_config(config: Config) {
                         config.config.early_export,
                         config.config.expiration_check_interval,
                         ingress_only,
-                        performance_mode_disabled,
+                        packet_graph_mode,
                     )
                     .await;
 
