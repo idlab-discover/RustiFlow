@@ -39,3 +39,10 @@ This file keeps short-lived design choices and execution notes that would make
 - Test hardening also exposed a real `FlowTable` lifecycle bug: packet-driven
   termination export could overwrite `TcpReset` with `TcpTermination`, and a
   first-packet-terminated flow could be left behind for duplicate export.
+- The next adversarial test layer should prefer integrated semantics over raw
+  test count: simultaneous close teardown, contiguous-versus-overlapping TCP
+  segments, and wrapper-level feature coordination in `RustiFlow`.
+- That test layer exposed another real parser bug: offline IPv4 parsing was
+  treating non-first IPv4 fragments as if they started with a fresh transport
+  header. Non-first IPv4 fragments should now be dropped while first fragments
+  still parse their transport header normally.
