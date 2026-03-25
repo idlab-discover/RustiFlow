@@ -98,18 +98,18 @@ If a change touches shared code used by multiple crates, prefer checking the wor
 - Treat the current test suite carefully: some tests may be stale or incomplete relative to the active code.
 - When adding or repairing tests, prefer tests that reflect the current flow architecture and public behavior rather than resurrecting outdated internal field expectations.
 
-## Feature Engineering Priorities
+## Engineering Checklist
 
-When deciding where to spend effort on RustiFlow features, prefer this order:
+Keep this section short and current. Longer decision history belongs in
+`docs/engineering-notes.md`.
 
-1. Semantic correctness across ingestion modes
-2. Quality of existing transport and timing features
-3. New diagnostic features with clear operational value
-4. Exporter-specific schema completeness
+### 1. Ingestion semantics
 
-### 1. Keep offline and realtime semantically aligned
+- [x] Preserve kernel capture timestamps in realtime events.
+- [x] Align realtime packet, header, and payload length semantics with offline mode.
+- [ ] Stabilize and measure before expanding the eBPF event payload further.
 
-Highest-leverage files:
+Primary files:
 
 - `rustiflow/src/packet_features.rs`
 - `rustiflow/src/pcap.rs`
@@ -118,15 +118,15 @@ Highest-leverage files:
 - `ebpf-ipv4/src/main.rs`
 - `ebpf-ipv6/src/main.rs`
 
-Focus areas:
+### 2. Existing feature families
 
-- Prefer improving packet metadata fidelity before adding many new derived features.
-- Treat timestamp semantics, packet length semantics, and parser coverage as foundational.
-- If offline and realtime do not mean the same thing, higher-level flow features are less trustworthy.
+- [x] Preserve sub-millisecond timing and IAT precision.
+- [ ] Improve retransmission detection beyond exact duplicate TCP sequence numbers.
+- [ ] Revisit active/idle and subflow threshold behavior.
+- [ ] Expand ICMP behavior beyond first seen type/code.
+- [ ] Make TCP lifecycle quality more explicit.
 
-### 2. Strengthen existing weak feature families before adding many new columns
-
-Most likely to benefit from refinement:
+Primary files:
 
 - `rustiflow/src/flows/features/retransmission_stats.rs`
 - `rustiflow/src/flows/features/iat_stats.rs`
@@ -136,36 +136,22 @@ Most likely to benefit from refinement:
 - `rustiflow/src/flows/features/icmp_stats.rs`
 - `rustiflow/src/flows/basic_flow.rs`
 
-Concrete priorities:
+### 3. New diagnostic features
 
-- Upgrade retransmission logic beyond simple repeated TCP sequence numbers.
-- Preserve more timing precision for short flows and LAN traffic.
-- Revisit hardcoded active/idle and subflow thresholds.
-- Make TCP lifecycle quality more explicit: handshake success, reset behavior, close style.
-- Expand ICMP handling beyond first seen type/code.
+- [ ] TCP quality signals: handshake completion, duplicate ACKs, zero-window events, reset phase, close style.
+- [ ] IP and path signals: TTL or hop-limit, DSCP or ECN, fragmentation behavior.
+- [ ] Optional lightweight application-aware metadata: DNS, TLS, HTTP, QUIC.
+- [ ] Better contamination-free abstractions than only coarse IANA port buckets.
 
-### 3. Highest-value new feature families
+### 4. Exporter gaps
 
-Prefer new features that explain behavior, not just more totals and moments.
-
-Best candidates:
-
-- TCP quality: handshake completion, SYN-to-SYN/ACK timing, duplicate ACKs, zero-window events, reset phase, close style.
-- IP/path signals: TTL or hop-limit stats, DSCP/ECN stats, IPv4 fragmentation, IPv6 fragment behavior.
-- ICMP behavior: request/response balance, error classes, unreachable subtype counts.
-- Optional lightweight application-aware features: DNS, TLS, HTTP, QUIC handshake metadata without deep DPI dependence.
-- Better contamination-free abstractions than only coarse IANA port buckets.
-
-### 4. Exporter-specific gaps worth filling
-
-- `rustiflow/src/flows/nf_flow.rs` still documents missing fields such as `ip_version`, `vlan_id`, and `tunnel_id`.
-- Prefer filling exporter gaps after the underlying packet metadata exists in both offline and realtime paths.
+- [ ] Fill `nf_flow` gaps such as `ip_version`, `vlan_id`, and `tunnel_id` once packet metadata exists in both ingestion modes.
 
 ### Working rule
 
 Before adding a new feature, ask:
 
 - Is the underlying packet metadata trustworthy in both offline and realtime modes?
-- Does this feature improve diagnostics or model usefulness more than refining an existing weak feature?
-- Can it be expressed as a reusable `FlowFeature` instead of exporter-specific logic?
+- Does this improve diagnostics more than refining an existing weak feature?
+- Can it live in a reusable `FlowFeature`?
 - Can it be tested with a tiny deterministic fixture?
