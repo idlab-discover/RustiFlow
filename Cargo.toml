@@ -1,2 +1,3 @@
 [workspace]
 members = ["rustiflow", "common", "xtask"]
+resolver = "2"
