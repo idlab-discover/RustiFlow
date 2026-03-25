@@ -173,13 +173,14 @@ impl PacketFeatures {
 
     // Constructor to create PacketFeatures from an IPv6 packet
     pub fn from_ipv6_packet(packet: &Ipv6Packet, timestamp_us: i64) -> Option<Self> {
+        let (protocol, payload) = skip_ipv6_extension_headers(packet)?;
         extract_packet_features_transport(
             packet.get_source().into(),
             packet.get_destination().into(),
-            packet.get_next_header(),
+            protocol,
             timestamp_us,
             packet.packet().len() as u16,
-            packet.payload(),
+            payload,
         )
     }
 
@@ -239,6 +240,58 @@ impl PacketFeatures {
 
 fn get_tcp_flag(value: u8, flag: u8) -> u8 {
     ((value & flag) != 0) as u8
+}
+
+fn skip_ipv6_extension_headers<'a>(
+    packet: &'a Ipv6Packet<'a>,
+) -> Option<(IpNextHeaderProtocol, &'a [u8])> {
+    const MAX_EXTENSION_HEADERS: usize = 8;
+    const HOP_BY_HOP: u8 = 0;
+    const ROUTING: u8 = 43;
+    const FRAGMENT: u8 = 44;
+    const ESP: u8 = 50;
+    const AUTHENTICATION: u8 = 51;
+    const DESTINATION_OPTIONS: u8 = 60;
+    const MOBILITY: u8 = 135;
+    const HIP: u8 = 139;
+    const SHIM6: u8 = 140;
+
+    let mut next_header = packet.get_next_header();
+    let mut payload = packet.payload();
+
+    for _ in 0..MAX_EXTENSION_HEADERS {
+        let header_len = match next_header.0 {
+            HOP_BY_HOP | ROUTING | DESTINATION_OPTIONS | MOBILITY | HIP | SHIM6 => {
+                if payload.len() < 8 {
+                    return None;
+                }
+                (usize::from(payload[1]) + 1) * 8
+            }
+            FRAGMENT => {
+                if payload.len() < 8 {
+                    return None;
+                }
+                8
+            }
+            AUTHENTICATION => {
+                if payload.len() < 8 {
+                    return None;
+                }
+                (usize::from(payload[1]) + 2) * 4
+            }
+            ESP => return None,
+            _ => return Some((next_header, payload)),
+        };
+
+        if payload.len() < header_len {
+            return None;
+        }
+
+        next_header = IpNextHeaderProtocol(payload[0]);
+        payload = &payload[header_len..];
+    }
+
+    Some((next_header, payload))
 }
 
 fn extract_packet_features_transport(
