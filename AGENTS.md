@@ -101,14 +101,16 @@ If a change touches shared code used by multiple crates, prefer checking the wor
 
 ## Engineering Checklist
 
-Keep this section short and current. Longer decision history belongs in
-`docs/engineering-notes.md`.
+Keep this section short and current. Completed work and decision history belong
+in `docs/engineering-notes.md`.
 
-### 1. Ingestion semantics
+### Current Focus
 
-- [x] Preserve kernel capture timestamps in realtime events.
-- [x] Align realtime packet, header, and payload length semantics with offline mode.
 - [ ] Stabilize and measure before expanding the eBPF event payload further.
+- [ ] Finish the remaining TCP quality signals that current metadata already supports:
+  duplicate ACKs, zero-window events, and close style.
+- [ ] Add the next IP and path signals once they can be trusted in both offline
+  and realtime modes.
 
 Primary files:
 
@@ -118,35 +120,15 @@ Primary files:
 - `common/src/lib.rs`
 - `ebpf-ipv4/src/main.rs`
 - `ebpf-ipv6/src/main.rs`
-
-### 2. Existing feature families
-
-- [x] Preserve sub-millisecond timing and IAT precision.
-- [x] Improve retransmission detection beyond exact duplicate TCP sequence numbers.
-- [x] Revisit active/idle and subflow threshold behavior.
-- [x] Expand ICMP behavior beyond first seen type/code.
-- [x] Make TCP lifecycle quality more explicit.
-
-Primary files:
-
-- `rustiflow/src/flows/features/retransmission_stats.rs`
-- `rustiflow/src/flows/features/iat_stats.rs`
-- `rustiflow/src/flows/features/timing_stats.rs`
-- `rustiflow/src/flows/features/active_idle_stats.rs`
-- `rustiflow/src/flows/features/bulk_stats.rs`
-- `rustiflow/src/flows/features/icmp_stats.rs`
 - `rustiflow/src/flows/basic_flow.rs`
+- `rustiflow/src/flows/features/`
 
-### 3. New diagnostic features
+### Later Work
 
-- [ ] TCP quality signals: handshake completion, duplicate ACKs, zero-window events, reset phase, close style.
-- [ ] IP and path signals: TTL or hop-limit, DSCP or ECN, fragmentation behavior.
 - [ ] Optional lightweight application-aware metadata: DNS, TLS, HTTP, QUIC.
 - [ ] Better contamination-free abstractions than only coarse IANA port buckets.
-
-### 4. Exporter gaps
-
-- [ ] Fill `nf_flow` gaps such as `ip_version`, `vlan_id`, and `tunnel_id` once packet metadata exists in both ingestion modes.
+- [ ] Fill `nf_flow` gaps such as `ip_version`, `vlan_id`, and `tunnel_id` once
+  packet metadata exists in both ingestion modes.
 
 ### Working rule
 
