@@ -1,6 +1,9 @@
-use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
+#[cfg(target_os = "linux")]
+use std::net::Ipv6Addr;
+use std::net::{IpAddr, Ipv4Addr};
 
 use chrono::Utc;
+#[cfg(target_os = "linux")]
 use common::{EbpfEventIpv4, EbpfEventIpv6};
 use log::debug;
 use pnet::packet::{
@@ -80,6 +83,7 @@ pub struct PacketFeatures {
 }
 
 impl PacketFeatures {
+    #[cfg(target_os = "linux")]
     // Constructor to create PacketFeatures from EbpfEventIpv4
     pub fn from_ebpf_event_ipv4(event: &EbpfEventIpv4) -> Self {
         PacketFeatures {
@@ -117,6 +121,7 @@ impl PacketFeatures {
         }
     }
 
+    #[cfg(target_os = "linux")]
     // Constructor to create PacketFeatures from EbpfEventIpv6
     pub fn from_ebpf_event_ipv6(event: &EbpfEventIpv6) -> Self {
         PacketFeatures {
