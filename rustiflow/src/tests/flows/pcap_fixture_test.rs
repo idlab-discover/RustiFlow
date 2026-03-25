@@ -22,26 +22,24 @@ mod tests {
         row.split(',').count()
     }
 
-    #[tokio::test]
-    async fn tiny_concap_tcp_syn_fixture_extracts_expected_flows() {
+    async fn extract_fixture(name: &str) -> Vec<RustiFlow> {
         let (tx, mut rx) = mpsc::channel::<RustiFlow>(64);
 
-        read_pcap_file::<RustiFlow>(
-            &fixture_path("nmap_tcp_syn_version.pcap"),
-            tx,
-            1,
-            3600,
-            120,
-            None,
-            60,
-        )
-        .await
-        .expect("fixture pcap should parse successfully");
+        read_pcap_file::<RustiFlow>(&fixture_path(name), tx, 1, 3600, 120, None, 60)
+            .await
+            .expect("fixture pcap should parse successfully");
 
         let mut flows = Vec::new();
         while let Some(flow) = rx.recv().await {
             flows.push(flow);
         }
+
+        flows
+    }
+
+    #[tokio::test]
+    async fn tiny_concap_tcp_syn_fixture_extracts_expected_flows() {
+        let flows = extract_fixture("nmap_tcp_syn_version.pcap").await;
 
         assert_eq!(flows.len(), 17);
 
@@ -82,6 +80,67 @@ mod tests {
             .find(|flow| flow.basic_flow.flow_key == "192.168.126.228:0-192.168.126.224:0-1")
             .expect("expected ICMP flow in fixture");
         assert_eq!(icmp_flow.packet_len_stats.flow_count(), 4);
+        assert_eq!(icmp_flow.icmp_stats.get_type(), 8);
+        assert_eq!(icmp_flow.icmp_stats.get_code(), 0);
+        assert_eq!(
+            icmp_flow.basic_flow.flow_expire_cause,
+            FlowExpireCause::ExporterShutdown
+        );
+    }
+
+    #[tokio::test]
+    async fn tiny_concap_udp_fixture_extracts_expected_protocol_mix() {
+        let flows = extract_fixture("nmap_udp_version.pcap").await;
+
+        assert_eq!(flows.len(), 56);
+
+        for flow in &flows {
+            assert_eq!(
+                count_csv_fields(&flow.dump()),
+                count_csv_fields(&RustiFlow::get_features())
+            );
+        }
+
+        assert_eq!(
+            flows
+                .iter()
+                .filter(|flow| flow.basic_flow.protocol == 17)
+                .count(),
+            53
+        );
+        assert_eq!(
+            flows
+                .iter()
+                .filter(|flow| flow.basic_flow.protocol == 6)
+                .count(),
+            2
+        );
+        assert_eq!(
+            flows
+                .iter()
+                .filter(|flow| flow.basic_flow.protocol == 1)
+                .count(),
+            1
+        );
+
+        let tcp_port_80_flow = flows
+            .iter()
+            .find(|flow| flow.basic_flow.flow_key == "192.168.177.151:48385-192.168.126.204:80-6")
+            .expect("expected TCP port 80 response flow in fixture");
+        assert_eq!(tcp_port_80_flow.packet_len_stats.flow_count(), 2);
+        assert_eq!(
+            tcp_port_80_flow.basic_flow.flow_expire_cause,
+            FlowExpireCause::TcpTermination
+        );
+        assert_eq!(tcp_port_80_flow.tcp_flags_stats.get_flags(), ".A.R..");
+
+        let icmp_flow = flows
+            .iter()
+            .find(|flow| flow.basic_flow.flow_key == "192.168.177.151:0-192.168.126.204:0-1")
+            .expect("expected ICMP response flow in fixture");
+        assert_eq!(icmp_flow.packet_len_stats.flow_count(), 22);
+        assert_eq!(icmp_flow.packet_len_stats.fwd_packet_len.get_count(), 2);
+        assert_eq!(icmp_flow.packet_len_stats.bwd_packet_len.get_count(), 20);
         assert_eq!(icmp_flow.icmp_stats.get_type(), 8);
         assert_eq!(icmp_flow.icmp_stats.get_code(), 0);
         assert_eq!(
