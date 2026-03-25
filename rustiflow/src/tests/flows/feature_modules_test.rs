@@ -139,6 +139,33 @@ mod tests {
     }
 
     #[test]
+    fn retransmission_stats_ignore_adjacent_tcp_segments_but_count_later_overlap() {
+        let mut stats = RetransmissionStats::new();
+
+        let mut first = packet(1_000_000);
+        first.protocol = IpNextHeaderProtocols::Tcp.0;
+        first.sequence_number = 100;
+        first.data_length = 100;
+        stats.update(&first, true, first.timestamp_us);
+
+        let mut adjacent = packet(1_050_000);
+        adjacent.protocol = IpNextHeaderProtocols::Tcp.0;
+        adjacent.sequence_number = 200;
+        adjacent.data_length = 100;
+        stats.update(&adjacent, true, first.timestamp_us);
+
+        let mut overlap = packet(1_100_000);
+        overlap.protocol = IpNextHeaderProtocols::Tcp.0;
+        overlap.sequence_number = 150;
+        overlap.data_length = 100;
+        stats.update(&overlap, true, adjacent.timestamp_us);
+
+        assert_eq!(stats.fwd_retransmission_count, 1);
+        assert_eq!(stats.bwd_retransmission_count, 0);
+        assert_eq!(stats.dump(), "1,1,0");
+    }
+
+    #[test]
     fn window_size_stats_capture_initial_sizes_for_each_direction() {
         let mut stats = WindowSizeStats::new();
 
