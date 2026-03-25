@@ -276,6 +276,20 @@ Options:
 RUST_LOG=info cargo xtask run --
 ```
 
+Run the focused Rust test suite with:
+
+```bash
+cargo test -p rustiflow
+```
+
+If you also have the sibling `concap` repository and a reachable Kubernetes cluster,
+you can run a tiny ConCap-backed smoke check and then reprocess the downloaded pcap
+with your current local RustiFlow checkout:
+
+```bash
+./scripts/concap_smoke.sh ../concap nmap-tcp-syn-version.yaml
+```
+
 ### Binary
 
 ```bash
