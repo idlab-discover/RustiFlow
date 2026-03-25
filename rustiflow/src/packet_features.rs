@@ -2,7 +2,6 @@
 use std::net::Ipv6Addr;
 use std::net::{IpAddr, Ipv4Addr};
 
-use chrono::Utc;
 #[cfg(target_os = "linux")]
 use common::{EbpfEventIpv4, EbpfEventIpv6};
 use log::debug;
@@ -34,7 +33,7 @@ impl Default for PacketFeatures {
             source_port: 0,
             destination_port: 0,
             protocol: 0,
-            timestamp_us: Utc::now().timestamp_micros(),
+            timestamp_us: 0,
             fin_flag: 0,
             syn_flag: 0,
             rst_flag: 0,
@@ -85,14 +84,14 @@ pub struct PacketFeatures {
 impl PacketFeatures {
     #[cfg(target_os = "linux")]
     // Constructor to create PacketFeatures from EbpfEventIpv4
-    pub fn from_ebpf_event_ipv4(event: &EbpfEventIpv4) -> Self {
+    pub fn from_ebpf_event_ipv4(event: &EbpfEventIpv4, realtime_offset_us: i64) -> Self {
         PacketFeatures {
             source_ip: IpAddr::V4(Ipv4Addr::from(event.ipv4_source.to_be())),
             destination_ip: IpAddr::V4(Ipv4Addr::from(event.ipv4_destination.to_be())),
             source_port: event.port_source,
             destination_port: event.port_destination,
             protocol: event.protocol,
-            timestamp_us: chrono::Utc::now().timestamp_micros(),
+            timestamp_us: monotonic_ns_to_epoch_us(event.timestamp_ns, realtime_offset_us),
             fin_flag: get_tcp_flag(event.combined_flags, FIN_FLAG),
             syn_flag: get_tcp_flag(event.combined_flags, SYN_FLAG),
             rst_flag: get_tcp_flag(event.combined_flags, RST_FLAG),
@@ -123,14 +122,14 @@ impl PacketFeatures {
 
     #[cfg(target_os = "linux")]
     // Constructor to create PacketFeatures from EbpfEventIpv6
-    pub fn from_ebpf_event_ipv6(event: &EbpfEventIpv6) -> Self {
+    pub fn from_ebpf_event_ipv6(event: &EbpfEventIpv6, realtime_offset_us: i64) -> Self {
         PacketFeatures {
             source_ip: IpAddr::V6(Ipv6Addr::from(event.ipv6_source.to_be())),
             destination_ip: IpAddr::V6(Ipv6Addr::from(event.ipv6_destination.to_be())),
             source_port: event.port_source,
             destination_port: event.port_destination,
             protocol: event.protocol,
-            timestamp_us: chrono::Utc::now().timestamp_micros(),
+            timestamp_us: monotonic_ns_to_epoch_us(event.timestamp_ns, realtime_offset_us),
             fin_flag: get_tcp_flag(event.combined_flags, FIN_FLAG),
             syn_flag: get_tcp_flag(event.combined_flags, SYN_FLAG),
             rst_flag: get_tcp_flag(event.combined_flags, RST_FLAG),
@@ -240,6 +239,11 @@ impl PacketFeatures {
 
 fn get_tcp_flag(value: u8, flag: u8) -> u8 {
     ((value & flag) != 0) as u8
+}
+
+#[cfg(target_os = "linux")]
+fn monotonic_ns_to_epoch_us(timestamp_ns: u64, realtime_offset_us: i64) -> i64 {
+    realtime_offset_us + (timestamp_ns / 1_000) as i64
 }
 
 fn skip_ipv6_extension_headers<'a>(
