@@ -163,7 +163,7 @@ impl NetworkHeader for TcpHdr {
             | ((self.cwr() as u8) << 7)
     }
     fn header_length(&self) -> u8 {
-        TcpHdr::LEN as u8
+        (self.doff() * 4) as u8
     }
     fn sequence_number(&self) -> u32 {
         self.seq
