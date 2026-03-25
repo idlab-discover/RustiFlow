@@ -73,6 +73,9 @@ mod tests {
             established_http_flow.basic_flow.flow_expire_cause,
             FlowExpireCause::TcpTermination
         );
+        assert!(established_http_flow.basic_flow.tcp_handshake_completed);
+        assert!(!established_http_flow.basic_flow.tcp_reset_before_handshake);
+        assert!(!established_http_flow.basic_flow.tcp_reset_after_handshake);
         assert_eq!(established_http_flow.tcp_flags_stats.get_flags(), ".AP.SF");
 
         let icmp_flow = flows
@@ -82,6 +85,7 @@ mod tests {
         assert_eq!(icmp_flow.packet_len_stats.flow_count(), 4);
         assert_eq!(icmp_flow.icmp_stats.get_type(), 8);
         assert_eq!(icmp_flow.icmp_stats.get_code(), 0);
+        assert!(!icmp_flow.basic_flow.tcp_handshake_completed);
         assert_eq!(
             icmp_flow.basic_flow.flow_expire_cause,
             FlowExpireCause::ExporterShutdown

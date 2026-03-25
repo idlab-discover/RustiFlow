@@ -84,6 +84,21 @@ mod tests {
     }
 
     #[test]
+    fn ipv6_non_first_fragment_is_rejected() {
+        let mut payload = vec![0_u8; 8 + 8];
+        payload[0] = IpNextHeaderProtocols::Udp.0;
+        payload[2..4].copy_from_slice(&0x0008_u16.to_be_bytes());
+        payload[8..10].copy_from_slice(&5353_u16.to_be_bytes());
+        payload[10..12].copy_from_slice(&53_u16.to_be_bytes());
+        payload[12..14].copy_from_slice(&8_u16.to_be_bytes());
+
+        let bytes = build_ipv6_packet(IpNextHeaderProtocols::Ipv6Frag.0, &payload);
+        let packet = Ipv6Packet::new(&bytes).unwrap();
+
+        assert!(PacketFeatures::from_ipv6_packet(&packet, 100).is_none());
+    }
+
+    #[test]
     fn truncated_ipv6_extension_header_is_rejected() {
         let bytes = build_ipv6_packet(
             IpNextHeaderProtocols::Hopopt.0,
@@ -92,5 +107,32 @@ mod tests {
         let packet = Ipv6Packet::new(&bytes).unwrap();
 
         assert!(PacketFeatures::from_ipv6_packet(&packet, 7).is_none());
+    }
+
+    #[test]
+    fn ipv6_auth_extension_is_skipped_before_tcp_parse() {
+        let mut payload = vec![0_u8; 12 + 20];
+        payload[0] = IpNextHeaderProtocols::Tcp.0;
+        payload[1] = 1;
+        payload[12..14].copy_from_slice(&42424_u16.to_be_bytes());
+        payload[14..16].copy_from_slice(&443_u16.to_be_bytes());
+        payload[24] = 0x50;
+        payload[25] = 0x10;
+
+        let bytes = build_ipv6_packet(IpNextHeaderProtocols::Ah.0, &payload);
+        let packet = Ipv6Packet::new(&bytes).unwrap();
+        let features = PacketFeatures::from_ipv6_packet(&packet, 123).unwrap();
+
+        assert_eq!(features.protocol, IpNextHeaderProtocols::Tcp.0);
+        assert_eq!(features.source_port, 42424);
+        assert_eq!(features.destination_port, 443);
+    }
+
+    #[test]
+    fn ipv6_esp_extension_is_rejected() {
+        let bytes = build_ipv6_packet(IpNextHeaderProtocols::Esp.0, &[0_u8; 16]);
+        let packet = Ipv6Packet::new(&bytes).unwrap();
+
+        assert!(PacketFeatures::from_ipv6_packet(&packet, 55).is_none());
     }
 }

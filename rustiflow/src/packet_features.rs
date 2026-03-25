@@ -275,6 +275,13 @@ fn skip_ipv6_extension_headers<'a>(
                 if payload.len() < 8 {
                     return None;
                 }
+
+                let fragment_offset_field = u16::from_be_bytes([payload[2], payload[3]]);
+                let fragment_offset = (fragment_offset_field & 0xfff8) >> 3;
+                if fragment_offset > 0 {
+                    return None;
+                }
+
                 8
             }
             AUTHENTICATION => {
