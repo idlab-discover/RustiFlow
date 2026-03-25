@@ -34,6 +34,10 @@ This file keeps short-lived design choices and execution notes that would make
   count TCP packets advertising a zero receive window; close style stays rooted
   in `BasicFlow` lifecycle state so timeout/reset/FIN semantics are not
   reimplemented in exporter code.
+- `nf_flow` now exports `ip_version` without expanding the eBPF event payload.
+  The value is derived from the normalized `IpAddr` already shared by offline
+  and realtime ingestion, and fixture-backed tests lock down the IPv4 path
+  while direct flow construction locks down the IPv6 path.
 - Current test-hardening focus is to add adversarial deterministic cases before
   more feature work: false handshake completion, teardown edge cases, parser
   rejection behavior, and tiny fixture assertions that prove exported

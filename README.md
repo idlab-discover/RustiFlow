@@ -220,7 +220,7 @@ Options:
           - basic:     A basic flow that stores the basic features of a flow
           - cic:       Represents the CIC Flow, giving 90 features
           - cidds:     Represents the CIDDS Flow, giving 10 features
-          - nfstream:  Represents a nfstream inspired flow, giving 69 features
+          - nfstream:  Represents a nfstream inspired flow, giving 71 features
           - rustiflow: Represents the Rusti Flow, giving 199 features
           - custom:    Represents a flow that you can implement yourself
 
