@@ -1,11 +1,17 @@
 mod args;
 mod flow_table;
+#[cfg(target_os = "linux")]
 mod flow_tui;
 mod flows;
 mod output;
+#[cfg(target_os = "linux")]
 mod packet_counts;
 mod packet_features;
 mod pcap;
+#[cfg(target_os = "linux")]
+mod realtime;
+#[cfg(not(target_os = "linux"))]
+#[path = "realtime_stub.rs"]
 mod realtime;
 mod tests;
 mod tui;

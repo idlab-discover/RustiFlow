@@ -1,12 +1,13 @@
 use std::hash::{DefaultHasher, Hash, Hasher};
+use std::path::PathBuf;
 use std::sync::Arc;
 
 use crate::debug;
 use crate::flow_tui::launch_packet_tui;
 use crate::packet_counts::PacketCountPerSecond;
 use crate::{flow_table::FlowTable, flows::flow::Flow, packet_features::PacketFeatures};
+use anyhow::Context;
 use aya::{
-    include_bytes_aligned,
     maps::{PerCpuArray, RingBuf},
     programs::{tc, SchedClassifier, TcAttachType},
     Ebpf,
@@ -272,16 +273,30 @@ fn bump_memlock_rlimit() {
     }
 }
 
+fn ebpf_binary_path(program_name: &str) -> PathBuf {
+    let target_dir = std::env::var_os("CARGO_TARGET_DIR")
+        .map(PathBuf::from)
+        .unwrap_or_else(|| PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../target"));
+    let profile = if cfg!(debug_assertions) {
+        "debug"
+    } else {
+        "release"
+    };
+
+    target_dir
+        .join("bpfel-unknown-none")
+        .join(profile)
+        .join(program_name)
+}
+
 fn load_ebpf_ipv4(interface: &str, tc_attach_type: TcAttachType) -> Result<Ebpf, anyhow::Error> {
-    // Loading the eBPF program, the macros make sure the correct file is loaded
-    #[cfg(debug_assertions)]
-    let mut bpf_ipv4 = Ebpf::load(include_bytes_aligned!(
-        "../../target/bpfel-unknown-none/debug/rustiflow-ebpf-ipv4"
-    ))?;
-    #[cfg(not(debug_assertions))]
-    let mut bpf_ipv4 = Ebpf::load(include_bytes_aligned!(
-        "../../target/bpfel-unknown-none/release/rustiflow-ebpf-ipv4"
-    ))?;
+    let binary_path = ebpf_binary_path("rustiflow-ebpf-ipv4");
+    let mut bpf_ipv4 = Ebpf::load_file(&binary_path).with_context(|| {
+        format!(
+            "Failed to load eBPF IPv4 binary from {}. Build it first with `cargo xtask ebpf-ipv4`.",
+            binary_path.display()
+        )
+    })?;
 
     // Attach the eBPF program function
     let _ = EbpfLogger::init(&mut bpf_ipv4);
@@ -304,15 +319,13 @@ fn load_ebpf_ipv4(interface: &str, tc_attach_type: TcAttachType) -> Result<Ebpf,
 }
 
 fn load_ebpf_ipv6(interface: &str, tc_attach_type: TcAttachType) -> Result<Ebpf, anyhow::Error> {
-    // Loading the eBPF program, the macros make sure the correct file is loaded
-    #[cfg(debug_assertions)]
-    let mut bpf_ipv6 = Ebpf::load(include_bytes_aligned!(
-        "../../target/bpfel-unknown-none/debug/rustiflow-ebpf-ipv6"
-    ))?;
-    #[cfg(not(debug_assertions))]
-    let mut bpf_ipv6 = Ebpf::load(include_bytes_aligned!(
-        "../../target/bpfel-unknown-none/release/rustiflow-ebpf-ipv6"
-    ))?;
+    let binary_path = ebpf_binary_path("rustiflow-ebpf-ipv6");
+    let mut bpf_ipv6 = Ebpf::load_file(&binary_path).with_context(|| {
+        format!(
+            "Failed to load eBPF IPv6 binary from {}. Build it first with `cargo xtask ebpf-ipv6`.",
+            binary_path.display()
+        )
+    })?;
 
     // Attach the eBPF program function
     let _ = EbpfLogger::init(&mut bpf_ipv6);
