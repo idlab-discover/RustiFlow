@@ -1,6 +1,6 @@
 #[cfg(test)]
 mod tests {
-    use pnet::packet::{ip::IpNextHeaderProtocols, ipv6::Ipv6Packet};
+    use pnet::packet::{ip::IpNextHeaderProtocols, ipv4::Ipv4Packet, ipv6::Ipv6Packet};
     use std::net::{IpAddr, Ipv4Addr};
 
     use crate::packet_features::PacketFeatures;
@@ -44,6 +44,19 @@ mod tests {
         packet[24..40]
             .copy_from_slice(&[0x20, 0x01, 0x0d, 0xb8, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2]);
         packet[40..].copy_from_slice(payload);
+        packet
+    }
+
+    fn build_ipv4_packet(protocol: u8, fragment_offset: u16, payload: &[u8]) -> Vec<u8> {
+        let mut packet = vec![0_u8; 20 + payload.len()];
+        packet[0] = 0x45;
+        packet[2..4].copy_from_slice(&((20 + payload.len()) as u16).to_be_bytes());
+        packet[6..8].copy_from_slice(&(fragment_offset & 0x1fff).to_be_bytes());
+        packet[8] = 64;
+        packet[9] = protocol;
+        packet[12..16].copy_from_slice(&[192, 0, 2, 1]);
+        packet[16..20].copy_from_slice(&[192, 0, 2, 2]);
+        packet[20..].copy_from_slice(payload);
         packet
     }
 
@@ -134,5 +147,29 @@ mod tests {
         let packet = Ipv6Packet::new(&bytes).unwrap();
 
         assert!(PacketFeatures::from_ipv6_packet(&packet, 55).is_none());
+    }
+
+    #[test]
+    fn ipv4_non_first_fragment_is_rejected() {
+        let bytes = build_ipv4_packet(IpNextHeaderProtocols::Udp.0, 1, &[0_u8; 8]);
+        let packet = Ipv4Packet::new(&bytes).unwrap();
+
+        assert!(PacketFeatures::from_ipv4_packet(&packet, 88).is_none());
+    }
+
+    #[test]
+    fn ipv4_first_fragment_still_parses_transport_header() {
+        let mut payload = vec![0_u8; 8];
+        payload[0..2].copy_from_slice(&5353_u16.to_be_bytes());
+        payload[2..4].copy_from_slice(&53_u16.to_be_bytes());
+        payload[4..6].copy_from_slice(&8_u16.to_be_bytes());
+
+        let bytes = build_ipv4_packet(IpNextHeaderProtocols::Udp.0, 0, &payload);
+        let packet = Ipv4Packet::new(&bytes).unwrap();
+        let features = PacketFeatures::from_ipv4_packet(&packet, 89).unwrap();
+
+        assert_eq!(features.protocol, IpNextHeaderProtocols::Udp.0);
+        assert_eq!(features.source_port, 5353);
+        assert_eq!(features.destination_port, 53);
     }
 }

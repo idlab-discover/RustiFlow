@@ -160,6 +160,10 @@ impl PacketFeatures {
 
     // Constructor to create PacketFeatures from an IPv4 packet
     pub fn from_ipv4_packet(packet: &Ipv4Packet, timestamp_us: i64) -> Option<Self> {
+        if packet.get_fragment_offset() > 0 {
+            return None;
+        }
+
         extract_packet_features_transport(
             packet.get_source().into(),
             packet.get_destination().into(),
