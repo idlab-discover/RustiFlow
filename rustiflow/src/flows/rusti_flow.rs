@@ -14,8 +14,9 @@ use super::{
         active_idle_stats::ActiveIdleStats, bulk_stats::BulkStats, header_stats::HeaderLengthStats,
         iat_stats::IATStats, icmp_stats::IcmpStats, packet_stats::PacketLengthStats,
         payload_stats::PayloadLengthStats, retransmission_stats::RetransmissionStats,
-        subflow_stats::SubflowStats, tcp_flag_stats::TcpFlagStats, timing_stats::TimingStats,
-        util::FlowFeature, window_size_stats::WindowSizeStats,
+        subflow_stats::SubflowStats, tcp_flag_stats::TcpFlagStats,
+        tcp_quality_stats::TcpQualityStats, timing_stats::TimingStats, util::FlowFeature,
+        window_size_stats::WindowSizeStats,
     },
     flow::Flow,
     util::FlowExpireCause,
@@ -35,6 +36,7 @@ pub struct RustiFlow {
     pub active_idle_stats: ActiveIdleStats,
     pub icmp_stats: IcmpStats,
     pub retransmission_stats: RetransmissionStats,
+    pub tcp_quality_stats: TcpQualityStats,
     pub window_size_stats: WindowSizeStats,
     pub timing_stats: TimingStats,
 }
@@ -69,6 +71,7 @@ impl Flow for RustiFlow {
             active_idle_stats: ActiveIdleStats::new(timestamp_us),
             icmp_stats: IcmpStats::new(),
             retransmission_stats: RetransmissionStats::new(),
+            tcp_quality_stats: TcpQualityStats::new(),
             window_size_stats: WindowSizeStats::new(),
             timing_stats: TimingStats::new(),
         }
@@ -91,6 +94,8 @@ impl Flow for RustiFlow {
         self.icmp_stats.update(packet, fwd, last_timestamp_us);
         self.retransmission_stats
             .update(packet, fwd, last_timestamp_us);
+        self.tcp_quality_stats
+            .update(packet, fwd, last_timestamp_us);
         self.window_size_stats
             .update(packet, fwd, last_timestamp_us);
         self.timing_stats.update(packet, fwd, last_timestamp_us);
@@ -111,306 +116,267 @@ impl Flow for RustiFlow {
         self.active_idle_stats.close(timestamp_us, cause);
         self.icmp_stats.close(timestamp_us, cause);
         self.retransmission_stats.close(timestamp_us, cause);
+        self.tcp_quality_stats.close(timestamp_us, cause);
         self.window_size_stats.close(timestamp_us, cause);
         self.timing_stats.close(timestamp_us, cause);
     }
 
     fn dump(&self) -> String {
         let duration_us = self.basic_flow.get_flow_duration_usec();
-        format!(
-            "{},{},{},{},{},{},{},{},{},{},\
-            {},{},{},{},{},{},{},{},{},{},\
-            {},{},{},{},{},{},{},{},{},{},\
-            {},{},{},{},{},{}",
-            // Basic Info
-            self.basic_flow.flow_key,
-            self.basic_flow.ip_source,
-            self.basic_flow.port_source,
-            self.basic_flow.ip_destination,
-            self.basic_flow.port_destination,
-            self.basic_flow.protocol,
-            self.basic_flow.get_first_timestamp(),
-            self.basic_flow.get_last_timestamp(),
-            duration_us,
-            self.basic_flow.flow_expire_cause.as_str(),
-            u8::from(self.basic_flow.tcp_handshake_completed),
-            u8::from(self.basic_flow.tcp_reset_before_handshake),
-            u8::from(self.basic_flow.tcp_reset_after_handshake),
-            // Timing Stats
+        vec![
+            self.basic_flow.flow_key.clone(),
+            self.basic_flow.ip_source.to_string(),
+            self.basic_flow.port_source.to_string(),
+            self.basic_flow.ip_destination.to_string(),
+            self.basic_flow.port_destination.to_string(),
+            self.basic_flow.protocol.to_string(),
+            self.basic_flow.get_first_timestamp().to_string(),
+            self.basic_flow.get_last_timestamp().to_string(),
+            duration_us.to_string(),
+            self.basic_flow.flow_expire_cause.as_str().to_string(),
+            u8::from(self.basic_flow.tcp_handshake_completed).to_string(),
+            u8::from(self.basic_flow.tcp_reset_before_handshake).to_string(),
+            u8::from(self.basic_flow.tcp_reset_after_handshake).to_string(),
+            self.basic_flow.tcp_close_style.as_str().to_string(),
             self.timing_stats.dump(),
-            // IAT Stats
             self.iat_stats.dump(),
-            // Packet Length Stats
             self.packet_len_stats.dump(),
-            // Packet Header Length Stats
             self.header_len_stats.dump(),
-            // Payload Length Stats
             self.payload_len_stats.dump(),
-            // Bulk Stats
             self.bulk_stats.dump(),
-            // Subflow Stats
             self.subflow_stats.dump(),
-            // Active Idle Stats
             self.active_idle_stats.dump(),
-            // ICMP Stats
             self.icmp_stats.dump(),
-            // Retransmission Stats
             self.retransmission_stats.dump(),
-            // Window Size Stats
+            self.tcp_quality_stats.dump(),
             self.window_size_stats.dump(),
-            // TCP Flag Stats
             self.tcp_flags_stats.dump(),
-            // Rate Stats (per second)
             safe_per_second_rate(
                 self.payload_len_stats.payload_len.get_total(),
-                duration_us as f64
-            ),
+                duration_us as f64,
+            )
+            .to_string(),
             safe_per_second_rate(
                 self.payload_len_stats.payload_len.get_count() as f64,
-                duration_us as f64
-            ),
+                duration_us as f64,
+            )
+            .to_string(),
             safe_per_second_rate(
                 self.payload_len_stats.fwd_payload_len.get_total(),
-                duration_us as f64
-            ),
+                duration_us as f64,
+            )
+            .to_string(),
             safe_per_second_rate(
                 self.payload_len_stats.fwd_payload_len.get_count() as f64,
-                duration_us as f64
-            ),
+                duration_us as f64,
+            )
+            .to_string(),
             safe_per_second_rate(
                 self.payload_len_stats.bwd_payload_len.get_total(),
-                duration_us as f64
-            ),
+                duration_us as f64,
+            )
+            .to_string(),
             safe_per_second_rate(
                 self.payload_len_stats.bwd_payload_len.get_count() as f64,
-                duration_us as f64
-            ),
+                duration_us as f64,
+            )
+            .to_string(),
             safe_div_int(
                 self.payload_len_stats.fwd_payload_len.get_count(),
-                self.subflow_stats.subflow_count
-            ),
+                self.subflow_stats.subflow_count,
+            )
+            .to_string(),
             safe_div(
                 self.payload_len_stats.fwd_payload_len.get_total(),
-                self.subflow_stats.subflow_count as f64
-            ),
+                self.subflow_stats.subflow_count as f64,
+            )
+            .to_string(),
             safe_div_int(
                 self.payload_len_stats.bwd_payload_len.get_count(),
-                self.subflow_stats.subflow_count
-            ),
+                self.subflow_stats.subflow_count,
+            )
+            .to_string(),
             safe_div(
                 self.payload_len_stats.bwd_payload_len.get_total(),
-                self.subflow_stats.subflow_count as f64
-            ),
-            // UP/DOWN Ratio
+                self.subflow_stats.subflow_count as f64,
+            )
+            .to_string(),
             safe_div_int(
                 self.payload_len_stats.bwd_payload_len.get_count(),
-                self.payload_len_stats.fwd_payload_len.get_count()
-            ),
-        )
+                self.payload_len_stats.fwd_payload_len.get_count(),
+            )
+            .to_string(),
+        ]
+        .join(",")
     }
 
     fn get_features() -> String {
-        format!(
-            "{},{},{},{},{},{},{},{},{},{},\
-            {},{},{},{},{},{},{},{},{},{},\
-            {},{},{},{},{},{},{},{},{},{},\
-            {},{},{},{},{},{}",
-            // Basic Info
-            "flow_id",
-            "source_ip",
-            "source_port",
-            "destination_ip",
-            "destination_port",
-            "protocol",
-            "timestamp_first",
-            "timestamp_last",
-            "flow_duration_us",
-            "flow_expire_cause",
-            "tcp_handshake_completed",
-            "tcp_reset_before_handshake",
-            "tcp_reset_after_handshake",
-            // Timing Stats
+        vec![
+            "flow_id".to_string(),
+            "source_ip".to_string(),
+            "source_port".to_string(),
+            "destination_ip".to_string(),
+            "destination_port".to_string(),
+            "protocol".to_string(),
+            "timestamp_first".to_string(),
+            "timestamp_last".to_string(),
+            "flow_duration_us".to_string(),
+            "flow_expire_cause".to_string(),
+            "tcp_handshake_completed".to_string(),
+            "tcp_reset_before_handshake".to_string(),
+            "tcp_reset_after_handshake".to_string(),
+            "tcp_close_style".to_string(),
             TimingStats::headers(),
-            // IAT Stats
             IATStats::headers(),
-            // Packet Length Stats
             PacketLengthStats::headers(),
-            // Packet Header Length Stats
             HeaderLengthStats::headers(),
-            // Payload Length Stats
             PayloadLengthStats::headers(),
-            // Bulk Stats
             BulkStats::headers(),
-            // Subflow Stats
             SubflowStats::headers(),
-            // Active Idle Stats
             ActiveIdleStats::headers(),
-            // ICMP Stats
             IcmpStats::headers(),
-            // Retransmission Stats
             RetransmissionStats::headers(),
-            // Window Size Stats
+            TcpQualityStats::headers(),
             WindowSizeStats::headers(),
-            // TCP Flag Stats
             TcpFlagStats::headers(),
-            // Rate Stats (per second)
-            "flow_bytes_s",
-            "flow_packets_s",
-            "fwd_bytes_s",
-            "fwd_packets_s",
-            "bwd_bytes_s",
-            "bwd_packets_s",
-            "fwd_subflow_packets_mean",
-            "fwd_subflow_bytes_mean",
-            "bwd_subflow_packets_mean",
-            "bwd_subflow_bytes_mean",
-            // UP/DOWN Ratio
-            "up_down_ratio",
-        )
+            "flow_bytes_s".to_string(),
+            "flow_packets_s".to_string(),
+            "fwd_bytes_s".to_string(),
+            "fwd_packets_s".to_string(),
+            "bwd_bytes_s".to_string(),
+            "bwd_packets_s".to_string(),
+            "fwd_subflow_packets_mean".to_string(),
+            "fwd_subflow_bytes_mean".to_string(),
+            "bwd_subflow_packets_mean".to_string(),
+            "bwd_subflow_bytes_mean".to_string(),
+            "up_down_ratio".to_string(),
+        ]
+        .join(",")
     }
 
     fn dump_without_contamination(&self) -> String {
         let duration_us = self.basic_flow.get_flow_duration_usec();
-        format!(
-            "{},{},{},{},{},{},{},{},{},{},\
-            {},{},{},{},{},{},{},{},{},{}\
-            ,{},{},{},{},{},{},{},{},{},{},{},{}",
-            // Basic Info
-            iana_port_mapping(self.basic_flow.port_source),
-            iana_port_mapping(self.basic_flow.port_destination),
-            self.basic_flow.protocol,
-            duration_us,
-            self.basic_flow.flow_expire_cause.as_str(),
-            u8::from(self.basic_flow.tcp_handshake_completed),
-            u8::from(self.basic_flow.tcp_reset_before_handshake),
-            u8::from(self.basic_flow.tcp_reset_after_handshake),
-            // Timing Stats
-            self.timing_stats.get_fwd_duration(),
-            self.timing_stats.get_bwd_duration(),
-            // IAT Stats
+        vec![
+            iana_port_mapping(self.basic_flow.port_source).to_string(),
+            iana_port_mapping(self.basic_flow.port_destination).to_string(),
+            self.basic_flow.protocol.to_string(),
+            duration_us.to_string(),
+            self.basic_flow.flow_expire_cause.as_str().to_string(),
+            u8::from(self.basic_flow.tcp_handshake_completed).to_string(),
+            u8::from(self.basic_flow.tcp_reset_before_handshake).to_string(),
+            u8::from(self.basic_flow.tcp_reset_after_handshake).to_string(),
+            self.basic_flow.tcp_close_style.as_str().to_string(),
+            self.timing_stats.get_fwd_duration().to_string(),
+            self.timing_stats.get_bwd_duration().to_string(),
             self.iat_stats.dump(),
-            // Packet Length Stats
             self.packet_len_stats.dump(),
-            // Packet Header Length Stats
             self.header_len_stats.dump(),
-            // Payload Length Stats
             self.payload_len_stats.dump(),
-            // Bulk Stats
             self.bulk_stats.dump(),
-            // Subflow Stats
             self.subflow_stats.dump(),
-            // Active Idle Stats
             self.active_idle_stats.dump(),
-            // ICMP Stats
             self.icmp_stats.dump(),
-            // Retransmission Stats
             self.retransmission_stats.dump(),
-            // Window Size Stats
+            self.tcp_quality_stats.dump(),
             self.window_size_stats.dump(),
-            // TCP Flag Stats
             self.tcp_flags_stats.dump(),
-            // Rate Stats (per second)
             safe_per_second_rate(
                 self.payload_len_stats.payload_len.get_total(),
-                duration_us as f64
-            ),
+                duration_us as f64,
+            )
+            .to_string(),
             safe_per_second_rate(
                 self.payload_len_stats.payload_len.get_count() as f64,
-                duration_us as f64
-            ),
+                duration_us as f64,
+            )
+            .to_string(),
             safe_per_second_rate(
                 self.payload_len_stats.fwd_payload_len.get_total(),
-                duration_us as f64
-            ),
+                duration_us as f64,
+            )
+            .to_string(),
             safe_per_second_rate(
                 self.payload_len_stats.fwd_payload_len.get_count() as f64,
-                duration_us as f64
-            ),
+                duration_us as f64,
+            )
+            .to_string(),
             safe_per_second_rate(
                 self.payload_len_stats.bwd_payload_len.get_total(),
-                duration_us as f64
-            ),
+                duration_us as f64,
+            )
+            .to_string(),
             safe_per_second_rate(
                 self.payload_len_stats.bwd_payload_len.get_count() as f64,
-                duration_us as f64
-            ),
+                duration_us as f64,
+            )
+            .to_string(),
             safe_div_int(
                 self.payload_len_stats.fwd_payload_len.get_count(),
-                self.subflow_stats.subflow_count
-            ),
+                self.subflow_stats.subflow_count,
+            )
+            .to_string(),
             safe_div(
                 self.payload_len_stats.fwd_payload_len.get_total(),
-                self.subflow_stats.subflow_count as f64
-            ),
+                self.subflow_stats.subflow_count as f64,
+            )
+            .to_string(),
             safe_div_int(
                 self.payload_len_stats.bwd_payload_len.get_count(),
-                self.subflow_stats.subflow_count
-            ),
+                self.subflow_stats.subflow_count,
+            )
+            .to_string(),
             safe_div(
                 self.payload_len_stats.bwd_payload_len.get_total(),
-                self.subflow_stats.subflow_count as f64
-            ),
-            // UP/DOWN Ratio
+                self.subflow_stats.subflow_count as f64,
+            )
+            .to_string(),
             safe_div_int(
                 self.payload_len_stats.bwd_payload_len.get_count(),
-                self.payload_len_stats.fwd_payload_len.get_count()
-            ),
-        )
+                self.payload_len_stats.fwd_payload_len.get_count(),
+            )
+            .to_string(),
+        ]
+        .join(",")
     }
 
     fn get_features_without_contamination() -> String {
-        format!(
-            "{},{},{},{},{},{},{},{},{},{},\
-            {},{},{},{},{},{},{},{},{},{}\
-            ,{},{},{},{},{},{},{},{},{},{},{},{}",
-            // Basic Info
-            "source_port_iana",
-            "destination_port_iana",
-            "protocol",
-            "flow_duration_us",
-            "flow_expire_cause",
-            "tcp_handshake_completed",
-            "tcp_reset_before_handshake",
-            "tcp_reset_after_handshake",
-            // Timing Stats
-            "fwd_duration_ms",
-            "bwd_duration_ms",
-            // IAT Stats
+        vec![
+            "source_port_iana".to_string(),
+            "destination_port_iana".to_string(),
+            "protocol".to_string(),
+            "flow_duration_us".to_string(),
+            "flow_expire_cause".to_string(),
+            "tcp_handshake_completed".to_string(),
+            "tcp_reset_before_handshake".to_string(),
+            "tcp_reset_after_handshake".to_string(),
+            "tcp_close_style".to_string(),
+            "fwd_duration_ms".to_string(),
+            "bwd_duration_ms".to_string(),
             IATStats::headers(),
-            // Packet Length Stats
             PacketLengthStats::headers(),
-            // Packet Header Length Stats
             HeaderLengthStats::headers(),
-            // Payload Length Stats
             PayloadLengthStats::headers(),
-            // Bulk Stats
             BulkStats::headers(),
-            // Subflow Stats
             SubflowStats::headers(),
-            // Active Idle Stats
             ActiveIdleStats::headers(),
-            // ICMP Stats
             IcmpStats::headers(),
-            // Retransmission Stats
             RetransmissionStats::headers(),
-            // Window Size Stats
+            TcpQualityStats::headers(),
             WindowSizeStats::headers(),
-            // TCP Flag Stats
             TcpFlagStats::headers(),
-            // Rate Stats (per second)
-            "flow_bytes_s",
-            "flow_packets_s",
-            "fwd_bytes_s",
-            "fwd_packets_s",
-            "bwd_bytes_s",
-            "bwd_packets_s",
-            "fwd_subflow_packets_mean",
-            "fwd_subflow_bytes_mean",
-            "bwd_subflow_packets_mean",
-            "bwd_subflow_bytes_mean",
-            // UP/DOWN Ratio
-            "up_down_ratio",
-        )
+            "flow_bytes_s".to_string(),
+            "flow_packets_s".to_string(),
+            "fwd_bytes_s".to_string(),
+            "fwd_packets_s".to_string(),
+            "bwd_bytes_s".to_string(),
+            "bwd_packets_s".to_string(),
+            "fwd_subflow_packets_mean".to_string(),
+            "fwd_subflow_bytes_mean".to_string(),
+            "bwd_subflow_packets_mean".to_string(),
+            "bwd_subflow_bytes_mean".to_string(),
+            "up_down_ratio".to_string(),
+        ]
+        .join(",")
     }
 
     fn get_first_timestamp_us(&self) -> i64 {

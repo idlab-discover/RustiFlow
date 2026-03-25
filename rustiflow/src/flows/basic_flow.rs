@@ -14,6 +14,31 @@ pub(crate) enum FlowState {
     FinAcked,
 }
 
+#[derive(Clone, Copy, PartialEq, Debug)]
+pub enum TcpCloseStyle {
+    NotApplicable,
+    None,
+    HalfClose,
+    BidirectionalFin,
+    FourWayFin,
+    SimultaneousFin,
+    Reset,
+}
+
+impl TcpCloseStyle {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::NotApplicable => "not_applicable",
+            Self::None => "none",
+            Self::HalfClose => "half_close",
+            Self::BidirectionalFin => "bidirectional_fin",
+            Self::FourWayFin => "four_way_fin",
+            Self::SimultaneousFin => "simultaneous_fin",
+            Self::Reset => "reset",
+        }
+    }
+}
+
 /// A basic flow that stores the basic features of a flow.
 #[derive(Clone)]
 pub struct BasicFlow {
@@ -47,6 +72,10 @@ pub struct BasicFlow {
     pub tcp_handshake_completed: bool,
     pub tcp_reset_before_handshake: bool,
     pub tcp_reset_after_handshake: bool,
+    pub tcp_close_style: TcpCloseStyle,
+    saw_fin_fwd: bool,
+    saw_fin_bwd: bool,
+    tcp_simultaneous_close: bool,
 }
 
 impl BasicFlow {
@@ -83,6 +112,28 @@ impl BasicFlow {
         }
     }
 
+    fn update_tcp_close_style(&mut self, cause: FlowExpireCause) {
+        self.tcp_close_style = if !self.is_tcp() {
+            TcpCloseStyle::NotApplicable
+        } else if cause == FlowExpireCause::TcpReset {
+            TcpCloseStyle::Reset
+        } else if self.saw_fin_fwd && self.saw_fin_bwd {
+            if self.state_fwd == FlowState::FinAcked && self.state_bwd == FlowState::FinAcked {
+                if self.tcp_simultaneous_close {
+                    TcpCloseStyle::SimultaneousFin
+                } else {
+                    TcpCloseStyle::FourWayFin
+                }
+            } else {
+                TcpCloseStyle::BidirectionalFin
+            }
+        } else if self.saw_fin_fwd || self.saw_fin_bwd {
+            TcpCloseStyle::HalfClose
+        } else {
+            TcpCloseStyle::None
+        };
+    }
+
     /// Checks if the flow is finished.
     ///
     /// A flow is considered finished when both FIN flags are set and the last ACK is received,
@@ -99,10 +150,18 @@ impl BasicFlow {
         // Update state when receiving FIN flag
         if packet.fin_flag > 0 {
             if forward {
+                if self.state_bwd == FlowState::FinSent {
+                    self.tcp_simultaneous_close = true;
+                }
+                self.saw_fin_fwd = true;
                 self.state_fwd = FlowState::FinSent;
                 self.expected_ack_seq_bwd =
                     Some(packet.sequence_number + packet.data_length as u32 + 1);
             } else {
+                if self.state_fwd == FlowState::FinSent {
+                    self.tcp_simultaneous_close = true;
+                }
+                self.saw_fin_bwd = true;
                 self.state_bwd = FlowState::FinSent;
                 self.expected_ack_seq_fwd =
                     Some(packet.sequence_number + packet.data_length as u32 + 1);
@@ -186,6 +245,10 @@ impl Flow for BasicFlow {
             tcp_handshake_completed: false,
             tcp_reset_before_handshake: false,
             tcp_reset_after_handshake: false,
+            tcp_close_style: TcpCloseStyle::None,
+            saw_fin_fwd: false,
+            saw_fin_bwd: false,
+            tcp_simultaneous_close: false,
         }
     }
 
@@ -195,6 +258,7 @@ impl Flow for BasicFlow {
 
         if self.is_tcp_finished(packet, fwd) {
             self.flow_expire_cause = FlowExpireCause::TcpTermination;
+            self.update_tcp_close_style(self.flow_expire_cause);
             return true;
         }
 
@@ -205,6 +269,7 @@ impl Flow for BasicFlow {
                 self.tcp_reset_before_handshake = true;
             }
             self.flow_expire_cause = FlowExpireCause::TcpReset;
+            self.update_tcp_close_style(self.flow_expire_cause);
             return true;
         }
 
@@ -213,6 +278,7 @@ impl Flow for BasicFlow {
 
     fn close_flow(&mut self, _timestamp_us: i64, cause: FlowExpireCause) -> () {
         self.flow_expire_cause = cause;
+        self.update_tcp_close_style(cause);
     }
 
     fn dump(&self) -> String {

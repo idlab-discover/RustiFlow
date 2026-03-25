@@ -28,6 +28,12 @@ This file keeps short-lived design choices and execution notes that would make
 - TCP lifecycle export now distinguishes observed handshake completion from
   resets seen before or after that observed handshake, so richer flow schemas
   do not have to infer lifecycle quality from flag totals alone.
+- RustiFlow export now includes duplicate ACK counts, zero-window
+  observations, and `tcp_close_style`. Duplicate ACKs currently mean repeated
+  pure ACKs with the same ACK number and advertised window; zero-window events
+  count TCP packets advertising a zero receive window; close style stays rooted
+  in `BasicFlow` lifecycle state so timeout/reset/FIN semantics are not
+  reimplemented in exporter code.
 - Current test-hardening focus is to add adversarial deterministic cases before
   more feature work: false handshake completion, teardown edge cases, parser
   rejection behavior, and tiny fixture assertions that prove exported

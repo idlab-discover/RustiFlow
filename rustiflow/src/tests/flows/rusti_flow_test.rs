@@ -3,7 +3,7 @@ mod tests {
     use std::net::{IpAddr, Ipv4Addr};
 
     use crate::{
-        flows::{flow::Flow, rusti_flow::RustiFlow},
+        flows::{basic_flow::TcpCloseStyle, flow::Flow, rusti_flow::RustiFlow},
         packet_features::{PacketFeatures, ACK_FLAG, SYN_FLAG},
     };
 
@@ -37,6 +37,7 @@ mod tests {
             destination_port,
             protocol: 6,
             timestamp_us,
+            window_size: 4096,
             ..Default::default()
         }
     }
@@ -94,6 +95,21 @@ mod tests {
         ack_bwd.sequence_number_ack = 200;
         assert!(!flow.update_flow(&ack_bwd, false));
 
+        let mut duplicate_ack_bwd = packet(destination_ip, 443, source_ip, 44444, 1_001_650);
+        duplicate_ack_bwd.ack_flag = 1;
+        duplicate_ack_bwd.flags = ACK_FLAG;
+        duplicate_ack_bwd.sequence_number = 702;
+        duplicate_ack_bwd.sequence_number_ack = 200;
+        assert!(!flow.update_flow(&duplicate_ack_bwd, false));
+
+        let mut zero_window_bwd = packet(destination_ip, 443, source_ip, 44444, 1_001_700);
+        zero_window_bwd.ack_flag = 1;
+        zero_window_bwd.flags = ACK_FLAG;
+        zero_window_bwd.sequence_number = 703;
+        zero_window_bwd.sequence_number_ack = 200;
+        zero_window_bwd.window_size = 0;
+        assert!(!flow.update_flow(&zero_window_bwd, false));
+
         let mut overlap = packet(source_ip, 44444, destination_ip, 443, 1_001_800);
         overlap.ack_flag = 1;
         overlap.flags = ACK_FLAG;
@@ -103,14 +119,19 @@ mod tests {
         assert!(!flow.update_flow(&overlap, true));
 
         assert!(flow.basic_flow.tcp_handshake_completed);
+        assert_eq!(flow.basic_flow.tcp_close_style, TcpCloseStyle::None);
         assert_eq!(flow.retransmission_stats.fwd_retransmission_count, 1);
         assert_eq!(flow.retransmission_stats.bwd_retransmission_count, 0);
-        assert_eq!(flow.iat_stats.iat.get_count(), 5);
+        assert_eq!(flow.tcp_quality_stats.fwd_duplicate_ack_count, 0);
+        assert_eq!(flow.tcp_quality_stats.bwd_duplicate_ack_count, 1);
+        assert_eq!(flow.tcp_quality_stats.fwd_zero_window_count, 0);
+        assert_eq!(flow.tcp_quality_stats.bwd_zero_window_count, 1);
+        assert_eq!(flow.iat_stats.iat.get_count(), 7);
         assert_eq!(flow.iat_stats.fwd_iat.get_count(), 3);
-        assert_eq!(flow.iat_stats.bwd_iat.get_count(), 1);
+        assert_eq!(flow.iat_stats.bwd_iat.get_count(), 3);
         assert_eq!(flow.subflow_stats.subflow_count, 1);
         assert!((flow.timing_stats.get_fwd_duration() - 1.7).abs() < f64::EPSILON);
-        assert!((flow.timing_stats.get_bwd_duration() - 1.3).abs() < f64::EPSILON);
+        assert!((flow.timing_stats.get_bwd_duration() - 1.5).abs() < f64::EPSILON);
         assert_eq!(flow.payload_len_stats.fwd_non_zero_payload_packets, 2);
         assert_eq!(flow.payload_len_stats.bwd_non_zero_payload_packets, 0);
     }

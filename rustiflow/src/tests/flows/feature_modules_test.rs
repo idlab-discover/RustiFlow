@@ -7,8 +7,8 @@ mod tests {
             features::{
                 active_idle_stats::ActiveIdleStats, iat_stats::IATStats, icmp_stats::IcmpStats,
                 payload_stats::PayloadLengthStats, retransmission_stats::RetransmissionStats,
-                subflow_stats::SubflowStats, timing_stats::TimingStats, util::FlowFeature,
-                window_size_stats::WindowSizeStats,
+                subflow_stats::SubflowStats, tcp_quality_stats::TcpQualityStats,
+                timing_stats::TimingStats, util::FlowFeature, window_size_stats::WindowSizeStats,
             },
             util::FlowExpireCause,
         },
@@ -214,6 +214,71 @@ mod tests {
         assert_eq!(stats.fwd_non_zero_payload_packets, 1);
         assert_eq!(stats.bwd_non_zero_payload_packets, 1);
         assert_eq!(stats.payload_len.get_count(), 4);
+    }
+
+    #[test]
+    fn tcp_quality_stats_count_duplicate_acks_and_zero_window_events() {
+        let mut stats = TcpQualityStats::new();
+
+        let mut first_ack = packet(1_000_000);
+        first_ack.protocol = IpNextHeaderProtocols::Tcp.0;
+        first_ack.flags = ACK_FLAG;
+        first_ack.ack_flag = 1;
+        first_ack.sequence_number_ack = 500;
+        first_ack.window_size = 4096;
+        stats.update(&first_ack, true, first_ack.timestamp_us);
+
+        let mut duplicate_ack = packet(1_000_500);
+        duplicate_ack.protocol = IpNextHeaderProtocols::Tcp.0;
+        duplicate_ack.flags = ACK_FLAG;
+        duplicate_ack.ack_flag = 1;
+        duplicate_ack.sequence_number_ack = 500;
+        duplicate_ack.window_size = 4096;
+        stats.update(&duplicate_ack, true, first_ack.timestamp_us);
+
+        let mut changed_window = packet(1_001_000);
+        changed_window.protocol = IpNextHeaderProtocols::Tcp.0;
+        changed_window.flags = ACK_FLAG;
+        changed_window.ack_flag = 1;
+        changed_window.sequence_number_ack = 500;
+        changed_window.window_size = 2048;
+        stats.update(&changed_window, true, duplicate_ack.timestamp_us);
+
+        let mut zero_window = packet(1_001_500);
+        zero_window.protocol = IpNextHeaderProtocols::Tcp.0;
+        zero_window.flags = ACK_FLAG;
+        zero_window.ack_flag = 1;
+        zero_window.sequence_number_ack = 800;
+        zero_window.window_size = 0;
+        stats.update(&zero_window, false, changed_window.timestamp_us);
+
+        let mut zero_window_repeat = packet(1_002_000);
+        zero_window_repeat.protocol = IpNextHeaderProtocols::Tcp.0;
+        zero_window_repeat.flags = ACK_FLAG;
+        zero_window_repeat.ack_flag = 1;
+        zero_window_repeat.sequence_number_ack = 800;
+        zero_window_repeat.window_size = 0;
+        stats.update(&zero_window_repeat, false, zero_window.timestamp_us);
+
+        let mut tcp_payload = packet(1_002_500);
+        tcp_payload.protocol = IpNextHeaderProtocols::Tcp.0;
+        tcp_payload.ack_flag = 1;
+        tcp_payload.flags = ACK_FLAG;
+        tcp_payload.sequence_number_ack = 500;
+        tcp_payload.data_length = 32;
+        tcp_payload.window_size = 4096;
+        stats.update(&tcp_payload, true, zero_window_repeat.timestamp_us);
+
+        let mut udp = packet(1_003_000);
+        udp.protocol = IpNextHeaderProtocols::Udp.0;
+        udp.window_size = 0;
+        stats.update(&udp, false, tcp_payload.timestamp_us);
+
+        assert_eq!(stats.fwd_duplicate_ack_count, 1);
+        assert_eq!(stats.bwd_duplicate_ack_count, 1);
+        assert_eq!(stats.fwd_zero_window_count, 0);
+        assert_eq!(stats.bwd_zero_window_count, 2);
+        assert_eq!(stats.dump(), "2,1,1,2,0,2");
     }
 
     #[test]
