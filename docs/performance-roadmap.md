@@ -114,9 +114,9 @@ Medium to high depending on export rate and flow size.
 
 ### 6. Performance Mode Should Mean Performance
 
-- [ ] Make sure high-throughput runs bypass packet-TUI work completely.
-- [ ] Audit mutexes, watch channels, and per-packet UI accounting in performance-sensitive modes.
-- [ ] Keep observability available, but not in the critical path by default.
+- [x] Make sure high-throughput runs bypass packet-TUI work completely.
+- [x] Audit mutexes, watch channels, and per-packet UI accounting in performance-sensitive modes.
+- [x] Keep observability available, but not in the critical path by default.
 
 Primary files:
 
@@ -258,6 +258,11 @@ What this does not fully prove:
   records repeated 400x, ~2.5 MB), warm-cache `--release` runs dropped from
   about `39.8 ms` to `19.7 ms` mean over 5 runs on this machine. Treat this as
   a local directional signal, not a Linux realtime substitute.
+- 2026-03-25: Realtime packet-graph state is now only constructed when the
+  graph is actually enabled. High-throughput CSV/performance-mode runs no
+  longer allocate the watch channel, mutex-protected packet counter, or
+  per-packet UI accounting state on the hot path. Linux-side throughput numbers
+  are still pending the broader benchmark work in Phase 0.
 - 2026-03-25: `FeatureStats` now uses a Welford-style running variance
   accumulator and computes `std` at readout time. On the same local amplified
   offline fixture, warm-cache `--release` runs moved from about `21.3 ms` to

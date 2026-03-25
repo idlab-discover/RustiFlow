@@ -1,4 +1,5 @@
 use crate::flows::flow::Flow;
+use crate::realtime_mode::PacketGraphMode;
 use tokio::sync::mpsc::Sender;
 
 /// Realtime capture depends on Aya/eBPF and is only available on Linux.
@@ -11,7 +12,7 @@ pub async fn handle_realtime<T>(
     _early_export: Option<u64>,
     _expiration_check_interval: u64,
     _ingress_only: bool,
-    _performance_mode_disabled: bool,
+    _packet_graph_mode: PacketGraphMode,
 ) -> Result<u64, anyhow::Error>
 where
     T: Flow,

@@ -6,6 +6,7 @@ use std::sync::Arc;
 use crate::debug;
 use crate::flow_tui::launch_packet_tui;
 use crate::packet_counts::PacketCountPerSecond;
+use crate::realtime_mode::PacketGraphMode;
 use crate::{flow_table::FlowTable, flows::flow::Flow, packet_features::PacketFeatures};
 use anyhow::Context;
 use aya::{
@@ -36,7 +37,7 @@ pub async fn handle_realtime<T>(
     early_export: Option<u64>,
     expiration_check_interval: u64,
     ingress_only: bool,
-    performance_mode_disabled: bool,
+    packet_graph_mode: PacketGraphMode,
 ) -> Result<u64, anyhow::Error>
 where
     T: Flow,
@@ -86,9 +87,19 @@ where
 
     let buffer_num_packets = 10_000;
     let mut shard_senders = Vec::with_capacity(num_threads as usize);
-
-    let (packet_tx, packet_rx) = watch::channel(Vec::new());
-    let packet_counter = Arc::new(Mutex::new(PacketCountPerSecond::new()));
+    let (packet_graph, packet_rx) = match packet_graph_mode {
+        PacketGraphMode::Enabled => {
+            let (packet_tx, packet_rx) = watch::channel(Vec::new());
+            (
+                Some(PacketGraphState {
+                    packet_counter: Arc::new(Mutex::new(PacketCountPerSecond::new())),
+                    packet_tx,
+                }),
+                Some(packet_rx),
+            )
+        }
+        PacketGraphMode::Disabled => (None, None),
+    };
 
     debug!("Creating {} sharded FlowTables...", num_threads);
     for _ in 0..num_threads {
@@ -123,8 +134,7 @@ where
 
     for ebpf_event_source in event_sources_v4 {
         let shard_senders_clone = shard_senders.clone();
-        let packet_counter_clone = Arc::clone(&packet_counter);
-        let packet_tx_clone = packet_tx.clone();
+        let packet_graph = packet_graph.clone();
         let realtime_offset_us = realtime_offset_us;
 
         handle_set.spawn(async move {
@@ -137,12 +147,8 @@ where
 
                 let ring_buf = guard.get_inner_mut();
                 while let Some(event) = ring_buf.next() {
-                    if performance_mode_disabled {
-                        let mut counter = packet_counter_clone.lock().await;
-                        counter.increment();
-                        // Send the updated count to the TUI
-                        let recent_counts = counter.get_counts_for_last_intervals(100);
-                        let _ = packet_tx_clone.send(recent_counts);
+                    if let Some(packet_graph) = &packet_graph {
+                        packet_graph.record_packet().await;
                     }
                     let ebpf_event_ipv4: EbpfEventIpv4 =
                         unsafe { std::ptr::read(event.as_ptr() as *const _) };
@@ -167,8 +173,7 @@ where
 
     for ebpf_event_source in event_sources_v6 {
         let shard_senders_clone = shard_senders.clone();
-        let packet_counter_clone = Arc::clone(&packet_counter);
-        let packet_tx_clone = packet_tx.clone();
+        let packet_graph = packet_graph.clone();
         let realtime_offset_us = realtime_offset_us;
 
         handle_set.spawn(async move {
@@ -181,12 +186,8 @@ where
 
                 let ring_buf = guard.get_inner_mut();
                 while let Some(event) = ring_buf.next() {
-                    if performance_mode_disabled {
-                        let mut counter = packet_counter_clone.lock().await;
-                        counter.increment();
-                        // Send the updated count to the TUI
-                        let recent_counts = counter.get_counts_for_last_intervals(100);
-                        let _ = packet_tx_clone.send(recent_counts);
+                    if let Some(packet_graph) = &packet_graph {
+                        packet_graph.record_packet().await;
                     }
                     let ebpf_event_ipv6: EbpfEventIpv6 =
                         unsafe { std::ptr::read(event.as_ptr() as *const _) };
@@ -211,7 +212,7 @@ where
 
     info!("Waiting for Ctrl-C...");
 
-    if performance_mode_disabled {
+    if let Some(packet_rx) = packet_rx {
         let _ = launch_packet_tui(packet_rx).await;
     }
 
@@ -257,6 +258,21 @@ where
     }
 
     Ok(total_dropped)
+}
+
+#[derive(Clone)]
+struct PacketGraphState {
+    packet_counter: Arc<Mutex<PacketCountPerSecond>>,
+    packet_tx: watch::Sender<Vec<(u64, u64)>>,
+}
+
+impl PacketGraphState {
+    async fn record_packet(&self) {
+        let mut counter = self.packet_counter.lock().await;
+        counter.increment();
+        let recent_counts = counter.get_counts_for_last_intervals(100);
+        let _ = self.packet_tx.send(recent_counts);
+    }
 }
 
 fn compute_shard_index<H: Hash>(flow_key: &H, num_shards: u8) -> usize {

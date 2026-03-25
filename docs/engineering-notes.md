@@ -45,6 +45,10 @@ This file keeps short-lived design choices and execution notes that would make
   deviation on demand instead of updating `std` itself on every packet.
   Dedicated tests now lock down population-std semantics, order invariance, and
   merged directional variance behavior.
+- Realtime packet-graph mode is now explicit and testable. When the graph is
+  disabled, RustiFlow no longer constructs the packet-count watch channel or
+  mutex-protected counter state, so high-throughput runs skip that observability
+  plumbing entirely instead of merely branching around it in the loop body.
 - Current test-hardening focus is to add adversarial deterministic cases before
   more feature work: false handshake completion, teardown edge cases, parser
   rejection behavior, and tiny fixture assertions that prove exported
