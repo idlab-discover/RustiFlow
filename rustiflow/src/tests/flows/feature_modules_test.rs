@@ -5,9 +5,10 @@ mod tests {
     use crate::{
         flows::{
             features::{
-                active_idle_stats::ActiveIdleStats, icmp_stats::IcmpStats,
+                active_idle_stats::ActiveIdleStats, iat_stats::IATStats, icmp_stats::IcmpStats,
                 payload_stats::PayloadLengthStats, retransmission_stats::RetransmissionStats,
-                subflow_stats::SubflowStats, util::FlowFeature, window_size_stats::WindowSizeStats,
+                subflow_stats::SubflowStats, timing_stats::TimingStats, util::FlowFeature,
+                window_size_stats::WindowSizeStats,
             },
             util::FlowExpireCause,
         },
@@ -163,5 +164,46 @@ mod tests {
         assert_eq!(stats.active_stats.get_count(), 1);
         assert_eq!(stats.idle_stats.get_total(), 9_000.0);
         assert_eq!(stats.idle_stats.get_count(), 2);
+    }
+
+    #[test]
+    fn iat_stats_preserve_sub_millisecond_precision() {
+        let mut stats = IATStats::new();
+
+        let first = packet(1_000_000);
+        stats.update(&first, true, first.timestamp_us);
+
+        let second = packet(1_000_500);
+        stats.update(&second, true, first.timestamp_us);
+
+        let third = packet(1_001_250);
+        stats.update(&third, false, second.timestamp_us);
+
+        assert_eq!(stats.fwd_iat.get_count(), 1);
+        assert!((stats.fwd_iat.get_mean() - 0.5).abs() < f64::EPSILON);
+        assert_eq!(stats.iat.get_count(), 2);
+        assert!((stats.iat.get_total() - 1.25).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn timing_stats_preserve_sub_millisecond_precision() {
+        let mut stats = TimingStats::new();
+
+        let first = packet(1_000_000);
+        stats.update(&first, true, first.timestamp_us);
+
+        let second = packet(1_000_750);
+        stats.update(&second, true, first.timestamp_us);
+
+        let third = packet(1_001_250);
+        stats.update(&third, false, second.timestamp_us);
+
+        let fourth = packet(1_002_125);
+        stats.update(&fourth, false, third.timestamp_us);
+
+        assert!((stats.first_timestamp_fwd_ms() - 1_000.0).abs() < f64::EPSILON);
+        assert!((stats.last_timestamp_fwd_ms() - 1_000.75).abs() < f64::EPSILON);
+        assert!((stats.get_fwd_duration() - 0.75).abs() < f64::EPSILON);
+        assert!((stats.get_bwd_duration() - 0.875).abs() < f64::EPSILON);
     }
 }
