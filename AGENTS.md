@@ -124,7 +124,7 @@ Primary files:
 - [x] Improve retransmission detection beyond exact duplicate TCP sequence numbers.
 - [x] Revisit active/idle and subflow threshold behavior.
 - [x] Expand ICMP behavior beyond first seen type/code.
-- [ ] Make TCP lifecycle quality more explicit.
+- [x] Make TCP lifecycle quality more explicit.
 
 Primary files:
 
