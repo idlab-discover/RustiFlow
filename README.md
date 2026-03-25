@@ -24,6 +24,23 @@ This tool is engineered for robust and efficient feature extraction, particularl
 
 See the [wiki](https://github.com/idlab-discover/RustiFlow/wiki) for the different feature sets available.
 
+## Supported Packet/Header Coverage
+
+RustiFlow currently extracts flows from the following protocol/header combinations:
+
+| Layer | Offline pcap | Realtime eBPF |
+| --- | --- | --- |
+| Link | Ethernet, Linux cooked capture, 802.1Q VLAN | Ethernet |
+| Network | IPv4, IPv6 | IPv4, IPv6 |
+| IPv6 extras | Extension headers supported before transport parsing | Extension headers supported before transport parsing |
+| Transport | TCP, UDP, ICMP, ICMPv6 | TCP, UDP, ICMP, ICMPv6 |
+
+Notes:
+
+- Realtime support is Linux-only.
+- Offline and realtime aim to expose the same flow semantics, but timestamp and packet-length sources can differ slightly.
+- Realtime VLAN parsing is not implemented yet.
+
 ## <img src="figures/RustiFlow_nobg.png" width="60px"/> Architecture
 
 ### Realtime processing
