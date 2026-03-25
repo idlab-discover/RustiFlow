@@ -36,3 +36,6 @@ This file keeps short-lived design choices and execution notes that would make
   unsupported offline frames must not panic the reader, and non-first IPv6
   fragments should be dropped instead of being treated like fresh transport
   headers.
+- Test hardening also exposed a real `FlowTable` lifecycle bug: packet-driven
+  termination export could overwrite `TcpReset` with `TcpTermination`, and a
+  first-packet-terminated flow could be left behind for duplicate export.
