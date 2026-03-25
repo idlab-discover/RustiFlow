@@ -46,10 +46,7 @@ impl NfFlow {
     }
 
     pub fn get_ip_version(&self) -> u8 {
-        match self.basic_flow.ip_source {
-            IpAddr::V4(_) => 4,
-            IpAddr::V6(_) => 6,
-        }
+        self.basic_flow.get_ip_version()
     }
 }
 

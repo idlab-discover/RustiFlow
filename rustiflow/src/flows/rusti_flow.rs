@@ -130,6 +130,13 @@ impl Flow for RustiFlow {
             self.basic_flow.ip_destination.to_string(),
             self.basic_flow.port_destination.to_string(),
             self.basic_flow.protocol.to_string(),
+            self.basic_flow.get_ip_version().to_string(),
+            self.basic_flow.get_source_ip_scope().as_str().to_string(),
+            self.basic_flow
+                .get_destination_ip_scope()
+                .as_str()
+                .to_string(),
+            self.basic_flow.get_path_locality().as_str().to_string(),
             self.basic_flow.get_first_timestamp().to_string(),
             self.basic_flow.get_last_timestamp().to_string(),
             duration_us.to_string(),
@@ -218,6 +225,10 @@ impl Flow for RustiFlow {
             "destination_ip".to_string(),
             "destination_port".to_string(),
             "protocol".to_string(),
+            "ip_version".to_string(),
+            "source_ip_scope".to_string(),
+            "destination_ip_scope".to_string(),
+            "path_locality".to_string(),
             "timestamp_first".to_string(),
             "timestamp_last".to_string(),
             "flow_duration_us".to_string(),
@@ -260,6 +271,13 @@ impl Flow for RustiFlow {
             iana_port_mapping(self.basic_flow.port_source).to_string(),
             iana_port_mapping(self.basic_flow.port_destination).to_string(),
             self.basic_flow.protocol.to_string(),
+            self.basic_flow.get_ip_version().to_string(),
+            self.basic_flow.get_source_ip_scope().as_str().to_string(),
+            self.basic_flow
+                .get_destination_ip_scope()
+                .as_str()
+                .to_string(),
+            self.basic_flow.get_path_locality().as_str().to_string(),
             duration_us.to_string(),
             self.basic_flow.flow_expire_cause.as_str().to_string(),
             u8::from(self.basic_flow.tcp_handshake_completed).to_string(),
@@ -344,6 +362,10 @@ impl Flow for RustiFlow {
             "source_port_iana".to_string(),
             "destination_port_iana".to_string(),
             "protocol".to_string(),
+            "ip_version".to_string(),
+            "source_ip_scope".to_string(),
+            "destination_ip_scope".to_string(),
+            "path_locality".to_string(),
             "flow_duration_us".to_string(),
             "flow_expire_cause".to_string(),
             "tcp_handshake_completed".to_string(),

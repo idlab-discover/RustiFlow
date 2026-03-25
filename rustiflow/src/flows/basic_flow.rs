@@ -3,7 +3,12 @@ use std::net::IpAddr;
 use chrono::{DateTime, Utc};
 use pnet::packet::ip::IpNextHeaderProtocols;
 
-use crate::{flows::util::iana_port_mapping, packet_features::PacketFeatures};
+use crate::{
+    flows::util::{
+        classify_ip_scope, classify_path_locality, iana_port_mapping, IpScope, PathLocality,
+    },
+    packet_features::PacketFeatures,
+};
 
 use super::{flow::Flow, util::FlowExpireCause};
 
@@ -212,6 +217,25 @@ impl BasicFlow {
 
     pub fn get_first_timestamp(&self) -> DateTime<Utc> {
         DateTime::from_timestamp_micros(self.first_timestamp_us).unwrap()
+    }
+
+    pub fn get_ip_version(&self) -> u8 {
+        match self.ip_source {
+            IpAddr::V4(_) => 4,
+            IpAddr::V6(_) => 6,
+        }
+    }
+
+    pub fn get_source_ip_scope(&self) -> IpScope {
+        classify_ip_scope(self.ip_source)
+    }
+
+    pub fn get_destination_ip_scope(&self) -> IpScope {
+        classify_ip_scope(self.ip_destination)
+    }
+
+    pub fn get_path_locality(&self) -> PathLocality {
+        classify_path_locality(self.ip_source, self.ip_destination)
     }
 }
 

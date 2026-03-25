@@ -20,6 +20,7 @@ This tool is engineered for robust and efficient feature extraction, particularl
 - **Pcap File Support:** Facilitates packet analysis from pcap files, compatible with both Linux and Windows generated files.
 - **Diverse Output Options:** Features can be outputted to the console, a CSV file, or other formats with minimal effort.
 - **Richer TCP Quality Signals:** The RustiFlow feature set exports duplicate ACK counts, zero-window observations, and TCP close style in addition to the existing lifecycle and retransmission fields.
+- **Endpoint-Aware IP Context:** The RustiFlow feature set exports `ip_version`, endpoint IP scope, and coarse `path_locality` derived from normalized addresses without expanding the eBPF event payload.
 
 ## Feature sets
 
@@ -221,7 +222,7 @@ Options:
           - cic:       Represents the CIC Flow, giving 90 features
           - cidds:     Represents the CIDDS Flow, giving 10 features
           - nfstream:  Represents a nfstream inspired flow, giving 71 features
-          - rustiflow: Represents the Rusti Flow, giving 199 features
+          - rustiflow: Represents the Rusti Flow, giving 203 features
           - custom:    Represents a flow that you can implement yourself
 
       --active-timeout <ACTIVE_TIMEOUT>

@@ -109,7 +109,7 @@ in `docs/engineering-notes.md`.
 - [ ] Stabilize and measure before expanding the eBPF event payload further.
 - [x] Finish the remaining TCP quality signals that current metadata already supports:
   duplicate ACKs, zero-window events, and close style.
-- [ ] Add the next IP and path signals once they can be trusted in both offline
+- [x] Add the next IP and path signals once they can be trusted in both offline
   and realtime modes.
 
 Primary files:
