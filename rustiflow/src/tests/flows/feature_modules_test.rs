@@ -12,7 +12,7 @@ mod tests {
             },
             util::FlowExpireCause,
         },
-        packet_features::{PacketFeatures, ACK_FLAG},
+        packet_features::{PacketFeatures, ACK_FLAG, FIN_FLAG, SYN_FLAG},
     };
 
     fn packet(timestamp_us: i64) -> PacketFeatures {
@@ -43,7 +43,7 @@ mod tests {
     }
 
     #[test]
-    fn retransmission_stats_skip_pure_acks_and_icmp_and_track_duplicates_by_direction() {
+    fn retransmission_stats_only_track_tcp_overlap_by_direction() {
         let mut stats = RetransmissionStats::new();
 
         let mut pure_ack = packet(1_000_000);
@@ -54,6 +54,12 @@ mod tests {
         stats.update(&pure_ack, true, pure_ack.timestamp_us);
         stats.update(&pure_ack, true, pure_ack.timestamp_us);
 
+        let mut udp = packet(1_250_000);
+        udp.protocol = IpNextHeaderProtocols::Udp.0;
+        udp.sequence_number = 0;
+        stats.update(&udp, true, pure_ack.timestamp_us);
+        stats.update(&udp, true, pure_ack.timestamp_us);
+
         let mut icmp = packet(1_500_000);
         icmp.protocol = IpNextHeaderProtocols::Icmp.0;
         icmp.sequence_number = 22;
@@ -63,18 +69,56 @@ mod tests {
         let mut fwd = packet(2_000_000);
         fwd.protocol = IpNextHeaderProtocols::Tcp.0;
         fwd.sequence_number = 100;
+        fwd.data_length = 100;
         stats.update(&fwd, true, pure_ack.timestamp_us);
-        stats.update(&fwd, true, pure_ack.timestamp_us);
+
+        let mut partial_fwd = packet(2_100_000);
+        partial_fwd.protocol = IpNextHeaderProtocols::Tcp.0;
+        partial_fwd.sequence_number = 150;
+        partial_fwd.data_length = 100;
+        stats.update(&partial_fwd, true, fwd.timestamp_us);
 
         let mut bwd = packet(2_500_000);
         bwd.protocol = IpNextHeaderProtocols::Tcp.0;
+        bwd.flags = SYN_FLAG;
+        bwd.syn_flag = 1;
         bwd.sequence_number = 200;
         stats.update(&bwd, false, fwd.timestamp_us);
-        stats.update(&bwd, false, fwd.timestamp_us);
+
+        let mut duplicate_syn = packet(2_600_000);
+        duplicate_syn.protocol = IpNextHeaderProtocols::Tcp.0;
+        duplicate_syn.flags = SYN_FLAG;
+        duplicate_syn.syn_flag = 1;
+        duplicate_syn.sequence_number = 200;
+        stats.update(&duplicate_syn, false, bwd.timestamp_us);
 
         assert_eq!(stats.fwd_retransmission_count, 1);
         assert_eq!(stats.bwd_retransmission_count, 1);
         assert_eq!(stats.dump(), "2,1,1");
+    }
+
+    #[test]
+    fn retransmission_stats_treat_fin_sequence_space_as_retransmittable() {
+        let mut stats = RetransmissionStats::new();
+
+        let mut fin = packet(1_000_000);
+        fin.protocol = IpNextHeaderProtocols::Tcp.0;
+        fin.flags = FIN_FLAG | ACK_FLAG;
+        fin.fin_flag = 1;
+        fin.ack_flag = 1;
+        fin.sequence_number = 500;
+        stats.update(&fin, true, fin.timestamp_us);
+
+        let mut duplicate_fin = packet(1_100_000);
+        duplicate_fin.protocol = IpNextHeaderProtocols::Tcp.0;
+        duplicate_fin.flags = FIN_FLAG | ACK_FLAG;
+        duplicate_fin.fin_flag = 1;
+        duplicate_fin.ack_flag = 1;
+        duplicate_fin.sequence_number = 500;
+        stats.update(&duplicate_fin, true, fin.timestamp_us);
+
+        assert_eq!(stats.fwd_retransmission_count, 1);
+        assert_eq!(stats.bwd_retransmission_count, 0);
     }
 
     #[test]

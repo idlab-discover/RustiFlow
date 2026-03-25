@@ -16,3 +16,6 @@ This file keeps short-lived design choices and execution notes that would make
 - Retransmission work should stay bounded: fix non-TCP false positives, move
   beyond exact duplicate sequence numbers, and leave richer TCP quality signals
   such as duplicate ACKs and handshake analysis for later checklist items.
+- Retransmission stats now stay TCP-only and count overlap in TCP sequence
+  space, including SYN and FIN sequence-number use, instead of only exact
+  duplicate sequence numbers.
