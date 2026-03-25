@@ -117,7 +117,7 @@ impl Flow for CicFlow {
             {},{},{},{},{},{},{},{},{},{},\
             {},{},{},{},{},{},{},{},{},{},\
             {},{},{},{},{},{},{},{},{},{},\
-            {},{},{},{},{},{},{}",
+            {},{},{},{},{},{},{},{},{},{}",
             // Basic Info
             self.basic_flow.flow_key,
             self.basic_flow.ip_source,
@@ -127,6 +127,9 @@ impl Flow for CicFlow {
             self.basic_flow.protocol,
             self.basic_flow.get_first_timestamp(),
             self.basic_flow.get_flow_duration_usec(),
+            u8::from(self.basic_flow.tcp_handshake_completed),
+            u8::from(self.basic_flow.tcp_reset_before_handshake),
+            u8::from(self.basic_flow.tcp_reset_after_handshake),
             // Packet Length Stats (fwd & bwd)
             self.payload_len_stats.fwd_payload_len.get_count(),
             self.payload_len_stats.bwd_payload_len.get_count(),
@@ -277,6 +280,9 @@ impl Flow for CicFlow {
             "Protocol",
             "Timestamp",
             "Flow Duration",
+            "TCP Handshake Completed",
+            "TCP Reset Before Handshake",
+            "TCP Reset After Handshake",
             "Total Fwd Packet",
             "Total Bwd packets",
             "Total Length of Fwd Packet",
@@ -380,12 +386,15 @@ impl Flow for CicFlow {
             {},{},{},{},{},{},{},{},{},{},\
             {},{},{},{},{},{},{},{},{},{},\
             {},{},{},{},{},{},{},{},{},{},\
-            {},{},{},{},{},{},{},{},{},{},{},{},{}",
+            {},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{}",
             // Basic Info
             iana_port_mapping(self.basic_flow.port_source),
             iana_port_mapping(self.basic_flow.port_destination),
             self.basic_flow.protocol,
             self.basic_flow.get_flow_duration_usec(),
+            u8::from(self.basic_flow.tcp_handshake_completed),
+            u8::from(self.basic_flow.tcp_reset_before_handshake),
+            u8::from(self.basic_flow.tcp_reset_after_handshake),
             // Packet Length Stats (fwd & bwd)
             self.payload_len_stats.fwd_payload_len.get_count(),
             self.payload_len_stats.bwd_payload_len.get_count(),
@@ -532,6 +541,9 @@ impl Flow for CicFlow {
             "Dst Port (IANA)",
             "Protocol",
             "Flow Duration",
+            "TCP Handshake Completed",
+            "TCP Reset Before Handshake",
+            "TCP Reset After Handshake",
             "Total Fwd Packet",
             "Total Bwd packets",
             "Total Length of Fwd Packet",

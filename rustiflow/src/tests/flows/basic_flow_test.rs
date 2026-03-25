@@ -79,4 +79,107 @@ mod tests {
         assert!(flow.update_flow(&ack_fwd, true));
         assert_eq!(flow.flow_expire_cause, FlowExpireCause::TcpTermination);
     }
+
+    #[test]
+    fn tcp_handshake_completion_is_tracked() {
+        let ip_source = IpAddr::V4(Ipv4Addr::new(10, 0, 0, 1));
+        let ip_destination = IpAddr::V4(Ipv4Addr::new(10, 0, 0, 2));
+        let mut flow = BasicFlow::new(
+            "flow-3".to_string(),
+            ip_source,
+            50001,
+            ip_destination,
+            443,
+            6,
+            1_000_000,
+        );
+
+        let mut syn = build_packet(ip_source, 50001, ip_destination, 443, 1_000_100);
+        syn.syn_flag = 1;
+        assert!(!flow.update_flow(&syn, true));
+        assert!(!flow.tcp_handshake_completed);
+
+        let mut syn_ack = build_packet(ip_destination, 443, ip_source, 50001, 1_000_200);
+        syn_ack.syn_flag = 1;
+        syn_ack.ack_flag = 1;
+        syn_ack.sequence_number = 700;
+        assert!(!flow.update_flow(&syn_ack, false));
+        assert!(!flow.tcp_handshake_completed);
+
+        let mut ack = build_packet(ip_source, 50001, ip_destination, 443, 1_000_300);
+        ack.ack_flag = 1;
+        ack.sequence_number_ack = 701;
+        assert!(!flow.update_flow(&ack, true));
+
+        assert!(flow.tcp_handshake_completed);
+        assert!(!flow.tcp_reset_before_handshake);
+        assert!(!flow.tcp_reset_after_handshake);
+    }
+
+    #[test]
+    fn tcp_reset_before_handshake_is_classified() {
+        let ip_source = IpAddr::V4(Ipv4Addr::new(10, 0, 0, 1));
+        let ip_destination = IpAddr::V4(Ipv4Addr::new(10, 0, 0, 2));
+        let mut flow = BasicFlow::new(
+            "flow-4".to_string(),
+            ip_source,
+            50002,
+            ip_destination,
+            22,
+            6,
+            1_000_000,
+        );
+
+        let mut syn = build_packet(ip_source, 50002, ip_destination, 22, 1_000_100);
+        syn.syn_flag = 1;
+        assert!(!flow.update_flow(&syn, true));
+
+        let mut rst = build_packet(ip_destination, 22, ip_source, 50002, 1_000_200);
+        rst.rst_flag = 1;
+        assert!(flow.update_flow(&rst, false));
+
+        assert_eq!(flow.flow_expire_cause, FlowExpireCause::TcpReset);
+        assert!(!flow.tcp_handshake_completed);
+        assert!(flow.tcp_reset_before_handshake);
+        assert!(!flow.tcp_reset_after_handshake);
+    }
+
+    #[test]
+    fn tcp_reset_after_handshake_is_classified() {
+        let ip_source = IpAddr::V4(Ipv4Addr::new(10, 0, 0, 1));
+        let ip_destination = IpAddr::V4(Ipv4Addr::new(10, 0, 0, 2));
+        let mut flow = BasicFlow::new(
+            "flow-5".to_string(),
+            ip_source,
+            50003,
+            ip_destination,
+            22,
+            6,
+            1_000_000,
+        );
+
+        let mut syn = build_packet(ip_source, 50003, ip_destination, 22, 1_000_100);
+        syn.syn_flag = 1;
+        assert!(!flow.update_flow(&syn, true));
+
+        let mut syn_ack = build_packet(ip_destination, 22, ip_source, 50003, 1_000_200);
+        syn_ack.syn_flag = 1;
+        syn_ack.ack_flag = 1;
+        syn_ack.sequence_number = 900;
+        assert!(!flow.update_flow(&syn_ack, false));
+
+        let mut ack = build_packet(ip_source, 50003, ip_destination, 22, 1_000_300);
+        ack.ack_flag = 1;
+        ack.sequence_number_ack = 901;
+        assert!(!flow.update_flow(&ack, true));
+
+        let mut rst = build_packet(ip_destination, 22, ip_source, 50003, 1_000_400);
+        rst.rst_flag = 1;
+        assert!(flow.update_flow(&rst, false));
+
+        assert_eq!(flow.flow_expire_cause, FlowExpireCause::TcpReset);
+        assert!(flow.tcp_handshake_completed);
+        assert!(!flow.tcp_reset_before_handshake);
+        assert!(flow.tcp_reset_after_handshake);
+    }
 }

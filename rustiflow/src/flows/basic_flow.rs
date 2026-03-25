@@ -1,6 +1,7 @@
 use std::net::IpAddr;
 
 use chrono::{DateTime, Utc};
+use pnet::packet::ip::IpNextHeaderProtocols;
 
 use crate::{flows::util::iana_port_mapping, packet_features::PacketFeatures};
 
@@ -40,9 +41,48 @@ pub struct BasicFlow {
     pub(crate) state_bwd: FlowState,
     expected_ack_seq_fwd: Option<u32>,
     expected_ack_seq_bwd: Option<u32>,
+    saw_syn_fwd: bool,
+    saw_syn_ack_bwd: bool,
+    expected_handshake_ack_seq_fwd: Option<u32>,
+    pub tcp_handshake_completed: bool,
+    pub tcp_reset_before_handshake: bool,
+    pub tcp_reset_after_handshake: bool,
 }
 
 impl BasicFlow {
+    fn is_tcp(&self) -> bool {
+        self.protocol == IpNextHeaderProtocols::Tcp.0
+    }
+
+    fn observe_tcp_handshake(&mut self, packet: &PacketFeatures, forward: bool) {
+        if !self.is_tcp() || self.tcp_handshake_completed {
+            return;
+        }
+
+        if forward && packet.syn_flag > 0 && packet.ack_flag == 0 {
+            self.saw_syn_fwd = true;
+            self.saw_syn_ack_bwd = false;
+            self.expected_handshake_ack_seq_fwd = None;
+            return;
+        }
+
+        if !forward && self.saw_syn_fwd && packet.syn_flag > 0 && packet.ack_flag > 0 {
+            self.saw_syn_ack_bwd = true;
+            self.expected_handshake_ack_seq_fwd = Some(packet.sequence_number + 1);
+            return;
+        }
+
+        if forward
+            && self.saw_syn_fwd
+            && self.saw_syn_ack_bwd
+            && packet.ack_flag > 0
+            && packet.syn_flag == 0
+            && Some(packet.sequence_number_ack) == self.expected_handshake_ack_seq_fwd
+        {
+            self.tcp_handshake_completed = true;
+        }
+    }
+
     /// Checks if the flow is finished.
     ///
     /// A flow is considered finished when both FIN flags are set and the last ACK is received,
@@ -140,18 +180,30 @@ impl Flow for BasicFlow {
             state_bwd: FlowState::Established,
             expected_ack_seq_fwd: None,
             expected_ack_seq_bwd: None,
+            saw_syn_fwd: false,
+            saw_syn_ack_bwd: false,
+            expected_handshake_ack_seq_fwd: None,
+            tcp_handshake_completed: false,
+            tcp_reset_before_handshake: false,
+            tcp_reset_after_handshake: false,
         }
     }
 
     fn update_flow(&mut self, packet: &PacketFeatures, fwd: bool) -> bool {
         self.last_timestamp_us = packet.timestamp_us;
+        self.observe_tcp_handshake(packet, fwd);
 
         if self.is_tcp_finished(packet, fwd) {
             self.flow_expire_cause = FlowExpireCause::TcpTermination;
             return true;
         }
 
-        if packet.rst_flag > 0 {
+        if self.is_tcp() && packet.rst_flag > 0 {
+            if self.tcp_handshake_completed {
+                self.tcp_reset_after_handshake = true;
+            } else {
+                self.tcp_reset_before_handshake = true;
+            }
             self.flow_expire_cause = FlowExpireCause::TcpReset;
             return true;
         }

@@ -25,3 +25,6 @@ This file keeps short-lived design choices and execution notes that would make
 - ICMP stats now keep the original first seen type and code, but also track
   echo request and reply counts plus error and destination-unreachable counts
   across ICMPv4 and ICMPv6 traffic.
+- TCP lifecycle export now distinguishes observed handshake completion from
+  resets seen before or after that observed handshake, so richer flow schemas
+  do not have to infer lifecycle quality from flag totals alone.

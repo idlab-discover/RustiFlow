@@ -121,7 +121,7 @@ impl Flow for RustiFlow {
             "{},{},{},{},{},{},{},{},{},{},\
             {},{},{},{},{},{},{},{},{},{},\
             {},{},{},{},{},{},{},{},{},{},\
-            {},{},{}",
+            {},{},{},{},{},{}",
             // Basic Info
             self.basic_flow.flow_key,
             self.basic_flow.ip_source,
@@ -133,6 +133,9 @@ impl Flow for RustiFlow {
             self.basic_flow.get_last_timestamp(),
             duration_us,
             self.basic_flow.flow_expire_cause.as_str(),
+            u8::from(self.basic_flow.tcp_handshake_completed),
+            u8::from(self.basic_flow.tcp_reset_before_handshake),
+            u8::from(self.basic_flow.tcp_reset_after_handshake),
             // Timing Stats
             self.timing_stats.dump(),
             // IAT Stats
@@ -211,7 +214,7 @@ impl Flow for RustiFlow {
             "{},{},{},{},{},{},{},{},{},{},\
             {},{},{},{},{},{},{},{},{},{},\
             {},{},{},{},{},{},{},{},{},{},\
-            {},{},{}",
+            {},{},{},{},{},{}",
             // Basic Info
             "flow_id",
             "source_ip",
@@ -223,6 +226,9 @@ impl Flow for RustiFlow {
             "timestamp_last",
             "flow_duration_us",
             "flow_expire_cause",
+            "tcp_handshake_completed",
+            "tcp_reset_before_handshake",
+            "tcp_reset_after_handshake",
             // Timing Stats
             TimingStats::headers(),
             // IAT Stats
@@ -268,13 +274,16 @@ impl Flow for RustiFlow {
         format!(
             "{},{},{},{},{},{},{},{},{},{},\
             {},{},{},{},{},{},{},{},{},{}\
-            ,{},{},{},{},{},{},{},{},{}",
+            ,{},{},{},{},{},{},{},{},{},{},{},{}",
             // Basic Info
             iana_port_mapping(self.basic_flow.port_source),
             iana_port_mapping(self.basic_flow.port_destination),
             self.basic_flow.protocol,
             duration_us,
             self.basic_flow.flow_expire_cause.as_str(),
+            u8::from(self.basic_flow.tcp_handshake_completed),
+            u8::from(self.basic_flow.tcp_reset_before_handshake),
+            u8::from(self.basic_flow.tcp_reset_after_handshake),
             // Timing Stats
             self.timing_stats.get_fwd_duration(),
             self.timing_stats.get_bwd_duration(),
@@ -353,13 +362,16 @@ impl Flow for RustiFlow {
         format!(
             "{},{},{},{},{},{},{},{},{},{},\
             {},{},{},{},{},{},{},{},{},{}\
-            ,{},{},{},{},{},{},{},{},{}",
+            ,{},{},{},{},{},{},{},{},{},{},{},{}",
             // Basic Info
             "source_port_iana",
             "destination_port_iana",
             "protocol",
             "flow_duration_us",
             "flow_expire_cause",
+            "tcp_handshake_completed",
+            "tcp_reset_before_handshake",
+            "tcp_reset_after_handshake",
             // Timing Stats
             "fwd_duration_ms",
             "bwd_duration_ms",
