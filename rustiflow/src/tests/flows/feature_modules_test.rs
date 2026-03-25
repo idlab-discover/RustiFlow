@@ -173,7 +173,7 @@ mod tests {
     }
 
     #[test]
-    fn subflow_stats_increment_only_on_gaps_greater_than_one_second() {
+    fn subflow_stats_count_initial_subflow_and_increment_only_on_gaps_greater_than_one_second() {
         let mut stats = SubflowStats::new();
 
         let first_ts = 1_000_000;
@@ -189,7 +189,7 @@ mod tests {
         let third = packet(third_ts);
         stats.update(&third, true, second_ts);
 
-        assert_eq!(stats.subflow_count, 1);
+        assert_eq!(stats.subflow_count, 2);
     }
 
     #[test]
@@ -208,6 +208,24 @@ mod tests {
         assert_eq!(stats.active_stats.get_count(), 1);
         assert_eq!(stats.idle_stats.get_total(), 9_000.0);
         assert_eq!(stats.idle_stats.get_count(), 2);
+    }
+
+    #[test]
+    fn active_idle_stats_preserve_gap_precision_and_exact_threshold_behavior() {
+        let first = packet(1_000_000);
+        let mut stats = ActiveIdleStats::new(first.timestamp_us);
+        stats.update(&first, true, 0);
+
+        let exact_threshold = packet(6_000_000);
+        stats.update(&exact_threshold, false, first.timestamp_us);
+
+        let over_threshold = packet(11_000_500);
+        stats.update(&over_threshold, true, exact_threshold.timestamp_us);
+
+        assert_eq!(stats.active_stats.get_count(), 1);
+        assert!((stats.active_stats.get_total() - 5_000.0).abs() < f64::EPSILON);
+        assert_eq!(stats.idle_stats.get_count(), 1);
+        assert!((stats.idle_stats.get_total() - 5_000.5).abs() < f64::EPSILON);
     }
 
     #[test]

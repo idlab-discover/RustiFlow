@@ -2,7 +2,7 @@ use crate::{flows::util::FlowExpireCause, packet_features::PacketFeatures};
 
 use super::util::{FeatureStats, FlowFeature};
 
-const ACTIVE_IDLE_TIMEOUT: i64 = 5_000; // 5s
+const ACTIVE_IDLE_TIMEOUT_US: i64 = 5_000_000; // 5s
 
 #[derive(Clone)]
 pub struct ActiveIdleStats {
@@ -26,14 +26,15 @@ impl ActiveIdleStats {
 impl FlowFeature for ActiveIdleStats {
     fn update(&mut self, packet: &PacketFeatures, _is_forward: bool, _last_timestamp_us: i64) {
         let current_ts = packet.timestamp_us;
-        let duration_ms = (current_ts - self.active_end) / 1_000; // Convert to milliseconds
+        let idle_gap_us = current_ts - self.active_end;
 
-        if duration_ms > ACTIVE_IDLE_TIMEOUT {
-            let active_duration = (self.active_end - self.active_start) / 1_000;
-            if active_duration > 0 {
-                self.active_stats.add_value(active_duration as f64);
+        if idle_gap_us > ACTIVE_IDLE_TIMEOUT_US {
+            let active_duration_us = self.active_end - self.active_start;
+            if active_duration_us > 0 {
+                self.active_stats
+                    .add_value(active_duration_us as f64 / 1_000.0);
             }
-            self.idle_stats.add_value(duration_ms as f64);
+            self.idle_stats.add_value(idle_gap_us as f64 / 1_000.0);
             self.active_start = current_ts;
         }
         self.active_end = current_ts;

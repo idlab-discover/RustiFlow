@@ -19,3 +19,6 @@ This file keeps short-lived design choices and execution notes that would make
 - Retransmission stats now stay TCP-only and count overlap in TCP sequence
   space, including SYN and FIN sequence-number use, instead of only exact
   duplicate sequence numbers.
+- Active/idle tracking now compares thresholds in microseconds before converting
+  to exported millisecond values, and subflow counting now represents actual
+  subflows instead of only counting gap boundaries after the first packet.
