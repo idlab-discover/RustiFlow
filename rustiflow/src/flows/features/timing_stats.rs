@@ -4,54 +4,74 @@ use super::util::FlowFeature;
 
 #[derive(Clone)]
 pub struct TimingStats {
-    pub first_timestamp_fwd_ms: Option<i64>,
-    pub first_timestamp_bwd_ms: Option<i64>,
-    pub last_timestamp_fwd_ms: Option<i64>,
-    pub last_timestamp_bwd_ms: Option<i64>,
+    first_timestamp_fwd_us: Option<i64>,
+    first_timestamp_bwd_us: Option<i64>,
+    last_timestamp_fwd_us: Option<i64>,
+    last_timestamp_bwd_us: Option<i64>,
 }
 
 impl TimingStats {
     pub fn new() -> Self {
         TimingStats {
-            first_timestamp_fwd_ms: None,
-            first_timestamp_bwd_ms: None,
-            last_timestamp_fwd_ms: None,
-            last_timestamp_bwd_ms: None,
+            first_timestamp_fwd_us: None,
+            first_timestamp_bwd_us: None,
+            last_timestamp_fwd_us: None,
+            last_timestamp_bwd_us: None,
         }
     }
 
-    pub fn get_fwd_duration(&self) -> i64 {
-        if let (Some(first), Some(last)) = (self.first_timestamp_fwd_ms, self.last_timestamp_fwd_ms)
+    pub fn first_timestamp_fwd_ms(&self) -> f64 {
+        self.first_timestamp_fwd_us
+            .map_or(0.0, |timestamp_us| timestamp_us as f64 / 1_000.0)
+    }
+
+    pub fn first_timestamp_bwd_ms(&self) -> f64 {
+        self.first_timestamp_bwd_us
+            .map_or(0.0, |timestamp_us| timestamp_us as f64 / 1_000.0)
+    }
+
+    pub fn last_timestamp_fwd_ms(&self) -> f64 {
+        self.last_timestamp_fwd_us
+            .map_or(0.0, |timestamp_us| timestamp_us as f64 / 1_000.0)
+    }
+
+    pub fn last_timestamp_bwd_ms(&self) -> f64 {
+        self.last_timestamp_bwd_us
+            .map_or(0.0, |timestamp_us| timestamp_us as f64 / 1_000.0)
+    }
+
+    pub fn get_fwd_duration(&self) -> f64 {
+        if let (Some(first), Some(last)) = (self.first_timestamp_fwd_us, self.last_timestamp_fwd_us)
         {
-            last - first
+            (last - first) as f64 / 1_000.0
         } else {
-            0
+            0.0
         }
     }
 
-    pub fn get_bwd_duration(&self) -> i64 {
-        if let (Some(first), Some(last)) = (self.first_timestamp_bwd_ms, self.last_timestamp_bwd_ms)
+    pub fn get_bwd_duration(&self) -> f64 {
+        if let (Some(first), Some(last)) = (self.first_timestamp_bwd_us, self.last_timestamp_bwd_us)
         {
-            last - first
+            (last - first) as f64 / 1_000.0
         } else {
-            0
+            0.0
         }
     }
 }
 
 impl FlowFeature for TimingStats {
     fn update(&mut self, packet: &PacketFeatures, is_forward: bool, _last_timestamp_us: i64) {
-        let current_ts = packet.timestamp_us / 1000;
+        let current_ts = packet.timestamp_us;
         if is_forward {
-            if self.first_timestamp_fwd_ms.is_none() {
-                self.first_timestamp_fwd_ms = Some(current_ts);
+            if self.first_timestamp_fwd_us.is_none() {
+                self.first_timestamp_fwd_us = Some(current_ts);
             }
-            self.last_timestamp_fwd_ms = Some(current_ts);
+            self.last_timestamp_fwd_us = Some(current_ts);
         } else {
-            if self.first_timestamp_bwd_ms.is_none() {
-                self.first_timestamp_bwd_ms = Some(current_ts);
+            if self.first_timestamp_bwd_us.is_none() {
+                self.first_timestamp_bwd_us = Some(current_ts);
             }
-            self.last_timestamp_bwd_ms = Some(current_ts);
+            self.last_timestamp_bwd_us = Some(current_ts);
         }
     }
 
@@ -62,10 +82,10 @@ impl FlowFeature for TimingStats {
     fn dump(&self) -> String {
         format!(
             "{},{},{},{},{},{}",
-            self.first_timestamp_fwd_ms.unwrap_or(0),
-            self.first_timestamp_bwd_ms.unwrap_or(0),
-            self.last_timestamp_fwd_ms.unwrap_or(0),
-            self.last_timestamp_bwd_ms.unwrap_or(0),
+            self.first_timestamp_fwd_ms(),
+            self.first_timestamp_bwd_ms(),
+            self.last_timestamp_fwd_ms(),
+            self.last_timestamp_bwd_ms(),
             self.get_fwd_duration(),
             self.get_bwd_duration()
         )

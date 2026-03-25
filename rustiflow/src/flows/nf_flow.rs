@@ -145,17 +145,13 @@ impl Flow for NfFlow {
             self.basic_flow.get_flow_duration_msec(),
             self.packet_len_stats.flow_count(),
             self.packet_len_stats.flow_total(),
-            self.timing_stats
-                .first_timestamp_fwd_ms
-                .unwrap_or_else(|| 0),
-            self.timing_stats.last_timestamp_fwd_ms.unwrap_or_else(|| 0),
+            self.timing_stats.first_timestamp_fwd_ms(),
+            self.timing_stats.last_timestamp_fwd_ms(),
             self.timing_stats.get_fwd_duration(),
             self.packet_len_stats.fwd_packet_len.get_count(),
             self.packet_len_stats.fwd_packet_len.get_total(),
-            self.timing_stats
-                .first_timestamp_bwd_ms
-                .unwrap_or_else(|| 0),
-            self.timing_stats.last_timestamp_bwd_ms.unwrap_or_else(|| 0),
+            self.timing_stats.first_timestamp_bwd_ms(),
+            self.timing_stats.last_timestamp_bwd_ms(),
             self.timing_stats.get_bwd_duration(),
             self.packet_len_stats.bwd_packet_len.get_count(),
             self.packet_len_stats.bwd_packet_len.get_total(),

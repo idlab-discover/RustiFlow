@@ -7,9 +7,9 @@ pub struct IATStats {
     pub fwd_iat: FeatureStats,
     pub bwd_iat: FeatureStats,
     pub iat: FeatureStats,
-    last_timestamp_fwd_ms: Option<i64>,
-    last_timestamp_bwd_ms: Option<i64>,
-    last_timestamp_ms: Option<i64>,
+    last_timestamp_fwd_us: Option<i64>,
+    last_timestamp_bwd_us: Option<i64>,
+    last_timestamp_us: Option<i64>,
 }
 
 impl IATStats {
@@ -18,36 +18,36 @@ impl IATStats {
             fwd_iat: FeatureStats::new(),
             bwd_iat: FeatureStats::new(),
             iat: FeatureStats::new(),
-            last_timestamp_fwd_ms: None,
-            last_timestamp_bwd_ms: None,
-            last_timestamp_ms: None,
+            last_timestamp_fwd_us: None,
+            last_timestamp_bwd_us: None,
+            last_timestamp_us: None,
         }
     }
 }
 
 impl FlowFeature for IATStats {
     fn update(&mut self, packet: &PacketFeatures, is_forward: bool, _last_timestamp_us: i64) {
-        let current_ts_ms = packet.timestamp_us / 1000;
+        let current_ts_us = packet.timestamp_us;
 
-        let duration_ms = |last_timestamp_ms: Option<i64>| {
-            last_timestamp_ms.map(|ts_ms| (current_ts_ms - ts_ms) as f64)
+        let duration_ms = |last_timestamp_us: Option<i64>| {
+            last_timestamp_us.map(|ts_us| (current_ts_us - ts_us) as f64 / 1_000.0)
         };
 
-        if let Some(dur) = duration_ms(self.last_timestamp_ms) {
+        if let Some(dur) = duration_ms(self.last_timestamp_us) {
             self.iat.add_value(dur);
         }
-        self.last_timestamp_ms = Some(current_ts_ms);
+        self.last_timestamp_us = Some(current_ts_us);
 
         if is_forward {
-            if let Some(dur) = duration_ms(self.last_timestamp_fwd_ms) {
+            if let Some(dur) = duration_ms(self.last_timestamp_fwd_us) {
                 self.fwd_iat.add_value(dur);
             }
-            self.last_timestamp_fwd_ms = Some(current_ts_ms);
+            self.last_timestamp_fwd_us = Some(current_ts_us);
         } else {
-            if let Some(dur) = duration_ms(self.last_timestamp_bwd_ms) {
+            if let Some(dur) = duration_ms(self.last_timestamp_bwd_us) {
                 self.bwd_iat.add_value(dur);
             }
-            self.last_timestamp_bwd_ms = Some(current_ts_ms);
+            self.last_timestamp_bwd_us = Some(current_ts_us);
         }
     }
 
