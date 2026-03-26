@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {};
+window.SIDEBAR_ITEMS = {"mod":["basic_flow_test","cidds_flow_test","feature_modules_test","flow_table_test","nf_flow_test","packet_features_test","pcap_fixture_test","pcap_reader_test","rusti_flow_test"]};

@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"struct":["RetransmissionStats"]};
+window.SIDEBAR_ITEMS = {"fn":["insert_sequence_range","sequence_range"],"struct":["RetransmissionStats","SequenceRange"]};

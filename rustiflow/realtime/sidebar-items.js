@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"fn":["bump_memlock_rlimit","compute_shard_index","handle_realtime","load_ebpf_ipv4","load_ebpf_ipv6"]};
+window.SIDEBAR_ITEMS = {"fn":["bump_memlock_rlimit","compute_realtime_offset_us","compute_shard_index","ebpf_binary_path","handle_realtime","load_ebpf_ipv4","load_ebpf_ipv6","read_clock_us"],"struct":["PacketGraphState"]};

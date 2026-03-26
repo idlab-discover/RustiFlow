@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"enum":["FlowExpireCause"],"fn":["iana_port_mapping"]};
+window.SIDEBAR_ITEMS = {"enum":["FlowExpireCause","IpScope","PathLocality"],"fn":["classify_ip_scope","classify_ipv4_scope","classify_ipv6_scope","classify_path_locality","iana_port_mapping","is_localish_scope","is_shared_ipv4"]};
