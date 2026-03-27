@@ -7,6 +7,24 @@ This repository is a Rust workspace for a network flow extractor. The main crate
 - `xtask`: helper commands for building and running the project
 - `ebpf-ipv4` / `ebpf-ipv6`: Linux eBPF programs used for realtime capture
 
+## Platform Notes
+
+- Realtime eBPF support is Linux-specific.
+- Linux is the source of truth for build, runtime, and performance validation.
+- Do not assume that successful non-Linux builds imply realtime correctness.
+- When touching `aya`/eBPF/realtime code, prefer validating on Linux.
+
+## Local Test Network
+
+- The primary dedicated software-path test setup is local to `rgbcore`.
+- A persistent veth pair is available for RustiFlow testing:
+  - host namespace capture side: `rustiflow-t0`
+  - peer namespace side: `rustiflow-p0`
+  - peer namespace: `rustiflow-peer`
+  - addressing: `10.203.0.1/30` on `rustiflow-t0`, `10.203.0.2/30` on `rustiflow-p0`
+- This setup is intended to stress the RustiFlow software path without depending on the physical LAN.
+- Treat it as a high-throughput local test harness, not as a substitute for true physical wire-rate validation.
+
 ## Remote Machine Guardrails
 
 - Remote Linux machines reachable over SSH may be used only for this RustiFlow project.
@@ -60,13 +78,6 @@ This repository is a Rust workspace for a network flow extractor. The main crate
   - a reusable `FlowFeature` implementation, or
   - one exporter only
 - If you change contamination-free exports, keep in mind that these outputs intentionally avoid raw identifiers such as exact ports/IPs.
-
-## Platform Notes
-
-- Realtime eBPF support is Linux-specific.
-- macOS may be usable for some read-only work, formatting, and limited code inspection, but Linux is the source of truth for full build and runtime validation.
-- Do not assume that successful macOS builds imply realtime correctness.
-- When touching `aya`/eBPF/realtime code, prefer validating on Linux or in a Linux container/VM.
 
 ## Commands
 
