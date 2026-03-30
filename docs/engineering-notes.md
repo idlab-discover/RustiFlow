@@ -372,3 +372,19 @@ This file keeps short-lived design choices and execution notes that would make
     neutral setting
   - shard batch size and queue capacity are worth keeping tunable as advanced
     knobs, but they are second-order compared with threads and export cadence
+- Semantic parity between offline and realtime ingestion now has explicit test
+  coverage for the changed structure:
+  - constructor-level parity tests compare `PacketFeatures` built from parsed
+    IPv4/IPv6 packets against `PacketFeatures` built from equivalent eBPF
+    events, including timestamps, packet lengths, flags, sequence numbers, and
+    biflow-defining endpoint fields
+  - flow-level parity tests feed equivalent offline and realtime packet
+    sequences into `FlowTable` and verify matching bidirectional exports and
+    matching idle-timeout expiration behavior
+  - this keeps the ingestion redesign grounded in the invariant that, once a
+    packet is normalized into `PacketFeatures`, flow ownership, expiration, and
+    exporter output stay aligned across both ingestion modes
+- Narrow validation for that semantic-parity work:
+  - `cargo test -p rustiflow packet_features_test -- --nocapture`
+  - `cargo test -p rustiflow flow_table_test -- --nocapture`
+  - `cargo check -p rustiflow`

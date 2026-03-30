@@ -121,28 +121,8 @@ in `docs/engineering-notes.md`.
 
 ### Current Focus
 
-- [x] Keep the `rustiflow-t0` / `rustiflow-peer` container harness green as the
-  realtime throughput baseline:
-  `docker run --privileged --network host ... realtime rustiflow-t0 --ingress-only`
-  plus `iperf3 -c 10.203.0.2 -B 10.203.0.1 -u -b 2.5G -l 1400 -R`.
-- [x] Prove where the current realtime bottleneck lives before redesigning it:
-  ring-buffer capacity, single-source drain task, shard channel backpressure,
-  or flow-table work.
-- [x] Restructure realtime ingestion so more than one userspace task can drain
-  packet events in parallel instead of funnelling all ingress traffic through
-  one hot path in `rustiflow/src/realtime.rs`.
-- [ ] Preserve semantic parity with offline mode while changing ingestion
-  structure: timestamps, packet lengths, biflow direction, expiration, and
-  export contents must remain aligned.
-- [x] Add a repeatable throughput comparison after each structural change:
-  same `iperf3` command, same interface, same export mode, and explicit
-  `Total dropped packets before exit` capture.
-- [x] Treat the redesign as successful only when the verification data improves:
-  fewer dropped packets on the single-flow `2.5G` case and materially better
-  behavior on the `-P 8` multi-flow ingress case.
-- [x] Decide whether the current multi-queue ring-buffer design should also be
-  extended to IPv6, or whether the next step should be the more invasive
-  transport rewrite captured as Option 2 in `docs/engineering-notes.md`.
+None right now. Keep this section empty when the current phase is complete and
+move completed work into `docs/engineering-notes.md`.
 
 Primary files:
 
