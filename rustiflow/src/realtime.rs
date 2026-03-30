@@ -29,7 +29,7 @@ use tokio::sync::watch;
 use tokio::{
     io::unix::AsyncFd,
     signal,
-    sync::mpsc::{self, Sender},
+    sync::mpsc::{self, Receiver, Sender},
     sync::Mutex,
     task::JoinSet,
 };
@@ -38,7 +38,8 @@ use tokio::{
 struct RealtimeSourceStats {
     events: AtomicU64,
     decode_and_shard_ns: AtomicU64,
-    send_wait_ns: AtomicU64,
+    dispatch_enqueue_ns: AtomicU64,
+    shard_send_wait_ns: AtomicU64,
     packet_graph_ns: AtomicU64,
     total_event_ns: AtomicU64,
     send_errors: AtomicU64,
@@ -56,8 +57,12 @@ impl RealtimeSourceStats {
         self.decode_and_shard_ns.fetch_add(value, Ordering::Relaxed);
     }
 
-    fn add_send_wait_ns(&self, value: u64) {
-        self.send_wait_ns.fetch_add(value, Ordering::Relaxed);
+    fn add_dispatch_enqueue_ns(&self, value: u64) {
+        self.dispatch_enqueue_ns.fetch_add(value, Ordering::Relaxed);
+    }
+
+    fn add_shard_send_wait_ns(&self, value: u64) {
+        self.shard_send_wait_ns.fetch_add(value, Ordering::Relaxed);
     }
 
     fn add_packet_graph_ns(&self, value: u64) {
@@ -84,7 +89,8 @@ fn elapsed_ns(start: Instant) -> u64 {
 fn log_source_stats(label: &str, stats: &RealtimeSourceStats) {
     let events = stats.events.load(Ordering::Relaxed);
     let decode_and_shard_ns = stats.decode_and_shard_ns.load(Ordering::Relaxed);
-    let send_wait_ns = stats.send_wait_ns.load(Ordering::Relaxed);
+    let dispatch_enqueue_ns = stats.dispatch_enqueue_ns.load(Ordering::Relaxed);
+    let shard_send_wait_ns = stats.shard_send_wait_ns.load(Ordering::Relaxed);
     let packet_graph_ns = stats.packet_graph_ns.load(Ordering::Relaxed);
     let total_event_ns = stats.total_event_ns.load(Ordering::Relaxed);
     let send_errors = stats.send_errors.load(Ordering::Relaxed);
@@ -95,21 +101,24 @@ fn log_source_stats(label: &str, stats: &RealtimeSourceStats) {
     }
 
     info!(
-        "Realtime source {}: events={} total_ms={:.3} decode_ms={:.3} send_wait_ms={:.3} packet_graph_ms={:.3} avg_event_us={:.3} avg_send_wait_us={:.3} send_errors={}",
+        "Realtime source {}: events={} total_ms={:.3} decode_ms={:.3} enqueue_wait_ms={:.3} shard_send_wait_ms={:.3} packet_graph_ms={:.3} avg_event_us={:.3} avg_enqueue_wait_us={:.3} avg_shard_send_wait_us={:.3} send_errors={}",
         label,
         events,
         total_event_ns as f64 / 1_000_000.0,
         decode_and_shard_ns as f64 / 1_000_000.0,
-        send_wait_ns as f64 / 1_000_000.0,
+        dispatch_enqueue_ns as f64 / 1_000_000.0,
+        shard_send_wait_ns as f64 / 1_000_000.0,
         packet_graph_ns as f64 / 1_000_000.0,
         total_event_ns as f64 / events as f64 / 1_000.0,
-        send_wait_ns as f64 / events as f64 / 1_000.0,
+        dispatch_enqueue_ns as f64 / events as f64 / 1_000.0,
+        shard_send_wait_ns as f64 / events as f64 / 1_000.0,
         send_errors,
     );
 }
 
 const DEFAULT_SHARD_BATCH_SIZE: usize = 128;
 const DEFAULT_SHARD_QUEUE_CAPACITY: usize = 512;
+const DEFAULT_SOURCE_DISPATCH_QUEUE_CAPACITY: usize = 1024;
 
 /// Starts the realtime processing of packets on the given interface.
 /// The function will return the number of packets dropped by the eBPF program.
@@ -135,6 +144,10 @@ where
     let shard_queue_capacity = read_env_usize(
         "RUSTIFLOW_REALTIME_SHARD_QUEUE_CAPACITY",
         DEFAULT_SHARD_QUEUE_CAPACITY,
+    );
+    let source_dispatch_queue_capacity = read_env_usize(
+        "RUSTIFLOW_REALTIME_SOURCE_DISPATCH_QUEUE_CAPACITY",
+        DEFAULT_SOURCE_DISPATCH_QUEUE_CAPACITY,
     );
 
     // Needed for older kernels
@@ -288,6 +301,12 @@ where
         let packet_graph = packet_graph.clone();
         let stats = enable_source_stats.then(|| Arc::new(RealtimeSourceStats::default()));
         source_stats.push((label, stats.clone()));
+        let dispatch_sender = spawn_source_dispatcher(
+            &mut handle_set,
+            shard_senders_clone.clone(),
+            source_dispatch_queue_capacity,
+            stats.clone(),
+        );
 
         handle_set.spawn(async move {
             // Wrap the RingBuf in AsyncFd to poll it with tokio
@@ -324,8 +343,8 @@ where
                     pending_batches[shard_index].push(packet_features);
 
                     if pending_batches[shard_index].len() >= shard_batch_size {
-                        flush_shard_batch(
-                            &shard_senders_clone[shard_index],
+                        enqueue_shard_batch(
+                            &dispatch_sender,
                             &mut pending_batches[shard_index],
                             stats.as_ref(),
                             shard_index,
@@ -341,7 +360,7 @@ where
                     }
                 }
 
-                flush_pending_batches(&shard_senders_clone, &mut pending_batches, stats.as_ref())
+                enqueue_pending_batches(&dispatch_sender, &mut pending_batches, stats.as_ref())
                     .await;
 
                 // Clear the readiness state for the next iteration
@@ -355,6 +374,12 @@ where
         let packet_graph = packet_graph.clone();
         let stats = enable_source_stats.then(|| Arc::new(RealtimeSourceStats::default()));
         source_stats.push((label, stats.clone()));
+        let dispatch_sender = spawn_source_dispatcher(
+            &mut handle_set,
+            shard_senders_clone.clone(),
+            source_dispatch_queue_capacity,
+            stats.clone(),
+        );
 
         handle_set.spawn(async move {
             // Wrap the RingBuf in AsyncFd to poll it with tokio
@@ -391,8 +416,8 @@ where
                     pending_batches[shard_index].push(packet_features);
 
                     if pending_batches[shard_index].len() >= shard_batch_size {
-                        flush_shard_batch(
-                            &shard_senders_clone[shard_index],
+                        enqueue_shard_batch(
+                            &dispatch_sender,
                             &mut pending_batches[shard_index],
                             stats.as_ref(),
                             shard_index,
@@ -408,7 +433,7 @@ where
                     }
                 }
 
-                flush_pending_batches(&shard_senders_clone, &mut pending_batches, stats.as_ref())
+                enqueue_pending_batches(&dispatch_sender, &mut pending_batches, stats.as_ref())
                     .await;
 
                 // Clear the readiness state for the next iteration
@@ -496,24 +521,61 @@ fn create_pending_batches(num_shards: usize, shard_batch_size: usize) -> Vec<Vec
         .collect()
 }
 
-async fn flush_pending_batches(
-    shard_senders: &[Sender<Vec<PacketFeatures>>],
+async fn enqueue_pending_batches(
+    dispatch_sender: &Sender<ShardDispatchBatch>,
     pending_batches: &mut [Vec<PacketFeatures>],
     stats: Option<&Arc<RealtimeSourceStats>>,
 ) {
     for (shard_index, pending_batch) in pending_batches.iter_mut().enumerate() {
-        flush_shard_batch(
-            &shard_senders[shard_index],
-            pending_batch,
-            stats,
-            shard_index,
-        )
-        .await;
+        enqueue_shard_batch(dispatch_sender, pending_batch, stats, shard_index).await;
     }
 }
 
-async fn flush_shard_batch(
-    shard_sender: &Sender<Vec<PacketFeatures>>,
+struct ShardDispatchBatch {
+    shard_index: usize,
+    batch: Vec<PacketFeatures>,
+}
+
+fn spawn_source_dispatcher(
+    handle_set: &mut JoinSet<()>,
+    shard_senders: Vec<Sender<Vec<PacketFeatures>>>,
+    source_dispatch_queue_capacity: usize,
+    stats: Option<Arc<RealtimeSourceStats>>,
+) -> Sender<ShardDispatchBatch> {
+    let (dispatch_sender, mut dispatch_receiver) =
+        mpsc::channel::<ShardDispatchBatch>(source_dispatch_queue_capacity);
+
+    handle_set.spawn(async move {
+        run_source_dispatcher(&shard_senders, &mut dispatch_receiver, stats.as_ref()).await;
+    });
+
+    dispatch_sender
+}
+
+async fn run_source_dispatcher(
+    shard_senders: &[Sender<Vec<PacketFeatures>>],
+    dispatch_receiver: &mut Receiver<ShardDispatchBatch>,
+    stats: Option<&Arc<RealtimeSourceStats>>,
+) {
+    while let Some(ShardDispatchBatch { shard_index, batch }) = dispatch_receiver.recv().await {
+        let send_start = stats.as_ref().map(|_| Instant::now());
+        if let Err(e) = shard_senders[shard_index].send(batch).await {
+            if let Some(stats) = stats {
+                stats.increment_send_errors();
+            }
+            error!(
+                "Failed to send packet batch to shard {}: {}",
+                shard_index, e
+            );
+        }
+        if let (Some(stats), Some(send_start)) = (stats, send_start) {
+            stats.add_shard_send_wait_ns(elapsed_ns(send_start));
+        }
+    }
+}
+
+async fn enqueue_shard_batch(
+    dispatch_sender: &Sender<ShardDispatchBatch>,
     pending_batch: &mut Vec<PacketFeatures>,
     stats: Option<&Arc<RealtimeSourceStats>>,
     shard_index: usize,
@@ -525,17 +587,20 @@ async fn flush_shard_batch(
     let next_capacity = pending_batch.capacity().max(1);
     let batch = std::mem::replace(pending_batch, Vec::with_capacity(next_capacity));
     let send_start = stats.as_ref().map(|_| Instant::now());
-    if let Err(e) = shard_sender.send(batch).await {
+    if let Err(e) = dispatch_sender
+        .send(ShardDispatchBatch { shard_index, batch })
+        .await
+    {
         if let Some(stats) = stats {
             stats.increment_send_errors();
         }
         error!(
-            "Failed to send packet batch to shard {}: {}",
+            "Failed to queue packet batch for shard {}: {}",
             shard_index, e
         );
     }
     if let (Some(stats), Some(send_start)) = (stats, send_start) {
-        stats.add_send_wait_ns(elapsed_ns(send_start));
+        stats.add_dispatch_enqueue_ns(elapsed_ns(send_start));
     }
 }
 
@@ -579,7 +644,7 @@ fn compute_realtime_offset_us() -> Result<i64, anyhow::Error> {
 fn labeled_ringbuf_sources(
     label_prefix: &'static str,
     ring_bufs: Vec<RingBuf<MapData>>,
-) -> Vec<(&'static str, RingBuf<MapData>)> {
+) -> Vec<(String, RingBuf<MapData>)> {
     ring_bufs
         .into_iter()
         .enumerate()
@@ -587,29 +652,8 @@ fn labeled_ringbuf_sources(
         .collect()
 }
 
-fn queue_label(label_prefix: &'static str, index: usize) -> &'static str {
-    match (label_prefix, index) {
-        ("ingress-ipv4", 0) => "ingress-ipv4-q0",
-        ("ingress-ipv4", 1) => "ingress-ipv4-q1",
-        ("ingress-ipv4", 2) => "ingress-ipv4-q2",
-        ("ingress-ipv4", 3) => "ingress-ipv4-q3",
-        ("egress-ipv4", 0) => "egress-ipv4-q0",
-        ("egress-ipv4", 1) => "egress-ipv4-q1",
-        ("egress-ipv4", 2) => "egress-ipv4-q2",
-        ("egress-ipv4", 3) => "egress-ipv4-q3",
-        ("ingress-ipv6", 0) => "ingress-ipv6-q0",
-        ("ingress-ipv6", 1) => "ingress-ipv6-q1",
-        ("ingress-ipv6", 2) => "ingress-ipv6-q2",
-        ("ingress-ipv6", 3) => "ingress-ipv6-q3",
-        ("egress-ipv6", 0) => "egress-ipv6-q0",
-        ("egress-ipv6", 1) => "egress-ipv6-q1",
-        ("egress-ipv6", 2) => "egress-ipv6-q2",
-        ("egress-ipv6", 3) => "egress-ipv6-q3",
-        _ => panic!(
-            "unexpected realtime queue label: {}-{}",
-            label_prefix, index
-        ),
-    }
+fn queue_label(label_prefix: &'static str, index: usize) -> String {
+    format!("{label_prefix}-q{index}")
 }
 
 fn take_ring_buf_maps(

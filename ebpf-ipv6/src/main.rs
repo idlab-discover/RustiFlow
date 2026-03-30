@@ -12,7 +12,8 @@ use aya_ebpf::{
 use aya_log_ebpf::debug;
 
 use common::{
-    EbpfEventIpv6, IcmpHdr, NetworkHeader, TcpHdr, UdpHdr, REALTIME_EVENT_RINGBUF_BYTES,
+    EbpfEventIpv6, IcmpHdr, NetworkHeader, TcpHdr, UdpHdr, REALTIME_EVENT_QUEUE_COUNT,
+    REALTIME_EVENT_RINGBUF_BYTES,
 };
 use network_types::{
     eth::{EthHdr, EtherType},
@@ -44,6 +45,18 @@ static EVENTS_IPV6_2: RingBuf = RingBuf::with_byte_size(REALTIME_EVENT_RINGBUF_B
 
 #[map]
 static EVENTS_IPV6_3: RingBuf = RingBuf::with_byte_size(REALTIME_EVENT_RINGBUF_BYTES, 0);
+
+#[map]
+static EVENTS_IPV6_4: RingBuf = RingBuf::with_byte_size(REALTIME_EVENT_RINGBUF_BYTES, 0);
+
+#[map]
+static EVENTS_IPV6_5: RingBuf = RingBuf::with_byte_size(REALTIME_EVENT_RINGBUF_BYTES, 0);
+
+#[map]
+static EVENTS_IPV6_6: RingBuf = RingBuf::with_byte_size(REALTIME_EVENT_RINGBUF_BYTES, 0);
+
+#[map]
+static EVENTS_IPV6_7: RingBuf = RingBuf::with_byte_size(REALTIME_EVENT_RINGBUF_BYTES, 0);
 
 #[classifier]
 pub fn tc_flow_track(ctx: TcContext) -> i32 {
@@ -136,7 +149,11 @@ fn submit_ipv6_event(ctx: &TcContext, event: EbpfEventIpv6, queue_index: u32) {
         0 => reserve_ipv6_event(&EVENTS_IPV6_0, event),
         1 => reserve_ipv6_event(&EVENTS_IPV6_1, event),
         2 => reserve_ipv6_event(&EVENTS_IPV6_2, event),
-        _ => reserve_ipv6_event(&EVENTS_IPV6_3, event),
+        3 => reserve_ipv6_event(&EVENTS_IPV6_3, event),
+        4 => reserve_ipv6_event(&EVENTS_IPV6_4, event),
+        5 => reserve_ipv6_event(&EVENTS_IPV6_5, event),
+        6 => reserve_ipv6_event(&EVENTS_IPV6_6, event),
+        _ => reserve_ipv6_event(&EVENTS_IPV6_7, event),
     };
 
     if !reserved {
@@ -179,12 +196,14 @@ fn queue_index_ipv6(packet_info: &PacketInfo, header: &impl NetworkHeader) -> u3
         packet_info.ipv6_destination,
         header.destination_port(),
     );
-    let hash = mix_u128(first_ip)
-        ^ mix_u128(second_ip).rotate_left(11)
-        ^ mix_u16(first_port).rotate_left(17)
-        ^ mix_u16(second_port).rotate_left(23)
-        ^ u32::from(packet_info.protocol).rotate_left(29);
-    hash & 0b11
+    let endpoint_ports = (u32::from(first_port) << 16) | u32::from(second_port);
+    let mut hash = 0x811c_9dc5;
+    hash = hash_combine(hash, mix_u128(first_ip));
+    hash = hash_combine(hash, mix_u128(second_ip));
+    hash = hash_combine(hash, endpoint_ports);
+    hash = hash_combine(hash, u32::from(packet_info.protocol));
+    hash = finish_hash32(hash);
+    hash % REALTIME_EVENT_QUEUE_COUNT as u32
 }
 
 #[inline(always)]
@@ -221,8 +240,21 @@ fn mix_u64(mut value: u64) -> u32 {
 }
 
 #[inline(always)]
-fn mix_u16(value: u16) -> u32 {
-    mix_u64(u64::from(value))
+fn hash_combine(state: u32, value: u32) -> u32 {
+    state
+        ^ value
+            .wrapping_add(0x9e37_79b9)
+            .wrapping_add(state << 6)
+            .wrapping_add(state >> 2)
+}
+
+#[inline(always)]
+fn finish_hash32(mut value: u32) -> u32 {
+    value ^= value >> 16;
+    value = value.wrapping_mul(0x85eb_ca6b);
+    value ^= value >> 13;
+    value = value.wrapping_mul(0xc2b2_ae35);
+    value ^ (value >> 16)
 }
 
 fn process_transport_packet<T: NetworkHeader>(

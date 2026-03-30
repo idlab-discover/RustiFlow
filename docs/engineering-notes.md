@@ -388,3 +388,118 @@ This file keeps short-lived design choices and execution notes that would make
   - `cargo test -p rustiflow packet_features_test -- --nocapture`
   - `cargo test -p rustiflow flow_table_test -- --nocapture`
   - `cargo check -p rustiflow`
+- First bounded follow-up on the new parallelization phase:
+  - added a per-source dispatch stage in `rustiflow/src/realtime.rs` so the
+    ring-buffer drain tasks no longer await shard-channel sends directly
+  - each realtime source now batches packets, enqueues shard work into a
+    bounded per-source dispatch queue, and a separate dispatcher task performs
+    the shard-channel `send().await`
+- Immediate validation on the local slim-container harness:
+  - `10G`, `1400`-byte UDP, `-P 8`, `--threads 12`, `--early-export 0`:
+    about `12.7 Gbit/s`, `0` RustiFlow drops
+  - overloaded ingress case, `2.5G`, `1400`-byte UDP, `-P 8`,
+    `--threads 4`, `--early-export 5`: about `13.2 Gbit/s`,
+    `608731` RustiFlow drops
+- Refined source stats on a short stats-enabled overloaded run show the first
+  checklist item is materially complete:
+  - `ingress-ipv4-q0`: `avg_event_us=0.209`,
+    `avg_enqueue_wait_us=0.059`, `avg_shard_send_wait_us=0.148`
+  - `ingress-ipv4-q2`: `avg_event_us=0.218`,
+    `avg_enqueue_wait_us=0.085`, `avg_shard_send_wait_us=0.080`
+  - `ingress-ipv4-q3`: `avg_event_us=0.222`,
+    `avg_enqueue_wait_us=0.117`, `avg_shard_send_wait_us=0.233`
+- Current interpretation:
+  - the source tasks are now spending much less time blocked on downstream
+    backpressure than in the earlier inline-send design
+  - the remaining hot wait has shifted into the dispatcher-to-shard stage,
+    which is exactly the next place to optimize
+  - queue balance is still imperfect under some `iperf3` multi-flow shapes, so
+    queue-count and fanout tuning remain worthwhile next experiments
+- Follow-up answer to the next checklist item, using the same slim-container
+  harness and hot workloads:
+  - clean `10G` case, `1400`-byte UDP, `-P 8`, `--threads 12`,
+    `--early-export 0`:
+    - repeated runs stayed at `10.9` to `12.7 Gbit/s`
+    - RustiFlow still reported `0` dropped packets
+  - overloaded ingress case, target `2.5G` per stream, `1400`-byte UDP,
+    `-P 8`, `--threads 4`, `--early-export 5`:
+    - recent runs landed between about `11.0` and `13.2 Gbit/s`
+    - RustiFlow drops fell between `0` and `608731`
+    - compared with the earlier pre-dispatch-decoupling baseline on the same
+      general shape (`641688` to `1233317` drops, but at higher achieved
+      bitrate around `15.7` to `16.3 Gbit/s`), the drop count generally
+      improved, but the load generator no longer drove quite as much traffic
+- Current interpretation of the hot-case comparison:
+  - the drain/dispatch split is not a clean across-the-board throughput win
+  - it does preserve the proven zero-drop operating point for the clean `10G`
+    case
+  - on the overloaded multi-flow case it appears to trade lower drop counts for
+    somewhat lower achieved bitrate, so the next experiments need to determine
+    whether that reflects healthier backpressure or simply a different upstream
+    bottleneck
+- Re-evaluated queue parallelism by increasing
+  `REALTIME_EVENT_QUEUE_COUNT` from `4` to `8` for both IPv4 and IPv6 ringbuf
+  sources:
+  - clean `10G` case, `1400`-byte UDP, `-P 8`, `--threads 12`,
+    `--early-export 0`: `9.96 Gbit/s`, `0` dropped packets
+  - overloaded ingress case, target `2.5G` per stream, `1400`-byte UDP,
+    `-P 8`, `--threads 4`, `--early-export 5`: `10.3 Gbit/s`,
+    `0` dropped packets
+  - relative to the earlier `4`-queue version on the same overloaded shape,
+    the `8`-queue version bought real headroom: the same workload no longer
+    overran RustiFlow internally
+- Short stats-enabled run on the `8`-queue build:
+  - `ingress-ipv4-q0`: `1114790` events
+  - `ingress-ipv4-q1`: `1733000` events
+  - `ingress-ipv4-q5`: `1136284` events
+  - `ingress-ipv4-q6`: `565056` events
+  - `ingress-ipv4-q2`, `q3`, `q4`, and `q7`: `no events drained`
+- Current interpretation of the `8`-queue result:
+  - increasing queue count beyond `4` does buy real headroom on the current
+    architecture and was worth doing before considering a more invasive
+    transport rewrite
+  - queue usage is still visibly skewed under the existing `iperf3` multi-flow
+    stress case, so fanout quality remains an active bottleneck even after the
+    headroom gain from `8` queues
+- Explicit queue-balance follow-up after the `8`-queue change:
+  - switched the queue-selection hash in both eBPF programs from the earlier
+    XOR-and-rotate tuple combiner to a stronger canonical-tuple
+    `hash_combine` + `fmix32` style finalization
+  - this kept biflow-stable queue selection but improved spread for the
+    observed reverse-UDP `iperf3` flow set
+- Short stats-enabled overloaded run with the revised fanout:
+  - `ingress-ipv4-q1`: `1174440` events
+  - `ingress-ipv4-q2`: `562581` events
+  - `ingress-ipv4-q3`: `566039` events
+  - `ingress-ipv4-q4`: `550207` events
+  - `ingress-ipv4-q5`: `566313` events
+  - `ingress-ipv4-q6`: `1135669` events
+  - only `q0` and `q7` stayed idle on this run, versus four idle queues under
+    the previous fanout
+- Hot-case check after the fanout revision:
+  - overloaded ingress case, target `2.5G` per stream, `1400`-byte UDP,
+    `-P 8`, `--threads 4`, `--early-export 5`: `9.77 Gbit/s`,
+    `0` dropped packets
+  - clean `10G` case, `1400`-byte UDP, `-P 8`, `--threads 12`,
+    `--early-export 0`: `9.67 Gbit/s`, `0` dropped packets
+- Current interpretation of the fanout experiment:
+  - queue-balance quality improved materially and no longer shows the earlier
+    obvious four-queue skew
+  - the current architecture now has more usable parallel ingress width before
+    a transport rewrite is justified
+  - some skew remains, so fanout quality is not "solved forever", but this
+    bounded experiment did move the real bottleneck forward
+- Semantic-parity guard for the newer realtime-only tuning steps:
+  - existing parity coverage already protected constructor-level normalization
+    for IPv4 and IPv6, and flow/export parity for IPv4
+  - added the missing IPv6 flow-level parity tests so the mirrored IPv6
+    multi-queue path is covered at the same level:
+    - offline/realtime IPv6 bidirectional export parity
+    - offline/realtime IPv6 idle-expiration parity
+  - this keeps the newer queue-count, fanout, and dispatch changes grounded in
+    the rule that realtime parallelization must not change timestamps, packet
+    lengths, biflow ownership, expiration causes, or exported flow contents
+- Narrow validation for the semantic-parity guard:
+  - `cargo test -p rustiflow packet_features_test -- --nocapture`
+  - `cargo test -p rustiflow flow_table_test -- --nocapture`
+  - `cargo check -p rustiflow`
