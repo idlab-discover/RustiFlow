@@ -130,16 +130,31 @@ Make sure that you don't use docker desktop and that you don't have it installed
   ```
 - **Run the Container**:
   ```bash
-  docker run --network host -v /path/on/host:/app rustiflow [ARGS like you are used to]
+  docker run --rm --network host -v /path/on/host:/app rustiflow [ARGS]
   ```
-  Run it with the --privileged flag if you want to capture traffic in real-time.
+  Run it with the `--privileged` flag if you want to capture traffic in real-time.
 - **Example**:
   ```bash
-  docker run --network host -v /home/user/pcap:/app rustiflow pcap basic-flow 60 /app/pcap.pcap print
+  docker run --rm --network host -v /home/user/pcap:/app rustiflow \
+    -f basic \
+    -o print \
+    pcap /app/pcap.pcap
   ```
   ```bash
-  docker run --privileged --network host -v /home/matisse/Documents:/app rustiflow realtime enp5s0 cic-flow 60 csv /app/output.csv
+  docker run --rm --privileged --network host -v /home/user/output:/app rustiflow \
+    -f cic \
+    -o csv \
+    --export-path /app/output.csv \
+    realtime enp5s0
   ```
+
+Notes:
+
+- The current CLI uses flags such as `-f basic` and `-o csv`; the older
+  positional examples are no longer correct.
+- Realtime capture in a container still depends on Linux host support for eBPF
+  and `tc`, so `--privileged --network host` remains the practical baseline for
+  local testing.
 
 ## <img src="figures/RustiFlow_nobg.png" width="60px"/> Installation Guide for development
 

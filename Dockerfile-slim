@@ -1,9 +1,11 @@
 # Stage 1: Build
-FROM rust:latest AS builder
+FROM rust:1-bookworm AS builder
 
 # Install build dependencies
 RUN apt-get update && apt-get install -y \
+    ca-certificates \
     libpcap-dev \
+    pkg-config \
     iproute2 \
     && rustup toolchain install stable \
     && rustup toolchain install nightly --component rust-src \
@@ -16,6 +18,7 @@ ENV PATH="/root/.cargo/bin:${PATH}"
 # Copy source code
 WORKDIR /usr/src/app
 COPY Cargo.toml ./
+COPY Cargo.lock ./
 COPY .cargo ./.cargo
 COPY common ./common
 COPY rustiflow ./rustiflow
@@ -27,20 +30,27 @@ COPY ebpf-ipv6 ./ebpf-ipv6
 # Build the project
 RUN cargo xtask ebpf-ipv4 --release && \
     cargo xtask ebpf-ipv6 --release && \
-    cargo build --release
+    cargo build --release --locked
 
 # Stage 2: Runtime
 FROM debian:bookworm-slim
 
 # Install runtime dependencies
 RUN apt-get update && apt-get install -y \
+    ca-certificates \
     libpcap0.8 \
     iproute2 \
     --no-install-recommends && \
     rm -rf /var/lib/apt/lists/*
 
+# Recreate the builder-time layout expected by the binary's relative eBPF path lookup.
+WORKDIR /usr/src/app
+
 # Copy the compiled binaries from the builder stage
 COPY --from=builder /usr/src/app/target/release/rustiflow /usr/local/bin/rustiflow
+COPY --from=builder /usr/src/app/target/bpfel-unknown-none/release/rustiflow-ebpf-ipv4 /usr/src/app/target/bpfel-unknown-none/release/rustiflow-ebpf-ipv4
+COPY --from=builder /usr/src/app/target/bpfel-unknown-none/release/rustiflow-ebpf-ipv6 /usr/src/app/target/bpfel-unknown-none/release/rustiflow-ebpf-ipv6
+RUN mkdir -p /usr/src/app/rustiflow
 
 # Set environment variables
 ENV RUST_LOG=info
