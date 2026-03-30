@@ -10,6 +10,11 @@ mod packet_counts;
 mod packet_features;
 mod pcap;
 #[cfg(target_os = "linux")]
+mod profiling;
+#[cfg(not(target_os = "linux"))]
+#[path = "profiling_stub.rs"]
+mod profiling;
+#[cfg(target_os = "linux")]
 mod realtime;
 #[cfg(not(target_os = "linux"))]
 #[path = "realtime_stub.rs"]
@@ -29,6 +34,7 @@ use flows::{
 };
 use log::{debug, error, info};
 use output::OutputWriter;
+use profiling::ProfilingSession;
 use realtime_mode::packet_graph_mode;
 use std::time::Instant;
 use tokio::sync::mpsc;
@@ -139,6 +145,13 @@ async fn run_with_config(config: Config) {
 
                     debug!("Starting realtime processing...");
                     let start = Instant::now();
+                    let profiling_session = match ProfilingSession::start_from_env("realtime") {
+                        Ok(session) => session,
+                        Err(err) => {
+                            error!("Error starting profiler: {:?}", err);
+                            None
+                        }
+                    };
                     let result = handle_realtime::<$flow_ty>(
                         &interface,
                         sender,
@@ -155,6 +168,12 @@ async fn run_with_config(config: Config) {
                     // Wait for the output task to finish (flush and close the writer)
                     if let Err(e) = output_task.await {
                         error!("Error waiting for output task: {:?}", e);
+                    }
+
+                    if let Some(profiling_session) = profiling_session {
+                        if let Err(err) = profiling_session.finish() {
+                            error!("Error finishing profiler: {:?}", err);
+                        }
                     }
 
                     let end = Instant::now();
@@ -219,6 +238,13 @@ async fn run_with_config(config: Config) {
                     });
 
                     let start = Instant::now();
+                    let profiling_session = match ProfilingSession::start_from_env("offline") {
+                        Ok(session) => session,
+                        Err(err) => {
+                            error!("Error starting profiler: {:?}", err);
+                            None
+                        }
+                    };
 
                     if let Err(err) = read_pcap_file::<$flow_ty>(
                         &path,
@@ -238,6 +264,12 @@ async fn run_with_config(config: Config) {
                     output_task.await.unwrap_or_else(|e| {
                         error!("Error waiting for output task: {:?}", e);
                     });
+
+                    if let Some(profiling_session) = profiling_session {
+                        if let Err(err) = profiling_session.finish() {
+                            error!("Error finishing profiler: {:?}", err);
+                        }
+                    }
 
                     let end = Instant::now();
                     debug!(

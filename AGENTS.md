@@ -121,7 +121,26 @@ in `docs/engineering-notes.md`.
 
 ### Current Focus
 
-None currently. Add only the next active bounded engineering phase here.
+- [ ] Add profiling on the current parallel realtime path before bigger
+  redesigns:
+  capture CPU usage and flamegraph-style evidence for drain/dispatch,
+  FlowTable work, and export cost on the `rustiflow-t0` harness.
+- [ ] Quantify resource usage for the proven local throughput tiers:
+  for the current `10G` operating point, and later `25/40G` attempts, record
+  CPU use, memory use, drop behavior, and export rate instead of bitrate alone.
+- [ ] Re-measure the remaining dispatcher bottleneck before transport rewrite:
+  after the current queue-count and fanout wins, determine whether the next
+  limiter is shard-channel backpressure, FlowTable processing, or export cost.
+- [ ] Revisit cheaper running statistics only after profiling confirms they are
+  still hot on the newer ingestion path.
+- [ ] Measure export-path cost explicitly before redesigning flow snapshots or
+  CSV serialization:
+  confirm whether cloning/export formatting is now a real limiter under high
+  export pressure.
+- [ ] Keep updating `docs/engineering-notes.md` after each bounded experiment
+  with:
+  workload, achieved bitrate, dropped-packet total, and what the new
+  bottleneck appears to be.
 
 Primary files:
 
