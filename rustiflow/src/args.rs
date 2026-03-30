@@ -1,5 +1,6 @@
 use clap::{ArgGroup, Args, Parser, Subcommand};
 use serde::{Deserialize, Serialize};
+use std::fmt;
 use strum_macros::{EnumString, VariantNames};
 
 #[derive(Debug, Parser)]
@@ -79,17 +80,18 @@ pub enum Commands {
     },
 }
 
-impl ToString for Commands {
-    fn to_string(&self) -> String {
+impl fmt::Display for Commands {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Commands::Realtime {
                 interface,
                 ingress_only,
-            } => format!(
+            } => write!(
+                f,
                 "Realtime/Interface: {}/Ingress only: {}",
                 interface, ingress_only
             ),
-            Commands::Pcap { path } => format!("Pcap/Path: {}", path),
+            Commands::Pcap { path } => write!(f, "Pcap/Path: {}", path),
         }
     }
 }
@@ -155,6 +157,7 @@ pub enum ExportMethodType {
     Csv,
 }
 
+#[allow(clippy::upper_case_acronyms)]
 #[derive(Serialize, Deserialize, clap::ValueEnum, Clone, Debug, EnumString, VariantNames)]
 #[strum(serialize_all = "kebab_case")]
 pub enum FlowType {

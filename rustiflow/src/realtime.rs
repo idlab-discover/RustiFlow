@@ -28,6 +28,7 @@ use tokio::{
 
 /// Starts the realtime processing of packets on the given interface.
 /// The function will return the number of packets dropped by the eBPF program.
+#[allow(clippy::too_many_arguments)]
 pub async fn handle_realtime<T>(
     interface: &str,
     output_channel: Sender<T>,
@@ -135,7 +136,6 @@ where
     for ebpf_event_source in event_sources_v4 {
         let shard_senders_clone = shard_senders.clone();
         let packet_graph = packet_graph.clone();
-        let realtime_offset_us = realtime_offset_us;
 
         handle_set.spawn(async move {
             // Wrap the RingBuf in AsyncFd to poll it with tokio
@@ -174,7 +174,6 @@ where
     for ebpf_event_source in event_sources_v6 {
         let shard_senders_clone = shard_senders.clone();
         let packet_graph = packet_graph.clone();
-        let realtime_offset_us = realtime_offset_us;
 
         handle_set.spawn(async move {
             // Wrap the RingBuf in AsyncFd to poll it with tokio
@@ -351,7 +350,7 @@ fn load_ebpf_ipv4(interface: &str, tc_attach_type: TcAttachType) -> Result<Ebpf,
         e
     })?;
     program_egress_ipv4
-        .attach(&interface, tc_attach_type)
+        .attach(interface, tc_attach_type)
         .map_err(|e| {
             error!("Failed to attach eBPF program: {:?}", e);
             e
@@ -376,7 +375,7 @@ fn load_ebpf_ipv6(interface: &str, tc_attach_type: TcAttachType) -> Result<Ebpf,
     let program_egress_ipv6: &mut SchedClassifier =
         bpf_ipv6.program_mut("tc_flow_track").unwrap().try_into()?;
     program_egress_ipv6.load()?;
-    program_egress_ipv6.attach(&interface, tc_attach_type)?;
+    program_egress_ipv6.attach(interface, tc_attach_type)?;
 
     Ok(bpf_ipv6)
 }

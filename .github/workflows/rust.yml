@@ -37,6 +37,9 @@ jobs:
     - name: Build userspace program
       run: cargo build --verbose
 
+    - name: Run Clippy
+      run: cargo clippy -p rustiflow --all-targets -- -D warnings
+
     - name: Fetch gh-pages branch
       run: git fetch origin gh-pages:gh-pages
 

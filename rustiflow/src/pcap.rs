@@ -220,7 +220,7 @@ where
 async fn process_packet<T, P>(
     packet: &P,
     timestamp_us: i64,
-    shard_senders: &Vec<mpsc::Sender<PacketFeatures>>,
+    shard_senders: &[mpsc::Sender<PacketFeatures>],
     num_shards: u8,
     extractor: fn(&P, i64) -> Option<PacketFeatures>,
 ) where

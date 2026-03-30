@@ -195,11 +195,9 @@ async fn run_app<B: Backend>(
                     | AppFocus::IdleTimeoutInput
                     | AppFocus::ExpirationCheckIntervalInput
                     | AppFocus::ThreadsInput
-                    | AppFocus::EarlyExportInput => {
-                        handle_numeric_input(key, app, app.focus.clone())?
-                    }
+                    | AppFocus::EarlyExportInput => handle_numeric_input(key, app, app.focus)?,
                     AppFocus::CommandSelection | AppFocus::OutputSelection => {
-                        handle_selection_input(key, app, app.focus.clone())?
+                        handle_selection_input(key, app, app.focus)?
                     }
                     AppFocus::CommandArgumentInput => handle_command_argument_input(key, app)?,
                     AppFocus::OutputArgumentInput => handle_output_argument_input(key, app)?,
@@ -207,7 +205,7 @@ async fn run_app<B: Backend>(
                     | AppFocus::PerformanceModeInput
                     | AppFocus::HeaderInput
                     | AppFocus::DropContaminantFeaturesInput => {
-                        handle_boolean_input(key, app, app.focus.clone())?
+                        handle_boolean_input(key, app, app.focus)?
                     }
                     AppFocus::ConfigFileInput => {
                         handle_config_file_input(key, app)?;
@@ -339,7 +337,7 @@ fn handle_numeric_input(
     focus: AppFocus,
 ) -> Result<(), Box<dyn Error>> {
     match key.code {
-        KeyCode::Char(c) if c.is_digit(10) => {
+        KeyCode::Char(c) if c.is_ascii_digit() => {
             let input = match focus {
                 AppFocus::ActiveTimeoutInput => &mut app.active_timeout_input,
                 AppFocus::IdleTimeoutInput => &mut app.idle_timeout_input,

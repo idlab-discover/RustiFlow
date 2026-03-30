@@ -200,7 +200,7 @@ where
     async fn check_and_export_expired_flows(&mut self, current_time_us: i64) {
         if self
             .next_check_time_us
-            .map_or(true, |next_check| current_time_us >= next_check)
+            .is_none_or(|next_check| current_time_us >= next_check)
         {
             self.export_expired_flows(current_time_us).await;
             self.next_check_time_us = Some(current_time_us + self.expiration_check_interval_us);

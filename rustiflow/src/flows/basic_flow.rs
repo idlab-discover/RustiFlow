@@ -300,7 +300,7 @@ impl Flow for BasicFlow {
         false
     }
 
-    fn close_flow(&mut self, _timestamp_us: i64, cause: FlowExpireCause) -> () {
+    fn close_flow(&mut self, _timestamp_us: i64, cause: FlowExpireCause) {
         self.flow_expire_cause = cause;
         self.update_tcp_close_style(cause);
     }
@@ -322,10 +322,9 @@ impl Flow for BasicFlow {
     }
 
     fn get_features() -> String {
-        format!(
-            "flow_id,source_ip,source_port,destination_ip,destination_port,protocol,\
+        "flow_id,source_ip,source_port,destination_ip,destination_port,protocol,\
             first_timestamp,last_timestamp,duration,flow_expire_cause"
-        )
+            .to_string()
     }
 
     fn dump_without_contamination(&self) -> String {
@@ -340,7 +339,7 @@ impl Flow for BasicFlow {
     }
 
     fn get_features_without_contamination() -> String {
-        format!("src_port_iana,dst_port_iana,protocol,duration,flow_expire_cause")
+        "src_port_iana,dst_port_iana,protocol,duration,flow_expire_cause".to_string()
     }
 
     fn get_first_timestamp_us(&self) -> i64 {

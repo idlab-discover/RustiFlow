@@ -81,7 +81,7 @@ impl Flow for CustomFlow {
 
     fn get_features() -> String {
         // Add here the features of the custom flow.
-        format!("flow_id,icmp_type,icmp_code,icmp_echo_request_count,icmp_echo_reply_count,icmp_error_count,icmp_destination_unreachable_count")
+        "flow_id,icmp_type,icmp_code,icmp_echo_request_count,icmp_echo_reply_count,icmp_error_count,icmp_destination_unreachable_count".to_string()
     }
 
     fn dump_without_contamination(&self) -> String {
@@ -99,7 +99,7 @@ impl Flow for CustomFlow {
 
     fn get_features_without_contamination() -> String {
         // Add here the features of the custom flow without contaminant features.
-        format!("icmp_type,icmp_code,icmp_echo_request_count,icmp_echo_reply_count,icmp_error_count,icmp_destination_unreachable_count")
+        "icmp_type,icmp_code,icmp_echo_request_count,icmp_echo_reply_count,icmp_error_count,icmp_destination_unreachable_count".to_string()
     }
 
     fn get_first_timestamp_us(&self) -> i64 {

@@ -54,7 +54,7 @@ impl IcmpStats {
                     self.error_count += 1;
                     self.destination_unreachable_count += 1;
                 }
-                Some(2 | 3 | 4) => self.error_count += 1,
+                Some(2..=4) => self.error_count += 1,
                 _ => {}
             },
             _ => {}

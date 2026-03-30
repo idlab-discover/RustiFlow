@@ -116,7 +116,7 @@ impl FlowFeature for BulkStats {
         let current_ts = packet.timestamp_us / 1000;
         // 1. Skip zero-length packets
         let packet_len = packet.length;
-        if packet_len <= 0 {
+        if packet_len == 0 {
             return;
         }
 

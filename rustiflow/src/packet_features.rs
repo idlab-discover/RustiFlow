@@ -299,7 +299,7 @@ fn extract_packet_features_transport(
                 cwr_flag: get_tcp_flag(tcp_packet.get_flags(), CWR_FLAG),
                 ece_flag: get_tcp_flag(tcp_packet.get_flags(), ECE_FLAG),
                 data_length: tcp_packet.payload().len() as u16,
-                header_length: (tcp_packet.get_data_offset() * 4) as u8,
+                header_length: tcp_packet.get_data_offset() * 4,
                 length: total_length,
                 window_size: tcp_packet.get_window(),
                 sequence_number: tcp_packet.get_sequence(),

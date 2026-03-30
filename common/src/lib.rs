@@ -25,6 +25,7 @@ pub struct EbpfEventIpv4 {
 }
 
 impl EbpfEventIpv4 {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         timestamp_ns: u64,
         ipv4_destination: u32,
@@ -89,6 +90,7 @@ pub struct EbpfEventIpv6 {
 }
 
 impl EbpfEventIpv6 {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         timestamp_ns: u64,
         ipv6_destination: u128,
@@ -150,10 +152,10 @@ impl NetworkHeader for TcpHdr {
         self.dest
     }
     fn window_size(&self) -> u16 {
-        self.window as u16
+        self.window
     }
     fn combined_flags(&self) -> u8 {
-        ((self.fin() as u8) << 0)
+        (self.fin() as u8)
             | ((self.syn() as u8) << 1)
             | ((self.rst() as u8) << 2)
             | ((self.psh() as u8) << 3)
