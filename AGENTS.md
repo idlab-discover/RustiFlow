@@ -121,8 +121,7 @@ in `docs/engineering-notes.md`.
 
 ### Current Focus
 
-None right now. Keep this section empty when the current phase is complete and
-move completed work into `docs/engineering-notes.md`.
+None currently. Add only the next active bounded engineering phase here.
 
 Primary files:
 

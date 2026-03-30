@@ -1,9 +1,9 @@
 #[cfg(test)]
 mod tests {
-    use std::net::{IpAddr, Ipv4Addr};
+    use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 
     #[cfg(target_os = "linux")]
-    use common::EbpfEventIpv4;
+    use common::{EbpfEventIpv4, EbpfEventIpv6};
     use tokio::sync::mpsc;
 
     use crate::{
@@ -58,6 +58,39 @@ mod tests {
             0,
         );
         PacketFeatures::from_ebpf_event_ipv4(&event, realtime_offset_us)
+    }
+
+    #[cfg(target_os = "linux")]
+    fn build_realtime_packet_ipv6(
+        source_ip: Ipv6Addr,
+        source_port: u16,
+        destination_ip: Ipv6Addr,
+        destination_port: u16,
+        timestamp_us: i64,
+        flags: u8,
+        sequence_number: u32,
+        sequence_number_ack: u32,
+        data_length: u16,
+    ) -> PacketFeatures {
+        let realtime_offset_us = 1_000_000;
+        let event = EbpfEventIpv6::new(
+            (timestamp_us - realtime_offset_us) as u64 * 1_000,
+            u128::from(destination_ip).to_be(),
+            u128::from(source_ip).to_be(),
+            destination_port,
+            source_port,
+            data_length,
+            40 + data_length,
+            4096,
+            flags,
+            6,
+            20,
+            sequence_number,
+            sequence_number_ack,
+            0,
+            0,
+        );
+        PacketFeatures::from_ebpf_event_ipv6(&event, realtime_offset_us)
     }
 
     #[tokio::test]
@@ -324,6 +357,176 @@ mod tests {
             0,
             0,
         );
+
+        offline_table.process_packet(&offline_packet).await;
+        realtime_table.process_packet(&realtime_packet).await;
+
+        offline_table.export_expired_flows(3_000_000).await;
+        realtime_table.export_expired_flows(3_000_000).await;
+
+        let offline_export = offline_rx.recv().await.expect("expected offline export");
+        let realtime_export = realtime_rx.recv().await.expect("expected realtime export");
+
+        assert_eq!(offline_export.dump(), realtime_export.dump());
+        assert_eq!(
+            offline_export.flow_expire_cause,
+            FlowExpireCause::IdleTimeout
+        );
+        assert_eq!(
+            realtime_export.flow_expire_cause,
+            FlowExpireCause::IdleTimeout
+        );
+        assert!(offline_rx.try_recv().is_err());
+        assert!(realtime_rx.try_recv().is_err());
+    }
+
+    #[cfg(target_os = "linux")]
+    #[tokio::test]
+    async fn offline_and_realtime_ipv6_bidirectional_exports_match() {
+        let (offline_tx, mut offline_rx) = mpsc::channel::<RustiFlow>(4);
+        let (realtime_tx, mut realtime_rx) = mpsc::channel::<RustiFlow>(4);
+        let mut offline_table = FlowTable::new(3600, 120, None, offline_tx, 60);
+        let mut realtime_table = FlowTable::new(3600, 120, None, realtime_tx, 60);
+
+        let client_ip = Ipv6Addr::new(0x2001, 0xdb8, 0, 1, 0, 0, 0, 1);
+        let server_ip = Ipv6Addr::new(0x2001, 0xdb8, 0, 1, 0, 0, 0, 2);
+
+        let offline_syn = PacketFeatures {
+            source_ip: IpAddr::V6(client_ip),
+            destination_ip: IpAddr::V6(server_ip),
+            source_port: 12345,
+            destination_port: 443,
+            protocol: 6,
+            timestamp_us: 1_000_000,
+            syn_flag: 1,
+            flags: 0x02,
+            header_length: 20,
+            length: 40,
+            window_size: 4096,
+            sequence_number: 100,
+            ..Default::default()
+        };
+
+        let offline_syn_ack = PacketFeatures {
+            source_ip: IpAddr::V6(server_ip),
+            destination_ip: IpAddr::V6(client_ip),
+            source_port: 443,
+            destination_port: 12345,
+            protocol: 6,
+            timestamp_us: 1_000_100,
+            syn_flag: 1,
+            ack_flag: 1,
+            flags: 0x12,
+            header_length: 20,
+            length: 40,
+            window_size: 4096,
+            sequence_number: 200,
+            sequence_number_ack: 101,
+            ..Default::default()
+        };
+
+        let offline_ack = PacketFeatures {
+            source_ip: IpAddr::V6(client_ip),
+            destination_ip: IpAddr::V6(server_ip),
+            source_port: 12345,
+            destination_port: 443,
+            protocol: 6,
+            timestamp_us: 1_000_200,
+            ack_flag: 1,
+            flags: 0x10,
+            header_length: 20,
+            length: 40,
+            window_size: 4096,
+            sequence_number: 101,
+            sequence_number_ack: 201,
+            ..Default::default()
+        };
+
+        let offline_payload = PacketFeatures {
+            source_ip: IpAddr::V6(client_ip),
+            destination_ip: IpAddr::V6(server_ip),
+            source_port: 12345,
+            destination_port: 443,
+            protocol: 6,
+            timestamp_us: 1_000_300,
+            ack_flag: 1,
+            psh_flag: 1,
+            flags: 0x18,
+            header_length: 20,
+            data_length: 64,
+            length: 104,
+            window_size: 4096,
+            sequence_number: 101,
+            sequence_number_ack: 201,
+            ..Default::default()
+        };
+
+        let realtime_syn = build_realtime_packet_ipv6(
+            client_ip, 12345, server_ip, 443, 1_000_000, 0x02, 100, 0, 0,
+        );
+        let realtime_syn_ack = build_realtime_packet_ipv6(
+            server_ip, 443, client_ip, 12345, 1_000_100, 0x12, 200, 101, 0,
+        );
+        let realtime_ack = build_realtime_packet_ipv6(
+            client_ip, 12345, server_ip, 443, 1_000_200, 0x10, 101, 201, 0,
+        );
+        let realtime_payload = build_realtime_packet_ipv6(
+            client_ip, 12345, server_ip, 443, 1_000_300, 0x18, 101, 201, 64,
+        );
+
+        for packet in [
+            &offline_syn,
+            &offline_syn_ack,
+            &offline_ack,
+            &offline_payload,
+        ] {
+            offline_table.process_packet(packet).await;
+        }
+        for packet in [
+            &realtime_syn,
+            &realtime_syn_ack,
+            &realtime_ack,
+            &realtime_payload,
+        ] {
+            realtime_table.process_packet(packet).await;
+        }
+
+        offline_table.export_all_flows(2_000_000).await;
+        realtime_table.export_all_flows(2_000_000).await;
+
+        let offline_export = offline_rx.recv().await.expect("expected offline export");
+        let realtime_export = realtime_rx.recv().await.expect("expected realtime export");
+
+        assert_eq!(offline_export.dump(), realtime_export.dump());
+        assert_eq!(
+            offline_export.dump_without_contamination(),
+            realtime_export.dump_without_contamination()
+        );
+        assert!(offline_rx.try_recv().is_err());
+        assert!(realtime_rx.try_recv().is_err());
+    }
+
+    #[cfg(target_os = "linux")]
+    #[tokio::test]
+    async fn offline_and_realtime_ipv6_idle_expiration_match() {
+        let (offline_tx, mut offline_rx) = mpsc::channel::<BasicFlow>(4);
+        let (realtime_tx, mut realtime_rx) = mpsc::channel::<BasicFlow>(4);
+        let mut offline_table = FlowTable::new(3600, 1, None, offline_tx, 60);
+        let mut realtime_table = FlowTable::new(3600, 1, None, realtime_tx, 60);
+
+        let client_ip = Ipv6Addr::new(0x2001, 0xdb8, 0, 2, 0, 0, 0, 10);
+        let server_ip = Ipv6Addr::new(0x2001, 0xdb8, 0, 2, 0, 0, 0, 20);
+        let offline_packet = PacketFeatures {
+            source_ip: IpAddr::V6(client_ip),
+            destination_ip: IpAddr::V6(server_ip),
+            source_port: 12345,
+            destination_port: 443,
+            protocol: 6,
+            timestamp_us: 1_000_000,
+            ..Default::default()
+        };
+        let realtime_packet =
+            build_realtime_packet_ipv6(client_ip, 12345, server_ip, 443, 1_000_000, 0, 0, 0, 0);
 
         offline_table.process_packet(&offline_packet).await;
         realtime_table.process_packet(&realtime_packet).await;
