@@ -117,22 +117,39 @@ in `docs/engineering-notes.md`.
 
 ### Current Focus
 
-- [ ] Stabilize and measure before expanding the eBPF event payload further.
-- [x] Finish the remaining TCP quality signals that current metadata already supports:
-  duplicate ACKs, zero-window events, and close style.
-- [x] Add the next IP and path signals once they can be trusted in both offline
-  and realtime modes.
+- [x] Keep the `rustiflow-t0` / `rustiflow-peer` container harness green as the
+  realtime throughput baseline:
+  `docker run --privileged --network host ... realtime rustiflow-t0 --ingress-only`
+  plus `iperf3 -c 10.203.0.2 -B 10.203.0.1 -u -b 2.5G -l 1400 -R`.
+- [x] Prove where the current realtime bottleneck lives before redesigning it:
+  ring-buffer capacity, single-source drain task, shard channel backpressure,
+  or flow-table work.
+- [x] Restructure realtime ingestion so more than one userspace task can drain
+  packet events in parallel instead of funnelling all ingress traffic through
+  one hot path in `rustiflow/src/realtime.rs`.
+- [ ] Preserve semantic parity with offline mode while changing ingestion
+  structure: timestamps, packet lengths, biflow direction, expiration, and
+  export contents must remain aligned.
+- [x] Add a repeatable throughput comparison after each structural change:
+  same `iperf3` command, same interface, same export mode, and explicit
+  `Total dropped packets before exit` capture.
+- [x] Treat the redesign as successful only when the verification data improves:
+  fewer dropped packets on the single-flow `2.5G` case and materially better
+  behavior on the `-P 8` multi-flow ingress case.
+- [ ] Decide whether the current multi-queue ring-buffer design should also be
+  extended to IPv6, or whether the next step should be the more invasive
+  transport rewrite captured as Option 2 in `docs/engineering-notes.md`.
 
 Primary files:
 
-- `rustiflow/src/packet_features.rs`
-- `rustiflow/src/pcap.rs`
 - `rustiflow/src/realtime.rs`
-- `common/src/lib.rs`
 - `ebpf-ipv4/src/main.rs`
 - `ebpf-ipv6/src/main.rs`
+- `common/src/lib.rs`
+- `rustiflow/src/packet_features.rs`
+- `rustiflow/src/flow_table.rs`
 - `rustiflow/src/flows/basic_flow.rs`
-- `rustiflow/src/flows/features/`
+- `docs/engineering-notes.md`
 
 ### Later Work
 

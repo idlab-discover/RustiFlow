@@ -9,11 +9,12 @@ use aya_ebpf::{
     maps::{PerCpuArray, RingBuf},
     programs::TcContext,
 };
-use aya_log_ebpf::error;
+use aya_log_ebpf::debug;
 
 use common::EbpfEventIpv4;
 use common::IcmpHdr;
 use common::NetworkHeader;
+use common::REALTIME_EVENT_RINGBUF_BYTES;
 use common::TcpHdr;
 use common::UdpHdr;
 use network_types::{
@@ -30,7 +31,16 @@ fn panic(_info: &core::panic::PanicInfo) -> ! {
 static DROPPED_PACKETS: PerCpuArray<u64> = PerCpuArray::with_max_entries(1, 0);
 
 #[map]
-static EVENTS_IPV4: RingBuf = RingBuf::with_byte_size(1024 * 1024 * 20, 0); // 20 MB
+static EVENTS_IPV4_0: RingBuf = RingBuf::with_byte_size(REALTIME_EVENT_RINGBUF_BYTES, 0);
+
+#[map]
+static EVENTS_IPV4_1: RingBuf = RingBuf::with_byte_size(REALTIME_EVENT_RINGBUF_BYTES, 0);
+
+#[map]
+static EVENTS_IPV4_2: RingBuf = RingBuf::with_byte_size(REALTIME_EVENT_RINGBUF_BYTES, 0);
+
+#[map]
+static EVENTS_IPV4_3: RingBuf = RingBuf::with_byte_size(REALTIME_EVENT_RINGBUF_BYTES, 0);
 
 #[classifier]
 pub fn tc_flow_track(ctx: TcContext) -> i32 {
@@ -60,16 +70,81 @@ fn process_packet(ctx: &TcContext) -> Result<i32, ()> {
 }
 
 #[inline(always)]
-fn submit_ipv4_event(ctx: &TcContext, event: EbpfEventIpv4) {
-    if let Some(mut entry) = EVENTS_IPV4.reserve::<EbpfEventIpv4>(0) {
+fn submit_ipv4_event(ctx: &TcContext, event: EbpfEventIpv4, queue_index: u32) {
+    let reserved = match queue_index {
+        0 => reserve_ipv4_event(&EVENTS_IPV4_0, event),
+        1 => reserve_ipv4_event(&EVENTS_IPV4_1, event),
+        2 => reserve_ipv4_event(&EVENTS_IPV4_2, event),
+        _ => reserve_ipv4_event(&EVENTS_IPV4_3, event),
+    };
+
+    if !reserved {
+        increment_dropped_packets();
+        debug!(ctx, "Failed to reserve entry in ring buffer.");
+    }
+}
+
+#[inline(always)]
+fn reserve_ipv4_event(queue: &RingBuf, event: EbpfEventIpv4) -> bool {
+    if let Some(mut entry) = queue.reserve::<EbpfEventIpv4>(0) {
         *entry = core::mem::MaybeUninit::new(event);
         entry.submit(0);
+        true
     } else {
-        if let Some(counter) = DROPPED_PACKETS.get_ptr_mut(0) {
-            unsafe { *counter += 1 };
-        }
-        error!(ctx, "Failed to reserve entry in ring buffer.");
+        false
     }
+}
+
+#[inline(always)]
+fn increment_dropped_packets() {
+    if let Some(counter) = DROPPED_PACKETS.get_ptr_mut(0) {
+        unsafe { *counter += 1 };
+    }
+}
+
+#[inline(always)]
+fn queue_index_ipv4(packet_info: &PacketInfo, header: &impl NetworkHeader) -> u32 {
+    let (first_ip, first_port, second_ip, second_port) = canonical_ipv4_endpoints(
+        packet_info.ipv4_source,
+        header.source_port(),
+        packet_info.ipv4_destination,
+        header.destination_port(),
+    );
+    let hash = mix_u32(first_ip)
+        ^ mix_u32(second_ip).rotate_left(7)
+        ^ mix_u16(first_port).rotate_left(13)
+        ^ mix_u16(second_port).rotate_left(19)
+        ^ u32::from(packet_info.protocol).rotate_left(27);
+    hash & 0b11
+}
+
+#[inline(always)]
+fn canonical_ipv4_endpoints(
+    source_ip: u32,
+    source_port: u16,
+    destination_ip: u32,
+    destination_port: u16,
+) -> (u32, u16, u32, u16) {
+    if source_ip < destination_ip || (source_ip == destination_ip && source_port <= destination_port)
+    {
+        (source_ip, source_port, destination_ip, destination_port)
+    } else {
+        (destination_ip, destination_port, source_ip, source_port)
+    }
+}
+
+#[inline(always)]
+fn mix_u32(mut value: u32) -> u32 {
+    value ^= value >> 16;
+    value = value.wrapping_mul(0x7feb_352d);
+    value ^= value >> 15;
+    value = value.wrapping_mul(0x846c_a68b);
+    value ^ (value >> 16)
+}
+
+#[inline(always)]
+fn mix_u16(value: u16) -> u32 {
+    mix_u32(u32::from(value))
 }
 
 fn process_transport_packet<T: NetworkHeader>(
@@ -79,8 +154,9 @@ fn process_transport_packet<T: NetworkHeader>(
 ) -> Result<i32, ()> {
     let hdr = ctx.load::<T>(header_offset).map_err(|_| ())?;
     let packet_log = packet_info.to_packet_log(&hdr);
+    let queue_index = queue_index_ipv4(packet_info, &hdr);
 
-    submit_ipv4_event(ctx, packet_log);
+    submit_ipv4_event(ctx, packet_log, queue_index);
 
     Ok(TC_ACT_PIPE)
 }

@@ -2,6 +2,9 @@
 
 pub use network_types::{icmp::IcmpHdr, tcp::TcpHdr, udp::UdpHdr};
 
+pub const REALTIME_EVENT_QUEUE_COUNT: usize = 4;
+pub const REALTIME_EVENT_RINGBUF_BYTES: u32 = 1024 * 1024 * 64;
+
 /// BasicFeaturesIpv4 is a struct collection all ipv4 traffic data.
 #[repr(C, packed)]
 #[derive(Copy, Clone)]
