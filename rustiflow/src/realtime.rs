@@ -97,8 +97,8 @@ fn log_source_stats(label: &str, stats: &RealtimeSourceStats) {
     );
 }
 
-const SHARD_BATCH_SIZE: usize = 128;
-const SHARD_QUEUE_CAPACITY: usize = 512;
+const DEFAULT_SHARD_BATCH_SIZE: usize = 128;
+const DEFAULT_SHARD_QUEUE_CAPACITY: usize = 512;
 
 /// Starts the realtime processing of packets on the given interface.
 /// The function will return the number of packets dropped by the eBPF program.
@@ -117,6 +117,15 @@ pub async fn handle_realtime<T>(
 where
     T: Flow,
 {
+    let shard_batch_size = read_env_usize(
+        "RUSTIFLOW_REALTIME_SHARD_BATCH_SIZE",
+        DEFAULT_SHARD_BATCH_SIZE,
+    );
+    let shard_queue_capacity = read_env_usize(
+        "RUSTIFLOW_REALTIME_SHARD_QUEUE_CAPACITY",
+        DEFAULT_SHARD_QUEUE_CAPACITY,
+    );
+
     // Needed for older kernels
     bump_memlock_rlimit();
 
@@ -183,7 +192,7 @@ where
 
     debug!("Creating {} sharded FlowTables...", num_threads);
     for _ in 0..num_threads {
-        let (tx, mut rx) = mpsc::channel::<Vec<PacketFeatures>>(SHARD_QUEUE_CAPACITY);
+        let (tx, mut rx) = mpsc::channel::<Vec<PacketFeatures>>(shard_queue_capacity);
         let mut flow_table = FlowTable::new(
             active_timeout,
             idle_timeout,
@@ -224,7 +233,8 @@ where
         handle_set.spawn(async move {
             // Wrap the RingBuf in AsyncFd to poll it with tokio
             let mut async_ring_buf = AsyncFd::new(ebpf_event_source).unwrap();
-            let mut pending_batches = create_pending_batches(num_threads as usize);
+            let mut pending_batches =
+                create_pending_batches(num_threads as usize, shard_batch_size);
 
             loop {
                 // Wait for data to be available in the ring buffer
@@ -254,7 +264,7 @@ where
                     }
                     pending_batches[shard_index].push(packet_features);
 
-                    if pending_batches[shard_index].len() >= SHARD_BATCH_SIZE {
+                    if pending_batches[shard_index].len() >= shard_batch_size {
                         flush_shard_batch(
                             &shard_senders_clone[shard_index],
                             &mut pending_batches[shard_index],
@@ -290,7 +300,8 @@ where
         handle_set.spawn(async move {
             // Wrap the RingBuf in AsyncFd to poll it with tokio
             let mut async_ring_buf = AsyncFd::new(ebpf_event_source).unwrap();
-            let mut pending_batches = create_pending_batches(num_threads as usize);
+            let mut pending_batches =
+                create_pending_batches(num_threads as usize, shard_batch_size);
 
             loop {
                 // Wait for data to be available in the ring buffer
@@ -320,7 +331,7 @@ where
                     }
                     pending_batches[shard_index].push(packet_features);
 
-                    if pending_batches[shard_index].len() >= SHARD_BATCH_SIZE {
+                    if pending_batches[shard_index].len() >= shard_batch_size {
                         flush_shard_batch(
                             &shard_senders_clone[shard_index],
                             &mut pending_batches[shard_index],
@@ -402,8 +413,8 @@ where
     Ok(total_dropped)
 }
 
-fn create_pending_batches(num_shards: usize) -> Vec<Vec<PacketFeatures>> {
-    std::iter::repeat_with(|| Vec::with_capacity(SHARD_BATCH_SIZE))
+fn create_pending_batches(num_shards: usize, shard_batch_size: usize) -> Vec<Vec<PacketFeatures>> {
+    std::iter::repeat_with(|| Vec::with_capacity(shard_batch_size))
         .take(num_shards)
         .collect()
 }
@@ -434,7 +445,8 @@ async fn flush_shard_batch(
         return;
     }
 
-    let batch = std::mem::replace(pending_batch, Vec::with_capacity(SHARD_BATCH_SIZE));
+    let next_capacity = pending_batch.capacity().max(1);
+    let batch = std::mem::replace(pending_batch, Vec::with_capacity(next_capacity));
     let send_start = stats.as_ref().map(|_| Instant::now());
     if let Err(e) = shard_sender.send(batch).await {
         if let Some(stats) = stats {
@@ -448,6 +460,14 @@ async fn flush_shard_batch(
     if let (Some(stats), Some(send_start)) = (stats, send_start) {
         stats.add_send_wait_ns(elapsed_ns(send_start));
     }
+}
+
+fn read_env_usize(var_name: &str, default_value: usize) -> usize {
+    std::env::var(var_name)
+        .ok()
+        .and_then(|value| value.parse::<usize>().ok())
+        .filter(|value| *value > 0)
+        .unwrap_or(default_value)
 }
 
 #[derive(Clone)]

@@ -259,7 +259,7 @@ Options:
           [default: 60]
 
       --threads <THREADS>
-          The numbers of threads to use for processing packets (optional) (default: 5, maximum number of logical CPUs)
+          The numbers of threads to use for processing packets (optional) (default: realtime uses 12, capped at the number of logical CPUs; pcap uses 5; maximum number of logical CPUs)
 
       -o, --output <OUTPUT>
               Output method (required if no config file is provided)
