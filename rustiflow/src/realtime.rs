@@ -1,7 +1,11 @@
 use std::hash::{DefaultHasher, Hash, Hasher};
 use std::io;
 use std::path::PathBuf;
-use std::sync::Arc;
+use std::sync::{
+    atomic::{AtomicU64, Ordering},
+    Arc,
+};
+use std::time::Instant;
 
 use crate::debug;
 use crate::flow_tui::launch_packet_tui;
@@ -10,12 +14,12 @@ use crate::realtime_mode::PacketGraphMode;
 use crate::{flow_table::FlowTable, flows::flow::Flow, packet_features::PacketFeatures};
 use anyhow::Context;
 use aya::{
-    maps::{PerCpuArray, RingBuf},
+    maps::{MapData, PerCpuArray, RingBuf},
     programs::{tc, SchedClassifier, TcAttachType},
     Ebpf,
 };
 use aya_log::EbpfLogger;
-use common::{EbpfEventIpv4, EbpfEventIpv6};
+use common::{EbpfEventIpv4, EbpfEventIpv6, REALTIME_EVENT_QUEUE_COUNT};
 use log::{error, info};
 use tokio::sync::watch;
 use tokio::{
@@ -25,6 +29,76 @@ use tokio::{
     sync::Mutex,
     task::JoinSet,
 };
+
+#[derive(Default)]
+struct RealtimeSourceStats {
+    events: AtomicU64,
+    decode_and_shard_ns: AtomicU64,
+    send_wait_ns: AtomicU64,
+    packet_graph_ns: AtomicU64,
+    total_event_ns: AtomicU64,
+    send_errors: AtomicU64,
+}
+
+impl RealtimeSourceStats {
+    fn add_decode_and_shard_ns(&self, value: u64) {
+        self.decode_and_shard_ns.fetch_add(value, Ordering::Relaxed);
+    }
+
+    fn add_send_wait_ns(&self, value: u64) {
+        self.send_wait_ns.fetch_add(value, Ordering::Relaxed);
+    }
+
+    fn add_packet_graph_ns(&self, value: u64) {
+        self.packet_graph_ns.fetch_add(value, Ordering::Relaxed);
+    }
+
+    fn add_total_event_ns(&self, value: u64) {
+        self.total_event_ns.fetch_add(value, Ordering::Relaxed);
+    }
+
+    fn increment_events(&self) {
+        self.events.fetch_add(1, Ordering::Relaxed);
+    }
+
+    fn increment_send_errors(&self) {
+        self.send_errors.fetch_add(1, Ordering::Relaxed);
+    }
+}
+
+fn elapsed_ns(start: Instant) -> u64 {
+    start.elapsed().as_nanos().min(u64::MAX as u128) as u64
+}
+
+fn log_source_stats(label: &str, stats: &RealtimeSourceStats) {
+    let events = stats.events.load(Ordering::Relaxed);
+    let decode_and_shard_ns = stats.decode_and_shard_ns.load(Ordering::Relaxed);
+    let send_wait_ns = stats.send_wait_ns.load(Ordering::Relaxed);
+    let packet_graph_ns = stats.packet_graph_ns.load(Ordering::Relaxed);
+    let total_event_ns = stats.total_event_ns.load(Ordering::Relaxed);
+    let send_errors = stats.send_errors.load(Ordering::Relaxed);
+
+    if events == 0 {
+        info!("Realtime source {}: no events drained", label);
+        return;
+    }
+
+    info!(
+        "Realtime source {}: events={} total_ms={:.3} decode_ms={:.3} send_wait_ms={:.3} packet_graph_ms={:.3} avg_event_us={:.3} avg_send_wait_us={:.3} send_errors={}",
+        label,
+        events,
+        total_event_ns as f64 / 1_000_000.0,
+        decode_and_shard_ns as f64 / 1_000_000.0,
+        send_wait_ns as f64 / 1_000_000.0,
+        packet_graph_ns as f64 / 1_000_000.0,
+        total_event_ns as f64 / events as f64 / 1_000.0,
+        send_wait_ns as f64 / events as f64 / 1_000.0,
+        send_errors,
+    );
+}
+
+const SHARD_BATCH_SIZE: usize = 128;
+const SHARD_QUEUE_CAPACITY: usize = 512;
 
 /// Starts the realtime processing of packets on the given interface.
 /// The function will return the number of packets dropped by the eBPF program.
@@ -51,7 +125,7 @@ where
     // Load the eBPF programs and attach to the event arrays
     let mut bpf_ingress_ipv4 = load_ebpf_ipv4(interface, TcAttachType::Ingress)?;
     let mut bpf_ingress_ipv6 = load_ebpf_ipv6(interface, TcAttachType::Ingress)?;
-    let events_ingress_ipv4 = RingBuf::try_from(bpf_ingress_ipv4.take_map("EVENTS_IPV4").unwrap())?;
+    let events_ingress_ipv4 = take_ring_buf_maps(&mut bpf_ingress_ipv4, "EVENTS_IPV4")?;
     let dropped_packets_ingress_ipv4: PerCpuArray<_, u64> =
         PerCpuArray::try_from(bpf_ingress_ipv4.take_map("DROPPED_PACKETS").unwrap())?;
     let events_ingress_ipv6 = RingBuf::try_from(bpf_ingress_ipv6.take_map("EVENTS_IPV6").unwrap())?;
@@ -64,16 +138,21 @@ where
     if !ingress_only {
         let mut bpf_egress_ipv4 = load_ebpf_ipv4(interface, TcAttachType::Egress)?;
         let mut bpf_egress_ipv6 = load_ebpf_ipv6(interface, TcAttachType::Egress)?;
-        let events_egress_ipv4 =
-            RingBuf::try_from(bpf_egress_ipv4.take_map("EVENTS_IPV4").unwrap())?;
+        let events_egress_ipv4 = take_ring_buf_maps(&mut bpf_egress_ipv4, "EVENTS_IPV4")?;
         let dropped_packets_egress_ipv4: PerCpuArray<_, u64> =
             PerCpuArray::try_from(bpf_egress_ipv4.take_map("DROPPED_PACKETS").unwrap())?;
         let events_egress_ipv6 =
             RingBuf::try_from(bpf_egress_ipv6.take_map("EVENTS_IPV6").unwrap())?;
         let dropped_packets_egress_ipv6: PerCpuArray<_, u64> =
             PerCpuArray::try_from(bpf_egress_ipv6.take_map("DROPPED_PACKETS").unwrap())?;
-        event_sources_v4 = vec![events_egress_ipv4, events_ingress_ipv4];
-        event_sources_v6 = vec![events_egress_ipv6, events_ingress_ipv6];
+        event_sources_v4 = labeled_ringbuf_sources("egress-ipv4", events_egress_ipv4)
+            .into_iter()
+            .chain(labeled_ringbuf_sources("ingress-ipv4", events_ingress_ipv4))
+            .collect();
+        event_sources_v6 = vec![
+            ("egress-ipv6", events_egress_ipv6),
+            ("ingress-ipv6", events_ingress_ipv6),
+        ];
         dropped_packet_counters = vec![
             dropped_packets_egress_ipv4,
             dropped_packets_ingress_ipv4,
@@ -81,13 +160,13 @@ where
             dropped_packets_ingress_ipv6,
         ];
     } else {
-        event_sources_v4 = vec![events_ingress_ipv4];
-        event_sources_v6 = vec![events_ingress_ipv6];
+        event_sources_v4 = labeled_ringbuf_sources("ingress-ipv4", events_ingress_ipv4);
+        event_sources_v6 = vec![("ingress-ipv6", events_ingress_ipv6)];
         dropped_packet_counters = vec![dropped_packets_ingress_ipv4, dropped_packets_ingress_ipv6];
     }
 
-    let buffer_num_packets = 10_000;
     let mut shard_senders = Vec::with_capacity(num_threads as usize);
+    let enable_source_stats = std::env::var_os("RUSTIFLOW_REALTIME_STATS").is_some();
     let (packet_graph, packet_rx) = match packet_graph_mode {
         PacketGraphMode::Enabled => {
             let (packet_tx, packet_rx) = watch::channel(Vec::new());
@@ -104,7 +183,7 @@ where
 
     debug!("Creating {} sharded FlowTables...", num_threads);
     for _ in 0..num_threads {
-        let (tx, mut rx) = mpsc::channel::<PacketFeatures>(buffer_num_packets);
+        let (tx, mut rx) = mpsc::channel::<Vec<PacketFeatures>>(SHARD_QUEUE_CAPACITY);
         let mut flow_table = FlowTable::new(
             active_timeout,
             idle_timeout,
@@ -116,9 +195,11 @@ where
         // Spawn a task per shard
         tokio::spawn(async move {
             let mut last_timestamp = None;
-            while let Some(packet_features) = rx.recv().await {
-                last_timestamp = Some(packet_features.timestamp_us);
-                flow_table.process_packet(&packet_features).await;
+            while let Some(packet_batch) = rx.recv().await {
+                for packet_features in packet_batch {
+                    last_timestamp = Some(packet_features.timestamp_us);
+                    flow_table.process_packet(&packet_features).await;
+                }
             }
             debug!("Shard finished processing packets");
             // Handle flow exporting when the receiver is closed
@@ -132,14 +213,18 @@ where
 
     // Spawn a task per event source
     let mut handle_set = JoinSet::new();
+    let mut source_stats = Vec::new();
 
-    for ebpf_event_source in event_sources_v4 {
+    for (label, ebpf_event_source) in event_sources_v4 {
         let shard_senders_clone = shard_senders.clone();
         let packet_graph = packet_graph.clone();
+        let stats = enable_source_stats.then(|| Arc::new(RealtimeSourceStats::default()));
+        source_stats.push((label, stats.clone()));
 
         handle_set.spawn(async move {
             // Wrap the RingBuf in AsyncFd to poll it with tokio
             let mut async_ring_buf = AsyncFd::new(ebpf_event_source).unwrap();
+            let mut pending_batches = create_pending_batches(num_threads as usize);
 
             loop {
                 // Wait for data to be available in the ring buffer
@@ -147,23 +232,48 @@ where
 
                 let ring_buf = guard.get_inner_mut();
                 while let Some(event) = ring_buf.next() {
+                    let event_start = enable_source_stats.then(Instant::now);
                     if let Some(packet_graph) = &packet_graph {
+                        let packet_graph_start = enable_source_stats.then(Instant::now);
                         packet_graph.record_packet().await;
+                        if let (Some(stats), Some(packet_graph_start)) =
+                            (&stats, packet_graph_start)
+                        {
+                            stats.add_packet_graph_ns(elapsed_ns(packet_graph_start));
+                        }
                     }
+                    let decode_start = enable_source_stats.then(Instant::now);
                     let ebpf_event_ipv4: EbpfEventIpv4 =
                         unsafe { std::ptr::read(event.as_ptr() as *const _) };
                     let packet_features =
                         PacketFeatures::from_ebpf_event_ipv4(&ebpf_event_ipv4, realtime_offset_us);
                     let flow_key = packet_features.biflow_key_value();
                     let shard_index = compute_shard_index(&flow_key, num_threads);
+                    if let (Some(stats), Some(decode_start)) = (&stats, decode_start) {
+                        stats.add_decode_and_shard_ns(elapsed_ns(decode_start));
+                    }
+                    pending_batches[shard_index].push(packet_features);
 
-                    if let Err(e) = shard_senders_clone[shard_index].send(packet_features).await {
-                        error!(
-                            "Failed to send packet_features to shard {}: {}",
-                            shard_index, e
-                        );
+                    if pending_batches[shard_index].len() >= SHARD_BATCH_SIZE {
+                        flush_shard_batch(
+                            &shard_senders_clone[shard_index],
+                            &mut pending_batches[shard_index],
+                            stats.as_ref(),
+                            shard_index,
+                        )
+                        .await;
+                    }
+
+                    if let Some(stats) = &stats {
+                        stats.increment_events();
+                        if let Some(event_start) = event_start {
+                            stats.add_total_event_ns(elapsed_ns(event_start));
+                        }
                     }
                 }
+
+                flush_pending_batches(&shard_senders_clone, &mut pending_batches, stats.as_ref())
+                    .await;
 
                 // Clear the readiness state for the next iteration
                 guard.clear_ready();
@@ -171,13 +281,16 @@ where
         });
     }
 
-    for ebpf_event_source in event_sources_v6 {
+    for (label, ebpf_event_source) in event_sources_v6 {
         let shard_senders_clone = shard_senders.clone();
         let packet_graph = packet_graph.clone();
+        let stats = enable_source_stats.then(|| Arc::new(RealtimeSourceStats::default()));
+        source_stats.push((label, stats.clone()));
 
         handle_set.spawn(async move {
             // Wrap the RingBuf in AsyncFd to poll it with tokio
             let mut async_ring_buf = AsyncFd::new(ebpf_event_source).unwrap();
+            let mut pending_batches = create_pending_batches(num_threads as usize);
 
             loop {
                 // Wait for data to be available in the ring buffer
@@ -185,23 +298,48 @@ where
 
                 let ring_buf = guard.get_inner_mut();
                 while let Some(event) = ring_buf.next() {
+                    let event_start = enable_source_stats.then(Instant::now);
                     if let Some(packet_graph) = &packet_graph {
+                        let packet_graph_start = enable_source_stats.then(Instant::now);
                         packet_graph.record_packet().await;
+                        if let (Some(stats), Some(packet_graph_start)) =
+                            (&stats, packet_graph_start)
+                        {
+                            stats.add_packet_graph_ns(elapsed_ns(packet_graph_start));
+                        }
                     }
+                    let decode_start = enable_source_stats.then(Instant::now);
                     let ebpf_event_ipv6: EbpfEventIpv6 =
                         unsafe { std::ptr::read(event.as_ptr() as *const _) };
                     let packet_features =
                         PacketFeatures::from_ebpf_event_ipv6(&ebpf_event_ipv6, realtime_offset_us);
                     let flow_key = packet_features.biflow_key_value();
                     let shard_index = compute_shard_index(&flow_key, num_threads);
+                    if let (Some(stats), Some(decode_start)) = (&stats, decode_start) {
+                        stats.add_decode_and_shard_ns(elapsed_ns(decode_start));
+                    }
+                    pending_batches[shard_index].push(packet_features);
 
-                    if let Err(e) = shard_senders_clone[shard_index].send(packet_features).await {
-                        error!(
-                            "Failed to send packet_features to shard {}: {}",
-                            shard_index, e
-                        );
+                    if pending_batches[shard_index].len() >= SHARD_BATCH_SIZE {
+                        flush_shard_batch(
+                            &shard_senders_clone[shard_index],
+                            &mut pending_batches[shard_index],
+                            stats.as_ref(),
+                            shard_index,
+                        )
+                        .await;
+                    }
+
+                    if let Some(stats) = &stats {
+                        stats.increment_events();
+                        if let Some(event_start) = event_start {
+                            stats.add_total_event_ns(elapsed_ns(event_start));
+                        }
                     }
                 }
+
+                flush_pending_batches(&shard_senders_clone, &mut pending_batches, stats.as_ref())
+                    .await;
 
                 // Clear the readiness state for the next iteration
                 guard.clear_ready();
@@ -234,6 +372,11 @@ where
     }
 
     info!("Total dropped packets before exit: {}", total_dropped);
+    for (label, stats) in &source_stats {
+        if let Some(stats) = stats.as_ref() {
+            log_source_stats(label, stats);
+        }
+    }
 
     // Cancel the tasks reading ebpf events
     handle_set.abort_all();
@@ -257,6 +400,54 @@ where
     }
 
     Ok(total_dropped)
+}
+
+fn create_pending_batches(num_shards: usize) -> Vec<Vec<PacketFeatures>> {
+    std::iter::repeat_with(|| Vec::with_capacity(SHARD_BATCH_SIZE))
+        .take(num_shards)
+        .collect()
+}
+
+async fn flush_pending_batches(
+    shard_senders: &[Sender<Vec<PacketFeatures>>],
+    pending_batches: &mut [Vec<PacketFeatures>],
+    stats: Option<&Arc<RealtimeSourceStats>>,
+) {
+    for (shard_index, pending_batch) in pending_batches.iter_mut().enumerate() {
+        flush_shard_batch(
+            &shard_senders[shard_index],
+            pending_batch,
+            stats,
+            shard_index,
+        )
+        .await;
+    }
+}
+
+async fn flush_shard_batch(
+    shard_sender: &Sender<Vec<PacketFeatures>>,
+    pending_batch: &mut Vec<PacketFeatures>,
+    stats: Option<&Arc<RealtimeSourceStats>>,
+    shard_index: usize,
+) {
+    if pending_batch.is_empty() {
+        return;
+    }
+
+    let batch = std::mem::replace(pending_batch, Vec::with_capacity(SHARD_BATCH_SIZE));
+    let send_start = stats.as_ref().map(|_| Instant::now());
+    if let Err(e) = shard_sender.send(batch).await {
+        if let Some(stats) = stats {
+            stats.increment_send_errors();
+        }
+        error!(
+            "Failed to send packet batch to shard {}: {}",
+            shard_index, e
+        );
+    }
+    if let (Some(stats), Some(send_start)) = (stats, send_start) {
+        stats.add_send_wait_ns(elapsed_ns(send_start));
+    }
 }
 
 #[derive(Clone)]
@@ -286,6 +477,52 @@ fn compute_realtime_offset_us() -> Result<i64, anyhow::Error> {
     let realtime_us = read_clock_us(libc::CLOCK_REALTIME)?;
     let monotonic_us = read_clock_us(libc::CLOCK_MONOTONIC)?;
     Ok(realtime_us - monotonic_us)
+}
+
+fn labeled_ringbuf_sources(
+    label_prefix: &'static str,
+    ring_bufs: Vec<RingBuf<MapData>>,
+) -> Vec<(&'static str, RingBuf<MapData>)> {
+    ring_bufs
+        .into_iter()
+        .enumerate()
+        .map(|(index, ring_buf)| (queue_label(label_prefix, index), ring_buf))
+        .collect()
+}
+
+fn queue_label(label_prefix: &'static str, index: usize) -> &'static str {
+    match (label_prefix, index) {
+        ("ingress-ipv4", 0) => "ingress-ipv4-q0",
+        ("ingress-ipv4", 1) => "ingress-ipv4-q1",
+        ("ingress-ipv4", 2) => "ingress-ipv4-q2",
+        ("ingress-ipv4", 3) => "ingress-ipv4-q3",
+        ("egress-ipv4", 0) => "egress-ipv4-q0",
+        ("egress-ipv4", 1) => "egress-ipv4-q1",
+        ("egress-ipv4", 2) => "egress-ipv4-q2",
+        ("egress-ipv4", 3) => "egress-ipv4-q3",
+        _ => panic!(
+            "unexpected realtime queue label: {}-{}",
+            label_prefix, index
+        ),
+    }
+}
+
+fn take_ring_buf_maps(
+    bpf: &mut Ebpf,
+    base_name: &str,
+) -> Result<Vec<RingBuf<MapData>>, anyhow::Error> {
+    let mut ring_bufs = Vec::with_capacity(REALTIME_EVENT_QUEUE_COUNT);
+
+    for index in 0..REALTIME_EVENT_QUEUE_COUNT {
+        let map_name = format!("{}_{}", base_name, index);
+        let ring_buf = RingBuf::try_from(
+            bpf.take_map(&map_name)
+                .with_context(|| format!("missing ring buffer map {}", map_name))?,
+        )?;
+        ring_bufs.push(ring_buf);
+    }
+
+    Ok(ring_bufs)
 }
 
 fn read_clock_us(clock_id: libc::clockid_t) -> Result<i64, anyhow::Error> {

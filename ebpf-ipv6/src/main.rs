@@ -9,7 +9,7 @@ use aya_ebpf::{
     maps::{PerCpuArray, RingBuf},
     programs::TcContext,
 };
-use aya_log_ebpf::error;
+use aya_log_ebpf::debug;
 
 use common::{EbpfEventIpv6, IcmpHdr, NetworkHeader, TcpHdr, UdpHdr};
 use network_types::{
@@ -26,7 +26,7 @@ fn panic(_info: &core::panic::PanicInfo) -> ! {
 static DROPPED_PACKETS: PerCpuArray<u64> = PerCpuArray::with_max_entries(1, 0);
 
 #[map]
-static EVENTS_IPV6: RingBuf = RingBuf::with_byte_size(1024 * 1024 * 10 * 2, 0); // 20 MB
+static EVENTS_IPV6: RingBuf = RingBuf::with_byte_size(1024 * 1024 * 64, 0); // 64 MB
 
 #[classifier]
 pub fn tc_flow_track(ctx: TcContext) -> i32 {
@@ -122,7 +122,7 @@ fn submit_ipv6_event(ctx: &TcContext, event: EbpfEventIpv6) {
         if let Some(counter) = DROPPED_PACKETS.get_ptr_mut(0) {
             unsafe { *counter += 1 };
         }
-        error!(ctx, "Failed to reserve entry in ring buffer.");
+        debug!(ctx, "Failed to reserve entry in ring buffer.");
     }
 }
 
