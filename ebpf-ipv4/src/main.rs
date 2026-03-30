@@ -31,6 +31,12 @@ fn panic(_info: &core::panic::PanicInfo) -> ! {
 static DROPPED_PACKETS: PerCpuArray<u64> = PerCpuArray::with_max_entries(1, 0);
 
 #[map]
+static MATCHED_PACKETS: PerCpuArray<u64> = PerCpuArray::with_max_entries(1, 0);
+
+#[map]
+static SUBMITTED_EVENTS: PerCpuArray<u64> = PerCpuArray::with_max_entries(1, 0);
+
+#[map]
 static EVENTS_IPV4_0: RingBuf = RingBuf::with_byte_size(REALTIME_EVENT_RINGBUF_BYTES, 0);
 
 #[map]
@@ -89,15 +95,23 @@ fn reserve_ipv4_event(queue: &RingBuf, event: EbpfEventIpv4) -> bool {
     if let Some(mut entry) = queue.reserve::<EbpfEventIpv4>(0) {
         *entry = core::mem::MaybeUninit::new(event);
         entry.submit(0);
+        increment_counter(&MATCHED_PACKETS);
+        increment_counter(&SUBMITTED_EVENTS);
         true
     } else {
+        increment_counter(&MATCHED_PACKETS);
         false
     }
 }
 
 #[inline(always)]
 fn increment_dropped_packets() {
-    if let Some(counter) = DROPPED_PACKETS.get_ptr_mut(0) {
+    increment_counter(&DROPPED_PACKETS);
+}
+
+#[inline(always)]
+fn increment_counter(counter_array: &PerCpuArray<u64>) {
+    if let Some(counter) = counter_array.get_ptr_mut(0) {
         unsafe { *counter += 1 };
     }
 }

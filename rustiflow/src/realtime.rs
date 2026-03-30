@@ -15,7 +15,11 @@ use crate::{flow_table::FlowTable, flows::flow::Flow, packet_features::PacketFea
 use anyhow::Context;
 use aya::{
     maps::{MapData, PerCpuArray, RingBuf},
-    programs::{tc, SchedClassifier, TcAttachType},
+    programs::{
+        tc,
+        tc::{NlOptions, TcAttachOptions},
+        SchedClassifier, TcAttachType,
+    },
     Ebpf,
 };
 use aya_log::EbpfLogger;
@@ -38,6 +42,13 @@ struct RealtimeSourceStats {
     packet_graph_ns: AtomicU64,
     total_event_ns: AtomicU64,
     send_errors: AtomicU64,
+}
+
+struct RealtimeEbpfCounters {
+    label: &'static str,
+    dropped_packets: PerCpuArray<MapData, u64>,
+    matched_packets: PerCpuArray<MapData, u64>,
+    submitted_events: PerCpuArray<MapData, u64>,
 }
 
 impl RealtimeSourceStats {
@@ -137,12 +148,20 @@ where
     let events_ingress_ipv4 = take_ring_buf_maps(&mut bpf_ingress_ipv4, "EVENTS_IPV4")?;
     let dropped_packets_ingress_ipv4: PerCpuArray<_, u64> =
         PerCpuArray::try_from(bpf_ingress_ipv4.take_map("DROPPED_PACKETS").unwrap())?;
-    let events_ingress_ipv6 = RingBuf::try_from(bpf_ingress_ipv6.take_map("EVENTS_IPV6").unwrap())?;
+    let matched_packets_ingress_ipv4: PerCpuArray<_, u64> =
+        PerCpuArray::try_from(bpf_ingress_ipv4.take_map("MATCHED_PACKETS").unwrap())?;
+    let submitted_events_ingress_ipv4: PerCpuArray<_, u64> =
+        PerCpuArray::try_from(bpf_ingress_ipv4.take_map("SUBMITTED_EVENTS").unwrap())?;
+    let events_ingress_ipv6 = take_ring_buf_maps(&mut bpf_ingress_ipv6, "EVENTS_IPV6")?;
     let dropped_packets_ingress_ipv6: PerCpuArray<_, u64> =
         PerCpuArray::try_from(bpf_ingress_ipv6.take_map("DROPPED_PACKETS").unwrap())?;
+    let matched_packets_ingress_ipv6: PerCpuArray<_, u64> =
+        PerCpuArray::try_from(bpf_ingress_ipv6.take_map("MATCHED_PACKETS").unwrap())?;
+    let submitted_events_ingress_ipv6: PerCpuArray<_, u64> =
+        PerCpuArray::try_from(bpf_ingress_ipv6.take_map("SUBMITTED_EVENTS").unwrap())?;
     let event_sources_v4;
     let event_sources_v6;
-    let dropped_packet_counters;
+    let ebpf_counters;
 
     if !ingress_only {
         let mut bpf_egress_ipv4 = load_ebpf_ipv4(interface, TcAttachType::Egress)?;
@@ -150,28 +169,68 @@ where
         let events_egress_ipv4 = take_ring_buf_maps(&mut bpf_egress_ipv4, "EVENTS_IPV4")?;
         let dropped_packets_egress_ipv4: PerCpuArray<_, u64> =
             PerCpuArray::try_from(bpf_egress_ipv4.take_map("DROPPED_PACKETS").unwrap())?;
-        let events_egress_ipv6 =
-            RingBuf::try_from(bpf_egress_ipv6.take_map("EVENTS_IPV6").unwrap())?;
+        let matched_packets_egress_ipv4: PerCpuArray<_, u64> =
+            PerCpuArray::try_from(bpf_egress_ipv4.take_map("MATCHED_PACKETS").unwrap())?;
+        let submitted_events_egress_ipv4: PerCpuArray<_, u64> =
+            PerCpuArray::try_from(bpf_egress_ipv4.take_map("SUBMITTED_EVENTS").unwrap())?;
+        let events_egress_ipv6 = take_ring_buf_maps(&mut bpf_egress_ipv6, "EVENTS_IPV6")?;
         let dropped_packets_egress_ipv6: PerCpuArray<_, u64> =
             PerCpuArray::try_from(bpf_egress_ipv6.take_map("DROPPED_PACKETS").unwrap())?;
+        let matched_packets_egress_ipv6: PerCpuArray<_, u64> =
+            PerCpuArray::try_from(bpf_egress_ipv6.take_map("MATCHED_PACKETS").unwrap())?;
+        let submitted_events_egress_ipv6: PerCpuArray<_, u64> =
+            PerCpuArray::try_from(bpf_egress_ipv6.take_map("SUBMITTED_EVENTS").unwrap())?;
         event_sources_v4 = labeled_ringbuf_sources("egress-ipv4", events_egress_ipv4)
             .into_iter()
             .chain(labeled_ringbuf_sources("ingress-ipv4", events_ingress_ipv4))
             .collect();
-        event_sources_v6 = vec![
-            ("egress-ipv6", events_egress_ipv6),
-            ("ingress-ipv6", events_ingress_ipv6),
-        ];
-        dropped_packet_counters = vec![
-            dropped_packets_egress_ipv4,
-            dropped_packets_ingress_ipv4,
-            dropped_packets_egress_ipv6,
-            dropped_packets_ingress_ipv6,
+        event_sources_v6 = labeled_ringbuf_sources("egress-ipv6", events_egress_ipv6)
+            .into_iter()
+            .chain(labeled_ringbuf_sources("ingress-ipv6", events_ingress_ipv6))
+            .collect();
+        ebpf_counters = vec![
+            RealtimeEbpfCounters {
+                label: "egress-ipv4",
+                dropped_packets: dropped_packets_egress_ipv4,
+                matched_packets: matched_packets_egress_ipv4,
+                submitted_events: submitted_events_egress_ipv4,
+            },
+            RealtimeEbpfCounters {
+                label: "ingress-ipv4",
+                dropped_packets: dropped_packets_ingress_ipv4,
+                matched_packets: matched_packets_ingress_ipv4,
+                submitted_events: submitted_events_ingress_ipv4,
+            },
+            RealtimeEbpfCounters {
+                label: "egress-ipv6",
+                dropped_packets: dropped_packets_egress_ipv6,
+                matched_packets: matched_packets_egress_ipv6,
+                submitted_events: submitted_events_egress_ipv6,
+            },
+            RealtimeEbpfCounters {
+                label: "ingress-ipv6",
+                dropped_packets: dropped_packets_ingress_ipv6,
+                matched_packets: matched_packets_ingress_ipv6,
+                submitted_events: submitted_events_ingress_ipv6,
+            },
         ];
     } else {
         event_sources_v4 = labeled_ringbuf_sources("ingress-ipv4", events_ingress_ipv4);
-        event_sources_v6 = vec![("ingress-ipv6", events_ingress_ipv6)];
-        dropped_packet_counters = vec![dropped_packets_ingress_ipv4, dropped_packets_ingress_ipv6];
+        event_sources_v6 = labeled_ringbuf_sources("ingress-ipv6", events_ingress_ipv6);
+        ebpf_counters = vec![
+            RealtimeEbpfCounters {
+                label: "ingress-ipv4",
+                dropped_packets: dropped_packets_ingress_ipv4,
+                matched_packets: matched_packets_ingress_ipv4,
+                submitted_events: submitted_events_ingress_ipv4,
+            },
+            RealtimeEbpfCounters {
+                label: "ingress-ipv6",
+                dropped_packets: dropped_packets_ingress_ipv6,
+                matched_packets: matched_packets_ingress_ipv6,
+                submitted_events: submitted_events_ingress_ipv6,
+            },
+        ];
     }
 
     let mut shard_senders = Vec::with_capacity(num_threads as usize);
@@ -369,17 +428,18 @@ where
     // Fetch dropped packets counter from eBPF program before terminating
     info!("Fetching dropped packet counters before exiting...");
     let mut total_dropped = 0;
-    for dropped_packets_array in dropped_packet_counters {
-        match dropped_packets_array.get(&0, 0) {
-            Ok(values) => {
-                for cpu_val in values.iter() {
-                    total_dropped += *cpu_val;
-                }
-            }
-            Err(e) => {
-                error!("Failed to read dropped packets counter: {:?}", e);
-            }
-        }
+    for counters in &ebpf_counters {
+        let dropped_packets =
+            read_per_cpu_counter(&counters.dropped_packets, counters.label, "dropped");
+        let matched_packets =
+            read_per_cpu_counter(&counters.matched_packets, counters.label, "matched");
+        let submitted_events =
+            read_per_cpu_counter(&counters.submitted_events, counters.label, "submitted");
+        total_dropped += dropped_packets;
+        info!(
+            "eBPF counters {}: matched_packets={}, submitted_events={}, dropped_packets={}",
+            counters.label, matched_packets, submitted_events, dropped_packets
+        );
     }
 
     info!("Total dropped packets before exit: {}", total_dropped);
@@ -411,6 +471,23 @@ where
     }
 
     Ok(total_dropped)
+}
+
+fn read_per_cpu_counter(
+    counter_array: &PerCpuArray<MapData, u64>,
+    label: &str,
+    counter_name: &str,
+) -> u64 {
+    match counter_array.get(&0, 0) {
+        Ok(values) => values.iter().sum(),
+        Err(e) => {
+            error!(
+                "Failed to read {} counter for {}: {:?}",
+                counter_name, label, e
+            );
+            0
+        }
+    }
 }
 
 fn create_pending_batches(num_shards: usize, shard_batch_size: usize) -> Vec<Vec<PacketFeatures>> {
@@ -520,6 +597,14 @@ fn queue_label(label_prefix: &'static str, index: usize) -> &'static str {
         ("egress-ipv4", 1) => "egress-ipv4-q1",
         ("egress-ipv4", 2) => "egress-ipv4-q2",
         ("egress-ipv4", 3) => "egress-ipv4-q3",
+        ("ingress-ipv6", 0) => "ingress-ipv6-q0",
+        ("ingress-ipv6", 1) => "ingress-ipv6-q1",
+        ("ingress-ipv6", 2) => "ingress-ipv6-q2",
+        ("ingress-ipv6", 3) => "ingress-ipv6-q3",
+        ("egress-ipv6", 0) => "egress-ipv6-q0",
+        ("egress-ipv6", 1) => "egress-ipv6-q1",
+        ("egress-ipv6", 2) => "egress-ipv6-q2",
+        ("egress-ipv6", 3) => "egress-ipv6-q3",
         _ => panic!(
             "unexpected realtime queue label: {}-{}",
             label_prefix, index
@@ -587,8 +672,23 @@ fn ebpf_binary_path(program_name: &str) -> PathBuf {
         .join(program_name)
 }
 
+fn tc_attach_type_label(tc_attach_type: TcAttachType) -> &'static str {
+    match tc_attach_type {
+        TcAttachType::Ingress => "ingress",
+        TcAttachType::Egress => "egress",
+        TcAttachType::Custom(_) => "custom",
+    }
+}
+
 fn load_ebpf_ipv4(interface: &str, tc_attach_type: TcAttachType) -> Result<Ebpf, anyhow::Error> {
     let binary_path = ebpf_binary_path("rustiflow-ebpf-ipv4");
+    let attach_label = tc_attach_type_label(tc_attach_type);
+    info!(
+        "Loading IPv4 eBPF binary {} for {} on {}",
+        binary_path.display(),
+        attach_label,
+        interface
+    );
     let mut bpf_ipv4 = Ebpf::load_file(&binary_path).with_context(|| {
         format!(
             "Failed to load eBPF IPv4 binary from {}. Build it first with `cargo xtask ebpf-ipv4`.",
@@ -598,26 +698,52 @@ fn load_ebpf_ipv4(interface: &str, tc_attach_type: TcAttachType) -> Result<Ebpf,
 
     // Attach the eBPF program function
     let _ = EbpfLogger::init(&mut bpf_ipv4);
-    let _ = tc::qdisc_add_clsact(interface);
+    match tc::qdisc_add_clsact(interface) {
+        Ok(()) => info!("Ensured clsact qdisc on {}", interface),
+        Err(e) => debug!("qdisc_add_clsact({}): {:?}", interface, e),
+    }
 
     let program_egress_ipv4: &mut SchedClassifier =
         bpf_ipv4.program_mut("tc_flow_track").unwrap().try_into()?;
+    info!(
+        "Loading IPv4 tc classifier for {} on {}",
+        attach_label, interface
+    );
     program_egress_ipv4.load().map_err(|e| {
         error!("Failed to load eBPF program: {:?}", e);
         e
     })?;
+    info!(
+        "Attaching IPv4 tc classifier to {} on {}",
+        attach_label, interface
+    );
     program_egress_ipv4
-        .attach(interface, tc_attach_type)
+        .attach_with_options(
+            interface,
+            tc_attach_type,
+            TcAttachOptions::Netlink(NlOptions::default()),
+        )
         .map_err(|e| {
             error!("Failed to attach eBPF program: {:?}", e);
             e
         })?;
+    info!(
+        "Attached IPv4 tc classifier to {} on {}",
+        attach_label, interface
+    );
 
     Ok(bpf_ipv4)
 }
 
 fn load_ebpf_ipv6(interface: &str, tc_attach_type: TcAttachType) -> Result<Ebpf, anyhow::Error> {
     let binary_path = ebpf_binary_path("rustiflow-ebpf-ipv6");
+    let attach_label = tc_attach_type_label(tc_attach_type);
+    info!(
+        "Loading IPv6 eBPF binary {} for {} on {}",
+        binary_path.display(),
+        attach_label,
+        interface
+    );
     let mut bpf_ipv6 = Ebpf::load_file(&binary_path).with_context(|| {
         format!(
             "Failed to load eBPF IPv6 binary from {}. Build it first with `cargo xtask ebpf-ipv6`.",
@@ -627,12 +753,31 @@ fn load_ebpf_ipv6(interface: &str, tc_attach_type: TcAttachType) -> Result<Ebpf,
 
     // Attach the eBPF program function
     let _ = EbpfLogger::init(&mut bpf_ipv6);
-    let _ = tc::qdisc_add_clsact(interface);
+    match tc::qdisc_add_clsact(interface) {
+        Ok(()) => info!("Ensured clsact qdisc on {}", interface),
+        Err(e) => debug!("qdisc_add_clsact({}): {:?}", interface, e),
+    }
 
     let program_egress_ipv6: &mut SchedClassifier =
         bpf_ipv6.program_mut("tc_flow_track").unwrap().try_into()?;
+    info!(
+        "Loading IPv6 tc classifier for {} on {}",
+        attach_label, interface
+    );
     program_egress_ipv6.load()?;
-    program_egress_ipv6.attach(interface, tc_attach_type)?;
+    info!(
+        "Attaching IPv6 tc classifier to {} on {}",
+        attach_label, interface
+    );
+    program_egress_ipv6.attach_with_options(
+        interface,
+        tc_attach_type,
+        TcAttachOptions::Netlink(NlOptions::default()),
+    )?;
+    info!(
+        "Attached IPv6 tc classifier to {} on {}",
+        attach_label, interface
+    );
 
     Ok(bpf_ipv6)
 }

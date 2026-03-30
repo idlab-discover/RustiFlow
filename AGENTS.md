@@ -13,6 +13,9 @@ This repository is a Rust workspace for a network flow extractor. The main crate
 - Linux is the source of truth for build, runtime, and performance validation.
 - Do not assume that successful non-Linux builds imply realtime correctness.
 - When touching `aya`/eBPF/realtime code, prefer validating on Linux.
+- On the local Arch `rustiflow-t0` veth harness, legacy netlink tc attach is
+  currently more reliable than `aya`'s automatic TCX attach path for realtime
+  validation.
 
 ## Local Test Network
 
@@ -21,7 +24,8 @@ This repository is a Rust workspace for a network flow extractor. The main crate
   - host namespace capture side: `rustiflow-t0`
   - peer namespace side: `rustiflow-p0`
   - peer namespace: `rustiflow-peer`
-  - addressing: `10.203.0.1/30` on `rustiflow-t0`, `10.203.0.2/30` on `rustiflow-p0`
+  - IPv4 addressing: `10.203.0.1/30` on `rustiflow-t0`, `10.203.0.2/30` on `rustiflow-p0`
+  - IPv6 addressing: `fd42:203::1/64` on `rustiflow-t0`, `fd42:203::2/64` on `rustiflow-p0`
 - This setup is intended to stress the RustiFlow software path without depending on the physical LAN.
 - Treat it as a high-throughput local test harness, not as a substitute for true physical wire-rate validation.
 
@@ -136,7 +140,7 @@ in `docs/engineering-notes.md`.
 - [x] Treat the redesign as successful only when the verification data improves:
   fewer dropped packets on the single-flow `2.5G` case and materially better
   behavior on the `-P 8` multi-flow ingress case.
-- [ ] Decide whether the current multi-queue ring-buffer design should also be
+- [x] Decide whether the current multi-queue ring-buffer design should also be
   extended to IPv6, or whether the next step should be the more invasive
   transport rewrite captured as Option 2 in `docs/engineering-notes.md`.
 

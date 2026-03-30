@@ -11,7 +11,9 @@ use aya_ebpf::{
 };
 use aya_log_ebpf::debug;
 
-use common::{EbpfEventIpv6, IcmpHdr, NetworkHeader, TcpHdr, UdpHdr};
+use common::{
+    EbpfEventIpv6, IcmpHdr, NetworkHeader, TcpHdr, UdpHdr, REALTIME_EVENT_RINGBUF_BYTES,
+};
 use network_types::{
     eth::{EthHdr, EtherType},
     ip::{IpProto, Ipv6Hdr},
@@ -26,7 +28,22 @@ fn panic(_info: &core::panic::PanicInfo) -> ! {
 static DROPPED_PACKETS: PerCpuArray<u64> = PerCpuArray::with_max_entries(1, 0);
 
 #[map]
-static EVENTS_IPV6: RingBuf = RingBuf::with_byte_size(1024 * 1024 * 64, 0); // 64 MB
+static MATCHED_PACKETS: PerCpuArray<u64> = PerCpuArray::with_max_entries(1, 0);
+
+#[map]
+static SUBMITTED_EVENTS: PerCpuArray<u64> = PerCpuArray::with_max_entries(1, 0);
+
+#[map]
+static EVENTS_IPV6_0: RingBuf = RingBuf::with_byte_size(REALTIME_EVENT_RINGBUF_BYTES, 0);
+
+#[map]
+static EVENTS_IPV6_1: RingBuf = RingBuf::with_byte_size(REALTIME_EVENT_RINGBUF_BYTES, 0);
+
+#[map]
+static EVENTS_IPV6_2: RingBuf = RingBuf::with_byte_size(REALTIME_EVENT_RINGBUF_BYTES, 0);
+
+#[map]
+static EVENTS_IPV6_3: RingBuf = RingBuf::with_byte_size(REALTIME_EVENT_RINGBUF_BYTES, 0);
 
 #[classifier]
 pub fn tc_flow_track(ctx: TcContext) -> i32 {
@@ -114,16 +131,98 @@ fn process_packet(ctx: &TcContext) -> Result<i32, ()> {
 }
 
 #[inline(always)]
-fn submit_ipv6_event(ctx: &TcContext, event: EbpfEventIpv6) {
-    if let Some(mut entry) = EVENTS_IPV6.reserve::<EbpfEventIpv6>(0) {
-        *entry = core::mem::MaybeUninit::new(event);
-        entry.submit(0);
-    } else {
-        if let Some(counter) = DROPPED_PACKETS.get_ptr_mut(0) {
-            unsafe { *counter += 1 };
-        }
+fn submit_ipv6_event(ctx: &TcContext, event: EbpfEventIpv6, queue_index: u32) {
+    let reserved = match queue_index {
+        0 => reserve_ipv6_event(&EVENTS_IPV6_0, event),
+        1 => reserve_ipv6_event(&EVENTS_IPV6_1, event),
+        2 => reserve_ipv6_event(&EVENTS_IPV6_2, event),
+        _ => reserve_ipv6_event(&EVENTS_IPV6_3, event),
+    };
+
+    if !reserved {
+        increment_dropped_packets();
         debug!(ctx, "Failed to reserve entry in ring buffer.");
     }
+}
+
+#[inline(always)]
+fn reserve_ipv6_event(queue: &RingBuf, event: EbpfEventIpv6) -> bool {
+    if let Some(mut entry) = queue.reserve::<EbpfEventIpv6>(0) {
+        *entry = core::mem::MaybeUninit::new(event);
+        entry.submit(0);
+        increment_counter(&MATCHED_PACKETS);
+        increment_counter(&SUBMITTED_EVENTS);
+        true
+    } else {
+        increment_counter(&MATCHED_PACKETS);
+        false
+    }
+}
+
+#[inline(always)]
+fn increment_dropped_packets() {
+    increment_counter(&DROPPED_PACKETS);
+}
+
+#[inline(always)]
+fn increment_counter(counter_array: &PerCpuArray<u64>) {
+    if let Some(counter) = counter_array.get_ptr_mut(0) {
+        unsafe { *counter += 1 };
+    }
+}
+
+#[inline(always)]
+fn queue_index_ipv6(packet_info: &PacketInfo, header: &impl NetworkHeader) -> u32 {
+    let (first_ip, first_port, second_ip, second_port) = canonical_ipv6_endpoints(
+        packet_info.ipv6_source,
+        header.source_port(),
+        packet_info.ipv6_destination,
+        header.destination_port(),
+    );
+    let hash = mix_u128(first_ip)
+        ^ mix_u128(second_ip).rotate_left(11)
+        ^ mix_u16(first_port).rotate_left(17)
+        ^ mix_u16(second_port).rotate_left(23)
+        ^ u32::from(packet_info.protocol).rotate_left(29);
+    hash & 0b11
+}
+
+#[inline(always)]
+fn canonical_ipv6_endpoints(
+    source_ip: u128,
+    source_port: u16,
+    destination_ip: u128,
+    destination_port: u16,
+) -> (u128, u16, u128, u16) {
+    if source_ip < destination_ip
+        || (source_ip == destination_ip && source_port <= destination_port)
+    {
+        (source_ip, source_port, destination_ip, destination_port)
+    } else {
+        (destination_ip, destination_port, source_ip, source_port)
+    }
+}
+
+#[inline(always)]
+fn mix_u128(value: u128) -> u32 {
+    let lower = value as u64;
+    let upper = (value >> 64) as u64;
+    mix_u64(lower) ^ mix_u64(upper).rotate_left(13)
+}
+
+#[inline(always)]
+fn mix_u64(mut value: u64) -> u32 {
+    value ^= value >> 30;
+    value = value.wrapping_mul(0xbf58_476d_1ce4_e5b9);
+    value ^= value >> 27;
+    value = value.wrapping_mul(0x94d0_49bb_1331_11eb);
+    let mixed = value ^ (value >> 31);
+    mixed as u32 ^ (mixed >> 32) as u32
+}
+
+#[inline(always)]
+fn mix_u16(value: u16) -> u32 {
+    mix_u64(u64::from(value))
 }
 
 fn process_transport_packet<T: NetworkHeader>(
@@ -133,8 +232,9 @@ fn process_transport_packet<T: NetworkHeader>(
 ) -> Result<i32, ()> {
     let hdr = ctx.load::<T>(transport_offset).map_err(|_| ())?;
     let packet_log = packet_info.to_packet_log(&hdr);
+    let queue_index = queue_index_ipv6(packet_info, &hdr);
 
-    submit_ipv6_event(ctx, packet_log);
+    submit_ipv6_event(ctx, packet_log, queue_index);
 
     Ok(TC_ACT_PIPE)
 }
