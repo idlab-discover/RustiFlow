@@ -278,6 +278,35 @@ This file keeps short-lived design choices and execution notes that would make
     `0` dropped packets
   - `8 x 1.25G`, `1400`-byte UDP, `--threads 16`: `9.98 Gbit/s`,
     `0` dropped packets
+- IPv6 now mirrors the bounded Option 1 ingress design as well:
+  - the IPv6 eBPF program emits into four fixed ring buffers using the same
+    canonical biflow-style queue selection pattern as IPv4
+  - userspace drains those four IPv6 queues in parallel before handing work to
+    the existing shard workers
+- Realtime attach debugging on the local Arch `rustiflow-t0` harness found a
+  separate issue from the queue design:
+  - `aya`'s automatic `SchedClassifier::attach()` path reported success but, on
+    this kernel and veth setup, the TCX-attached programs never executed
+  - the added per-CPU eBPF counters (`matched_packets`, `submitted_events`,
+    `dropped_packets`) made this visible immediately because both IPv4 and IPv6
+    stayed at `0` despite successful traffic on the harness
+  - forcing legacy netlink tc attach from userspace restored execution on the
+    local harness, after which the IPv6 counters tracked the live traffic as
+    expected
+- IPv6 validation after forcing legacy netlink tc attach on the same slim
+  container workflow:
+  - `8 x 1.25G`, `1400`-byte UDP, `10s`, `--threads 4`, reverse IPv6 traffic:
+    `9.99 Gbit/s`, `0` RustiFlow drops
+  - `8 x 1.25G`, `1400`-byte UDP, `10s`, `--threads 12`, reverse IPv6 traffic:
+    `9.99 Gbit/s`, `0` RustiFlow drops
+  - `8 x 1.25G`, `512`-byte UDP, `10s`, `--threads 12`, reverse IPv6 traffic:
+    about `5.83 Gbit/s`, `0` RustiFlow drops
+- Current interpretation of the IPv6 result:
+  - the bounded multi-queue ingress design now holds for both IPv4 and IPv6 on
+    the local software-path harness
+  - the local `512`-byte IPv6 case is not presently exposing a RustiFlow drop
+    point; the traffic generator or receive path gives out first while
+    RustiFlow still reports `0` drops
 - More adversarial 10 Gbit/s shapes with `--threads 11`:
   - `16 x 625M`, `1400`-byte UDP: `10.0 Gbit/s`, `0` dropped packets
   - `8 x 1.25G`, `1024`-byte UDP: `9.90 Gbit/s`, `0` dropped packets
