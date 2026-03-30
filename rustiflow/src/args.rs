@@ -33,7 +33,7 @@ pub struct Cli {
     pub expiration_check_interval: u64,
 
     /// The numbers of threads to use for processing packets (optional)
-    /// (default: 5, maximum: number of logical CPUs)
+    /// (default: realtime uses 12, capped at the number of logical CPUs; pcap uses 5; maximum: number of logical CPUs)
     #[clap(long, group = "cli_group")]
     pub threads: Option<u8>,
 
@@ -120,7 +120,7 @@ pub struct ExportConfig {
     pub expiration_check_interval: u64,
 
     /// The numbers of threads to use for processing packets (optional)
-    /// (default: 5, maximum: number of logical CPUs)
+    /// (default: realtime uses 12, capped at the number of logical CPUs; pcap uses 5; maximum: number of logical CPUs)
     #[clap(short, long)]
     pub threads: Option<u8>,
 }

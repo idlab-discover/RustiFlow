@@ -34,6 +34,9 @@ use std::time::Instant;
 use tokio::sync::mpsc;
 use tui::{launch_tui, Config};
 
+const DEFAULT_OFFLINE_THREADS: u8 = 5;
+const DEFAULT_REALTIME_THREADS: u8 = 12;
+
 #[tokio::main]
 async fn main() {
     env_logger::init();
@@ -139,7 +142,7 @@ async fn run_with_config(config: Config) {
                     let result = handle_realtime::<$flow_ty>(
                         &interface,
                         sender,
-                        std::cmp::min(config.config.threads.unwrap_or(5), num_cpus::get() as u8),
+                        resolve_realtime_threads(config.config.threads),
                         config.config.active_timeout,
                         config.config.idle_timeout,
                         config.config.early_export,
@@ -220,7 +223,7 @@ async fn run_with_config(config: Config) {
                     if let Err(err) = read_pcap_file::<$flow_ty>(
                         &path,
                         sender,
-                        std::cmp::min(config.config.threads.unwrap_or(5), num_cpus::get() as u8),
+                        resolve_offline_threads(config.config.threads),
                         config.config.active_timeout,
                         config.config.idle_timeout,
                         config.config.early_export,
@@ -254,4 +257,20 @@ async fn run_with_config(config: Config) {
             }
         }
     }
+}
+
+fn resolve_realtime_threads(config_threads: Option<u8>) -> u8 {
+    let logical_cpus = num_cpus::get() as u8;
+    std::cmp::min(
+        config_threads.unwrap_or(DEFAULT_REALTIME_THREADS),
+        logical_cpus,
+    )
+}
+
+fn resolve_offline_threads(config_threads: Option<u8>) -> u8 {
+    let logical_cpus = num_cpus::get() as u8;
+    std::cmp::min(
+        config_threads.unwrap_or(DEFAULT_OFFLINE_THREADS),
+        logical_cpus,
+    )
 }

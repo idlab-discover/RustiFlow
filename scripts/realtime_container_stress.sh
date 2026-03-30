@@ -22,6 +22,10 @@ Options:
   --length BYTES       iperf3 UDP payload length (default: 1400)
   --parallel N         iperf3 parallel streams (default: 1)
   --duration SEC       iperf3 run duration in seconds (default: 15)
+  --early-export SEC   RustiFlow early-export interval in seconds
+                       (default: 5, use 0 to disable)
+  --env KEY=VALUE      Extra environment variable for the RustiFlow container
+                       (repeatable)
   --export-path PATH   CSV export path inside the host filesystem
                        (default: target/realtime-stress/rustiflow-stress.csv)
   -h, --help           Show this help text
@@ -40,9 +44,11 @@ bitrate="2.5G"
 length=1400
 parallel=1
 duration=15
+early_export=5
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 repo_root="$(cd "$script_dir/.." && pwd)"
 export_path="$repo_root/target/realtime-stress/rustiflow-stress.csv"
+container_env=()
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -80,6 +86,14 @@ while [[ $# -gt 0 ]]; do
             ;;
         --duration)
             duration="$2"
+            shift 2
+            ;;
+        --early-export)
+            early_export="$2"
+            shift 2
+            ;;
+        --env)
+            container_env+=(-e "$2")
             shift 2
             ;;
         --export-path)
@@ -128,20 +142,29 @@ rm -f "$export_path"
 mkdir -p "$export_dir"
 docker rm -f "$container_name" >/dev/null 2>&1 || true
 
+rustiflow_args=(
+    -f "$features"
+    -o csv
+    --header
+    --export-path "/tmp/$(basename "$export_path")"
+    --performance-mode
+    --threads "$threads"
+)
+
+if [[ "$early_export" != "0" ]]; then
+    rustiflow_args+=(--early-export "$early_export")
+fi
+
+rustiflow_args+=(realtime "$interface" --ingress-only)
+
 docker run -d \
     --name "$container_name" \
     --privileged \
     --network host \
     -v "$export_dir:/tmp" \
+    "${container_env[@]}" \
     "$image" \
-    -f "$features" \
-    -o csv \
-    --header \
-    --export-path "/tmp/$(basename "$export_path")" \
-    --performance-mode \
-    --threads "$threads" \
-    --early-export 5 \
-    realtime "$interface" --ingress-only >/dev/null
+    "${rustiflow_args[@]}" >/dev/null
 
 sleep 2
 
@@ -178,6 +201,7 @@ printf 'bitrate_target: %s\n' "$bitrate"
 printf 'parallel_streams: %s\n' "$parallel"
 printf 'udp_length: %s\n' "$length"
 printf 'duration_s: %s\n' "$duration"
+printf 'early_export_s: %s\n' "$early_export"
 printf 'receiver_bitrate: %s\n' "${receiver_bitrate:-missing}"
 printf 'dropped_packets: %s\n' "${dropped_packets:-missing}"
 printf 'export_path: %s\n' "$export_path"

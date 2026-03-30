@@ -264,3 +264,82 @@ This file keeps short-lived design choices and execution notes that would make
   - distribution across the four queues is not perfectly even, so there is
     still room to tune the fanout function or escalate to the Option 2
     transport rewrite later if needed
+- Follow-up adversarial 10 Gbit/s work on the same slim-container IPv4 path
+  now shows a practical zero-drop operating point for larger packets:
+  - `8 x 1.25G`, `1400`-byte UDP, `--threads 4`: about `9.99 Gbit/s`,
+    `275442` dropped packets
+  - `8 x 1.25G`, `1400`-byte UDP, `--threads 8`: about `9.99 Gbit/s`,
+    `178257` dropped packets
+  - `8 x 1.25G`, `1400`-byte UDP, `--threads 10`: about `9.99 Gbit/s`,
+    `229803` dropped packets
+  - `8 x 1.25G`, `1400`-byte UDP, `--threads 11`: repeated `9.99 Gbit/s`,
+    `0` dropped packets
+  - `8 x 1.25G`, `1400`-byte UDP, `--threads 12`: `9.99 Gbit/s`,
+    `0` dropped packets
+  - `8 x 1.25G`, `1400`-byte UDP, `--threads 16`: `9.98 Gbit/s`,
+    `0` dropped packets
+- More adversarial 10 Gbit/s shapes with `--threads 11`:
+  - `16 x 625M`, `1400`-byte UDP: `10.0 Gbit/s`, `0` dropped packets
+  - `8 x 1.25G`, `1024`-byte UDP: `9.90 Gbit/s`, `0` dropped packets
+  - `8 x 1.25G`, `512`-byte UDP: only about `5.77 Gbit/s` achieved and
+    `1171091` dropped packets
+  - the same `512`-byte case with `--threads 16` still only reached about
+    `5.86 Gbit/s`, though dropped packets fell to `489178`
+- Current interpretation:
+  - after Option 1, the IPv4 realtime path can now sustain about `10 Gbit/s`
+    without internal drops for larger-packet UDP workloads when given at least
+    `11` worker threads in this local harness
+  - the next remaining pressure point is packet-per-second intensity rather
+    than only aggregate bitrate; the `512`-byte case is still a clear failure
+    mode even with more threads
+- Additional hot-path knob ranking on the improved IPv4 ingress path:
+  - dominant runtime knobs:
+    - worker thread count
+    - feature/export cost (`basic` vs `rustiflow`)
+    - early export cadence
+  - secondary userspace knobs:
+    - shard batch size
+    - shard queue capacity
+  - already-proven eBPF / transport knobs from earlier work:
+    - ring-buffer count / parallel ingress queues
+    - ring-buffer byte size
+- Measured on the `8 x 1.25G`, `1400`-byte UDP, `15s` ingress case:
+  - `rustiflow`, `--threads 10`, `--early-export 5`, current defaults:
+    about `9.98 Gbit/s`, `3190699` dropped packets
+  - same traffic, `--early-export 0`:
+    about `9.99 Gbit/s`, `0` dropped packets
+  - same traffic, `basic`, `--threads 11`, `--early-export 5`:
+    about `9.99 Gbit/s`, `0` dropped packets
+  - same traffic, `rustiflow`, `--threads 11`, `--early-export 5`:
+    still vulnerable to multi-million drops on longer runs
+- Runtime batch / queue-depth experiments on the same stressed
+  `rustiflow`, `--threads 10`, `--early-export 5`, `15s` case:
+  - default batch `128`, queue capacity `512`: `3190699` drops
+  - batch `32`: `2821050` drops
+  - batch `256`: `2723922` drops
+  - queue capacity `2048`: `2670573` drops
+  - batch `256` plus queue capacity `2048`: `1737472` drops
+- Current interpretation of the knob sweep:
+  - worker count and early-export behavior dominate the outcome much more than
+    local batching tweaks
+  - larger batches and deeper shard queues help, but they do not rescue a
+    configuration that is already overloaded by richer flow work plus frequent
+    early export
+  - `--threads 5` is not a sensible realtime high-throughput default for the
+    current architecture; it is too low relative to the measured `10 Gbit/s`
+    operating point
+  - the realtime default thread policy is now `12`, still capped at the
+    number of logical CPUs, while offline pcap keeps the historical default of
+    `5`
+  - validation of the new realtime default on `rustiflow:test-slim` with no
+    explicit `--threads`, `8 x 1.25G`, `1400`-byte UDP, `15s`, ingress:
+    `9.99 Gbit/s`, `0` dropped packets
+  - using all logical CPUs by default was unnecessary for the current `10G`
+    target in this harness; a bounded default keeps the out-of-box realtime
+    behavior aligned with the proven zero-drop operating point without jumping
+    straight to the machine maximum
+  - `early_export = None` remains the sane throughput default; short periodic
+    export intervals should be treated as an observability tradeoff, not as a
+    neutral setting
+  - shard batch size and queue capacity are worth keeping tunable as advanced
+    knobs, but they are second-order compared with threads and export cadence
