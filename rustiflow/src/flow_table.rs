@@ -1,7 +1,8 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, time::Instant};
 
 use crate::{
-    flow_key::FlowKey, flows::util::FlowExpireCause, packet_features::PacketFeatures, Flow,
+    export_profile, flow_key::FlowKey, flows::util::FlowExpireCause,
+    packet_features::PacketFeatures, Flow,
 };
 use log::{debug, error};
 use tokio::sync::mpsc;
@@ -158,12 +159,18 @@ where
         early_export: Option<u64>,
     ) -> FlowUpdate<T> {
         if flow.update_flow(packet, is_forward) {
-            FlowUpdate::Terminated(flow.clone())
+            let clone_start = Instant::now();
+            let snapshot = flow.clone();
+            export_profile::record_clone(clone_start.elapsed());
+            FlowUpdate::Terminated(snapshot)
         } else if early_export.is_some_and(|early_export| {
             ((packet.timestamp_us - flow.get_first_timestamp_us()) / 1_000_000) as u64
                 > early_export
         }) {
-            FlowUpdate::EarlyExport(flow.clone())
+            let clone_start = Instant::now();
+            let snapshot = flow.clone();
+            export_profile::record_clone(clone_start.elapsed());
+            FlowUpdate::EarlyExport(snapshot)
         } else {
             FlowUpdate::Active
         }

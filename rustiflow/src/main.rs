@@ -1,4 +1,5 @@
 mod args;
+mod export_profile;
 mod flow_key;
 mod flow_table;
 #[cfg(target_os = "linux")]
@@ -176,6 +177,8 @@ async fn run_with_config(config: Config) {
                         }
                     }
 
+                    export_profile::log_summary("realtime");
+
                     let end = Instant::now();
                     info!(
                         "Duration: {:.4} seconds",
@@ -264,6 +267,8 @@ async fn run_with_config(config: Config) {
                     output_task.await.unwrap_or_else(|e| {
                         error!("Error waiting for output task: {:?}", e);
                     });
+
+                    export_profile::log_summary("offline");
 
                     if let Some(profiling_session) = profiling_session {
                         if let Err(err) = profiling_session.finish() {

@@ -668,6 +668,35 @@ This file keeps short-lived design choices and execution notes that would make
       wider feature-dump rewrite as a trusted optimization
     - the next export-path work should target a more structural bottleneck than
       replacing additional leaf `format!` calls one by one
+- Export-breakdown measurement for the first structural checklist item:
+  - added an opt-in userspace export breakdown behind
+    `RUSTIFLOW_PROFILE_EXPORT_BREAKDOWN=1`
+  - current instrumentation records:
+    - flow snapshot clone time inside `FlowTable::apply_packet_to_flow`
+    - row serialization time inside `OutputWriter::write_flow` around
+      `dump()` / `dump_without_contamination()`
+    - buffered write time for the serialized row bytes
+  - reran the same rebuilt `rustiflow:test-slim` hot case:
+    - `rustiflow`, `--early-export 5`, `10G`, `1400`-byte UDP, `-P 8`,
+      `--threads 12`, ingress on `rustiflow-t0`
+    - receiver bitrate about `9.98 Gbit/s`
+    - RustiFlow dropped packets `0`
+    - process summary about `20.0 s` user CPU / `6.3 s` sys CPU, max RSS about
+      `2.28 GB`
+    - exported output about `474,875` rows / `489 MB`
+  - measured export split on that run:
+    - `clone_count=474,866`
+    - flow snapshot clone time about `92 ms` total
+    - row serialization (`dump`) time about `5,030 ms` total
+    - buffered write time about `561 ms` total
+  - current interpretation:
+    - at the proven `10G` early-export operating point, snapshot ownership cost
+      is not the main export bottleneck
+    - per-row serialization dominates clone cost by roughly two orders of
+      magnitude on the measured hot case
+    - buffered row writes are visible but still much smaller than `dump()`
+    - the next structural export experiment should focus on avoiding or
+      reshaping full-row string serialization, not on clone elimination first
 - One accidental command detail also matters operationally:
   - passing `--early-export 0` does not disable early export; it produces
     effectively continuous early export because the CLI passes `Some(0)`
