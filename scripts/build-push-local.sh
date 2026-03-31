@@ -3,7 +3,7 @@ set -euo pipefail
 
 GHCR_USER="${GHCR_USER:-Str-Gen}"
 GHCR_REGISTRY="${GHCR_REGISTRY:-ghcr.io}"
-GHCR_OWNER="${GHCR_OWNER:-idlab-discover}"
+GHCR_OWNER="${GHCR_OWNER:-str-gen}"
 IMAGE_NAME="${IMAGE_NAME:-rustiflow}"
 PLATFORM="${PLATFORM:-linux/amd64}"
 BUILDER_NAME="${BUILDER_NAME:-rustiflow-builder}"
