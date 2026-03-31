@@ -753,6 +753,46 @@ This file keeps short-lived design choices and execution notes that would make
       semantics
     - the remaining structural export bottleneck is still inside per-feature
       serialization work rather than snapshot cloning or top-level row writes
+- Evaluation of a typed snapshot-vs-owned export message at the channel
+  boundary:
+  - tried a bounded `ExportedFlow::{Snapshot, Owned}` split so early export
+    could keep sending cloned snapshots while terminated / expired / shutdown
+    flows moved out of the shard without cloning
+  - this was the most plausible safe substitute for a borrow-based export view,
+    because the current writer task consumes exports asynchronously over
+    `mpsc`; that boundary needs owned data and does not permit borrowing flow
+    state out of the shard task
+  - validation was clean:
+    - `cargo fmt`
+    - `cargo check -p rustiflow`
+    - `cargo test -p rustiflow flow_table_test -- --nocapture`
+    - `cargo test -p rustiflow pcap_fixture_test -- --nocapture`
+    - `cargo clippy -p rustiflow --all-targets`
+  - reran the same rebuilt `rustiflow:test-slim` hot case with export
+    breakdown enabled:
+    - `rustiflow`, `--early-export 5`, `10G`, `1400`-byte UDP, `-P 8`,
+      `--threads 12`, ingress on `rustiflow-t0`
+    - receiver bitrate about `9.98 Gbit/s`
+    - RustiFlow dropped packets `0`
+    - process summary about `20.0 s` user CPU / `6.7 s` sys CPU, max RSS about
+      `2.29 GB`
+    - exported output about `603,424` rows / `621 MB`
+    - measured export breakdown:
+      - `clone_count=603,415`
+      - clone time about `122 ms`
+      - row serialization (`dump`) time about `5,348 ms`
+      - buffered write time about `628 ms`
+  - current interpretation:
+    - on the proven hot case, the typed ownership split does not materially
+      change what the exporter is paying for
+    - only `9` of `603,424` exported rows were owned final exports; the rest
+      were still early-export snapshots, so clone elimination on termination
+      paths is not where the current pressure lives
+    - a borrow-based export view is not compatible with the present
+      cross-task writer architecture without a larger ownership and scheduling
+      redesign
+    - revert the typed ownership split and keep the conclusion in notes rather
+      than carrying extra plumbing that does not improve the measured hot path
 - One accidental command detail also matters operationally:
   - passing `--early-export 0` does not disable early export; it produces
     effectively continuous early export because the CLI passes `Some(0)`
