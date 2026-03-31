@@ -26,7 +26,10 @@ docker buildx inspect --bootstrap
 
 echo "Building and pushing $IMAGE_REF for $PLATFORM"
 docker buildx build \
+    --progress plain \
     --platform "$PLATFORM" \
+    --provenance false \
+    --sbom false \
     -f Dockerfile \
     -t "$IMAGE_REF:sha-$GIT_SHA" \
     -t "$IMAGE_REF:$BRANCH_TAG" \
@@ -35,7 +38,10 @@ docker buildx build \
 
 echo "Building and pushing slim variant for $PLATFORM"
 docker buildx build \
+    --progress plain \
     --platform "$PLATFORM" \
+    --provenance false \
+    --sbom false \
     -f Dockerfile-slim \
     -t "$IMAGE_REF:sha-$GIT_SHA-slim" \
     -t "$IMAGE_REF:$BRANCH_TAG-slim" \
