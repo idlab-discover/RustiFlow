@@ -7,19 +7,12 @@ GHCR_OWNER="${GHCR_OWNER:-str-gen}"
 IMAGE_NAME="${IMAGE_NAME:-rustiflow}"
 PLATFORM="${PLATFORM:-linux/amd64}"
 BUILDER_NAME="${BUILDER_NAME:-rustiflow-builder}"
-TOKEN_FILE="${GHCR_TOKEN_FILE:-/home/strgenix/postdoc/projects/AIDE-FL/rgbcore-classic-arch.key}"
-
-if [[ ! -f "$TOKEN_FILE" ]]; then
-    echo "missing GHCR token file: $TOKEN_FILE" >&2
-    exit 1
-fi
 
 GIT_SHA="$(git rev-parse --short HEAD)"
 BRANCH_TAG="$(git rev-parse --abbrev-ref HEAD | tr '[:upper:]' '[:lower:]' | tr '/' '-')"
 IMAGE_REF="$GHCR_REGISTRY/$GHCR_OWNER/$IMAGE_NAME"
 
-echo "Logging in to $GHCR_REGISTRY as $GHCR_USER"
-cat "$TOKEN_FILE" | docker login "$GHCR_REGISTRY" -u "$GHCR_USER" --password-stdin
+echo "Using existing Docker login for $GHCR_REGISTRY as $GHCR_USER"
 
 docker buildx create --name "$BUILDER_NAME" --use >/dev/null 2>&1 || docker buildx use "$BUILDER_NAME"
 docker buildx inspect --bootstrap
