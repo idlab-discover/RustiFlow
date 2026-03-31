@@ -721,6 +721,38 @@ This file keeps short-lived design choices and execution notes that would make
       way strong enough to justify keeping the added complexity
     - revert this prototype and keep looking for a more structural reduction in
       per-row serialization cost
+- Accepted follow-up export-path change: reuse one top-level row buffer per
+  `OutputWriter` instead of allocating a fresh row `String` on every export:
+  - kept the existing row-assembly semantics and feature `dump()` calls, but
+    added append-style flow methods so `OutputWriter` can clear and reuse an
+    owned `String` buffer for each row
+  - reran the same rebuilt `rustiflow:test-slim` hot case with export
+    breakdown enabled:
+    - `rustiflow`, `--early-export 5`, `10G`, `1400`-byte UDP, `-P 8`,
+      `--threads 12`, ingress on `rustiflow-t0`
+    - receiver bitrate about `9.99 Gbit/s`
+    - RustiFlow dropped packets `0`
+    - process summary about `19.1 s` user CPU / `6.3 s` sys CPU, max RSS about
+      `2.27 GB`
+    - exported output about `524,089` rows / `540 MB`
+    - measured export breakdown:
+      - `clone_count=524,080`
+      - clone time about `89 ms`
+      - row serialization (`dump`) time about `4,807 ms`
+      - buffered write time about `545 ms`
+  - normalized comparison against the earlier `breakdown2` row-string baseline:
+    - dump cost fell from about `10.59 us` per row to about `9.17 us` per row
+    - write cost fell from about `1.18 us` per row to about `1.04 us` per row
+    - total CPU time fell from about `55.3 us` per row to about `48.4 us` per
+      row
+  - current interpretation:
+    - reusing the top-level export row buffer is a clean trusted win even
+      though the sampled run exported more rows than the earlier baseline
+    - the gain is meaningfully smaller than a full serialization redesign, but
+      it removes one recurring allocation layer without changing export
+      semantics
+    - the remaining structural export bottleneck is still inside per-feature
+      serialization work rather than snapshot cloning or top-level row writes
 - One accidental command detail also matters operationally:
   - passing `--early-export 0` does not disable early export; it produces
     effectively continuous early export because the CLI passes `Some(0)`

@@ -71,7 +71,16 @@ pub trait Flow: Send + Sync + 'static + Clone {
     /// ### Returns
     ///
     /// Returns a `String` that represents the current state of the flow.
-    fn dump(&self) -> String;
+    fn dump(&self) -> String {
+        let mut output = String::new();
+        self.append_to_csv_row(&mut output);
+        output
+    }
+
+    /// Appends the current state of the flow to an existing CSV row buffer.
+    fn append_to_csv_row(&self, output: &mut String) {
+        output.push_str(&self.dump());
+    }
 
     /// Dumps the current state of the flow without contaminant features.
     ///
@@ -80,7 +89,16 @@ pub trait Flow: Send + Sync + 'static + Clone {
     /// ### Returns
     ///
     /// Returns a `String` that represents the current state of the flow without contaminant features.
-    fn dump_without_contamination(&self) -> String;
+    fn dump_without_contamination(&self) -> String {
+        let mut output = String::new();
+        self.append_to_csv_row_without_contamination(&mut output);
+        output
+    }
+
+    /// Appends the contamination-free state of the flow to an existing CSV row buffer.
+    fn append_to_csv_row_without_contamination(&self, output: &mut String) {
+        output.push_str(&self.dump_without_contamination());
+    }
 
     /// Returns the first timestamp of the flow.
     ///

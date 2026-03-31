@@ -313,19 +313,17 @@ impl Flow for BasicFlow {
         self.update_tcp_close_style(cause);
     }
 
-    fn dump(&self) -> String {
-        let mut output = String::with_capacity(192);
-        push_csv_display(&mut output, &self.flow_key);
-        push_csv_display(&mut output, self.ip_source);
-        push_csv_display(&mut output, self.port_source);
-        push_csv_display(&mut output, self.ip_destination);
-        push_csv_display(&mut output, self.port_destination);
-        push_csv_display(&mut output, self.protocol);
-        push_csv_display(&mut output, self.get_first_timestamp());
-        push_csv_display(&mut output, self.get_last_timestamp());
-        push_csv_display(&mut output, self.get_flow_duration_usec());
-        push_csv_display(&mut output, self.flow_expire_cause.as_str());
-        output
+    fn append_to_csv_row(&self, output: &mut String) {
+        push_csv_display(output, &self.flow_key);
+        push_csv_display(output, self.ip_source);
+        push_csv_display(output, self.port_source);
+        push_csv_display(output, self.ip_destination);
+        push_csv_display(output, self.port_destination);
+        push_csv_display(output, self.protocol);
+        push_csv_display(output, self.get_first_timestamp());
+        push_csv_display(output, self.get_last_timestamp());
+        push_csv_display(output, self.get_flow_duration_usec());
+        push_csv_display(output, self.flow_expire_cause.as_str());
     }
 
     fn get_features() -> String {
@@ -334,14 +332,12 @@ impl Flow for BasicFlow {
             .to_string()
     }
 
-    fn dump_without_contamination(&self) -> String {
-        let mut output = String::with_capacity(96);
-        push_csv_display(&mut output, iana_port_mapping(self.port_source));
-        push_csv_display(&mut output, iana_port_mapping(self.port_destination));
-        push_csv_display(&mut output, self.protocol);
-        push_csv_display(&mut output, self.get_flow_duration_usec());
-        push_csv_display(&mut output, self.flow_expire_cause.as_str());
-        output
+    fn append_to_csv_row_without_contamination(&self, output: &mut String) {
+        push_csv_display(output, iana_port_mapping(self.port_source));
+        push_csv_display(output, iana_port_mapping(self.port_destination));
+        push_csv_display(output, self.protocol);
+        push_csv_display(output, self.get_flow_duration_usec());
+        push_csv_display(output, self.flow_expire_cause.as_str());
     }
 
     fn get_features_without_contamination() -> String {
