@@ -697,6 +697,30 @@ This file keeps short-lived design choices and execution notes that would make
     - buffered row writes are visible but still much smaller than `dump()`
     - the next structural export experiment should focus on avoiding or
       reshaping full-row string serialization, not on clone elimination first
+- First bounded direct-to-writer CSV prototype:
+  - added `write_csv_row` / `write_csv_row_without_contamination` on the hot
+    `BasicFlow` and `RustiFlow` exporters so `OutputWriter` could emit rows
+    directly to the buffered writer instead of first building one full row
+    `String`
+  - reran the same rebuilt `rustiflow:test-slim` hot case with export
+    breakdown enabled:
+    - receiver bitrate about `9.99 Gbit/s`
+    - RustiFlow dropped packets `0`
+    - process summary about `19.6 s` user CPU / `7.0 s` sys CPU, max RSS about
+      `2.27 GB`
+    - exported output about `526,580` rows / `542 MB`
+    - measured export breakdown:
+      - `clone_count=526,571`
+      - clone time about `97 ms`
+      - export-path timed section about `5,954 ms`
+      - trailing newline write about `12 ms`
+  - current interpretation:
+    - this first direct-to-writer version did not produce a clean trusted win
+      over the prior row-string path on the same hot case
+    - output volume varied upward, and total export-path time did not fall in a
+      way strong enough to justify keeping the added complexity
+    - revert this prototype and keep looking for a more structural reduction in
+      per-row serialization cost
 - One accidental command detail also matters operationally:
   - passing `--early-export 0` does not disable early export; it produces
     effectively continuous early export because the CLI passes `Some(0)`
