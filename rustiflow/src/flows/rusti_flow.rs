@@ -157,18 +157,18 @@ impl Flow for RustiFlow {
         push_csv_display(output, u8::from(self.basic_flow.tcp_reset_after_handshake));
         push_csv_display(output, self.basic_flow.tcp_close_style.as_str());
         push_csv_str(output, &self.timing_stats.dump());
-        push_csv_str(output, &self.iat_stats.dump());
-        push_csv_str(output, &self.packet_len_stats.dump());
+        self.iat_stats.append_to_csv(output);
+        self.packet_len_stats.append_to_csv(output);
         push_csv_str(output, &self.header_len_stats.dump());
-        push_csv_str(output, &self.payload_len_stats.dump());
-        push_csv_str(output, &self.bulk_stats.dump());
+        self.payload_len_stats.append_to_csv(output);
+        self.bulk_stats.append_to_csv(output);
         push_csv_str(output, &self.subflow_stats.dump());
         push_csv_str(output, &self.active_idle_stats.dump());
         push_csv_str(output, &self.icmp_stats.dump());
         push_csv_str(output, &self.retransmission_stats.dump());
         push_csv_str(output, &self.tcp_quality_stats.dump());
-        push_csv_str(output, &self.window_size_stats.dump());
-        push_csv_str(output, &self.tcp_flags_stats.dump());
+        self.window_size_stats.append_to_csv(output);
+        self.tcp_flags_stats.append_to_csv(output);
         push_csv_display(
             output,
             safe_per_second_rate(
@@ -313,18 +313,18 @@ impl Flow for RustiFlow {
         push_csv_display(output, self.basic_flow.tcp_close_style.as_str());
         push_csv_display(output, self.timing_stats.get_fwd_duration());
         push_csv_display(output, self.timing_stats.get_bwd_duration());
-        push_csv_str(output, &self.iat_stats.dump());
-        push_csv_str(output, &self.packet_len_stats.dump());
+        self.iat_stats.append_to_csv(output);
+        self.packet_len_stats.append_to_csv(output);
         push_csv_str(output, &self.header_len_stats.dump());
-        push_csv_str(output, &self.payload_len_stats.dump());
-        push_csv_str(output, &self.bulk_stats.dump());
+        self.payload_len_stats.append_to_csv(output);
+        self.bulk_stats.append_to_csv(output);
         push_csv_str(output, &self.subflow_stats.dump());
         push_csv_str(output, &self.active_idle_stats.dump());
         push_csv_str(output, &self.icmp_stats.dump());
         push_csv_str(output, &self.retransmission_stats.dump());
         push_csv_str(output, &self.tcp_quality_stats.dump());
-        push_csv_str(output, &self.window_size_stats.dump());
-        push_csv_str(output, &self.tcp_flags_stats.dump());
+        self.window_size_stats.append_to_csv(output);
+        self.tcp_flags_stats.append_to_csv(output);
         push_csv_display(
             output,
             safe_per_second_rate(

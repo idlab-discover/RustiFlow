@@ -64,6 +64,12 @@ impl FlowFeature for IATStats {
         )
     }
 
+    fn append_to_csv(&self, output: &mut String) {
+        self.iat.append_csv_values(output);
+        self.fwd_iat.append_csv_values(output);
+        self.bwd_iat.append_csv_values(output);
+    }
+
     fn headers() -> String {
         format!(
             "{},{},{}",

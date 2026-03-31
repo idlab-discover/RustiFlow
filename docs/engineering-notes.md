@@ -793,6 +793,63 @@ This file keeps short-lived design choices and execution notes that would make
       redesign
     - revert the typed ownership split and keep the conclusion in notes rather
       than carrying extra plumbing that does not improve the measured hot path
+- Remaining hot-family identification after the accepted top-level row-buffer
+  reuse:
+  - inspected the kept `rusti-10g-ee5-reuse1.svg` hot-case flamegraph and the
+    `RustiFlow::dump` call structure
+  - the feature families still showing up materially as direct dump leaves were:
+    - `BulkStats` about `3.1%`
+    - `PacketLengthStats` about `3.0%`
+    - `WindowSizeStats` about `2.5%`
+    - `PayloadLengthStats` about `2.4%`
+    - `IATStats` about `2.3%`
+    - `TcpFlagStats` about `2.2%`
+  - smaller but still visible families included `HeaderLengthStats` and
+    `ActiveIdleStats`, while the colder families did not justify another broad
+    rewrite
+- Accepted targeted dump-path change for those first-tier families:
+  - added append-style CSV emission to `FeatureStats` and `FlowFeature`, but
+    only overrode it for the six feature families still showing up materially
+    in the flamegraph:
+    `BulkStats`, `PacketLengthStats`, `WindowSizeStats`,
+    `PayloadLengthStats`, `IATStats`, and `TcpFlagStats`
+  - `RustiFlow::dump` and the contamination-free dump path now append those
+    fields directly into the shared row buffer instead of allocating one
+    intermediate feature `String` for each of them
+  - validation:
+    - `cargo fmt`
+    - `cargo check -p rustiflow`
+    - `cargo clippy -p rustiflow --all-targets`
+    - `cargo test -p rustiflow pcap_fixture_test -- --nocapture`
+    - `cargo test -p rustiflow nf_flow_test -- --nocapture`
+  - reran the same rebuilt `rustiflow:test-slim` hot case with export
+    breakdown enabled:
+    - `rustiflow`, `--early-export 5`, `10G`, `1400`-byte UDP, `-P 8`,
+      `--threads 12`, ingress on `rustiflow-t0`
+    - receiver bitrate about `9.91 Gbit/s`
+    - RustiFlow dropped packets `0`
+    - process summary about `20.2 s` user CPU / `7.1 s` sys CPU, max RSS about
+      `2.29 GB`
+    - exported output about `700,668` rows / `721 MB`
+    - measured export breakdown:
+      - `clone_count=700,659`
+      - clone time about `121 ms`
+      - row serialization (`dump`) time about `5,110 ms`
+      - buffered write time about `790 ms`
+  - normalized comparison against `rusti-10g-ee5-reuse1`:
+    - dump cost fell from about `9.17 us` per row to about `7.29 us` per row
+    - total CPU time fell from about `48.4 us` per row to about `38.8 us` per
+      row
+    - the targeted feature families no longer appeared as standalone hot dump
+      leaves in the new flamegraph
+  - current interpretation:
+    - the targeted append-path change is worth keeping
+    - the flamegraph-guided approach worked better than the earlier broad
+      feature-dump rewrite because it cut one allocation layer only where the
+      profile still showed meaningful cost
+    - the next export work should re-run the comparison matrix
+      (`basic --early-export 5`, `rustiflow --early-export 5`, and a
+      no-early-export control) before picking the next colder feature family
 - One accidental command detail also matters operationally:
   - passing `--early-export 0` does not disable early export; it produces
     effectively continuous early export because the CLI passes `Some(0)`

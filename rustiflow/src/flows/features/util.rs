@@ -1,3 +1,5 @@
+use std::{fmt::Display, fmt::Write as _};
+
 use crate::{flows::util::FlowExpireCause, packet_features::PacketFeatures};
 
 /// Trait for network flow features that can be updated, closed, and dumped to CSV format
@@ -10,6 +12,11 @@ pub trait FlowFeature: Send + Sync + Clone {
 
     /// Dumps the current state as a CSV string
     fn dump(&self) -> String;
+
+    /// Appends the current state as CSV fields to an existing row buffer.
+    fn append_to_csv(&self, output: &mut String) {
+        output.push_str(&self.dump());
+    }
 
     /// Returns the CSV headers for this feature
     fn headers() -> String
@@ -113,6 +120,21 @@ impl FeatureStats {
             self.get_min(),
         )
     }
+
+    pub fn append_csv_values(&self, output: &mut String) {
+        push_csv_display(output, self.get_total());
+        push_csv_display(output, self.get_mean());
+        push_csv_display(output, self.get_std());
+        push_csv_display(output, self.get_max());
+        push_csv_display(output, self.get_min());
+    }
+}
+
+pub fn push_csv_display(output: &mut String, value: impl Display) {
+    if !output.is_empty() {
+        output.push(',');
+    }
+    let _ = write!(output, "{value}");
 }
 
 /// Safely performs floating point division, returning 0.0 if denominator is 0
