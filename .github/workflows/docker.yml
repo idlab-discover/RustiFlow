@@ -1,49 +1,83 @@
-name: Docker Image CI
+name: Publish Containers
 
 on:
   push:
-    branches: ["main"]
+    branches:
+      - main
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+concurrency:
+  group: docker-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: idlab-discover/rustiflow
 
 jobs:
+  docker:
+    name: Publish ${{ matrix.variant.name }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      fail-fast: false
+      matrix:
+        variant:
+          - name: default
+            dockerfile: Dockerfile
+            latest_tag: latest
+            flavor_suffix: ""
+          - name: slim
+            dockerfile: Dockerfile-slim
+            latest_tag: slim
+            flavor_suffix: -slim
 
-    docker:
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-        name: Publish Docker image
-        runs-on: ubuntu-latest
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
 
-        permissions:
-          contents: read
-          packages: write
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
 
-        steps:
-        - name: Checkout repository
-          uses: actions/checkout@v4
-          
-        - name: Set up QEMU
-          uses: docker/setup-qemu-action@v3
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
-        - name: Set up Docker Buildx
-          uses: docker/setup-buildx-action@v3
+      - name: Extract image metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          flavor: |
+            latest=false
+          tags: |
+            type=raw,value=${{ matrix.variant.latest_tag }},enable={{is_default_branch}}
+            type=ref,event=branch,suffix=${{ matrix.variant.flavor_suffix }}
+            type=ref,event=tag,suffix=${{ matrix.variant.flavor_suffix }}
+            type=sha,prefix=sha-,suffix=${{ matrix.variant.flavor_suffix }}
+          labels: |
+            org.opencontainers.image.title=RustiFlow
+            org.opencontainers.image.description=Network flow extractor with offline and realtime capture modes
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
 
-        - name: Log in to the GitHub Container Registry
-          uses: docker/login-action@v3
-          with:
-            registry: ghcr.io
-            username: ${{ github.actor }}
-            password: ${{ secrets.GITHUB_TOKEN }}
-            
-        - name: Build and push the Docker image
-          uses: docker/build-push-action@v6
-          with:
-            context: .
-            file: Dockerfile
-            push: true
-            tags: ghcr.io/idlab-discover/rustiflow:ubuntu-20
-
-        - name: Build and push the slim Docker image
-          uses: docker/build-push-action@v6
-          with:
-            context: .
-            file: Dockerfile-slim
-            push: true
-            tags: ghcr.io/idlab-discover/rustiflow:slim
+      - name: Build and push image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ${{ matrix.variant.dockerfile }}
+          push: true
+          provenance: false
+          sbom: false
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
