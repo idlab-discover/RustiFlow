@@ -1,4 +1,5 @@
 use std::net::IpAddr;
+use std::{fmt::Display, fmt::Write as _};
 
 use chrono::{DateTime, Utc};
 use pnet::packet::ip::IpNextHeaderProtocols;
@@ -239,6 +240,13 @@ impl BasicFlow {
     }
 }
 
+fn push_csv_display(output: &mut String, value: impl Display) {
+    if !output.is_empty() {
+        output.push(',');
+    }
+    let _ = write!(output, "{value}");
+}
+
 impl Flow for BasicFlow {
     fn new(
         flow_id: String,
@@ -306,19 +314,18 @@ impl Flow for BasicFlow {
     }
 
     fn dump(&self) -> String {
-        format!(
-            "{},{},{},{},{},{},{},{},{},{}",
-            self.flow_key,
-            self.ip_source,
-            self.port_source,
-            self.ip_destination,
-            self.port_destination,
-            self.protocol,
-            self.get_first_timestamp(),
-            self.get_last_timestamp(),
-            self.get_flow_duration_usec(),
-            self.flow_expire_cause.as_str()
-        )
+        let mut output = String::with_capacity(192);
+        push_csv_display(&mut output, &self.flow_key);
+        push_csv_display(&mut output, self.ip_source);
+        push_csv_display(&mut output, self.port_source);
+        push_csv_display(&mut output, self.ip_destination);
+        push_csv_display(&mut output, self.port_destination);
+        push_csv_display(&mut output, self.protocol);
+        push_csv_display(&mut output, self.get_first_timestamp());
+        push_csv_display(&mut output, self.get_last_timestamp());
+        push_csv_display(&mut output, self.get_flow_duration_usec());
+        push_csv_display(&mut output, self.flow_expire_cause.as_str());
+        output
     }
 
     fn get_features() -> String {
@@ -328,14 +335,13 @@ impl Flow for BasicFlow {
     }
 
     fn dump_without_contamination(&self) -> String {
-        format!(
-            "{},{},{},{},{}",
-            iana_port_mapping(self.port_source),
-            iana_port_mapping(self.port_destination),
-            self.protocol,
-            self.get_flow_duration_usec(),
-            self.flow_expire_cause.as_str(),
-        )
+        let mut output = String::with_capacity(96);
+        push_csv_display(&mut output, iana_port_mapping(self.port_source));
+        push_csv_display(&mut output, iana_port_mapping(self.port_destination));
+        push_csv_display(&mut output, self.protocol);
+        push_csv_display(&mut output, self.get_flow_duration_usec());
+        push_csv_display(&mut output, self.flow_expire_cause.as_str());
+        output
     }
 
     fn get_features_without_contamination() -> String {

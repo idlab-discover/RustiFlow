@@ -503,3 +503,176 @@ This file keeps short-lived design choices and execution notes that would make
   - `cargo test -p rustiflow packet_features_test -- --nocapture`
   - `cargo test -p rustiflow flow_table_test -- --nocapture`
   - `cargo check -p rustiflow`
+
+## 2026-03-31
+
+- First bounded profiling pass on the current parallel realtime path used the
+  local `rustiflow-t0` harness with the existing userspace profiling hooks:
+  - `RUSTIFLOW_REALTIME_STATS=1` for per-source drain/dispatch timing in
+    `rustiflow/src/realtime.rs`
+  - `RUSTIFLOW_PROFILE_RESOURCE_SUMMARY=1` for process CPU/RSS/context-switch
+    summaries
+  - `RUSTIFLOW_PROFILE_FLAMEGRAPH=...svg` for userspace flamegraph output
+- Workload shape for the main bounded comparisons:
+  - ingress IPv4 only on `rustiflow-t0`
+  - reverse UDP traffic from the local namespace peer
+  - `iperf3 -c 10.203.0.2 -B 10.203.0.1 -u -b 1.25G -l 1400 -P 8 -t 10 -R -p 5201`
+  - container image `rustiflow:test-slim`
+  - `--threads 12`
+- `basic` with no `--early-export` flag:
+  - receiver bitrate about `9.85 Gbit/s`
+  - RustiFlow dropped packets `0`
+  - process summary: about `17.7 s` user CPU, `6.0 s` sys CPU, max RSS about
+    `2.19 GB`
+  - per-source stats show the clean `10G` operating point is no longer
+    dominated by shard-send wait:
+    - active queues stayed around `0.10` to `0.12 us` average enqueue wait
+    - active queues stayed around `0.11` to `0.18 us` average shard-send wait
+    - decode-and-shard stayed around `0.22` to `0.23 us` average event cost
+  - current interpretation:
+    - on the proven `10G` case, the parallel ingress path is comfortably past
+      the earlier multi-millisecond backpressure regime
+    - the remaining sampled hot userspace work is mostly inside the source task
+      / batching path rather than export
+- `rustiflow` with `--early-export 5` on the same traffic shape:
+  - receiver bitrate about `9.99 Gbit/s`
+  - RustiFlow dropped packets `0`
+  - process summary: about `21.4 s` user CPU, `6.9 s` sys CPU, max RSS about
+    `2.28 GB`
+  - exported CSV volume rose sharply to about `636590` lines and about
+    `625 MB` in a `10 s` run
+  - per-source stats moved back into a materially slower regime:
+    - average enqueue wait about `1.67` to `5.20 us`
+    - average shard-send wait about `1.81` to `5.26 us`
+    - average total event cost about `1.73` to `5.03 us`
+  - the userspace flamegraph on this export-heavy run shows the export subtree
+    is now a real cost center:
+    - `rustiflow::output::OutputWriter::<T>::write_flow` occupied about `35%`
+      inclusive sampled width
+    - `RustiFlow::dump` directly underneath it also occupied about `35%`
+      inclusive sampled width
+    - formatting-heavy feature dumps such as payload and window-size stats were
+      visible hot subtrees under `dump`
+  - current interpretation:
+    - export formatting and serialization are now confirmed costs under high
+      export pressure; they are no longer merely speculative redesign targets
+    - the dispatcher/backpressure path still matters, but on this shape export
+      work is large enough that snapshot / CSV redesign questions should now be
+      evidence-driven rather than deferred as unmeasured risk
+- `rustiflow` with no `--early-export` flag on the same traffic shape:
+  - receiver bitrate about `9.98 Gbit/s`
+  - RustiFlow dropped packets `0`
+  - process summary: about `18.1 s` user CPU, `5.9 s` sys CPU, max RSS about
+    `2.19 GB`
+  - exported CSV volume collapsed back to only the final-flow output: about
+    `10` lines and about `15 KB`
+  - per-source stats returned to the same low-wait regime as the `basic`
+    no-early-export case:
+    - average enqueue wait about `0.09` to `0.12 us`
+    - average shard-send wait about `0.11` to `0.17 us`
+    - average total event cost about `0.21` to `0.22 us`
+  - the no-early-export flamegraph no longer shows `OutputWriter::write_flow`
+    or `RustiFlow::dump` as meaningful hot subtrees
+  - instead, the visible sampled work is concentrated in:
+    - realtime source-task batching (`enqueue_pending_batches` /
+      `enqueue_shard_batch`)
+    - dispatcher tasks spawned by `spawn_source_dispatcher`
+    - `FlowTable::process_packet` / `process_existing_flow`
+    - `RustiFlow::update_flow`
+  - current interpretation:
+    - at the proven `10G` operating point, richer feature extraction by itself
+      is not the main remaining limiter
+    - the large extra CPU cost seen with `--early-export 5` is primarily export
+      pressure rather than inherent `RustiFlow` feature-update cost
+    - this gives a cleaner priority order for follow-up work:
+      measure export-path redesign options first, and only revisit cheaper
+      running-statistics implementations if later profiling still shows the
+      feature modules hot after export pressure is removed
+- Export-cost isolation follow-up with `basic --early-export 5` on the same
+  `10G` shape:
+  - receiver bitrate about `9.96 Gbit/s`
+  - RustiFlow dropped packets `0`
+  - process summary: about `20.6 s` user CPU, `6.7 s` sys CPU, max RSS about
+    `2.31 GB`
+  - exported output grew to about `2296493` CSV lines and about `326 MB`
+  - per-source waits clearly rose relative to the no-early-export `basic`
+    baseline:
+    - average enqueue wait about `1.34` to `4.27 us`
+    - average shard-send wait about `2.27` to `4.37 us`
+  - the flamegraph confirms that periodic export alone is enough to create a
+    visible export subtree even for the cheap schema:
+    - `OutputWriter::write_flow` occupied about `7.3%` inclusive sampled width
+    - `BasicFlow::dump` occupied about `7.0%` inclusive sampled width
+    - timestamp / formatting work under `BasicFlow::dump` was visible, but much
+      smaller than the richer `RustiFlow::dump` export tree
+- Current interpretation after the export-cost isolation pass:
+  - export pressure by itself is a real limiter even for `basic`
+  - richer exporter formatting in `rustiflow` magnifies that cost sharply:
+    - `basic --early-export 5`: about `7%` sampled export subtree
+    - `rustiflow --early-export 5`: about `35%` sampled export subtree
+  - line count alone is not the right proxy for export cost:
+    - `basic --early-export 5` emitted more lines than `rustiflow --early-export 5`
+    - but `rustiflow --early-export 5` still produced the much hotter export
+      flamegraph because each serialized record is substantially heavier
+  - the next export-path experiments should focus on reducing per-record
+    formatting / serialization cost before redesigning ingestion again for the
+    clean `10G` operating point
+- First bounded export-path mitigation on `2026-03-31`:
+  - changed `OutputWriter` to write the serialized flow string directly with
+    `write_all()` plus `\n` instead of going back through `writeln!`
+  - rewrote top-level `BasicFlow` and `RustiFlow` CSV assembly to build one
+    output buffer directly instead of creating `Vec<String>` plus `join(",")`
+  - validation:
+    - `cargo fmt`
+    - `cargo test -p rustiflow flow_table_test -- --nocapture`
+    - `cargo check -p rustiflow`
+    - `cargo clippy -p rustiflow --all-targets`
+- Reprofile of the same hot case after that bounded export change:
+  - workload unchanged: `rustiflow`, `--early-export 5`, `10G`, `1400`-byte
+    UDP, `-P 8`, `--threads 12`, ingress on `rustiflow-t0`
+  - receiver bitrate stayed at about `9.99 Gbit/s`
+  - RustiFlow dropped packets stayed at `0`
+  - process summary improved from about `21.4 s` user / `6.9 s` sys CPU to
+    about `19.4 s` user / `6.4 s` sys CPU
+  - flamegraph comparison:
+    - before: `OutputWriter::write_flow` and `RustiFlow::dump` each occupied
+      about `35%` inclusive sampled width
+    - after: the same subtree fell to about `28%` inclusive sampled width
+    - payload/window-size dump helpers are still visible hot leaves underneath
+      `RustiFlow::dump`
+  - current interpretation:
+    - the bounded CSV-assembly cleanup produced a real but not decisive win
+    - export formatting remains a major cost center under periodic export even
+      after removing obvious top-level string assembly overhead
+    - the next profitable layer is likely inside the heavier feature dump
+      helpers themselves, or a more structural change to how CSV rows are
+      emitted, rather than another ingress redesign
+- Follow-up bounded experiment on the shared feature dump helpers:
+  - tried replacing several feature-level `format!` / nested `dump_values()`
+    paths with append-style `String` assembly in shared `FeatureStats`,
+    `PayloadLengthStats`, `WindowSizeStats`, `PacketLengthStats`,
+    `HeaderLengthStats`, `IATStats`, `ActiveIdleStats`, `BulkStats`,
+    `TimingStats`, and `TcpFlagStats`
+  - reprofiled the same `rustiflow --early-export 5`, `10G`, `-P 8`,
+    `--threads 12` case:
+    - receiver bitrate stayed about `9.99 Gbit/s`
+    - RustiFlow dropped packets stayed at `0`
+    - process summary came back at about `21.6 s` user / `7.2 s` sys CPU
+    - CSV output was about `712,637` lines / `734 MB`
+  - current interpretation:
+    - this second-pass feature-dump refactor did not show a reliable win on the
+      same hot case
+    - output volume also varied upward enough that the run is not cleaner than
+      the earlier `opt1` result
+    - keep the earlier top-level CSV assembly cleanup, but do not keep this
+      wider feature-dump rewrite as a trusted optimization
+    - the next export-path work should target a more structural bottleneck than
+      replacing additional leaf `format!` calls one by one
+- One accidental command detail also matters operationally:
+  - passing `--early-export 0` does not disable early export; it produces
+    effectively continuous early export because the CLI passes `Some(0)`
+  - on the same `10G` shape with `basic`, that setting still produced `0`
+    RustiFlow drops but exploded output to about `5.85 million` CSV lines and
+    about `832 MB` in `10 s`
+  - for throughput experiments, disabling early export still means omitting the
+    flag entirely rather than passing `0`

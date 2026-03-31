@@ -58,7 +58,8 @@ where
             flow.dump()
         };
 
-        writeln!(self.writer, "{}", flow_str)
+        self.writer.write_all(flow_str.as_bytes())?;
+        self.writer.write_all(b"\n")
     }
 
     /// Flushes the writer and closes the output file
@@ -75,6 +76,7 @@ where
         } else {
             T::get_features()
         };
-        writeln!(self.writer, "{}", header)
+        self.writer.write_all(header.as_bytes())?;
+        self.writer.write_all(b"\n")
     }
 }
