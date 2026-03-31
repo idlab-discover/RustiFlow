@@ -28,7 +28,7 @@ mod tests {
     }
 
     #[cfg(target_os = "linux")]
-    fn build_realtime_packet(
+    struct RealtimePacketIpv4Spec {
         source_ip: Ipv4Addr,
         source_port: u16,
         destination_ip: Ipv4Addr,
@@ -38,22 +38,25 @@ mod tests {
         sequence_number: u32,
         sequence_number_ack: u32,
         data_length: u16,
-    ) -> PacketFeatures {
+    }
+
+    #[cfg(target_os = "linux")]
+    fn build_realtime_packet(spec: RealtimePacketIpv4Spec) -> PacketFeatures {
         let realtime_offset_us = 1_000_000;
         let event = EbpfEventIpv4::new(
-            (timestamp_us - realtime_offset_us) as u64 * 1_000,
-            u32::from(destination_ip).to_be(),
-            u32::from(source_ip).to_be(),
-            destination_port,
-            source_port,
-            data_length,
-            40 + data_length,
+            (spec.timestamp_us - realtime_offset_us) as u64 * 1_000,
+            u32::from(spec.destination_ip).to_be(),
+            u32::from(spec.source_ip).to_be(),
+            spec.destination_port,
+            spec.source_port,
+            spec.data_length,
+            40 + spec.data_length,
             4096,
-            flags,
+            spec.flags,
             6,
             20,
-            sequence_number,
-            sequence_number_ack,
+            spec.sequence_number,
+            spec.sequence_number_ack,
             0,
             0,
         );
@@ -61,7 +64,7 @@ mod tests {
     }
 
     #[cfg(target_os = "linux")]
-    fn build_realtime_packet_ipv6(
+    struct RealtimePacketIpv6Spec {
         source_ip: Ipv6Addr,
         source_port: u16,
         destination_ip: Ipv6Addr,
@@ -71,22 +74,25 @@ mod tests {
         sequence_number: u32,
         sequence_number_ack: u32,
         data_length: u16,
-    ) -> PacketFeatures {
+    }
+
+    #[cfg(target_os = "linux")]
+    fn build_realtime_packet_ipv6(spec: RealtimePacketIpv6Spec) -> PacketFeatures {
         let realtime_offset_us = 1_000_000;
         let event = EbpfEventIpv6::new(
-            (timestamp_us - realtime_offset_us) as u64 * 1_000,
-            u128::from(destination_ip).to_be(),
-            u128::from(source_ip).to_be(),
-            destination_port,
-            source_port,
-            data_length,
-            40 + data_length,
+            (spec.timestamp_us - realtime_offset_us) as u64 * 1_000,
+            u128::from(spec.destination_ip).to_be(),
+            u128::from(spec.source_ip).to_be(),
+            spec.destination_port,
+            spec.source_port,
+            spec.data_length,
+            40 + spec.data_length,
             4096,
-            flags,
+            spec.flags,
             6,
             20,
-            sequence_number,
-            sequence_number_ack,
+            spec.sequence_number,
+            spec.sequence_number_ack,
             0,
             0,
         );
@@ -293,17 +299,50 @@ mod tests {
         offline_payload.sequence_number = 101;
         offline_payload.sequence_number_ack = 201;
 
-        let realtime_syn =
-            build_realtime_packet(client_ip, 12345, server_ip, 443, 1_000_000, 0x02, 100, 0, 0);
-        let realtime_syn_ack = build_realtime_packet(
-            server_ip, 443, client_ip, 12345, 1_000_100, 0x12, 200, 101, 0,
-        );
-        let realtime_ack = build_realtime_packet(
-            client_ip, 12345, server_ip, 443, 1_000_200, 0x10, 101, 201, 0,
-        );
-        let realtime_payload = build_realtime_packet(
-            client_ip, 12345, server_ip, 443, 1_000_300, 0x18, 101, 201, 64,
-        );
+        let realtime_syn = build_realtime_packet(RealtimePacketIpv4Spec {
+            source_ip: client_ip,
+            source_port: 12345,
+            destination_ip: server_ip,
+            destination_port: 443,
+            timestamp_us: 1_000_000,
+            flags: 0x02,
+            sequence_number: 100,
+            sequence_number_ack: 0,
+            data_length: 0,
+        });
+        let realtime_syn_ack = build_realtime_packet(RealtimePacketIpv4Spec {
+            source_ip: server_ip,
+            source_port: 443,
+            destination_ip: client_ip,
+            destination_port: 12345,
+            timestamp_us: 1_000_100,
+            flags: 0x12,
+            sequence_number: 200,
+            sequence_number_ack: 101,
+            data_length: 0,
+        });
+        let realtime_ack = build_realtime_packet(RealtimePacketIpv4Spec {
+            source_ip: client_ip,
+            source_port: 12345,
+            destination_ip: server_ip,
+            destination_port: 443,
+            timestamp_us: 1_000_200,
+            flags: 0x10,
+            sequence_number: 101,
+            sequence_number_ack: 201,
+            data_length: 0,
+        });
+        let realtime_payload = build_realtime_packet(RealtimePacketIpv4Spec {
+            source_ip: client_ip,
+            source_port: 12345,
+            destination_ip: server_ip,
+            destination_port: 443,
+            timestamp_us: 1_000_300,
+            flags: 0x18,
+            sequence_number: 101,
+            sequence_number_ack: 201,
+            data_length: 64,
+        });
 
         for packet in [
             &offline_syn,
@@ -346,17 +385,17 @@ mod tests {
         let mut realtime_table = FlowTable::new(3600, 1, None, realtime_tx, 60);
 
         let offline_packet = build_packet(1_000_000);
-        let realtime_packet = build_realtime_packet(
-            Ipv4Addr::new(192, 168, 1, 1),
-            12345,
-            Ipv4Addr::new(192, 168, 1, 2),
-            443,
-            1_000_000,
-            0,
-            0,
-            0,
-            0,
-        );
+        let realtime_packet = build_realtime_packet(RealtimePacketIpv4Spec {
+            source_ip: Ipv4Addr::new(192, 168, 1, 1),
+            source_port: 12345,
+            destination_ip: Ipv4Addr::new(192, 168, 1, 2),
+            destination_port: 443,
+            timestamp_us: 1_000_000,
+            flags: 0,
+            sequence_number: 0,
+            sequence_number_ack: 0,
+            data_length: 0,
+        });
 
         offline_table.process_packet(&offline_packet).await;
         realtime_table.process_packet(&realtime_packet).await;
@@ -461,18 +500,50 @@ mod tests {
             ..Default::default()
         };
 
-        let realtime_syn = build_realtime_packet_ipv6(
-            client_ip, 12345, server_ip, 443, 1_000_000, 0x02, 100, 0, 0,
-        );
-        let realtime_syn_ack = build_realtime_packet_ipv6(
-            server_ip, 443, client_ip, 12345, 1_000_100, 0x12, 200, 101, 0,
-        );
-        let realtime_ack = build_realtime_packet_ipv6(
-            client_ip, 12345, server_ip, 443, 1_000_200, 0x10, 101, 201, 0,
-        );
-        let realtime_payload = build_realtime_packet_ipv6(
-            client_ip, 12345, server_ip, 443, 1_000_300, 0x18, 101, 201, 64,
-        );
+        let realtime_syn = build_realtime_packet_ipv6(RealtimePacketIpv6Spec {
+            source_ip: client_ip,
+            source_port: 12345,
+            destination_ip: server_ip,
+            destination_port: 443,
+            timestamp_us: 1_000_000,
+            flags: 0x02,
+            sequence_number: 100,
+            sequence_number_ack: 0,
+            data_length: 0,
+        });
+        let realtime_syn_ack = build_realtime_packet_ipv6(RealtimePacketIpv6Spec {
+            source_ip: server_ip,
+            source_port: 443,
+            destination_ip: client_ip,
+            destination_port: 12345,
+            timestamp_us: 1_000_100,
+            flags: 0x12,
+            sequence_number: 200,
+            sequence_number_ack: 101,
+            data_length: 0,
+        });
+        let realtime_ack = build_realtime_packet_ipv6(RealtimePacketIpv6Spec {
+            source_ip: client_ip,
+            source_port: 12345,
+            destination_ip: server_ip,
+            destination_port: 443,
+            timestamp_us: 1_000_200,
+            flags: 0x10,
+            sequence_number: 101,
+            sequence_number_ack: 201,
+            data_length: 0,
+        });
+        let realtime_payload = build_realtime_packet_ipv6(RealtimePacketIpv6Spec {
+            source_ip: client_ip,
+            source_port: 12345,
+            destination_ip: server_ip,
+            destination_port: 443,
+            timestamp_us: 1_000_300,
+            flags: 0x18,
+            sequence_number: 101,
+            sequence_number_ack: 201,
+            data_length: 64,
+        });
 
         for packet in [
             &offline_syn,
@@ -525,8 +596,17 @@ mod tests {
             timestamp_us: 1_000_000,
             ..Default::default()
         };
-        let realtime_packet =
-            build_realtime_packet_ipv6(client_ip, 12345, server_ip, 443, 1_000_000, 0, 0, 0, 0);
+        let realtime_packet = build_realtime_packet_ipv6(RealtimePacketIpv6Spec {
+            source_ip: client_ip,
+            source_port: 12345,
+            destination_ip: server_ip,
+            destination_port: 443,
+            timestamp_us: 1_000_000,
+            flags: 0,
+            sequence_number: 0,
+            sequence_number_ack: 0,
+            data_length: 0,
+        });
 
         offline_table.process_packet(&offline_packet).await;
         realtime_table.process_packet(&realtime_packet).await;
