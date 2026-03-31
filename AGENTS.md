@@ -121,36 +121,36 @@ in `docs/engineering-notes.md`.
 
 ### Current Focus
 
-- [ ] Add profiling on the current parallel realtime path before bigger
-  redesigns:
-  capture CPU usage and flamegraph-style evidence for drain/dispatch,
-  FlowTable work, and export cost on the `rustiflow-t0` harness.
-- [ ] Quantify resource usage for the proven local throughput tiers:
-  for the current `10G` operating point, and later `25/40G` attempts, record
-  CPU use, memory use, drop behavior, and export rate instead of bitrate alone.
-- [ ] Re-measure the remaining dispatcher bottleneck before transport rewrite:
-  after the current queue-count and fanout wins, determine whether the next
-  limiter is shard-channel backpressure, FlowTable processing, or export cost.
-- [ ] Revisit cheaper running statistics only after profiling confirms they are
-  still hot on the newer ingestion path.
-- [ ] Measure export-path cost explicitly before redesigning flow snapshots or
-  CSV serialization:
-  confirm whether cloning/export formatting is now a real limiter under high
-  export pressure.
+- [ ] Measure how much of the remaining hot export path is snapshot ownership
+  cost versus row serialization cost:
+  isolate clone/copy work from string/CSV formatting work under the proven
+  `10G` `--early-export 5` case.
+- [ ] Prototype a structural export path that writes CSV fields directly to the
+  buffered writer instead of requiring one fully assembled row `String` per
+  exported flow, then reprofile the same workload.
+- [ ] Evaluate whether a typed export snapshot or borrow-based export view can
+  reduce per-export cloning/allocation without violating flow ownership,
+  sharding, or semantic parity.
+- [ ] Identify the heaviest remaining field families inside `RustiFlow::dump`
+  after the accepted top-level CSV cleanup, and only optimize subsystems that
+  still show up materially in flamegraphs.
+- [ ] Re-run the export-heavy comparison after each bounded structural change
+  using at least:
+  `basic --early-export 5`, `rustiflow --early-export 5`, and one no-early-
+  export control, recording CPU, RSS, drop total, output size, and bitrate.
 - [ ] Keep updating `docs/engineering-notes.md` after each bounded experiment
   with:
-  workload, achieved bitrate, dropped-packet total, and what the new
-  bottleneck appears to be.
+  workload, achieved bitrate, dropped-packet total, resource summary, and what
+  the new bottleneck appears to be.
 
 Primary files:
 
-- `rustiflow/src/realtime.rs`
-- `ebpf-ipv4/src/main.rs`
-- `ebpf-ipv6/src/main.rs`
-- `common/src/lib.rs`
-- `rustiflow/src/packet_features.rs`
-- `rustiflow/src/flow_table.rs`
+- `rustiflow/src/output.rs`
 - `rustiflow/src/flows/basic_flow.rs`
+- `rustiflow/src/flows/rusti_flow.rs`
+- `rustiflow/src/flows/features/`
+- `rustiflow/src/flow_table.rs`
+- `rustiflow/src/realtime.rs`
 - `docs/engineering-notes.md`
 
 ### Later Work
