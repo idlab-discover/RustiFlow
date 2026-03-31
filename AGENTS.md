@@ -134,7 +134,7 @@ in `docs/engineering-notes.md`.
 - [x] Identify the heaviest remaining field families inside `RustiFlow::dump`
   after the accepted top-level CSV cleanup, and only optimize subsystems that
   still show up materially in flamegraphs.
-- [ ] Re-run the export-heavy comparison after each bounded structural change
+- [x] Re-run the export-heavy comparison after each bounded structural change
   using at least:
   `basic --early-export 5`, `rustiflow --early-export 5`, and one no-early-
   export control, recording CPU, RSS, drop total, output size, and bitrate.

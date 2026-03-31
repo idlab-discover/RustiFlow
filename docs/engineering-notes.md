@@ -850,6 +850,58 @@ This file keeps short-lived design choices and execution notes that would make
     - the next export work should re-run the comparison matrix
       (`basic --early-export 5`, `rustiflow --early-export 5`, and a
       no-early-export control) before picking the next colder feature family
+- Post-change export-heavy comparison matrix on the current kept codepath:
+  - workload shape kept constant for all three runs:
+    `10G`, `1400`-byte UDP, `-P 8`, `10s`, `--threads 12`, ingress on
+    `rustiflow-t0`, containerized `rustiflow:test-slim`
+  - `basic --early-export 5`:
+    - receiver bitrate about `9.98 Gbit/s`
+    - RustiFlow dropped packets `0`
+    - process summary about `19.3 s` user CPU / `6.1 s` sys CPU, max RSS about
+      `2.26 GB`
+    - exported output about `3,085,329` rows / `459 MB`
+    - export breakdown:
+      - `clone_count=3,085,320`
+      - clone time about `350 ms`
+      - row serialization (`dump`) time about `1,849 ms`
+      - buffered write time about `634 ms`
+  - `rustiflow --early-export 5` after the targeted hot-family change:
+    - receiver bitrate about `9.91 Gbit/s`
+    - RustiFlow dropped packets `0`
+    - process summary about `20.2 s` user CPU / `7.1 s` sys CPU, max RSS about
+      `2.29 GB`
+    - exported output about `700,668` rows / `721 MB`
+    - export breakdown:
+      - `clone_count=700,659`
+      - clone time about `121 ms`
+      - row serialization (`dump`) time about `5,110 ms`
+      - buffered write time about `790 ms`
+    - this run saw noticeably higher `iperf3` receiver loss than the other two
+      matrix runs, so the export-timer normalization is the stronger signal
+      than raw loss percentage here
+  - `rustiflow` with no `--early-export`:
+    - receiver bitrate about `9.98 Gbit/s`
+    - RustiFlow dropped packets `0`
+    - process summary about `17.0 s` user CPU / `6.1 s` sys CPU, max RSS about
+      `2.19 GB`
+    - exported output about `9` rows / `11 KB`
+    - export breakdown:
+      - `clone_count=0`
+      - clone time `0 ms`
+      - row serialization (`dump`) time about `0.097 ms`
+      - buffered write time about `0.030 ms`
+  - current interpretation after the matrix rerun:
+    - the current structural export work continues to preserve the practical
+      `10G` operating point with `0` RustiFlow drops across the matrix
+    - export pressure is still the dominant differentiator:
+      the no-early-export control nearly removes export cost entirely, while
+      both `--early-export 5` cases spend real time in serialization
+    - `basic --early-export 5` remains much cheaper per exported row than
+      `rustiflow --early-export 5`, but the gap is narrower after the targeted
+      hot-family append-path change
+    - the next export-path target should come from a colder second tier under
+      `RustiFlow::dump`, not from revisiting snapshot cloning or whole-pipeline
+      ownership changes
 - One accidental command detail also matters operationally:
   - passing `--early-export 0` does not disable early export; it produces
     effectively continuous early export because the CLI passes `Some(0)`
