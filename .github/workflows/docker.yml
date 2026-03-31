@@ -1,15 +1,44 @@
-name: Publish Containers
+name: Container Images
 
 on:
+  pull_request:
+    paths:
+      - .github/workflows/docker.yml
+      - .dockerignore
+      - Dockerfile
+      - Dockerfile-slim
+      - Cargo.toml
+      - Cargo.lock
+      - .cargo/**
+      - common/**
+      - rustiflow/**
+      - xtask/**
+      - ebpf-ipv4/**
+      - ebpf-ipv6/**
+      - rustfmt.toml
   push:
     branches:
       - main
     tags:
       - "v*"
+    paths:
+      - .github/workflows/docker.yml
+      - .dockerignore
+      - Dockerfile
+      - Dockerfile-slim
+      - Cargo.toml
+      - Cargo.lock
+      - .cargo/**
+      - common/**
+      - rustiflow/**
+      - xtask/**
+      - ebpf-ipv4/**
+      - ebpf-ipv6/**
+      - rustfmt.toml
   workflow_dispatch:
 
 concurrency:
-  group: docker-${{ github.ref }}
+  group: docker-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 env:
@@ -17,8 +46,8 @@ env:
   IMAGE_NAME: idlab-discover/rustiflow
 
 jobs:
-  docker:
-    name: Publish ${{ matrix.variant.name }}
+  images:
+    name: ${{ matrix.variant.name }}
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -30,23 +59,23 @@ jobs:
           - name: default
             dockerfile: Dockerfile
             latest_tag: latest
-            flavor_suffix: ""
+            tag_suffix: ""
+            cache_scope: docker-default
           - name: slim
             dockerfile: Dockerfile-slim
             latest_tag: slim
-            flavor_suffix: -slim
+            tag_suffix: -slim
+            cache_scope: docker-slim
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
 
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v4
-
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v4
 
       - name: Log in to GHCR
+        if: github.event_name != 'pull_request'
         uses: docker/login-action@v4
         with:
           registry: ${{ env.REGISTRY }}
@@ -62,22 +91,25 @@ jobs:
             latest=false
           tags: |
             type=raw,value=${{ matrix.variant.latest_tag }},enable={{is_default_branch}}
-            type=ref,event=branch,suffix=${{ matrix.variant.flavor_suffix }}
-            type=ref,event=tag,suffix=${{ matrix.variant.flavor_suffix }}
-            type=sha,prefix=sha-,suffix=${{ matrix.variant.flavor_suffix }}
+            type=ref,event=branch,suffix=${{ matrix.variant.tag_suffix }}
+            type=ref,event=tag,suffix=${{ matrix.variant.tag_suffix }}
+            type=sha,prefix=sha-,suffix=${{ matrix.variant.tag_suffix }}
           labels: |
             org.opencontainers.image.title=RustiFlow
             org.opencontainers.image.description=Network flow extractor with offline and realtime capture modes
             org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
             org.opencontainers.image.revision=${{ github.sha }}
 
-      - name: Build and push image
+      - name: Build image
         uses: docker/build-push-action@v7
         with:
           context: ${{ github.workspace }}
           file: ${{ github.workspace }}/${{ matrix.variant.dockerfile }}
-          push: true
+          platforms: linux/amd64
+          push: ${{ github.event_name != 'pull_request' }}
           provenance: false
           sbom: false
+          cache-from: type=gha,scope=${{ matrix.variant.cache_scope }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.variant.cache_scope }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}

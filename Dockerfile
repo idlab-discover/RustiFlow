@@ -25,7 +25,6 @@ ENV RUST_LOG=info
 # Copy
 WORKDIR /usr/src/app
 COPY Cargo.toml ./
-COPY Cargo.lock ./
 COPY .cargo ./.cargo
 COPY common ./common
 COPY rustiflow ./rustiflow
@@ -37,7 +36,7 @@ COPY ebpf-ipv6 ./ebpf-ipv6
 # Build
 RUN cargo xtask ebpf-ipv4 --release
 RUN cargo xtask ebpf-ipv6 --release
-RUN cargo build --release --locked
+RUN cargo build --release
 
 # Command
 ENTRYPOINT ["/usr/src/app/target/release/rustiflow"]
