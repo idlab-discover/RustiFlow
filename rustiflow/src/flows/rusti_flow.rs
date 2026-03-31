@@ -1,4 +1,5 @@
 use std::net::IpAddr;
+use std::{fmt::Display, fmt::Write as _};
 
 use crate::{
     flows::{
@@ -39,6 +40,20 @@ pub struct RustiFlow {
     pub tcp_quality_stats: TcpQualityStats,
     pub window_size_stats: WindowSizeStats,
     pub timing_stats: TimingStats,
+}
+
+fn push_csv_display(output: &mut String, value: impl Display) {
+    if !output.is_empty() {
+        output.push(',');
+    }
+    let _ = write!(output, "{value}");
+}
+
+fn push_csv_str(output: &mut String, value: &str) {
+    if !output.is_empty() {
+        output.push(',');
+    }
+    output.push_str(value);
 }
 
 impl Flow for RustiFlow {
@@ -123,98 +138,128 @@ impl Flow for RustiFlow {
 
     fn dump(&self) -> String {
         let duration_us = self.basic_flow.get_flow_duration_usec();
-        vec![
-            self.basic_flow.flow_key.clone(),
-            self.basic_flow.ip_source.to_string(),
-            self.basic_flow.port_source.to_string(),
-            self.basic_flow.ip_destination.to_string(),
-            self.basic_flow.port_destination.to_string(),
-            self.basic_flow.protocol.to_string(),
-            self.basic_flow.get_ip_version().to_string(),
-            self.basic_flow.get_source_ip_scope().as_str().to_string(),
-            self.basic_flow
-                .get_destination_ip_scope()
-                .as_str()
-                .to_string(),
-            self.basic_flow.get_path_locality().as_str().to_string(),
-            self.basic_flow.get_first_timestamp().to_string(),
-            self.basic_flow.get_last_timestamp().to_string(),
-            duration_us.to_string(),
-            self.basic_flow.flow_expire_cause.as_str().to_string(),
-            u8::from(self.basic_flow.tcp_handshake_completed).to_string(),
-            u8::from(self.basic_flow.tcp_reset_before_handshake).to_string(),
-            u8::from(self.basic_flow.tcp_reset_after_handshake).to_string(),
-            self.basic_flow.tcp_close_style.as_str().to_string(),
-            self.timing_stats.dump(),
-            self.iat_stats.dump(),
-            self.packet_len_stats.dump(),
-            self.header_len_stats.dump(),
-            self.payload_len_stats.dump(),
-            self.bulk_stats.dump(),
-            self.subflow_stats.dump(),
-            self.active_idle_stats.dump(),
-            self.icmp_stats.dump(),
-            self.retransmission_stats.dump(),
-            self.tcp_quality_stats.dump(),
-            self.window_size_stats.dump(),
-            self.tcp_flags_stats.dump(),
+        let mut output = String::with_capacity(4096);
+        push_csv_display(&mut output, &self.basic_flow.flow_key);
+        push_csv_display(&mut output, self.basic_flow.ip_source);
+        push_csv_display(&mut output, self.basic_flow.port_source);
+        push_csv_display(&mut output, self.basic_flow.ip_destination);
+        push_csv_display(&mut output, self.basic_flow.port_destination);
+        push_csv_display(&mut output, self.basic_flow.protocol);
+        push_csv_display(&mut output, self.basic_flow.get_ip_version());
+        push_csv_display(&mut output, self.basic_flow.get_source_ip_scope().as_str());
+        push_csv_display(
+            &mut output,
+            self.basic_flow.get_destination_ip_scope().as_str(),
+        );
+        push_csv_display(&mut output, self.basic_flow.get_path_locality().as_str());
+        push_csv_display(&mut output, self.basic_flow.get_first_timestamp());
+        push_csv_display(&mut output, self.basic_flow.get_last_timestamp());
+        push_csv_display(&mut output, duration_us);
+        push_csv_display(&mut output, self.basic_flow.flow_expire_cause.as_str());
+        push_csv_display(
+            &mut output,
+            u8::from(self.basic_flow.tcp_handshake_completed),
+        );
+        push_csv_display(
+            &mut output,
+            u8::from(self.basic_flow.tcp_reset_before_handshake),
+        );
+        push_csv_display(
+            &mut output,
+            u8::from(self.basic_flow.tcp_reset_after_handshake),
+        );
+        push_csv_display(&mut output, self.basic_flow.tcp_close_style.as_str());
+        push_csv_str(&mut output, &self.timing_stats.dump());
+        push_csv_str(&mut output, &self.iat_stats.dump());
+        push_csv_str(&mut output, &self.packet_len_stats.dump());
+        push_csv_str(&mut output, &self.header_len_stats.dump());
+        push_csv_str(&mut output, &self.payload_len_stats.dump());
+        push_csv_str(&mut output, &self.bulk_stats.dump());
+        push_csv_str(&mut output, &self.subflow_stats.dump());
+        push_csv_str(&mut output, &self.active_idle_stats.dump());
+        push_csv_str(&mut output, &self.icmp_stats.dump());
+        push_csv_str(&mut output, &self.retransmission_stats.dump());
+        push_csv_str(&mut output, &self.tcp_quality_stats.dump());
+        push_csv_str(&mut output, &self.window_size_stats.dump());
+        push_csv_str(&mut output, &self.tcp_flags_stats.dump());
+        push_csv_display(
+            &mut output,
             safe_per_second_rate(
                 self.payload_len_stats.payload_len.get_total(),
                 duration_us as f64,
-            )
-            .to_string(),
+            ),
+        );
+        push_csv_display(
+            &mut output,
             safe_per_second_rate(
                 self.payload_len_stats.payload_len.get_count() as f64,
                 duration_us as f64,
-            )
-            .to_string(),
+            ),
+        );
+        push_csv_display(
+            &mut output,
             safe_per_second_rate(
                 self.payload_len_stats.fwd_payload_len.get_total(),
                 duration_us as f64,
-            )
-            .to_string(),
+            ),
+        );
+        push_csv_display(
+            &mut output,
             safe_per_second_rate(
                 self.payload_len_stats.fwd_payload_len.get_count() as f64,
                 duration_us as f64,
-            )
-            .to_string(),
+            ),
+        );
+        push_csv_display(
+            &mut output,
             safe_per_second_rate(
                 self.payload_len_stats.bwd_payload_len.get_total(),
                 duration_us as f64,
-            )
-            .to_string(),
+            ),
+        );
+        push_csv_display(
+            &mut output,
             safe_per_second_rate(
                 self.payload_len_stats.bwd_payload_len.get_count() as f64,
                 duration_us as f64,
-            )
-            .to_string(),
+            ),
+        );
+        push_csv_display(
+            &mut output,
             safe_div_int(
                 self.payload_len_stats.fwd_payload_len.get_count(),
                 self.subflow_stats.subflow_count,
-            )
-            .to_string(),
+            ),
+        );
+        push_csv_display(
+            &mut output,
             safe_div(
                 self.payload_len_stats.fwd_payload_len.get_total(),
                 self.subflow_stats.subflow_count as f64,
-            )
-            .to_string(),
+            ),
+        );
+        push_csv_display(
+            &mut output,
             safe_div_int(
                 self.payload_len_stats.bwd_payload_len.get_count(),
                 self.subflow_stats.subflow_count,
-            )
-            .to_string(),
+            ),
+        );
+        push_csv_display(
+            &mut output,
             safe_div(
                 self.payload_len_stats.bwd_payload_len.get_total(),
                 self.subflow_stats.subflow_count as f64,
-            )
-            .to_string(),
+            ),
+        );
+        push_csv_display(
+            &mut output,
             safe_div_int(
                 self.payload_len_stats.bwd_payload_len.get_count(),
                 self.payload_len_stats.fwd_payload_len.get_count(),
-            )
-            .to_string(),
-        ]
-        .join(",")
+            ),
+        );
+        output
     }
 
     fn get_features() -> String {
@@ -267,94 +312,127 @@ impl Flow for RustiFlow {
 
     fn dump_without_contamination(&self) -> String {
         let duration_us = self.basic_flow.get_flow_duration_usec();
-        vec![
-            iana_port_mapping(self.basic_flow.port_source).to_string(),
-            iana_port_mapping(self.basic_flow.port_destination).to_string(),
-            self.basic_flow.protocol.to_string(),
-            self.basic_flow.get_ip_version().to_string(),
-            self.basic_flow.get_source_ip_scope().as_str().to_string(),
-            self.basic_flow
-                .get_destination_ip_scope()
-                .as_str()
-                .to_string(),
-            self.basic_flow.get_path_locality().as_str().to_string(),
-            duration_us.to_string(),
-            self.basic_flow.flow_expire_cause.as_str().to_string(),
-            u8::from(self.basic_flow.tcp_handshake_completed).to_string(),
-            u8::from(self.basic_flow.tcp_reset_before_handshake).to_string(),
-            u8::from(self.basic_flow.tcp_reset_after_handshake).to_string(),
-            self.basic_flow.tcp_close_style.as_str().to_string(),
-            self.timing_stats.get_fwd_duration().to_string(),
-            self.timing_stats.get_bwd_duration().to_string(),
-            self.iat_stats.dump(),
-            self.packet_len_stats.dump(),
-            self.header_len_stats.dump(),
-            self.payload_len_stats.dump(),
-            self.bulk_stats.dump(),
-            self.subflow_stats.dump(),
-            self.active_idle_stats.dump(),
-            self.icmp_stats.dump(),
-            self.retransmission_stats.dump(),
-            self.tcp_quality_stats.dump(),
-            self.window_size_stats.dump(),
-            self.tcp_flags_stats.dump(),
+        let mut output = String::with_capacity(3072);
+        push_csv_display(&mut output, iana_port_mapping(self.basic_flow.port_source));
+        push_csv_display(
+            &mut output,
+            iana_port_mapping(self.basic_flow.port_destination),
+        );
+        push_csv_display(&mut output, self.basic_flow.protocol);
+        push_csv_display(&mut output, self.basic_flow.get_ip_version());
+        push_csv_display(&mut output, self.basic_flow.get_source_ip_scope().as_str());
+        push_csv_display(
+            &mut output,
+            self.basic_flow.get_destination_ip_scope().as_str(),
+        );
+        push_csv_display(&mut output, self.basic_flow.get_path_locality().as_str());
+        push_csv_display(&mut output, duration_us);
+        push_csv_display(&mut output, self.basic_flow.flow_expire_cause.as_str());
+        push_csv_display(
+            &mut output,
+            u8::from(self.basic_flow.tcp_handshake_completed),
+        );
+        push_csv_display(
+            &mut output,
+            u8::from(self.basic_flow.tcp_reset_before_handshake),
+        );
+        push_csv_display(
+            &mut output,
+            u8::from(self.basic_flow.tcp_reset_after_handshake),
+        );
+        push_csv_display(&mut output, self.basic_flow.tcp_close_style.as_str());
+        push_csv_display(&mut output, self.timing_stats.get_fwd_duration());
+        push_csv_display(&mut output, self.timing_stats.get_bwd_duration());
+        push_csv_str(&mut output, &self.iat_stats.dump());
+        push_csv_str(&mut output, &self.packet_len_stats.dump());
+        push_csv_str(&mut output, &self.header_len_stats.dump());
+        push_csv_str(&mut output, &self.payload_len_stats.dump());
+        push_csv_str(&mut output, &self.bulk_stats.dump());
+        push_csv_str(&mut output, &self.subflow_stats.dump());
+        push_csv_str(&mut output, &self.active_idle_stats.dump());
+        push_csv_str(&mut output, &self.icmp_stats.dump());
+        push_csv_str(&mut output, &self.retransmission_stats.dump());
+        push_csv_str(&mut output, &self.tcp_quality_stats.dump());
+        push_csv_str(&mut output, &self.window_size_stats.dump());
+        push_csv_str(&mut output, &self.tcp_flags_stats.dump());
+        push_csv_display(
+            &mut output,
             safe_per_second_rate(
                 self.payload_len_stats.payload_len.get_total(),
                 duration_us as f64,
-            )
-            .to_string(),
+            ),
+        );
+        push_csv_display(
+            &mut output,
             safe_per_second_rate(
                 self.payload_len_stats.payload_len.get_count() as f64,
                 duration_us as f64,
-            )
-            .to_string(),
+            ),
+        );
+        push_csv_display(
+            &mut output,
             safe_per_second_rate(
                 self.payload_len_stats.fwd_payload_len.get_total(),
                 duration_us as f64,
-            )
-            .to_string(),
+            ),
+        );
+        push_csv_display(
+            &mut output,
             safe_per_second_rate(
                 self.payload_len_stats.fwd_payload_len.get_count() as f64,
                 duration_us as f64,
-            )
-            .to_string(),
+            ),
+        );
+        push_csv_display(
+            &mut output,
             safe_per_second_rate(
                 self.payload_len_stats.bwd_payload_len.get_total(),
                 duration_us as f64,
-            )
-            .to_string(),
+            ),
+        );
+        push_csv_display(
+            &mut output,
             safe_per_second_rate(
                 self.payload_len_stats.bwd_payload_len.get_count() as f64,
                 duration_us as f64,
-            )
-            .to_string(),
+            ),
+        );
+        push_csv_display(
+            &mut output,
             safe_div_int(
                 self.payload_len_stats.fwd_payload_len.get_count(),
                 self.subflow_stats.subflow_count,
-            )
-            .to_string(),
+            ),
+        );
+        push_csv_display(
+            &mut output,
             safe_div(
                 self.payload_len_stats.fwd_payload_len.get_total(),
                 self.subflow_stats.subflow_count as f64,
-            )
-            .to_string(),
+            ),
+        );
+        push_csv_display(
+            &mut output,
             safe_div_int(
                 self.payload_len_stats.bwd_payload_len.get_count(),
                 self.subflow_stats.subflow_count,
-            )
-            .to_string(),
+            ),
+        );
+        push_csv_display(
+            &mut output,
             safe_div(
                 self.payload_len_stats.bwd_payload_len.get_total(),
                 self.subflow_stats.subflow_count as f64,
-            )
-            .to_string(),
+            ),
+        );
+        push_csv_display(
+            &mut output,
             safe_div_int(
                 self.payload_len_stats.bwd_payload_len.get_count(),
                 self.payload_len_stats.fwd_payload_len.get_count(),
-            )
-            .to_string(),
-        ]
-        .join(",")
+            ),
+        );
+        output
     }
 
     fn get_features_without_contamination() -> String {
