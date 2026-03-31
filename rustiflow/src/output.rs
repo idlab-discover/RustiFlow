@@ -10,6 +10,7 @@ pub struct OutputWriter<T> {
     write_header: bool,
     skip_contaminant_features: bool,
     writer: BufWriter<Box<dyn Write + Send>>,
+    row_buffer: String,
     _phantom_data: std::marker::PhantomData<T>,
 }
 
@@ -38,6 +39,7 @@ where
             write_header,
             skip_contaminant_features,
             writer,
+            row_buffer: String::with_capacity(4096),
             _phantom_data: std::marker::PhantomData,
         }
     }
@@ -54,15 +56,16 @@ where
 
     pub fn write_flow(&mut self, flow: T) -> std::io::Result<()> {
         let dump_start = Instant::now();
-        let flow_str = if self.skip_contaminant_features {
-            flow.dump_without_contamination()
+        self.row_buffer.clear();
+        if self.skip_contaminant_features {
+            flow.append_to_csv_row_without_contamination(&mut self.row_buffer);
         } else {
-            flow.dump()
-        };
-        export_profile::record_dump(dump_start.elapsed(), flow_str.len());
+            flow.append_to_csv_row(&mut self.row_buffer);
+        }
+        export_profile::record_dump(dump_start.elapsed(), self.row_buffer.len());
 
         let write_start = Instant::now();
-        self.writer.write_all(flow_str.as_bytes())?;
+        self.writer.write_all(self.row_buffer.as_bytes())?;
         self.writer.write_all(b"\n")?;
         export_profile::record_write(write_start.elapsed());
         Ok(())

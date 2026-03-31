@@ -121,11 +121,11 @@ in `docs/engineering-notes.md`.
 
 ### Current Focus
 
-- [ ] Measure how much of the remaining hot export path is snapshot ownership
+- [x] Measure how much of the remaining hot export path is snapshot ownership
   cost versus row serialization cost:
   isolate clone/copy work from string/CSV formatting work under the proven
   `10G` `--early-export 5` case.
-- [ ] Prototype a structural export path that writes CSV fields directly to the
+- [x] Prototype a structural export path that writes CSV fields directly to the
   buffered writer instead of requiring one fully assembled row `String` per
   exported flow, then reprofile the same workload.
 - [ ] Evaluate whether a typed export snapshot or borrow-based export view can
