@@ -128,7 +128,7 @@ in `docs/engineering-notes.md`.
 - [x] Prototype a structural export path that writes CSV fields directly to the
   buffered writer instead of requiring one fully assembled row `String` per
   exported flow, then reprofile the same workload.
-- [ ] Evaluate whether a typed export snapshot or borrow-based export view can
+- [x] Evaluate whether a typed export snapshot or borrow-based export view can
   reduce per-export cloning/allocation without violating flow ownership,
   sharding, or semantic parity.
 - [ ] Identify the heaviest remaining field families inside `RustiFlow::dump`
