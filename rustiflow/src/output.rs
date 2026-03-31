@@ -1,8 +1,9 @@
-use crate::{args::ExportMethodType, flows::flow::Flow};
+use crate::{args::ExportMethodType, export_profile, flows::flow::Flow};
 use log::{debug, error};
 use std::{
     fs::File,
     io::{BufWriter, Write},
+    time::Instant,
 };
 
 pub struct OutputWriter<T> {
@@ -52,14 +53,19 @@ where
     }
 
     pub fn write_flow(&mut self, flow: T) -> std::io::Result<()> {
+        let dump_start = Instant::now();
         let flow_str = if self.skip_contaminant_features {
             flow.dump_without_contamination()
         } else {
             flow.dump()
         };
+        export_profile::record_dump(dump_start.elapsed(), flow_str.len());
 
+        let write_start = Instant::now();
         self.writer.write_all(flow_str.as_bytes())?;
-        self.writer.write_all(b"\n")
+        self.writer.write_all(b"\n")?;
+        export_profile::record_write(write_start.elapsed());
+        Ok(())
     }
 
     /// Flushes the writer and closes the output file
