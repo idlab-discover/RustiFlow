@@ -74,8 +74,8 @@ jobs:
       - name: Build and push image
         uses: docker/build-push-action@v7
         with:
-          context: .
-          file: ${{ matrix.variant.dockerfile }}
+          context: ${{ github.workspace }}
+          file: ${{ github.workspace }}/${{ matrix.variant.dockerfile }}
           push: true
           provenance: false
           sbom: false
