@@ -32,9 +32,11 @@ docker buildx build \
     --sbom false \
     -f Dockerfile \
     -t "$IMAGE_REF:sha-$GIT_SHA" \
-    -t "$IMAGE_REF:$BRANCH_TAG" \
-    --push \
+    --load \
     .
+docker tag "$IMAGE_REF:sha-$GIT_SHA" "$IMAGE_REF:$BRANCH_TAG"
+docker push "$IMAGE_REF:sha-$GIT_SHA"
+docker push "$IMAGE_REF:$BRANCH_TAG"
 
 echo "Building and pushing slim variant for $PLATFORM"
 docker buildx build \
@@ -44,9 +46,11 @@ docker buildx build \
     --sbom false \
     -f Dockerfile-slim \
     -t "$IMAGE_REF:sha-$GIT_SHA-slim" \
-    -t "$IMAGE_REF:$BRANCH_TAG-slim" \
-    --push \
+    --load \
     .
+docker tag "$IMAGE_REF:sha-$GIT_SHA-slim" "$IMAGE_REF:$BRANCH_TAG-slim"
+docker push "$IMAGE_REF:sha-$GIT_SHA-slim"
+docker push "$IMAGE_REF:$BRANCH_TAG-slim"
 
 echo "Pushed:"
 echo "  $IMAGE_REF:sha-$GIT_SHA"
