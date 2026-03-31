@@ -121,27 +121,8 @@ in `docs/engineering-notes.md`.
 
 ### Current Focus
 
-- [x] Measure how much of the remaining hot export path is snapshot ownership
-  cost versus row serialization cost:
-  isolate clone/copy work from string/CSV formatting work under the proven
-  `10G` `--early-export 5` case.
-- [x] Prototype a structural export path that writes CSV fields directly to the
-  buffered writer instead of requiring one fully assembled row `String` per
-  exported flow, then reprofile the same workload.
-- [x] Evaluate whether a typed export snapshot or borrow-based export view can
-  reduce per-export cloning/allocation without violating flow ownership,
-  sharding, or semantic parity.
-- [x] Identify the heaviest remaining field families inside `RustiFlow::dump`
-  after the accepted top-level CSV cleanup, and only optimize subsystems that
-  still show up materially in flamegraphs.
-- [x] Re-run the export-heavy comparison after each bounded structural change
-  using at least:
-  `basic --early-export 5`, `rustiflow --early-export 5`, and one no-early-
-  export control, recording CPU, RSS, drop total, output size, and bitrate.
-- [ ] Keep updating `docs/engineering-notes.md` after each bounded experiment
-  with:
-  workload, achieved bitrate, dropped-packet total, resource summary, and what
-  the new bottleneck appears to be.
+None currently. See `docs/engineering-notes.md` for completed experiments and
+decision history.
 
 Primary files:
 
