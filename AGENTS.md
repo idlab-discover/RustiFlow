@@ -131,7 +131,7 @@ in `docs/engineering-notes.md`.
 - [x] Evaluate whether a typed export snapshot or borrow-based export view can
   reduce per-export cloning/allocation without violating flow ownership,
   sharding, or semantic parity.
-- [ ] Identify the heaviest remaining field families inside `RustiFlow::dump`
+- [x] Identify the heaviest remaining field families inside `RustiFlow::dump`
   after the accepted top-level CSV cleanup, and only optimize subsystems that
   still show up materially in flamegraphs.
 - [ ] Re-run the export-heavy comparison after each bounded structural change

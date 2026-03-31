@@ -1,6 +1,6 @@
 use crate::{flows::util::FlowExpireCause, packet_features::PacketFeatures};
 
-use super::util::{FeatureStats, FlowFeature};
+use super::util::{push_csv_display, FeatureStats, FlowFeature};
 
 #[derive(Clone)]
 pub struct PayloadLengthStats {
@@ -53,6 +53,15 @@ impl FlowFeature for PayloadLengthStats {
             self.fwd_non_zero_payload_packets,
             self.bwd_non_zero_payload_packets,
         )
+    }
+
+    fn append_to_csv(&self, output: &mut String) {
+        self.payload_len.append_csv_values(output);
+        push_csv_display(output, self.payload_len.get_std().powi(2));
+        self.fwd_payload_len.append_csv_values(output);
+        self.bwd_payload_len.append_csv_values(output);
+        push_csv_display(output, self.fwd_non_zero_payload_packets);
+        push_csv_display(output, self.bwd_non_zero_payload_packets);
     }
 
     fn headers() -> String {
