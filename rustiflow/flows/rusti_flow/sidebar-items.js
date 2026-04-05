@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"struct":["RustiFlow"]};
+window.SIDEBAR_ITEMS = {"fn":["push_csv_display","push_csv_str"],"struct":["RustiFlow"]};

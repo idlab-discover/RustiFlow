@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"struct":["EbpfEventIpv4","EbpfEventIpv6","IcmpHdr","TcpHdr","UdpHdr"],"trait":["NetworkHeader"]};
+window.SIDEBAR_ITEMS = {"constant":["REALTIME_EVENT_QUEUE_COUNT","REALTIME_EVENT_RINGBUF_BYTES"],"struct":["EbpfEventIpv4","EbpfEventIpv6","IcmpHdr","TcpHdr","UdpHdr"],"trait":["NetworkHeader"]};
