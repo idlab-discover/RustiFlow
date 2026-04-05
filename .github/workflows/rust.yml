@@ -20,7 +20,7 @@ jobs:
       with:
         toolchain: nightly
         profile: minimal
-        components: rust-src, llvm-tools-preview
+        components: rust-src, llvm-tools-preview, clippy
         override: true
     - name: Install libpcap-dev
       run: sudo apt install libpcap-dev
