@@ -910,3 +910,130 @@ This file keeps short-lived design choices and execution notes that would make
     about `832 MB` in `10 s`
   - for throughput experiments, disabling early export still means omitting the
     flag entirely rather than passing `0`
+
+## 2026-04-04
+
+- Completed a local `25G`-target realtime matrix on the `rustiflow-t0`
+  software-path harness using 24-port `iperf3` fanout for both IPv4 and IPv6.
+  Large-packet UDP (`1400` bytes) now repeatedly reaches near-line-rate local
+  control throughput (`24.96 Gbit/s`) and RustiFlow stays close to it with `0`
+  internal drops (`24.72 Gbit/s` to `/dev/null`, `24.76 Gbit/s` with normal
+  final CSV output). PPS-heavier UDP remains limited by the local
+  generator/harness before RustiFlow drops (`512` bytes about `9.93 Gbit/s`
+  control, `8.97 Gbit/s` with RustiFlow; `256` bytes about `4.70 Gbit/s` with
+  RustiFlow and still `0` drops). Bounded mixed-workload, short-lived-flow
+  churn, and `900 s` soak runs also stayed clean: IPv4 soak about
+  `22.32 Gbit/s`, IPv6 soak about `23.92 Gbit/s`, and a disk-backed churn soak
+  exported `14,276` CSV lines / about `18.3 MB` with `0` dropped packets.
+
+## 2026-04-05
+
+- Explored a separate local multiqueue `pktgen` harness on `rgbcore` as a
+  bounded attempt to push beyond the existing `iperf3` software-path setup.
+- The dedicated local `pktgen` harness used:
+  - host interface `rustiflow-pg0`
+  - peer namespace `rustiflow-pktgen`
+  - peer interface `rustiflow-pg1`
+  - multiqueue veth with `8` RX and `8` TX queues on both ends
+  - separate addressing from the original `iperf3` harness:
+    `10.204.0.1/30` and `10.204.0.2/30`
+- Bounded `pktgen` control runs worked reliably after switching from infinite
+  `count 0` operation to finite packet counts derived from target rate,
+  duration, and packet size.
+- However, the local control ceiling stayed well below the intended `40G`
+  target:
+  - earlier best `8`-queue control runs were only about `22.5` to
+    `22.9 Gbit/s`
+  - later control sweeps on the same software-path harness flattened around
+    `19.7 Gbit/s` regardless of whether the target was `25G`, `30G`, `35G`, or
+    `40G`
+  - reducing to `4` queues made the control path materially worse, about
+    `10 Gbit/s`
+  - slightly larger packets (`1500` bytes) helped only modestly, reaching
+    about `20.9 Gbit/s`
+- Interpretation from the control sweeps:
+  - the local multiqueue veth plus `pktgen` path itself is the bottleneck
+  - the target-rate knob is no longer the limiting factor once the harness
+    reaches that software-path ceiling
+  - this makes the local `pktgen` harness unsuitable as a credible proxy for
+    true `40G` wire-rate validation of the current RustiFlow architecture
+- RustiFlow comparison runs on that harness also did not justify keeping the
+  experiment as a maintained workflow:
+  - containerized `null` runs with `8` queues and a `25G` target were around
+    `18.9 Gbit/s` with `0` dropped packets
+  - a rebuilt host `release` binary pinned with `taskset` to CPUs `8-15` and
+    `--threads 8` was comparable, about `18.0 Gbit/s` with `0` dropped
+    packets
+  - host-mode `taskset` plus host RX `RPS` was better than `taskset` alone,
+    but neither path changed the underlying local control ceiling enough to
+    make the setup useful for a `40G` answer
+- Conclusion:
+  - keep the original `rustiflow-t0` / `rustiflow-peer` / `rustiflow-p0`
+    harness as the trusted local software-path validation environment
+  - do not keep the local `pktgen` harness workflow or helper files in-tree
+  - treat true `40G` validation for the current tc/eBPF realtime path as a
+    physical-hardware problem rather than a local veth virtualization problem
+- Updated the persistent local `rustiflow-swtest-veth.service` harness to bias
+  for bulk local throughput rather than realism:
+  - explicit `8x8` multiqueue veth on both ends, matching the current
+    userspace/eBPF `REALTIME_EVENT_QUEUE_COUNT`
+  - jumbo `9000` MTU and `txqueuelen 10000` on both ends
+  - widened veth `gso`/`gro` ceilings (`262144`) on both ends
+  - host and peer `RPS`/`XPS` fanout spread evenly across the available local
+    CPUs
+  - keep in mind this increases throughput bias and can make the local harness
+    less representative of real NIC packetization behavior
+- Added a structured local harness regression matrix in
+  `docs/realtime-throughput-matrix.md`, including fixed CPU partitioning and
+  scenario bundles for control, `basic`, and `rustiflow` runs on the trusted
+  local software-path harness.
+- Validated the full local harness matrix end to end on the trusted
+  `rustiflow-t0` / `rustiflow-peer` software-path rig using the fixed CPU split
+  documented in `docs/realtime-throughput-matrix.md`:
+  - sender / generator CPUs `0-7`
+  - RustiFlow CPUs `8-23`
+  - control / receiver CPUs `24-31`
+  - raw artifacts stored in `target/realtime-matrix/20260405-190241/`
+- Summary of the completed matrix:
+  - `B1` steady large-packet UDP baseline (`1400` bytes, `P8`, `30 s`):
+    control `22.2 Gbit/s`; `basic` `13.9 Gbit/s` with `0` drops and `37.4%`
+    headroom loss; `rustiflow` `11.1 Gbit/s` with `0` drops and `50.0%`
+    headroom loss
+  - `B2` large-packet UDP near local ceiling (best bounded control from the
+    sweep): control `16.7 Gbit/s`; `basic` `13.4 Gbit/s` with `0` drops and
+    `19.8%` headroom loss; `rustiflow` `11.1 Gbit/s` with `0` drops and
+    `33.5%` headroom loss
+  - `B3` small-packet UDP PPS stress (`512` bytes): control `7.27 Gbit/s`;
+    `basic` `5.21 Gbit/s` with `0` drops and `28.3%` headroom loss;
+    `rustiflow` `4.20 Gbit/s` with `0` drops and `42.2%` headroom loss
+  - `B4` smaller-packet UDP PPS stress (`256` bytes): control `3.68 Gbit/s`;
+    `basic` `2.11 Gbit/s` with `0` drops and `42.7%` headroom loss;
+    `rustiflow` `2.68 Gbit/s` with `0` drops and `27.2%` headroom loss
+  - `B5` mixed UDP plus TCP: control `114.37 Gbit/s` total
+    (`udp=7.37`, `tcp=107.00`); `basic` `110.94 Gbit/s` with `0` drops and
+    `3.0%` headroom loss; `rustiflow` `114.24 Gbit/s` with `0` drops and
+    `0.1%` headroom loss
+  - `B6` short-lived TCP flow churn (`200` short reverse-TCP runs): control
+    average `94.48 Gbit/s`; `basic` average `94.25 Gbit/s` with `0` drops and
+    `0.24%` headroom loss; `rustiflow` average `93.78 Gbit/s` with `0` drops
+    and `0.74%` headroom loss
+  - `B7` long soak (`900 s` large-packet UDP): control `18.8 Gbit/s`;
+    `basic` `13.7 Gbit/s` with `0` drops and `27.1%` headroom loss;
+    `rustiflow` `12.6 Gbit/s` with `0` drops and `33.0%` headroom loss
+  - `B8` local replay fallback using `rustiflow/tests/data/nmap_udp_version.pcap`
+    looped through `tcpreplay`: control `241.85 Mbit/s`; `basic`
+    `258.92 Mbit/s` with `0` drops; `rustiflow` `239.68 Mbit/s` with `0`
+    drops. This is only a bounded parser / replay smoke test, not a
+    representative throughput trace. `tcpreplay` also emitted repeated decode
+    warnings about the tiny trace lacking enough bytes for an ICMP header.
+- Takeaways from the full matrix:
+  - the trusted local harness is credible as a software-path regression rig in
+    the approximate `20-25G` large-packet range, not as a true `40G`
+    wire-rate validator
+  - large-packet and PPS-heavy reverse UDP cases still give up substantial
+    headroom under both `basic` and `rustiflow`, even though all completed
+    capture runs stayed at `0` internal dropped packets
+  - mixed TCP / UDP and short-lived TCP churn stay much closer to control on
+    this host than the pure reverse-UDP cases
+  - the `900 s` soak stayed stable and drop-free, but still showed material
+    headroom loss versus control

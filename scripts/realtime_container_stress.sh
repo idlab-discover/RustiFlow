@@ -147,7 +147,6 @@ rustiflow_args=(
     -o csv
     --header
     --export-path "/tmp/$(basename "$export_path")"
-    --performance-mode
     --threads "$threads"
 )
 
