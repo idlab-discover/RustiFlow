@@ -40,7 +40,7 @@ impl Config {
                 export_path: None,
                 header: false,
                 drop_contaminant_features: false,
-                performance_mode: false,
+                packet_graph: false,
             },
             command: Commands::Realtime {
                 interface: String::from("eth0"),
@@ -165,7 +165,7 @@ enum AppFocus {
     CommandArgumentInput,
     OutputArgumentInput,
     IngressOnlyInput,
-    PerformanceModeInput,
+    PacketGraphInput,
     ThreadsInput,
     EarlyExportInput,
     HeaderInput,
@@ -202,7 +202,7 @@ async fn run_app<B: Backend>(
                     AppFocus::CommandArgumentInput => handle_command_argument_input(key, app)?,
                     AppFocus::OutputArgumentInput => handle_output_argument_input(key, app)?,
                     AppFocus::IngressOnlyInput
-                    | AppFocus::PerformanceModeInput
+                    | AppFocus::PacketGraphInput
                     | AppFocus::HeaderInput
                     | AppFocus::DropContaminantFeaturesInput => {
                         handle_boolean_input(key, app, app.focus)?
@@ -423,9 +423,9 @@ fn handle_boolean_input(
                     *ingress_only = !*ingress_only;
                 }
             }
-            AppFocus::PerformanceModeInput => {
+            AppFocus::PacketGraphInput => {
                 if let ExportMethodType::Csv = &app.config.output.output {
-                    app.config.output.performance_mode = !app.config.output.performance_mode;
+                    app.config.output.packet_graph = !app.config.output.packet_graph;
                 }
             }
             AppFocus::HeaderInput => {
@@ -447,9 +447,9 @@ fn handle_boolean_input(
                         *ingress_only = false;
                     }
                 }
-                AppFocus::PerformanceModeInput => {
+                AppFocus::PacketGraphInput => {
                     if let ExportMethodType::Csv = &app.config.output.output {
-                        app.config.output.performance_mode = false;
+                        app.config.output.packet_graph = false;
                     }
                 }
                 AppFocus::HeaderInput => {
@@ -591,7 +591,7 @@ fn handle_output_argument_input(key: KeyEvent, app: &mut App) -> Result<(), Box<
             }
         }
         KeyCode::Enter => {
-            app.focus = AppFocus::PerformanceModeInput;
+            app.focus = AppFocus::PacketGraphInput;
         }
         KeyCode::Left | KeyCode::Esc => {
             if let Some(ref mut export_path) = app.config.output.export_path {
@@ -1022,9 +1022,9 @@ fn render_current_selections<B: Backend>(f: &mut Frame<B>, app: &App, area: Rect
             ),
         ])),
         ListItem::new(Spans::from(vec![
-            Span::raw("Performance Mode: "),
+            Span::raw("Packet Graph: "),
             Span::styled(
-                format!("{:?}", app.config.output.performance_mode),
+                format!("{:?}", app.config.output.packet_graph),
                 Style::default().fg(Color::Yellow),
             ),
         ])),
@@ -1176,9 +1176,9 @@ fn render_popups<B: Backend>(f: &mut Frame<B>, app: &App, size: Rect) {
         render_boolean_choice(f, inner_area, is_true_selected);
     }
 
-    if matches!(app.focus, AppFocus::PerformanceModeInput) {
+    if matches!(app.focus, AppFocus::PacketGraphInput) {
         let is_true_selected = match &app.config.output.output {
-            ExportMethodType::Csv => app.config.output.performance_mode,
+            ExportMethodType::Csv => app.config.output.packet_graph,
             _ => false,
         };
 
@@ -1186,7 +1186,7 @@ fn render_popups<B: Backend>(f: &mut Frame<B>, app: &App, size: Rect) {
         f.render_widget(Clear, popup_area);
 
         let boolean_input_block = Block::default()
-            .title("Performance mode (no graph)?")
+            .title("Enable packet graph?")
             .borders(Borders::ALL)
             .style(Style::default().bg(Color::Black))
             .border_style(Style::default().fg(Color::Yellow));

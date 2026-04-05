@@ -94,7 +94,7 @@ async fn main() {
                     export_path: cli.export_path,
                     header: cli.header,
                     drop_contaminant_features: cli.drop_contaminant_features,
-                    performance_mode: cli.performance_mode,
+                    packet_graph: cli.packet_graph,
                 },
                 command: cli.command,
             }

@@ -120,6 +120,21 @@ header = true
 drop_contaminant_features = false
 ```
 
+For realtime CSV exports, the live packet graph is now off by default so the
+standard CLI path keeps the best throughput-oriented behavior. Enable it only
+when you want the graph:
+
+```toml
+[output]
+packet_graph = true
+```
+
+or with:
+
+```bash
+rustiflow ... -o csv --export-path out.csv --packet-graph realtime <interface>
+```
+
 ## <img src="figures/RustiFlow_nobg.png" width="60px"/> Using the Container:
 
 Make sure that you don't use docker desktop and that you don't have it installed on your machine. If you have this setup, it will not work as intended as the `--network host` will not link the container to the host network, but to the network of a VM that docker desktop uses.
@@ -270,6 +285,10 @@ Options:
 
           --export-path <EXPORT_PATH>
               File path for output (used if method is Csv)
+
+          --packet-graph
+              Enable the realtime packet graph for CSV exports
+              [default: false]
 
           --header
               Whether to export the feature header

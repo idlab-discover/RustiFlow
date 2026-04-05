@@ -17,10 +17,10 @@ fn packet_graph_mode_with_debug(
     match (
         &output.output,
         output.export_path.is_some(),
-        output.performance_mode,
+        output.packet_graph,
         debug_logging_enabled,
     ) {
-        (ExportMethodType::Csv, true, false, false) => PacketGraphMode::Enabled,
+        (ExportMethodType::Csv, true, true, false) => PacketGraphMode::Enabled,
         _ => PacketGraphMode::Disabled,
     }
 }
@@ -37,20 +37,20 @@ mod tests {
     fn output_config(
         output: ExportMethodType,
         export_path: Option<&str>,
-        performance_mode: bool,
+        packet_graph: bool,
     ) -> OutputConfig {
         OutputConfig {
             output,
             export_path: export_path.map(str::to_string),
             header: false,
             drop_contaminant_features: false,
-            performance_mode,
+            packet_graph,
         }
     }
 
     #[test]
-    fn packet_graph_mode_only_enables_for_csv_exports_without_performance_mode() {
-        let output = output_config(ExportMethodType::Csv, Some("/tmp/out.csv"), false);
+    fn packet_graph_mode_only_enables_for_explicit_csv_packet_graph() {
+        let output = output_config(ExportMethodType::Csv, Some("/tmp/out.csv"), true);
 
         assert_eq!(
             packet_graph_mode_with_debug(&output, false),
@@ -59,8 +59,8 @@ mod tests {
     }
 
     #[test]
-    fn packet_graph_mode_stays_disabled_for_csv_performance_mode() {
-        let output = output_config(ExportMethodType::Csv, Some("/tmp/out.csv"), true);
+    fn packet_graph_mode_stays_disabled_without_packet_graph() {
+        let output = output_config(ExportMethodType::Csv, Some("/tmp/out.csv"), false);
 
         assert_eq!(
             packet_graph_mode_with_debug(&output, false),

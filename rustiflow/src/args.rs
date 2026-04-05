@@ -45,9 +45,9 @@ pub struct Cli {
     #[clap(long, group = "cli_group", required_if_eq("output", "Csv"))]
     pub export_path: Option<String>,
 
-    /// Disable the graph in TUI when exporting in CSV mode
-    #[clap(long, group = "cli_group", action = clap::ArgAction::SetTrue, required_if_eq("output", "Csv"))]
-    pub performance_mode: bool,
+    /// Enable the realtime packet graph when exporting to CSV
+    #[clap(long = "packet-graph", alias = "performance-mode", group = "cli_group", action = clap::ArgAction::SetTrue, required_if_eq("output", "Csv"))]
+    pub packet_graph: bool,
 
     /// Whether to export the feature header
     #[clap(long, action = clap::ArgAction::SetTrue, group = "cli_group")]
@@ -135,9 +135,10 @@ pub struct OutputConfig {
     #[clap(required_if_eq("output", "csv"))]
     pub export_path: Option<String>,
 
-    /// Disable the graph in TUI when exporting in CSV mode
-    #[clap(long, action = clap::ArgAction::SetTrue, required_if_eq("output", "Csv"))]
-    pub performance_mode: bool,
+    /// Enable the realtime packet graph when exporting to CSV
+    #[clap(long = "packet-graph", alias = "performance-mode", action = clap::ArgAction::SetTrue, required_if_eq("output", "Csv"))]
+    #[serde(default, alias = "performance_mode")]
+    pub packet_graph: bool,
 
     /// Whether to export the feature header
     #[clap(long, action = clap::ArgAction::SetTrue)]
@@ -202,7 +203,7 @@ impl Default for ConfigFile {
                 export_path: None,
                 header: false,
                 drop_contaminant_features: false,
-                performance_mode: false,
+                packet_graph: false,
             },
         }
     }
