@@ -4,7 +4,7 @@ use crate::{
     export_profile, flow_key::FlowKey, flows::util::FlowExpireCause,
     packet_features::PacketFeatures, Flow,
 };
-use log::{debug, error};
+use log::{debug, error, warn};
 use tokio::sync::mpsc;
 
 enum ExistingFlowUpdate<T> {
@@ -28,6 +28,8 @@ pub struct FlowTable<T> {
     export_channel: mpsc::Sender<T>,
     next_check_time_us: Option<i64>, // Track the next time we check for flow expirations
     expiration_check_interval_us: i64, // Check for expired flows every x seconds
+    max_active_flows: usize,
+    rejected_new_flows: u64,
 }
 
 impl<T> FlowTable<T>
@@ -40,6 +42,7 @@ where
         early_export: Option<u64>,
         export_channel: mpsc::Sender<T>,
         expiration_check_interval: u64,
+        max_active_flows: usize,
     ) -> Self {
         Self {
             flow_map: HashMap::new(),
@@ -49,6 +52,8 @@ where
             export_channel,
             next_check_time_us: None,
             expiration_check_interval_us: (expiration_check_interval * 1_000_000) as i64,
+            max_active_flows,
+            rejected_new_flows: 0,
         }
     }
 
@@ -74,6 +79,17 @@ where
 
     /// Create and insert a new flow for the given packet.
     async fn create_and_insert_flow(&mut self, packet: &PacketFeatures) {
+        if self.flow_map.len() >= self.max_active_flows {
+            self.rejected_new_flows = self.rejected_new_flows.saturating_add(1);
+            if self.rejected_new_flows.is_power_of_two() {
+                warn!(
+                    "Flow table is at its {}-flow limit; rejected {} packets for new flows",
+                    self.max_active_flows, self.rejected_new_flows
+                );
+            }
+            return;
+        }
+
         let flow_key = packet.flow_key_value();
         let mut new_flow = T::new(
             flow_key.to_string(),
@@ -178,6 +194,13 @@ where
 
     /// Export all flows in the flow map in order of first packet arrival.
     pub async fn export_all_flows(&mut self, timestamp_us: i64) {
+        if self.rejected_new_flows > 0 {
+            warn!(
+                "Flow table rejected {} packets for new flows after reaching its {}-flow limit",
+                self.rejected_new_flows, self.max_active_flows
+            );
+        }
+
         let mut flows_to_export: Vec<_> = self
             .flow_map
             .drain() // Drain all entries from the map
@@ -192,6 +215,16 @@ where
             flow.close_flow(timestamp_us, FlowExpireCause::ExporterShutdown);
             self.export_flow(flow).await;
         }
+    }
+
+    #[cfg(test)]
+    pub fn active_flow_count(&self) -> usize {
+        self.flow_map.len()
+    }
+
+    #[cfg(test)]
+    pub fn rejected_new_flow_count(&self) -> u64 {
+        self.rejected_new_flows
     }
 
     /// Exports a single flow.
@@ -243,4 +276,9 @@ where
             }
         }
     }
+}
+
+pub fn shard_flow_limit(max_flows: usize, shard_index: usize, num_shards: usize) -> usize {
+    let base_limit = max_flows / num_shards;
+    base_limit + usize::from(shard_index < max_flows % num_shards)
 }

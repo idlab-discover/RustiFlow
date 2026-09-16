@@ -53,8 +53,17 @@ mod tests {
 
         let (tx, mut rx) = mpsc::channel::<RustiFlow>(8);
 
-        let result =
-            read_pcap_file::<RustiFlow>(path.to_str().unwrap(), tx, 1, 3600, 120, None, 60).await;
+        let result = read_pcap_file::<RustiFlow>(
+            path.to_str().unwrap(),
+            tx,
+            1,
+            3600,
+            120,
+            None,
+            60,
+            usize::MAX,
+        )
+        .await;
 
         fs::remove_file(&path).ok();
 

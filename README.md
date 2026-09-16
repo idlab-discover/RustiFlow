@@ -95,6 +95,7 @@ active_timeout = 522
 idle_timeout = 885855
 early_export = 25
 expiration_check_interval = 0
+max_flows = 100000
 
 [output]
 output = "Csv"
@@ -112,6 +113,7 @@ active_timeout = 3600
 idle_timeout = 120
 early_export = 10
 expiration_check_interval = 60
+max_flows = 100000
 threads = 8
 
 [output]
@@ -134,6 +136,19 @@ or with:
 ```bash
 rustiflow ... -o csv --export-path out.csv --packet-graph realtime <interface>
 ```
+
+### Bounding active-flow memory
+
+RustiFlow keeps at most `max_flows` active bidirectional 5-tuples in memory
+across all processing threads. The default is `100000`. Once the limit is
+reached, packets for existing flows are still processed, while packets for
+previously unseen flows are rejected until expiration frees capacity. Warnings
+report rejected packets at a logarithmically limited rate.
+
+Choose the limit from the available memory and selected feature set. In a local
+debug-build measurement, the full `rustiflow` feature set used approximately
+5.5 KiB per active flow at high cardinality; allocator, build, and platform
+differences mean this is a sizing estimate rather than a guarantee.
 
 ## <img src="figures/RustiFlow_nobg.png" width="60px"/> Using the Container:
 
@@ -272,6 +287,11 @@ Options:
           Interval (in seconds) for checking and expiring flows in the flowtable. This represents how often the flowtable should be scanned to remove inactive flows
 
           [default: 60]
+
+      --max-flows <MAX_FLOWS>
+          Maximum number of active flows kept in memory across all processing threads
+
+          [default: 100000]
 
       --threads <THREADS>
           The numbers of threads to use for processing packets (optional) (default: realtime uses 12, capped at the number of logical CPUs; pcap uses 5; maximum number of logical CPUs)

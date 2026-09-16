@@ -34,6 +34,7 @@ impl Config {
                 early_export: None,
                 threads: None,
                 expiration_check_interval: 60,
+                max_flows: crate::args::DEFAULT_MAX_FLOWS,
             },
             output: OutputConfig {
                 output: ExportMethodType::Print,

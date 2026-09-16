@@ -7,7 +7,7 @@ mod tests {
     use tokio::sync::mpsc;
 
     use crate::{
-        flow_table::FlowTable,
+        flow_table::{shard_flow_limit, FlowTable},
         flows::{
             basic_flow::BasicFlow, cidds_flow::CiddsFlow, flow::Flow, rusti_flow::RustiFlow,
             util::FlowExpireCause,
@@ -24,6 +24,13 @@ mod tests {
             protocol: 6,
             timestamp_us,
             ..Default::default()
+        }
+    }
+
+    fn build_unique_packet(source_port: u16, timestamp_us: i64) -> PacketFeatures {
+        PacketFeatures {
+            source_port,
+            ..build_packet(timestamp_us)
         }
     }
 
@@ -102,7 +109,7 @@ mod tests {
     #[tokio::test]
     async fn exports_idle_timed_out_flow_with_idle_timeout_cause() {
         let (tx, mut rx) = mpsc::channel::<BasicFlow>(4);
-        let mut flow_table = FlowTable::new(3600, 1, None, tx, 60);
+        let mut flow_table = FlowTable::new(3600, 1, None, tx, 60, usize::MAX);
 
         flow_table.process_packet(&build_packet(1_000_000)).await;
         flow_table.export_expired_flows(3_000_000).await;
@@ -120,9 +127,42 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn rejects_new_flows_after_reaching_the_active_flow_limit() {
+        let (tx, _rx) = mpsc::channel::<BasicFlow>(4);
+        let mut flow_table = FlowTable::new(3600, 120, None, tx, 60, 2);
+
+        flow_table
+            .process_packet(&build_unique_packet(10_001, 1_000_000))
+            .await;
+        flow_table
+            .process_packet(&build_unique_packet(10_002, 1_000_001))
+            .await;
+        flow_table
+            .process_packet(&build_unique_packet(10_003, 1_000_002))
+            .await;
+        flow_table
+            .process_packet(&build_unique_packet(10_001, 1_000_003))
+            .await;
+
+        assert_eq!(flow_table.active_flow_count(), 2);
+        assert_eq!(flow_table.rejected_new_flow_count(), 1);
+    }
+
+    #[test]
+    fn divides_the_total_flow_limit_exactly_across_shards() {
+        let limits: Vec<_> = (0..12)
+            .map(|shard_index| shard_flow_limit(100_000, shard_index, 12))
+            .collect();
+
+        assert_eq!(limits.iter().sum::<usize>(), 100_000);
+        assert_eq!(&limits[..4], &[8_334; 4]);
+        assert!(limits[4..].iter().all(|limit| *limit == 8_333));
+    }
+
+    #[tokio::test]
     async fn preserves_tcp_reset_cause_when_packet_terminates_flow() {
         let (tx, mut rx) = mpsc::channel::<BasicFlow>(4);
-        let mut flow_table = FlowTable::new(3600, 120, None, tx, 60);
+        let mut flow_table = FlowTable::new(3600, 120, None, tx, 60, usize::MAX);
 
         let mut syn = build_packet(1_000_000);
         syn.syn_flag = 1;
@@ -141,7 +181,7 @@ mod tests {
     #[tokio::test]
     async fn does_not_reexport_first_packet_terminated_flow() {
         let (tx, mut rx) = mpsc::channel::<BasicFlow>(4);
-        let mut flow_table = FlowTable::new(3600, 120, None, tx, 60);
+        let mut flow_table = FlowTable::new(3600, 120, None, tx, 60, usize::MAX);
 
         let mut rst = build_packet(1_000_000);
         rst.rst_flag = 1;
@@ -158,7 +198,7 @@ mod tests {
     #[tokio::test]
     async fn reverse_direction_packets_stay_in_one_bidirectional_flow() {
         let (tx, mut rx) = mpsc::channel::<CiddsFlow>(4);
-        let mut flow_table = FlowTable::new(3600, 120, None, tx, 60);
+        let mut flow_table = FlowTable::new(3600, 120, None, tx, 60, usize::MAX);
 
         let mut forward = build_packet(1_000_000);
         forward.length = 120;
@@ -192,7 +232,7 @@ mod tests {
     #[tokio::test]
     async fn expired_flow_is_replaced_by_new_flow_for_the_same_key() {
         let (tx, mut rx) = mpsc::channel::<BasicFlow>(4);
-        let mut flow_table = FlowTable::new(3600, 1, None, tx, 60);
+        let mut flow_table = FlowTable::new(3600, 1, None, tx, 60, usize::MAX);
 
         let first_packet = build_packet(1_000_000);
         let replacement_packet = build_packet(3_000_000);
@@ -220,7 +260,7 @@ mod tests {
     #[tokio::test]
     async fn early_export_keeps_flow_active_for_later_final_export() {
         let (tx, mut rx) = mpsc::channel::<BasicFlow>(4);
-        let mut flow_table = FlowTable::new(3600, 120, Some(1), tx, 60);
+        let mut flow_table = FlowTable::new(3600, 120, Some(1), tx, 60, usize::MAX);
 
         flow_table.process_packet(&build_packet(1_000_000)).await;
         flow_table.process_packet(&build_packet(3_000_001)).await;
@@ -247,8 +287,8 @@ mod tests {
     async fn offline_and_realtime_bidirectional_exports_match() {
         let (offline_tx, mut offline_rx) = mpsc::channel::<RustiFlow>(4);
         let (realtime_tx, mut realtime_rx) = mpsc::channel::<RustiFlow>(4);
-        let mut offline_table = FlowTable::new(3600, 120, None, offline_tx, 60);
-        let mut realtime_table = FlowTable::new(3600, 120, None, realtime_tx, 60);
+        let mut offline_table = FlowTable::new(3600, 120, None, offline_tx, 60, usize::MAX);
+        let mut realtime_table = FlowTable::new(3600, 120, None, realtime_tx, 60, usize::MAX);
 
         let client_ip = Ipv4Addr::new(192, 168, 1, 1);
         let server_ip = Ipv4Addr::new(192, 168, 1, 2);
@@ -381,8 +421,8 @@ mod tests {
     async fn offline_and_realtime_idle_expiration_match() {
         let (offline_tx, mut offline_rx) = mpsc::channel::<BasicFlow>(4);
         let (realtime_tx, mut realtime_rx) = mpsc::channel::<BasicFlow>(4);
-        let mut offline_table = FlowTable::new(3600, 1, None, offline_tx, 60);
-        let mut realtime_table = FlowTable::new(3600, 1, None, realtime_tx, 60);
+        let mut offline_table = FlowTable::new(3600, 1, None, offline_tx, 60, usize::MAX);
+        let mut realtime_table = FlowTable::new(3600, 1, None, realtime_tx, 60, usize::MAX);
 
         let offline_packet = build_packet(1_000_000);
         let realtime_packet = build_realtime_packet(RealtimePacketIpv4Spec {
@@ -424,8 +464,8 @@ mod tests {
     async fn offline_and_realtime_ipv6_bidirectional_exports_match() {
         let (offline_tx, mut offline_rx) = mpsc::channel::<RustiFlow>(4);
         let (realtime_tx, mut realtime_rx) = mpsc::channel::<RustiFlow>(4);
-        let mut offline_table = FlowTable::new(3600, 120, None, offline_tx, 60);
-        let mut realtime_table = FlowTable::new(3600, 120, None, realtime_tx, 60);
+        let mut offline_table = FlowTable::new(3600, 120, None, offline_tx, 60, usize::MAX);
+        let mut realtime_table = FlowTable::new(3600, 120, None, realtime_tx, 60, usize::MAX);
 
         let client_ip = Ipv6Addr::new(0x2001, 0xdb8, 0, 1, 0, 0, 0, 1);
         let server_ip = Ipv6Addr::new(0x2001, 0xdb8, 0, 1, 0, 0, 0, 2);
@@ -582,8 +622,8 @@ mod tests {
     async fn offline_and_realtime_ipv6_idle_expiration_match() {
         let (offline_tx, mut offline_rx) = mpsc::channel::<BasicFlow>(4);
         let (realtime_tx, mut realtime_rx) = mpsc::channel::<BasicFlow>(4);
-        let mut offline_table = FlowTable::new(3600, 1, None, offline_tx, 60);
-        let mut realtime_table = FlowTable::new(3600, 1, None, realtime_tx, 60);
+        let mut offline_table = FlowTable::new(3600, 1, None, offline_tx, 60, usize::MAX);
+        let mut realtime_table = FlowTable::new(3600, 1, None, realtime_tx, 60, usize::MAX);
 
         let client_ip = Ipv6Addr::new(0x2001, 0xdb8, 0, 2, 0, 0, 0, 10);
         let server_ip = Ipv6Addr::new(0x2001, 0xdb8, 0, 2, 0, 0, 0, 20);

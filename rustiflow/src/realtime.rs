@@ -11,7 +11,11 @@ use crate::debug;
 use crate::flow_tui::launch_packet_tui;
 use crate::packet_counts::PacketCountPerSecond;
 use crate::realtime_mode::PacketGraphMode;
-use crate::{flow_table::FlowTable, flows::flow::Flow, packet_features::PacketFeatures};
+use crate::{
+    flow_table::{shard_flow_limit, FlowTable},
+    flows::flow::Flow,
+    packet_features::PacketFeatures,
+};
 use anyhow::Context;
 use aya::{
     maps::{MapData, PerCpuArray, RingBuf},
@@ -131,6 +135,7 @@ pub async fn handle_realtime<T>(
     idle_timeout: u64,
     early_export: Option<u64>,
     expiration_check_interval: u64,
+    max_flows: usize,
     ingress_only: bool,
     packet_graph_mode: PacketGraphMode,
 ) -> Result<u64, anyhow::Error>
@@ -263,7 +268,7 @@ where
     };
 
     debug!("Creating {} sharded FlowTables...", num_threads);
-    for _ in 0..num_threads {
+    for shard_index in 0..num_threads {
         let (tx, mut rx) = mpsc::channel::<Vec<PacketFeatures>>(shard_queue_capacity);
         let mut flow_table = FlowTable::new(
             active_timeout,
@@ -271,6 +276,7 @@ where
             early_export,
             output_channel.clone(),
             expiration_check_interval,
+            shard_flow_limit(max_flows, shard_index as usize, num_threads as usize),
         );
 
         // Spawn a task per shard

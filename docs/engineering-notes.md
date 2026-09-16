@@ -1037,3 +1037,21 @@ This file keeps short-lived design choices and execution notes that would make
     this host than the pure reverse-UDP cases
   - the `900 s` soak stayed stable and drop-free, but still showed material
     headroom loss versus control
+
+## 2026-09-15: Active-flow memory bound
+
+- Reproduced unbounded active-flow growth with Scapy-generated Ethernet/IPv4/UDP
+  captures containing 50k, 100k, and 300k unique bidirectional 5-tuples.
+- With one processing shard and the full `rustiflow` feature set, observed peak
+  RSS was approximately 238 MB, 460 MB, and 1.55 GB respectively. The
+  high-cardinality slope was approximately 5.5 KiB per active flow on this
+  debug build.
+- In an 800 MB cgroup with swap disabled, the unmodified 300k-flow replay was
+  OOM-killed at the 800 MB limit after 1.69 seconds. The bounded build completed
+  the same replay in 2.87 seconds with a 441 MB cgroup peak, retaining 100k
+  flows and rejecting the remaining 200k new-flow packets.
+- Added a default total `max_flows = 100000` budget, divided exactly across
+  processing shards. At capacity, existing flows continue to update and unseen
+  flows are rejected until expiration frees space.
+- Rejection warnings use power-of-two sampling and a shutdown summary so an
+  attack cannot turn the warning path into another high-rate workload.

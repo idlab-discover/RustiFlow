@@ -88,6 +88,7 @@ async fn main() {
                     early_export: cli.early_export,
                     threads: cli.threads,
                     expiration_check_interval: cli.expiration_check_interval,
+                    max_flows: cli.max_flows,
                 },
                 output: OutputConfig {
                     output: cli.output.unwrap(),
@@ -105,6 +106,11 @@ async fn main() {
 }
 
 async fn run_with_config(config: Config) {
+    if config.config.max_flows == 0 {
+        error!("max_flows must be greater than zero");
+        return;
+    }
+
     // Start the selected command
     match config.command {
         Commands::Realtime {
@@ -161,6 +167,7 @@ async fn run_with_config(config: Config) {
                         config.config.idle_timeout,
                         config.config.early_export,
                         config.config.expiration_check_interval,
+                        config.config.max_flows,
                         ingress_only,
                         packet_graph_mode,
                     )
@@ -257,6 +264,7 @@ async fn run_with_config(config: Config) {
                         config.config.idle_timeout,
                         config.config.early_export,
                         config.config.expiration_check_interval,
+                        config.config.max_flows,
                     )
                     .await
                     {

@@ -102,6 +102,7 @@ mod tests {
             120,
             None,
             60,
+            usize::MAX,
         )
         .await
         .expect("fixture pcap should parse successfully");

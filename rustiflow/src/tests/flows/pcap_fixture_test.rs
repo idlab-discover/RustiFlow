@@ -25,7 +25,7 @@ mod tests {
     async fn extract_fixture(name: &str) -> Vec<RustiFlow> {
         let (tx, mut rx) = mpsc::channel::<RustiFlow>(64);
 
-        read_pcap_file::<RustiFlow>(&fixture_path(name), tx, 1, 3600, 120, None, 60)
+        read_pcap_file::<RustiFlow>(&fixture_path(name), tx, 1, 3600, 120, None, 60, usize::MAX)
             .await
             .expect("fixture pcap should parse successfully");
 

@@ -3,9 +3,11 @@ use serde::{Deserialize, Serialize};
 use std::fmt;
 use strum_macros::{EnumString, VariantNames};
 
+pub const DEFAULT_MAX_FLOWS: usize = 100_000;
+
 #[derive(Debug, Parser)]
 #[clap(author, version, about)]
-#[clap(group(ArgGroup::new("config_group").args(&["config_file"])), group(ArgGroup::new("cli_group").args(&["features", "output", "active_timeout", "idle_timeout", "export_path"]).multiple(true)))]
+#[clap(group(ArgGroup::new("config_group").args(&["config_file"])), group(ArgGroup::new("cli_group").args(&["features", "output", "active_timeout", "idle_timeout", "max_flows", "export_path"]).multiple(true)))]
 pub struct Cli {
     /// Configuration file path
     #[clap(long, short = 'c', group = "config_group")]
@@ -31,6 +33,10 @@ pub struct Cli {
     /// This represents how often the flowtable should be scanned to remove inactive flows.
     #[clap(long, default_value_t = 60, group = "cli_group")]
     pub expiration_check_interval: u64,
+
+    /// Maximum number of active flows kept in memory across all processing threads
+    #[clap(long, default_value_t = DEFAULT_MAX_FLOWS, value_parser = parse_positive_usize, group = "cli_group")]
+    pub max_flows: usize,
 
     /// The numbers of threads to use for processing packets (optional)
     /// (default: realtime uses 12, capped at the number of logical CPUs; pcap uses 5; maximum: number of logical CPUs)
@@ -119,6 +125,11 @@ pub struct ExportConfig {
     #[clap(long, default_value_t = 60, group = "cli_group")]
     pub expiration_check_interval: u64,
 
+    /// Maximum number of active flows kept in memory across all processing threads
+    #[clap(long, default_value_t = DEFAULT_MAX_FLOWS, value_parser = parse_positive_usize)]
+    #[serde(default = "default_max_flows")]
+    pub max_flows: usize,
+
     /// The numbers of threads to use for processing packets (optional)
     /// (default: realtime uses 12, capped at the number of logical CPUs; pcap uses 5; maximum: number of logical CPUs)
     #[clap(short, long)]
@@ -195,6 +206,7 @@ impl Default for ConfigFile {
                 active_timeout: 3600,
                 idle_timeout: 120,
                 expiration_check_interval: 60,
+                max_flows: DEFAULT_MAX_FLOWS,
                 early_export: None,
                 threads: None,
             },
@@ -206,5 +218,17 @@ impl Default for ConfigFile {
                 packet_graph: false,
             },
         }
+    }
+}
+
+fn default_max_flows() -> usize {
+    DEFAULT_MAX_FLOWS
+}
+
+fn parse_positive_usize(value: &str) -> Result<usize, String> {
+    match value.parse() {
+        Ok(0) => Err("must be greater than zero".to_string()),
+        Ok(value) => Ok(value),
+        Err(error) => Err(error.to_string()),
     }
 }

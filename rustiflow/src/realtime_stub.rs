@@ -11,6 +11,7 @@ pub async fn handle_realtime<T>(
     _idle_timeout: u64,
     _early_export: Option<u64>,
     _expiration_check_interval: u64,
+    _max_flows: usize,
     _ingress_only: bool,
     _packet_graph_mode: PacketGraphMode,
 ) -> Result<u64, anyhow::Error>

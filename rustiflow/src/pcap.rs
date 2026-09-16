@@ -1,7 +1,10 @@
 use std::hash::{DefaultHasher, Hash, Hasher};
 
 use crate::Flow;
-use crate::{flow_table::FlowTable, packet_features::PacketFeatures};
+use crate::{
+    flow_table::{shard_flow_limit, FlowTable},
+    packet_features::PacketFeatures,
+};
 use chrono::DateTime;
 use log::{debug, error};
 use pnet::packet::{
@@ -19,6 +22,7 @@ const SLL_IPV6: u16 = 0x86DD;
 // Define constant for 802.1Q VLAN EtherType
 const ETHERTYPE_VLAN: u16 = 0x8100;
 
+#[allow(clippy::too_many_arguments)]
 pub async fn read_pcap_file<T>(
     path: &str,
     output_channel: Sender<T>,
@@ -27,6 +31,7 @@ pub async fn read_pcap_file<T>(
     idle_timeout: u64,
     early_export: Option<u64>,
     expiration_check_interval: u64,
+    max_flows: usize,
 ) -> Result<(), anyhow::Error>
 where
     T: Flow,
@@ -51,6 +56,7 @@ where
         idle_timeout,
         early_export,
         expiration_check_interval,
+        max_flows,
     );
 
     debug!("Reading the pcap file: {:?} ...", path);
@@ -249,6 +255,7 @@ fn compute_shard_index<H: Hash>(flow_key: &H, num_shards: u8) -> usize {
 }
 
 /// Creates shard channels to FlowTables and spawns processing tasks for each shard.
+#[allow(clippy::too_many_arguments)]
 fn create_shard_senders<T>(
     num_shards: u8,
     buffer_num_packets: usize,
@@ -257,13 +264,14 @@ fn create_shard_senders<T>(
     idle_timeout: u64,
     early_export: Option<u64>,
     expiration_check_interval: u64,
+    max_flows: usize,
 ) -> Vec<mpsc::Sender<PacketFeatures>>
 where
     T: Flow,
 {
     debug!("Creating {} sharded FlowTables...", num_shards);
     let mut shard_senders = Vec::with_capacity(num_shards as usize);
-    for _ in 0..num_shards {
+    for shard_index in 0..num_shards {
         let (tx, mut rx) = mpsc::channel::<PacketFeatures>(buffer_num_packets);
         let mut flow_table = FlowTable::new(
             active_timeout,
@@ -271,6 +279,7 @@ where
             early_export,
             output_channel.clone(),
             expiration_check_interval,
+            shard_flow_limit(max_flows, shard_index as usize, num_shards as usize),
         );
 
         tokio::spawn(async move {
