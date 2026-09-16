@@ -13,20 +13,23 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v7
 
     - name: Set up Rust
-      uses: actions-rs/toolchain@v1
+      uses: dtolnay/rust-toolchain@nightly
       with:
-        toolchain: nightly
-        profile: minimal
-        components: rust-src, llvm-tools-preview, clippy
-        override: true
-    - name: Install libpcap-dev
-      run: sudo apt install libpcap-dev
+        components: rust-src, clippy
+    - name: Install system dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y libpcap-dev zstd
       
     - name: Install bpf-linker
-      run: cargo install bpf-linker
+      # Use the upstream binary; source builds require a matching system LLVM.
+      run: |
+        curl -fL --retry 3 https://github.com/aya-rs/bpf-linker/releases/download/v0.11.1/bpf-linker-x86_64-unknown-linux-musl.tar.zst -o "$RUNNER_TEMP/bpf-linker.tar.zst"
+        tar --zstd -xf "$RUNNER_TEMP/bpf-linker.tar.zst" -C "$HOME/.cargo/bin"
+        bpf-linker --version
 
     - name: Build eBPF program ipv4
       run: cargo xtask ebpf-ipv4
@@ -59,7 +62,7 @@ jobs:
       run: mv index.html.backup target/doc/index.html
 
     - name: Push docs to gh-pages
-      uses: peaceiris/actions-gh-pages@v3
+      uses: peaceiris/actions-gh-pages@v4
       with:
         github_token: ${{ secrets.GITHUB_TOKEN }}
         publish_dir: ./target/doc

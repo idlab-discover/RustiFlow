@@ -4,12 +4,17 @@ FROM rust:1-bookworm AS builder
 # Install build dependencies
 RUN apt-get update && apt-get install -y \
     ca-certificates \
+    curl \
+    zstd \
     libpcap-dev \
     pkg-config \
     iproute2 \
     && rustup toolchain install stable \
     && rustup toolchain install nightly --component rust-src \
-    && cargo install bpf-linker \
+    && curl -fL --retry 3 "https://github.com/aya-rs/bpf-linker/releases/download/v0.11.1/bpf-linker-$(uname -m)-unknown-linux-musl.tar.zst" -o /tmp/bpf-linker.tar.zst \
+    && tar --zstd -xf /tmp/bpf-linker.tar.zst -C "$CARGO_HOME/bin" \
+    && rm /tmp/bpf-linker.tar.zst \
+    && bpf-linker --version \
     && rm -rf /var/lib/apt/lists/*
 
 # Set environment variables

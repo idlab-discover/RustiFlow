@@ -191,15 +191,22 @@ Notes:
 
 ### bpf Linker Installation:
 
+Use the upstream prebuilt binary. Building current `bpf-linker` releases with
+`cargo install` requires a matching system LLVM installation; Rust's
+`llvm-tools-preview` component alone is not sufficient.
+
 - **For Linux x86_64**:
   ```bash
-  cargo install bpf-linker
+  sudo apt install zstd # Debian/Ubuntu; use your distribution's package manager elsewhere
+  curl -fL --retry 3 https://github.com/aya-rs/bpf-linker/releases/download/v0.11.1/bpf-linker-x86_64-unknown-linux-musl.tar.zst -o /tmp/bpf-linker.tar.zst
+  mkdir -p "$HOME/.cargo/bin"
+  tar --zstd -xf /tmp/bpf-linker.tar.zst -C "$HOME/.cargo/bin"
+  rm /tmp/bpf-linker.tar.zst
+  bpf-linker --version
   ```
-- **For MacOS/Linux (Other Architectures)**:
-  ```bash
-  brew install llvm
-  cargo install --no-default-features bpf-linker
-  ```
+- **For macOS/Linux (Other Architectures)**: choose the matching archive from
+  the [upstream releases](https://github.com/aya-rs/bpf-linker/releases/tag/v0.11.1),
+  or follow the [upstream installation guide](https://github.com/aya-rs/bpf-linker#installation).
 - **Ubuntu 20.04 LTS Specific**:
   ```bash
   sudo apt install linux-tools-5.8.0-63-generic
