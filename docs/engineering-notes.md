@@ -3,6 +3,49 @@
 This file keeps short-lived design choices and execution notes that would make
 `AGENTS.md` too long.
 
+## 2026-10-15: bulk timing and AuthStorm regeneration
+
+- Bulk state now retains integer microseconds. The idle threshold is exactly
+  1,000,000 microseconds, with a new bulk only when the gap is greater.
+- Exported duration statistics remain milliseconds, now fractional. Rates use
+  packet bytes per second through `safe_per_second_rate`. Identical timestamps
+  yield the existing zero-denominator fallback of zero; a positive bulk count
+  and zero duration identify an undefined rate rather than no bulk.
+- Packet-byte accounting, the four-packet minimum and direction-switch rules
+  are unchanged. RustiFlow and CIC share the correction in ordinary and
+  contamination-free exports.
+- Regression tests fail against the original source and pass after the fix.
+  Coverage includes both directions, sub-millisecond and identical timestamps,
+  accumulated bulks, exact idle boundaries, direction switches, close, CSV
+  serialization and IPv4/IPv6 offline versus eBPF-event feature conversion.
+- Timing audit found no further instance of this rate-unit defect. IAT,
+  active/idle and directional timing already subtract integer microseconds
+  before exporting fractional milliseconds. Other per-second rates consume
+  microsecond durations. NF/CIDDS whole-millisecond fields remain their
+  existing schema choices; this change does not redefine them.
+- AuthStorm regeneration scripts stage a new directory, hash accepted inputs,
+  preserve legacy annotations in sidecars, compare flow multisets, and build
+  the existing fixed train/test split. The final run preserves the original
+  five-thread default. A one-thread exploratory run changed shard-expiration
+  statistics and was excluded from the final revision.
+- Final staged CSV comparison: 1,172 scenarios, 1,019,250 flows, 18,906,131
+  extracted packets; no non-bulk feature or bulk-membership changes and no
+  nonfinite rates or zero-duration bulks. The crosswalk assigns 1,019,204 unique matches; 46 rows in
+  23 duplicate-identity groups remain explicitly ambiguous. All duplicate rows
+  are identical across their native fields, so row-order assignment would invent
+  correspondence.
+- The final Parquet release is in the AuthStorm dataset at
+  `feature-revisions/bulk-us-20261015-default/release/`. Packaging verification
+  passes for train 858,081 and test 161,169 rows; nine family replay comparisons
+  pass. All 69,520 legacy annotation rows are linked into metadata. The 463
+  parser-excluded frames match documented intentional-corruption exceptions.
+  Original dataset artifacts remain intact.
+- Validation on Linux: `cargo fmt --all -- --check`,
+  `cargo check -p rustiflow --locked`, `cargo test -p rustiflow --locked`
+  with 66 tests, and `cargo clippy -p rustiflow --all-targets --locked -- -D warnings`.
+  No live eBPF attachment test was performed; event conversion is covered
+  deterministically and no capture/attach code changed.
+
 ## 2026-03-25
 
 - Use branch `codex/ingestion-semantics-foundation` for the AGENTS-driven

@@ -55,6 +55,59 @@ mod tests {
     }
 
     #[test]
+    fn bulk_rates_match_in_both_exporters_and_serialization_paths() {
+        use crate::flows::{cic_flow::CicFlow, util::FlowExpireCause};
+
+        fn check<F: Flow>(rate_names: [&str; 2]) {
+            let mut flow = F::new(
+                "bulk".to_string(),
+                IpAddr::V4(Ipv4Addr::LOCALHOST),
+                1234,
+                IpAddr::V4(Ipv4Addr::LOCALHOST),
+                80,
+                17,
+                1_000_000,
+            );
+            for (forward, base) in [(true, 1_000_000), (false, 2_000_000)] {
+                for delta in [0, 1, 2, 5] {
+                    let packet = PacketFeatures {
+                        timestamp_us: base + delta,
+                        protocol: 17,
+                        length: 100,
+                        ..Default::default()
+                    };
+                    flow.update_flow(&packet, forward);
+                }
+            }
+            flow.close_flow(2_000_005, FlowExpireCause::ExporterShutdown);
+            for (headers, dump, clean) in [
+                (F::get_features(), flow.dump(), false),
+                (
+                    F::get_features_without_contamination(),
+                    flow.dump_without_contamination(),
+                    true,
+                ),
+            ] {
+                let mut appended = String::new();
+                if clean {
+                    flow.append_to_csv_row_without_contamination(&mut appended);
+                } else {
+                    flow.append_to_csv_row(&mut appended);
+                }
+                assert_eq!(appended, dump);
+                let values: std::collections::HashMap<_, _> =
+                    headers.split(',').zip(dump.split(',')).collect();
+                for name in rate_names {
+                    let rate = values[name].parse::<f64>().unwrap();
+                    assert!((rate - 80_000_000.0).abs() < 1e-6);
+                }
+            }
+        }
+        check::<RustiFlow>(["fwd_bulk_rate_s", "bwd_bulk_rate_s"]);
+        check::<CicFlow>(["Fwd Bulk Rate Avg", "Bwd Bulk Rate Avg"]);
+    }
+
+    #[test]
     fn dump_matches_feature_headers() {
         let flow = setup_rusti_flow();
 

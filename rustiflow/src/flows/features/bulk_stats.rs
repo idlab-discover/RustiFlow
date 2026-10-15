@@ -1,13 +1,13 @@
 use crate::{flows::util::FlowExpireCause, packet_features::PacketFeatures};
 
-use super::util::{push_csv_display, FeatureStats, FlowFeature};
+use super::util::{push_csv_display, safe_per_second_rate, FeatureStats, FlowFeature};
 
 const MIN_BULK_PACKETS: u32 = 4;
-const BULK_IDLE_MS: i64 = 1000;
+const BULK_IDLE_US: i64 = 1_000_000;
 
 #[derive(Clone)]
 pub struct BulkState {
-    // Tracks "bulk in progress" state
+    // Timestamps retain integer microseconds from PacketFeatures.
     pub start_time: i64,
     pub last_time: i64,
     pub packet_count: u32,
@@ -35,12 +35,14 @@ impl BulkState {
 pub struct BulkStats {
     pub fwd_bulk_payload_size: FeatureStats,
     pub fwd_bulk_packets: FeatureStats,
+    /// Exported duration statistics are fractional milliseconds.
     pub fwd_bulk_duration: FeatureStats,
     // Tracks "bulk in progress" state
     fwd_bulk_state: Option<BulkState>,
 
     pub bwd_bulk_payload_size: FeatureStats,
     pub bwd_bulk_packets: FeatureStats,
+    /// Exported duration statistics are fractional milliseconds.
     pub bwd_bulk_duration: FeatureStats,
     // Tracks "bulk in progress" state
     bwd_bulk_state: Option<BulkState>,
@@ -61,36 +63,38 @@ impl BulkStats {
         }
     }
 
-    /// Get the rate of bulk bytes in the forward direction per second.
+    /// Get the rate of bulk packet bytes in the forward direction per second.
+    /// Zero total duration returns zero as an undefined-rate fallback. A positive
+    /// bulk count with zero duration distinguishes this case from no bulk.
     pub fn fwd_bulk_rate(&self) -> f64 {
-        if self.fwd_bulk_duration.get_count() == 0 {
-            return 0.0;
-        }
-        self.fwd_bulk_payload_size.get_total() / (self.fwd_bulk_duration.get_total() / 1_000_000.0)
+        safe_per_second_rate(
+            self.fwd_bulk_payload_size.get_total(),
+            self.fwd_bulk_duration.get_total() * 1_000.0,
+        )
     }
 
     /// Get the rate of bulk bytes in the backward direction per second.
     pub fn bwd_bulk_rate(&self) -> f64 {
-        if self.bwd_bulk_duration.get_count() == 0 {
-            return 0.0;
-        }
-        self.bwd_bulk_payload_size.get_total() / (self.bwd_bulk_duration.get_total() / 1_000_000.0)
+        safe_per_second_rate(
+            self.bwd_bulk_payload_size.get_total(),
+            self.bwd_bulk_duration.get_total() * 1_000.0,
+        )
     }
 
     /// Finalize a BulkState (if it meets the minimum packet threshold),
     /// adding its stats to the appropriate FeatureStats.
     fn finalize_bulk(&mut self, bulk: BulkState, is_fwd: bool) {
         if bulk.packet_count >= MIN_BULK_PACKETS {
-            let duration_ms = bulk.last_time - bulk.start_time;
+            let duration_ms = (bulk.last_time - bulk.start_time) as f64 / 1_000.0;
 
             if is_fwd {
                 self.fwd_bulk_packets.add_value(bulk.packet_count as f64);
                 self.fwd_bulk_payload_size.add_value(bulk.size as f64);
-                self.fwd_bulk_duration.add_value(duration_ms as f64);
+                self.fwd_bulk_duration.add_value(duration_ms);
             } else {
                 self.bwd_bulk_packets.add_value(bulk.packet_count as f64);
                 self.bwd_bulk_payload_size.add_value(bulk.size as f64);
-                self.bwd_bulk_duration.add_value(duration_ms as f64);
+                self.bwd_bulk_duration.add_value(duration_ms);
             }
         }
     }
@@ -113,7 +117,7 @@ impl FlowFeature for BulkStats {
     /// Update the bulk logic for a given packet and direction.
     /// Logic adopted from CICFlowMeter's bulk feature, but adjusted for capturing stats on bulk finish.
     fn update(&mut self, packet: &PacketFeatures, is_forward: bool, _last_timestamp: i64) {
-        let current_ts = packet.timestamp_us / 1000;
+        let current_ts = packet.timestamp_us;
         // 1. Skip zero-length packets
         let packet_len = packet.length;
         if packet_len == 0 {
@@ -133,9 +137,9 @@ impl FlowFeature for BulkStats {
         match bulk_opt.as_mut() {
             // 2. If there's an existing bulk in progress:
             Some(current_bulk) => {
-                let gap_ms = current_ts - current_bulk.last_time;
+                let gap_us = current_ts - current_bulk.last_time;
 
-                if gap_ms > BULK_IDLE_MS {
+                if gap_us > BULK_IDLE_US {
                     // The old bulk has ended -> remove it
                     old_bulk = bulk_opt.take();
                     // Start a fresh bulk with the current packet

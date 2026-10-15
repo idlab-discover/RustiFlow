@@ -26,6 +26,14 @@ This tool is engineered for robust and efficient feature extraction, particularl
 
 See the [wiki](https://github.com/idlab-discover/RustiFlow/wiki) for the different feature sets available.
 
+Bulk durations are exported in milliseconds, including fractional milliseconds.
+Bulk rates are packet bytes per second, measured using integer microsecond timestamps.
+A bulk needs at least four nonzero-length packets; an idle gap greater than exactly
+one second ends it. Packet-byte accounting and direction-switch rules are unchanged.
+A bulk with identical timestamps has an undefined rate exported as zero, following
+the shared rate convention. Positive bulk count with zero total duration identifies
+that fallback; it must not be interpreted as measured zero throughput.
+
 ## Supported Packet/Header Coverage
 
 RustiFlow currently extracts flows from the following protocol/header combinations:

@@ -6,6 +6,7 @@ mod tests {
         flows::{
             features::{
                 active_idle_stats::ActiveIdleStats,
+                bulk_stats::BulkStats,
                 iat_stats::IATStats,
                 icmp_stats::IcmpStats,
                 packet_stats::PacketLengthStats,
@@ -27,6 +28,79 @@ mod tests {
             timestamp_us,
             ..Default::default()
         }
+    }
+
+    #[test]
+    fn bulk_rates_preserve_microseconds_and_use_seconds() {
+        for forward in [true, false] {
+            for (times, duration_ms, rate) in [
+                ([0, 100_000, 200_000, 500_000], 500.0, 800.0),
+                ([1_001, 1_002, 1_003, 1_006], 0.005, 80_000_000.0),
+                ([1_001; 4], 0.0, 0.0),
+            ] {
+                let mut bulk = BulkStats::new();
+                for timestamp in times {
+                    let mut packet = packet(timestamp);
+                    packet.length = 100;
+                    bulk.update(&packet, forward, timestamp);
+                }
+                bulk.close(times[3], FlowExpireCause::ExporterShutdown);
+                let (duration, actual_rate) = if forward {
+                    (&bulk.fwd_bulk_duration, bulk.fwd_bulk_rate())
+                } else {
+                    (&bulk.bwd_bulk_duration, bulk.bwd_bulk_rate())
+                };
+                assert_eq!(
+                    (duration.get_count(), duration.get_total()),
+                    (1, duration_ms)
+                );
+                assert!(
+                    (actual_rate - rate).abs() <= rate * 1e-12,
+                    "{actual_rate} != {rate}"
+                );
+                let mut csv = String::new();
+                bulk.append_to_csv(&mut csv);
+                assert_eq!(csv.trim_start_matches(','), bulk.dump());
+                assert!(bulk
+                    .dump()
+                    .split(',')
+                    .all(|value| value.parse::<f64>().unwrap().is_finite()));
+            }
+        }
+    }
+
+    #[test]
+    fn bulk_idle_boundary_and_accumulation() {
+        for forward in [true, false] {
+            for gap in [999_999, 1_000_000, 1_000_001] {
+                let mut bulk = BulkStats::new();
+                for timestamp in [1, 2, 3, 4, 4 + gap, 5 + gap, 6 + gap, 7 + gap] {
+                    let mut packet = packet(timestamp);
+                    packet.length = 100;
+                    bulk.update(&packet, forward, timestamp);
+                }
+                // A direction switch finalizes the previous direction.
+                let mut other = packet(8 + gap);
+                other.length = 100;
+                bulk.update(&other, !forward, other.timestamp_us);
+                bulk.close(other.timestamp_us, FlowExpireCause::ExporterShutdown);
+                let (duration, rate) = if forward {
+                    (&bulk.fwd_bulk_duration, bulk.fwd_bulk_rate())
+                } else {
+                    (&bulk.bwd_bulk_duration, bulk.bwd_bulk_rate())
+                };
+                let expected = if gap > 1_000_000 {
+                    (2, 0.006)
+                } else {
+                    (1, (gap + 6) as f64 / 1000.0)
+                };
+                assert_eq!((duration.get_count(), duration.get_total()), expected);
+                assert!((rate - 800_000.0 / expected.1).abs() < 1e-6);
+            }
+        }
+        let mut empty = BulkStats::new();
+        empty.close(0, FlowExpireCause::ExporterShutdown);
+        assert_eq!((empty.fwd_bulk_rate(), empty.bwd_bulk_rate()), (0.0, 0.0));
     }
 
     fn population_std(values: &[f64]) -> f64 {

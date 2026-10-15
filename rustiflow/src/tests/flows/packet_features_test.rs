@@ -266,6 +266,26 @@ mod tests {
         let realtime_packet = PacketFeatures::from_ebpf_event_ipv4(&event, realtime_offset_us);
 
         assert_packet_features_match(&parsed_packet, &realtime_packet, 1_234_567);
+        use crate::flows::{
+            features::{bulk_stats::BulkStats, util::FlowFeature},
+            util::FlowExpireCause,
+        };
+        for forward in [true, false] {
+            let mut offline = BulkStats::new();
+            let mut realtime = BulkStats::new();
+            let mut event = event;
+            for delta in [0, 1, 2, 5] {
+                let timestamp_us = 1_234_567 + delta;
+                let parsed = PacketFeatures::from_ipv4_packet(&packet, timestamp_us).unwrap();
+                event.timestamp_ns = (timestamp_us - realtime_offset_us) as u64 * 1_000;
+                let live = PacketFeatures::from_ebpf_event_ipv4(&event, realtime_offset_us);
+                offline.update(&parsed, forward, timestamp_us);
+                realtime.update(&live, forward, timestamp_us);
+            }
+            offline.close(1_234_572, FlowExpireCause::ExporterShutdown);
+            realtime.close(1_234_572, FlowExpireCause::ExporterShutdown);
+            assert_eq!(offline.dump(), realtime.dump());
+        }
     }
 
     #[cfg(target_os = "linux")]
@@ -303,5 +323,25 @@ mod tests {
         let realtime_packet = PacketFeatures::from_ebpf_event_ipv6(&event, realtime_offset_us);
 
         assert_packet_features_match(&parsed_packet, &realtime_packet, 2_345_678);
+        use crate::flows::{
+            features::{bulk_stats::BulkStats, util::FlowFeature},
+            util::FlowExpireCause,
+        };
+        for forward in [true, false] {
+            let mut offline = BulkStats::new();
+            let mut realtime = BulkStats::new();
+            let mut event = event;
+            for delta in [0, 1, 2, 5] {
+                let timestamp_us = 2_345_678 + delta;
+                let parsed = PacketFeatures::from_ipv6_packet(&packet, timestamp_us).unwrap();
+                event.timestamp_ns = (timestamp_us - realtime_offset_us) as u64 * 1_000;
+                let live = PacketFeatures::from_ebpf_event_ipv6(&event, realtime_offset_us);
+                offline.update(&parsed, forward, timestamp_us);
+                realtime.update(&live, forward, timestamp_us);
+            }
+            offline.close(2_345_683, FlowExpireCause::ExporterShutdown);
+            realtime.close(2_345_683, FlowExpireCause::ExporterShutdown);
+            assert_eq!(offline.dump(), realtime.dump());
+        }
     }
 }
