@@ -35,7 +35,6 @@ where
 {
     let shard_count =
         NonZeroUsize::new(usize::from(num_threads)).context("thread count must be at least 1")?;
-    let shard_selector = ShardSelector::new(shard_count);
 
     debug!("Opening the pcap file: {:?} ...", path);
 
@@ -47,16 +46,17 @@ where
         }
     };
 
-    // Create sharded FlowTables each in their own task and returns channels to send packets to the shards
-    let buffer_num_packets = 10_000;
-    let shard_senders = create_shard_senders::<T>(
-        num_threads,
-        buffer_num_packets,
-        exporter,
-        active_timeout,
-        idle_timeout,
-        early_export,
-        expiration_check_interval,
+    // Create sharded FlowTables each in their own task and route packets to them in batches
+    let mut dispatcher = ShardDispatcher::new(
+        shard_count,
+        create_shard_senders::<T>(
+            num_threads,
+            exporter,
+            active_timeout,
+            idle_timeout,
+            early_export,
+            expiration_check_interval,
+        ),
     );
 
     debug!("Reading the pcap file: {:?} ...", path);
@@ -76,8 +76,7 @@ where
                         process_packet::<T, Ipv4Packet>(
                             &packet,
                             timestamp_us,
-                            &shard_senders,
-                            &shard_selector,
+                            &mut dispatcher,
                             PacketFeatures::from_ipv4_packet,
                         )
                         .await;
@@ -88,8 +87,7 @@ where
                         process_packet::<T, Ipv6Packet>(
                             &packet,
                             timestamp_us,
-                            &shard_senders,
-                            &shard_selector,
+                            &mut dispatcher,
                             PacketFeatures::from_ipv6_packet,
                         )
                         .await;
@@ -108,8 +106,7 @@ where
                                     process_packet::<T, Ipv4Packet>(
                                         &packet,
                                         timestamp_us,
-                                        &shard_senders,
-                                        &shard_selector,
+                                        &mut dispatcher,
                                         PacketFeatures::from_ipv4_packet,
                                     )
                                     .await;
@@ -120,8 +117,7 @@ where
                                     process_packet::<T, Ipv6Packet>(
                                         &packet,
                                         timestamp_us,
-                                        &shard_senders,
-                                        &shard_selector,
+                                        &mut dispatcher,
                                         PacketFeatures::from_ipv6_packet,
                                     )
                                     .await;
@@ -150,8 +146,7 @@ where
                                 process_packet::<T, Ipv4Packet>(
                                     &packet,
                                     timestamp_us,
-                                    &shard_senders,
-                                    &shard_selector,
+                                    &mut dispatcher,
                                     PacketFeatures::from_ipv4_packet,
                                 )
                                 .await;
@@ -162,8 +157,7 @@ where
                                 process_packet::<T, Ipv6Packet>(
                                     &packet,
                                     timestamp_us,
-                                    &shard_senders,
-                                    &shard_selector,
+                                    &mut dispatcher,
                                     PacketFeatures::from_ipv6_packet,
                                 )
                                 .await;
@@ -182,8 +176,7 @@ where
                                             process_packet::<T, Ipv4Packet>(
                                                 &packet,
                                                 timestamp_us,
-                                                &shard_senders,
-                                                &shard_selector,
+                                                &mut dispatcher,
                                                 PacketFeatures::from_ipv4_packet,
                                             )
                                             .await;
@@ -194,8 +187,7 @@ where
                                             process_packet::<T, Ipv6Packet>(
                                                 &packet,
                                                 timestamp_us,
-                                                &shard_senders,
-                                                &shard_selector,
+                                                &mut dispatcher,
                                                 PacketFeatures::from_ipv6_packet,
                                             )
                                             .await;
@@ -218,51 +210,100 @@ where
             error!("Error parsing packet...");
         }
     }
+    dispatcher.flush().await;
     debug!("Finished reading the pcap file: {:?}", path);
     Ok(())
 }
 
-/// Processes and sends packet features to the appropriate shard.
-async fn process_packet<T, P>(
-    packet: &P,
-    timestamp_us: i64,
-    shard_senders: &[mpsc::Sender<PacketFeatures>],
-    shard_selector: &ShardSelector,
-    extractor: fn(&P, i64) -> Option<PacketFeatures>,
-) where
-    T: Flow,
-    P: Packet,
-{
-    if let Some(packet_features) = extractor(packet, timestamp_us) {
-        let flow_key = packet_features.biflow_key_value();
-        let shard_index = shard_selector.shard_index(&flow_key);
+/// Packets routed to a shard per channel send.
+const SHARD_BATCH_SIZE: usize = 128;
+/// Batches that may wait for a shard (about 10k packets).
+const SHARD_QUEUE_CAPACITY: usize = 10_000 / SHARD_BATCH_SIZE;
 
-        if let Err(e) = shard_senders[shard_index].send(packet_features).await {
+/// Routes packets to shard tasks in per-shard batches, preserving each shard's
+/// packet order while amortizing channel sends and wakeups.
+struct ShardDispatcher {
+    selector: ShardSelector,
+    senders: Vec<mpsc::Sender<Vec<PacketFeatures>>>,
+    pending: Vec<Vec<PacketFeatures>>,
+}
+
+impl ShardDispatcher {
+    fn new(shard_count: NonZeroUsize, senders: Vec<mpsc::Sender<Vec<PacketFeatures>>>) -> Self {
+        Self {
+            selector: ShardSelector::new(shard_count),
+            pending: senders
+                .iter()
+                .map(|_| Vec::with_capacity(SHARD_BATCH_SIZE))
+                .collect(),
+            senders,
+        }
+    }
+
+    async fn dispatch(&mut self, packet_features: PacketFeatures) {
+        let shard_index = self
+            .selector
+            .shard_index(&packet_features.biflow_key_value());
+        self.pending[shard_index].push(packet_features);
+        if self.pending[shard_index].len() >= SHARD_BATCH_SIZE {
+            self.send_pending(shard_index).await;
+        }
+    }
+
+    /// Sends every partially filled batch.
+    async fn flush(&mut self) {
+        for shard_index in 0..self.pending.len() {
+            if !self.pending[shard_index].is_empty() {
+                self.send_pending(shard_index).await;
+            }
+        }
+    }
+
+    async fn send_pending(&mut self, shard_index: usize) {
+        let batch = std::mem::replace(
+            &mut self.pending[shard_index],
+            Vec::with_capacity(SHARD_BATCH_SIZE),
+        );
+        if let Err(e) = self.senders[shard_index].send(batch).await {
             error!(
-                "Failed to send packet_features to shard {}: {}",
+                "Failed to send packet batch to shard {}: {}",
                 shard_index, e
             );
         }
     }
 }
 
+/// Extracts packet features and routes them to the appropriate shard.
+async fn process_packet<T, P>(
+    packet: &P,
+    timestamp_us: i64,
+    dispatcher: &mut ShardDispatcher,
+    extractor: fn(&P, i64) -> Option<PacketFeatures>,
+) where
+    T: Flow,
+    P: Packet,
+{
+    if let Some(packet_features) = extractor(packet, timestamp_us) {
+        dispatcher.dispatch(packet_features).await;
+    }
+}
+
 /// Creates shard channels to FlowTables and spawns processing tasks for each shard.
 fn create_shard_senders<T>(
     num_shards: u8,
-    buffer_num_packets: usize,
     exporter: impl FlowSink<T>,
     active_timeout: u64,
     idle_timeout: u64,
     early_export: Option<u64>,
     expiration_check_interval: u64,
-) -> Vec<mpsc::Sender<PacketFeatures>>
+) -> Vec<mpsc::Sender<Vec<PacketFeatures>>>
 where
     T: Flow,
 {
     debug!("Creating {} sharded FlowTables...", num_shards);
     let mut shard_senders = Vec::with_capacity(num_shards as usize);
     for _ in 0..num_shards {
-        let (tx, mut rx) = mpsc::channel::<PacketFeatures>(buffer_num_packets);
+        let (tx, mut rx) = mpsc::channel::<Vec<PacketFeatures>>(SHARD_QUEUE_CAPACITY);
         let mut flow_table = FlowTable::new(
             active_timeout,
             idle_timeout,
@@ -273,9 +314,11 @@ where
 
         tokio::spawn(async move {
             let mut last_timestamp = None;
-            while let Some(packet_features) = rx.recv().await {
-                last_timestamp = Some(packet_features.timestamp_us);
-                flow_table.process_packet(&packet_features).await;
+            while let Some(packet_batch) = rx.recv().await {
+                for packet_features in packet_batch {
+                    last_timestamp = Some(packet_features.timestamp_us);
+                    flow_table.process_packet(&packet_features).await;
+                }
             }
             // Handle flow exporting when the receiver is closed
             if let Some(timestamp) = last_timestamp {
