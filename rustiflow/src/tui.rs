@@ -1,20 +1,22 @@
-use crossterm::event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode, KeyEvent};
-use crossterm::execute;
-use crossterm::terminal::{
+use log::error;
+use ratatui::backend::{Backend, CrosstermBackend};
+use ratatui::crossterm::event::{
+    self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode, KeyEvent,
+};
+use ratatui::crossterm::execute;
+use ratatui::crossterm::terminal::{
     disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen,
 };
-use log::error;
+use ratatui::layout::{Alignment, Constraint, Direction, Layout, Rect};
+use ratatui::style::{Color, Modifier, Style};
+use ratatui::text::{Line, Span, Text};
+use ratatui::widgets::{Block, Borders, Clear, List, ListItem, ListState, Paragraph};
+use ratatui::{Frame, Terminal};
 use serde::{Deserialize, Serialize};
 use std::error::Error;
 use std::num::NonZeroU64;
 use std::{fs, io};
 use strum::VariantNames;
-use tui::backend::{Backend, CrosstermBackend};
-use tui::layout::{Alignment, Constraint, Direction, Layout, Rect};
-use tui::style::{Color, Modifier, Style};
-use tui::text::{Span, Spans, Text};
-use tui::widgets::{Block, Borders, Clear, List, ListItem, ListState, Paragraph};
-use tui::{Frame, Terminal};
 
 use crate::args::{Commands, ConfigFile, ExportConfig, ExportMethodType, FlowType, OutputConfig};
 
@@ -178,11 +180,14 @@ enum AppFocus {
 async fn run_app<B: Backend>(
     terminal: &mut Terminal<B>,
     app: &mut App,
-) -> Result<Option<Config>, Box<dyn Error>> {
+) -> Result<Option<Config>, Box<dyn Error>>
+where
+    B::Error: 'static,
+{
     loop {
         terminal.draw(|f| ui_main_screen(f, app))?;
 
-        if crossterm::event::poll(std::time::Duration::from_millis(100))? {
+        if event::poll(std::time::Duration::from_millis(100))? {
             if let Event::Key(key) = event::read()? {
                 match app.focus {
                     AppFocus::TitleBar => {
@@ -672,8 +677,8 @@ fn handle_config_file_save_input(key: KeyEvent, app: &mut App) -> Result<(), Box
     Ok(())
 }
 
-fn ui_main_screen<B: Backend>(f: &mut Frame<B>, app: &App) {
-    let size = f.size();
+fn ui_main_screen(f: &mut Frame, app: &App) {
+    let size = f.area();
 
     let background = Block::default().style(Style::default().bg(Color::Black));
 
@@ -739,7 +744,7 @@ fn ui_main_screen<B: Backend>(f: &mut Frame<B>, app: &App) {
     render_popups(f, app, size);
 }
 
-fn render_title_buttons<B: Backend>(f: &mut Frame<B>, app: &App, area: Rect) {
+fn render_title_buttons(f: &mut Frame, app: &App, area: Rect) {
     let buttons_layout = Layout::default()
         .direction(Direction::Horizontal)
         .constraints(
@@ -805,7 +810,7 @@ fn create_button<'a>(label: &'a str, selected: bool, color: Color) -> Paragraph<
         .alignment(Alignment::Center)
 }
 
-fn render_menu<B: Backend>(f: &mut Frame<B>, app: &App, area: Rect) {
+fn render_menu(f: &mut Frame, app: &App, area: Rect) {
     let menu_items: Vec<ListItem> = app
         .main_menu_items
         .iter()
@@ -841,7 +846,7 @@ fn render_menu<B: Backend>(f: &mut Frame<B>, app: &App, area: Rect) {
     f.render_stateful_widget(menu, area, &mut app.main_menu_state.clone());
 }
 
-fn render_content<B: Backend>(f: &mut Frame<B>, app: &App, area: Rect) {
+fn render_content(f: &mut Frame, app: &App, area: Rect) {
     match app.main_menu_state.selected() {
         Some(0) => {
             let items: Vec<ListItem> = FlowType::VARIANTS
@@ -934,8 +939,8 @@ fn render_content<B: Backend>(f: &mut Frame<B>, app: &App, area: Rect) {
     }
 }
 
-fn render_selectable_list<B: Backend>(
-    f: &mut Frame<B>,
+fn render_selectable_list(
+    f: &mut Frame,
     area: Rect,
     items: Vec<ListItem>,
     title: &str,
@@ -963,13 +968,7 @@ fn render_selectable_list<B: Backend>(
     f.render_stateful_widget(list, area, &mut state.clone());
 }
 
-fn render_input_paragraph<B: Backend>(
-    f: &mut Frame<B>,
-    area: Rect,
-    input: &str,
-    title: &str,
-    focus: bool,
-) {
+fn render_input_paragraph(f: &mut Frame, area: Rect, input: &str, title: &str, focus: bool) {
     let paragraph = Paragraph::new(input)
         .block(
             Block::default()
@@ -986,7 +985,7 @@ fn render_input_paragraph<B: Backend>(
     f.render_widget(paragraph, area);
 }
 
-fn render_boolean_choice<B: Backend>(f: &mut Frame<B>, area: Rect, is_true_selected: bool) {
+fn render_boolean_choice(f: &mut Frame, area: Rect, is_true_selected: bool) {
     let true_button = create_button(" True ", is_true_selected, Color::Green);
     let false_button = create_button(" False ", !is_true_selected, Color::Red);
 
@@ -999,44 +998,44 @@ fn render_boolean_choice<B: Backend>(f: &mut Frame<B>, area: Rect, is_true_selec
     f.render_widget(false_button, buttons_layout[1]);
 }
 
-fn render_current_selections<B: Backend>(f: &mut Frame<B>, app: &App, area: Rect) {
+fn render_current_selections(f: &mut Frame, app: &App, area: Rect) {
     let mut selections = vec![
-        ListItem::new(Spans::from(vec![
+        ListItem::new(Line::from(vec![
             Span::raw("Feature Set: "),
             Span::styled(
                 format!("{:?}", app.config.config.features),
                 Style::default().fg(Color::Yellow),
             ),
         ])),
-        ListItem::new(Spans::from(vec![
+        ListItem::new(Line::from(vec![
             Span::raw("Output Method: "),
             Span::styled(
                 format!("{:?}", app.config.output.output),
                 Style::default().fg(Color::Yellow),
             ),
         ])),
-        ListItem::new(Spans::from(vec![
+        ListItem::new(Line::from(vec![
             Span::raw("Output Path: "),
             Span::styled(
                 format!("{:?}", app.config.output.export_path),
                 Style::default().fg(Color::Yellow),
             ),
         ])),
-        ListItem::new(Spans::from(vec![
+        ListItem::new(Line::from(vec![
             Span::raw("Packet Graph: "),
             Span::styled(
                 format!("{:?}", app.config.output.packet_graph),
                 Style::default().fg(Color::Yellow),
             ),
         ])),
-        ListItem::new(Spans::from(vec![
+        ListItem::new(Line::from(vec![
             Span::raw("Active Timeout: "),
             Span::styled(
                 format!("{}", app.config.config.active_timeout),
                 Style::default().fg(Color::Yellow),
             ),
         ])),
-        ListItem::new(Spans::from(vec![
+        ListItem::new(Line::from(vec![
             Span::raw("Idle Timeout: "),
             Span::styled(
                 format!("{}", app.config.config.idle_timeout),
@@ -1044,8 +1043,8 @@ fn render_current_selections<B: Backend>(f: &mut Frame<B>, app: &App, area: Rect
             ),
         ])),
         ListItem::new(Text::from(vec![
-            Spans::from(vec![Span::raw("Expiration Check")]),
-            Spans::from(vec![
+            Line::from(vec![Span::raw("Expiration Check")]),
+            Line::from(vec![
                 Span::raw("Interval: "),
                 Span::styled(
                     format!("{}", app.config.config.expiration_check_interval),
@@ -1053,21 +1052,21 @@ fn render_current_selections<B: Backend>(f: &mut Frame<B>, app: &App, area: Rect
                 ),
             ]),
         ])),
-        ListItem::new(Spans::from(vec![
+        ListItem::new(Line::from(vec![
             Span::raw("Threads: "),
             Span::styled(
                 format!("{:?}", app.config.config.threads),
                 Style::default().fg(Color::Yellow),
             ),
         ])),
-        ListItem::new(Spans::from(vec![
+        ListItem::new(Line::from(vec![
             Span::raw("Early Export: "),
             Span::styled(
                 format!("{:?}", app.config.config.early_export),
                 Style::default().fg(Color::Yellow),
             ),
         ])),
-        ListItem::new(Spans::from(vec![
+        ListItem::new(Line::from(vec![
             Span::raw("Header: "),
             Span::styled(
                 format!("{}", app.config.output.header),
@@ -1075,8 +1074,8 @@ fn render_current_selections<B: Backend>(f: &mut Frame<B>, app: &App, area: Rect
             ),
         ])),
         ListItem::new(Text::from(vec![
-            Spans::from(vec![Span::raw("Drop Contaminant")]),
-            Spans::from(vec![
+            Line::from(vec![Span::raw("Drop Contaminant")]),
+            Line::from(vec![
                 Span::raw("Features: "),
                 Span::styled(
                     format!("{}", app.config.output.drop_contaminant_features),
@@ -1092,17 +1091,17 @@ fn render_current_selections<B: Backend>(f: &mut Frame<B>, app: &App, area: Rect
             interface,
             ingress_only,
         } => {
-            let mut text = Text::from(Spans::from(vec![
+            let mut text = Text::from(Line::from(vec![
                 Span::raw("Mode: "),
                 Span::styled("Realtime", Style::default().fg(Color::Yellow)),
             ]));
 
-            text.extend(vec![Spans::from(vec![
+            text.extend(vec![Line::from(vec![
                 Span::raw("Interface: "),
                 Span::styled(interface, Style::default().fg(Color::Yellow)),
             ])]);
 
-            text.extend(vec![Spans::from(vec![
+            text.extend(vec![Line::from(vec![
                 Span::raw("Ingress only: "),
                 Span::styled(
                     format!("{}", ingress_only),
@@ -1113,12 +1112,12 @@ fn render_current_selections<B: Backend>(f: &mut Frame<B>, app: &App, area: Rect
             ListItem::new(text)
         }
         Commands::Pcap { path } => {
-            let mut text = Text::from(Spans::from(vec![
+            let mut text = Text::from(Line::from(vec![
                 Span::raw("Mode: "),
                 Span::styled("Pcap", Style::default().fg(Color::Yellow)),
             ]));
 
-            text.extend(vec![Spans::from(vec![
+            text.extend(vec![Line::from(vec![
                 Span::raw("Path: "),
                 Span::styled(path, Style::default().fg(Color::Yellow)),
             ])]);
@@ -1141,7 +1140,7 @@ fn render_current_selections<B: Backend>(f: &mut Frame<B>, app: &App, area: Rect
     f.render_widget(selections_list, area);
 }
 
-fn render_popups<B: Backend>(f: &mut Frame<B>, app: &App, size: Rect) {
+fn render_popups(f: &mut Frame, app: &App, size: Rect) {
     if matches!(app.focus, AppFocus::CommandArgumentInput) {
         let (input_text, title) = match &app.config.command {
             Commands::Realtime { interface, .. } => (interface.as_str(), "Enter Interface"),
@@ -1200,7 +1199,7 @@ fn render_popups<B: Backend>(f: &mut Frame<B>, app: &App, size: Rect) {
     }
 }
 
-fn render_popup_input<B: Backend>(f: &mut Frame<B>, size: Rect, input_text: &str, title: &str) {
+fn render_popup_input(f: &mut Frame, size: Rect, input_text: &str, title: &str) {
     let command_input_block = Block::default()
         .title(title)
         .borders(Borders::ALL)
@@ -1246,8 +1245,8 @@ fn centered_rect(percent_x: u16, percent_y: u16, r: Rect) -> Rect {
         .split(popup_layout[1])[1]
 }
 
-fn render_config_file_input<B: Backend>(f: &mut Frame<B>, app: &App, area: Rect) {
-    let config_file_input = Paragraph::new(app.config_file_input.as_ref())
+fn render_config_file_input(f: &mut Frame, app: &App, area: Rect) {
+    let config_file_input = Paragraph::new(app.config_file_input.as_str())
         .block(
             Block::default()
                 .title("Enter Configuration File Path or press ENTER to start clean")
@@ -1267,8 +1266,8 @@ fn render_config_file_input<B: Backend>(f: &mut Frame<B>, app: &App, area: Rect)
     f.render_widget(config_file_input, area);
 }
 
-fn render_config_file_save<B: Backend>(f: &mut Frame<B>, app: &App, area: Rect) {
-    let config_file_save = Paragraph::new(app.config_file_input.as_ref())
+fn render_config_file_save(f: &mut Frame, app: &App, area: Rect) {
+    let config_file_save = Paragraph::new(app.config_file_input.as_str())
         .block(
             Block::default()
                 .title("Enter Configuration File Path to Save")

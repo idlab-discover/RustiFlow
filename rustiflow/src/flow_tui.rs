@@ -1,18 +1,18 @@
-use crossterm::event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode};
-use crossterm::execute;
-use crossterm::terminal::{
+use ratatui::backend::{Backend, CrosstermBackend};
+use ratatui::crossterm::event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode};
+use ratatui::crossterm::execute;
+use ratatui::crossterm::terminal::{
     disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen,
 };
+use ratatui::layout::{Alignment, Constraint, Direction, Layout};
+use ratatui::style::{Color, Style};
+use ratatui::widgets::{Block, Borders, Paragraph, Sparkline};
+use ratatui::{Frame, Terminal};
 use std::error::Error;
 use std::io;
 use std::time::Duration;
 use tokio::sync::watch::Receiver;
 use tokio::task;
-use tui::backend::{Backend, CrosstermBackend};
-use tui::layout::{Alignment, Constraint, Direction, Layout};
-use tui::style::{Color, Style};
-use tui::widgets::{Block, Borders, Paragraph, Sparkline};
-use tui::{Frame, Terminal};
 
 struct PacketData {
     count: u64,
@@ -73,7 +73,10 @@ async fn run_app<B: Backend>(
     terminal: &mut Terminal<B>,
     app: &mut App,
     mut packet_rx: Receiver<Vec<(u64, u64)>>,
-) -> Result<(), Box<dyn Error>> {
+) -> Result<(), Box<dyn Error>>
+where
+    B::Error: 'static,
+{
     loop {
         terminal.draw(|f| ui_main_screen(f, app))?;
 
@@ -83,7 +86,7 @@ async fn run_app<B: Backend>(
                 app.update_packet_data(&counts);
             }
 
-            poll_result = task::spawn_blocking(|| crossterm::event::poll(Duration::from_millis(100))) => {
+            poll_result = task::spawn_blocking(|| event::poll(Duration::from_millis(100))) => {
                 if poll_result?? {
                     if let Event::Key(key) = event::read()? {
                         if let KeyCode::Char('q') = key.code {
@@ -96,8 +99,8 @@ async fn run_app<B: Backend>(
     }
 }
 
-fn ui_main_screen<B: Backend>(f: &mut Frame<B>, app: &App) {
-    let size = f.size();
+fn ui_main_screen(f: &mut Frame, app: &App) {
+    let size = f.area();
 
     let background = Block::default().style(Style::default().bg(Color::Black));
 
