@@ -4,6 +4,36 @@ This file keeps short-lived design choices and execution notes that would make
 `AGENTS.md` too long. Newest entries come first. Older entries are condensed to
 the decisions and results that still describe the current code.
 
+## 2026-10-20: aya 0.14 and network-types 0.2; realtime byte order
+
+Moved to aya 0.14, aya-log 0.3, aya-ebpf 0.2, aya-log-ebpf 0.2 and
+network-types 0.2, with bpf-linker 0.12.0 in CI and the images. `common` now
+takes aya from crates.io instead of unpinned git, so one aya version is locked.
+aya 0.14 also fixes ring buffer consumer ordering in userspace.
+
+network-types 0.2 stores multi-byte header fields as wire-order byte arrays,
+which exposed a realtime bug present since `c645b70` (2024-03): the eBPF
+programs passed TCP/UDP ports, TCP window and sequence/ack numbers to userspace
+in network byte order, and the userspace decoder used them as host order, so
+realtime ports read byte-swapped on little-endian hosts. IPv6 addresses were
+also reversed (`from_be_bytes` in eBPF, then `to_be` again in userspace). The
+offline/realtime parity tests and the replay build events in userspace with the
+intended convention, so they did not cover the eBPF side. `EbpfEventIpv4/6`
+now document the contract: addresses in wire order in memory, everything else
+host order. `common` tests decode wire bytes through the same `NetworkHeader`
+accessors the eBPF programs use.
+
+Other changes that came with the bump:
+
+- `Ipv4Hdr::ihl()` now returns bytes, not 32-bit words.
+- Protocol, EtherType and IPv6 extension `next_hdr` are read as integers and
+  converted with checked accessors instead of loading enums from packet bytes.
+- aya-log 0.3 no longer spawns a reader; `spawn_ebpf_logger` drives it.
+
+Realtime ports, window, sequence numbers and IPv6 addresses in datasets
+exported before this change are not trustworthy. Not yet validated with a live
+realtime run on the veth harness.
+
 ## 2026-10-20: realtime userspace replay benchmark
 
 `rustiflow ... replay-bench` (README, "Replay benchmark") generates synthetic
