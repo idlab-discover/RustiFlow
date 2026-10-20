@@ -4,7 +4,7 @@
 
 use aya_ebpf::{
     bindings::TC_ACT_PIPE,
-    helpers::gen::bpf_ktime_get_ns,
+    helpers::bpf_ktime_get_ns,
     macros::{classifier, map},
     maps::{PerCpuArray, RingBuf},
     programs::TcContext,
@@ -12,13 +12,14 @@ use aya_ebpf::{
 use aya_log_ebpf::debug;
 
 use common::{
-    EbpfEventIpv6, IcmpHdr, NetworkHeader, TcpHdr, UdpHdr, REALTIME_EVENT_QUEUE_COUNT,
+    EbpfEventIpv6, Icmpv6Hdr, NetworkHeader, TcpHdr, UdpHdr, REALTIME_EVENT_QUEUE_COUNT,
     REALTIME_EVENT_RINGBUF_BYTES,
 };
 use network_types::{
     eth::{EthHdr, EtherType},
     ip::{IpProto, Ipv6Hdr},
 };
+use num_traits::FromPrimitive;
 
 #[panic_handler]
 fn panic(_info: &core::panic::PanicInfo) -> ! {
@@ -69,17 +70,18 @@ pub fn tc_flow_track(ctx: TcContext) -> i32 {
 #[repr(C, packed)]
 #[derive(Debug, Copy, Clone)]
 pub struct Ipv6ExtensionHdr {
-    pub next_hdr: IpProto,
+    pub next_hdr: u8,
     pub hdr_ext_len: u8,
     // The rest is variable-length, but for the first 2 bytes, this is enough
 }
 
 const MAX_EXT_HEADERS: usize = 8; // Arbitrary safe limit
 
-fn is_extension_header(proto: IpProto) -> bool {
+fn is_extension_header(proto: u8) -> bool {
     matches!(
-        proto,
-        IpProto::HopOpt     // 0   Hop-by-Hop
+        IpProto::from_u8(proto),
+        Some(
+            IpProto::HopOpt     // 0   Hop-by-Hop
             | IpProto::Ipv6Route    // 43  Routing
             | IpProto::Ipv6Frag   // 44  Fragment
             | IpProto::Esp       // 50  ESP
@@ -88,10 +90,11 @@ fn is_extension_header(proto: IpProto) -> bool {
             | IpProto::MobilityHeader    // 135 Mobility
             | IpProto::Hip         // 139 HIP
             | IpProto::Shim6 // 140 Shim6
+        )
     )
 }
 
-fn skip_ipv6_ext_headers(ctx: &TcContext, start_offset: usize) -> Result<(IpProto, usize), ()> {
+fn skip_ipv6_ext_headers(ctx: &TcContext, start_offset: usize) -> Result<(u8, usize), ()> {
     // Load the base IPv6 header
     let ipv6hdr = ctx.load::<Ipv6Hdr>(start_offset).map_err(|_| ())?;
 
@@ -119,8 +122,8 @@ fn skip_ipv6_ext_headers(ctx: &TcContext, start_offset: usize) -> Result<(IpProt
 }
 
 fn process_packet(ctx: &TcContext) -> Result<i32, ()> {
-    let ether_type = ctx.load::<EthHdr>(0).map_err(|_| ())?.ether_type;
-    if ether_type != EtherType::Ipv6 {
+    let eth_hdr = ctx.load::<EthHdr>(0).map_err(|_| ())?;
+    if !matches!(eth_hdr.ether_type(), Ok(EtherType::Ipv6)) {
         return Ok(TC_ACT_PIPE);
     }
 
@@ -133,11 +136,15 @@ fn process_packet(ctx: &TcContext) -> Result<i32, ()> {
     let packet_info = PacketInfo::new(&ipv6hdr, final_proto, network_header_length)?;
 
     // 3) Dispatch on the final protocol
-    match final_proto {
-        IpProto::Tcp => process_transport_packet::<TcpHdr>(ctx, &packet_info, offset_after_ext),
-        IpProto::Udp => process_transport_packet::<UdpHdr>(ctx, &packet_info, offset_after_ext),
-        IpProto::Ipv6Icmp => {
-            process_transport_packet::<IcmpHdr>(ctx, &packet_info, offset_after_ext)
+    match IpProto::from_u8(final_proto) {
+        Some(IpProto::Tcp) => {
+            process_transport_packet::<TcpHdr>(ctx, &packet_info, offset_after_ext)
+        }
+        Some(IpProto::Udp) => {
+            process_transport_packet::<UdpHdr>(ctx, &packet_info, offset_after_ext)
+        }
+        Some(IpProto::Ipv6Icmp) => {
+            process_transport_packet::<Icmpv6Hdr>(ctx, &packet_info, offset_after_ext)
         }
         _ => Ok(TC_ACT_PIPE),
     }
@@ -282,15 +289,15 @@ struct PacketInfo {
 impl PacketInfo {
     fn new(
         ipv6hdr: &Ipv6Hdr,
-        protocol: IpProto,
+        protocol: u8,
         network_header_length: usize,
     ) -> Result<Self, ()> {
         Ok(Self {
-            ipv6_source: u128::from_be_bytes(unsafe { ipv6hdr.src_addr.in6_u.u6_addr8 }),
-            ipv6_destination: u128::from_be_bytes(unsafe { ipv6hdr.dst_addr.in6_u.u6_addr8 }),
-            total_length: Ipv6Hdr::LEN as u16 + u16::from_be(ipv6hdr.payload_len),
+            ipv6_source: u128::from_ne_bytes(ipv6hdr.src_addr),
+            ipv6_destination: u128::from_ne_bytes(ipv6hdr.dst_addr),
+            total_length: Ipv6Hdr::LEN as u16 + ipv6hdr.payload_len(),
             network_header_length: network_header_length as u16,
-            protocol: protocol as u8,
+            protocol,
         })
     }
 

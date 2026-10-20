@@ -49,12 +49,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "allocator-api2"
-version = "0.2.21"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "683d7910e743518b0e34f1186f92494becacb047c7b6bf616c96772180fef923"
-
-[[package]]
 name = "android_system_properties"
 version = "0.1.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -139,85 +133,52 @@ checksum = "c08606f8c3cbf4ce6ec8e28fb0014a2c086708fe954eaa885384a6165172e7e8"
 
 [[package]]
 name = "aya"
-version = "0.13.1"
+version = "0.14.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d18bc4e506fbb85ab7392ed993a7db4d1a452c71b75a246af4a80ab8c9d2dd50"
+checksum = "66e644424fada9fff4fdc63848db1732fb69b626e8328202ef55c03df1f4d939"
 dependencies = [
  "assert_matches",
- "aya-obj 0.2.1",
+ "aya-obj",
  "bitflags 2.11.0",
- "bytes",
+ "hashbrown 0.17.1",
  "libc",
  "log",
- "object 0.36.7",
+ "object 0.39.1",
  "once_cell",
- "thiserror 1.0.69",
- "tokio",
-]
-
-[[package]]
-name = "aya"
-version = "0.13.2"
-source = "git+https://github.com/aya-rs/aya#746a4e9523164a4817c006b43c68ab6248b32da5"
-dependencies = [
- "assert_matches",
- "aya-obj 0.2.2",
- "bitflags 2.11.0",
- "bytes",
- "hashbrown 0.16.1",
- "libc",
- "log",
- "object 0.38.1",
- "once_cell",
+ "scopeguard",
  "thiserror 2.0.18",
 ]
 
 [[package]]
 name = "aya-log"
-version = "0.2.1"
+version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b600d806c1d07d3b81ab5f4a2a95fd80f479a0d3f1d68f29064d660865f85f02"
+checksum = "476912cd6322ecf481a48f9db82207406a472563875eef014e927800522aac5c"
 dependencies = [
- "aya 0.13.1",
+ "aya",
  "aya-log-common",
- "bytes",
  "log",
- "thiserror 1.0.69",
- "tokio",
+ "thiserror 2.0.18",
 ]
 
 [[package]]
 name = "aya-log-common"
-version = "0.1.15"
+version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "befef9fe882e63164a2ba0161874e954648a72b0e1c4b361f532d590638c4eec"
+checksum = "d14c56374a63b20cb1d76108bf9ff2a75e137d47f57f32f2841ef74153b2186a"
 dependencies = [
  "num_enum",
 ]
 
 [[package]]
 name = "aya-obj"
-version = "0.2.1"
+version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c51b96c5a8ed8705b40d655273bc4212cbbf38d4e3be2788f36306f154523ec7"
+checksum = "8c76b9c75d9cdc155ff8f6a06d61e873f67bf47be8cfa92a3b5aaea43f4b4077"
 dependencies = [
  "bytes",
- "core-error",
- "hashbrown 0.15.5",
  "log",
- "object 0.36.7",
- "thiserror 1.0.69",
-]
-
-[[package]]
-name = "aya-obj"
-version = "0.2.2"
-source = "git+https://github.com/aya-rs/aya#746a4e9523164a4817c006b43c68ab6248b32da5"
-dependencies = [
- "bytes",
- "hashbrown 0.16.1",
- "log",
- "object 0.38.1",
+ "object 0.39.1",
  "thiserror 2.0.18",
 ]
 
@@ -351,7 +312,7 @@ checksum = "1d07550c9036bf2ae0c684c4297d503f838287c83c53686d05370d0e139ae570"
 name = "common"
 version = "0.1.0"
 dependencies = [
- "aya 0.13.2",
+ "aya",
  "network-types",
 ]
 
@@ -365,15 +326,6 @@ dependencies = [
  "serde",
  "thiserror 1.0.69",
  "toml",
-]
-
-[[package]]
-name = "core-error"
-version = "0.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "efcdb2972eb64230b4c50646d8498ff73f5128d196a90c7236eec4cbe8619b8f"
-dependencies = [
- "version_check",
 ]
 
 [[package]]
@@ -538,7 +490,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "39cab71617ae0d63f51a36d69f866391735b51691dbda63cf6f96d042b63efeb"
 dependencies = [
  "libc",
- "windows-sys 0.59.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -641,16 +593,14 @@ version = "0.15.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9229cfe53dfd69f0609a49f65461bd93001ea1ef889cd5529dd176593f5338a1"
 dependencies = [
- "allocator-api2",
- "equivalent",
  "foldhash 0.1.5",
 ]
 
 [[package]]
 name = "hashbrown"
-version = "0.16.1"
+version = "0.17.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "841d1cc9bed7f9236f321df977030373f4a4163ae1a7dbfe1a51a2c1a51d9100"
+checksum = "ed5909b6e89a2db4456e54cd5f673791d7eca6732202bbf2a9cc504fe2f9b84a"
 dependencies = [
  "equivalent",
  "foldhash 0.2.0",
@@ -700,12 +650,12 @@ checksum = "3d3067d79b975e8844ca9eb072e16b31c3c1c36928edf9c6789548c524d0d954"
 
 [[package]]
 name = "indexmap"
-version = "2.13.0"
+version = "2.14.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7714e70437a7dc3ac8eb7e6f8df75fd8eb422675fc7678aff7364301092b1017"
+checksum = "cc4e190f5d26ca7051642629da2c52fc03bde85a03197c99408dcd291734c855"
 dependencies = [
  "equivalent",
- "hashbrown 0.16.1",
+ "hashbrown 0.17.1",
  "serde",
  "serde_core",
 ]
@@ -745,7 +695,7 @@ checksum = "3640c1c38b8e4e43584d8df18be5fc6b0aa314ce6ebf51b53313d4306cca8e46"
 dependencies = [
  "hermit-abi",
  "libc",
- "windows-sys 0.59.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -908,9 +858,13 @@ dependencies = [
 
 [[package]]
 name = "network-types"
-version = "0.0.5"
+version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f07952b48f02537f3088f517a3cf87372a25372d51991328938531b83a31cb3a"
+checksum = "5b2a639fbb002e28c2db28571f31aacc167fe7b36b33eaf650412b8d5efff26a"
+dependencies = [
+ "num-derive",
+ "num-traits",
+]
 
 [[package]]
 name = "nix"
@@ -928,6 +882,17 @@ name = "no-std-net"
 version = "0.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "43794a0ace135be66a25d3ae77d41b91615fb68ae937f904090203e81f755b65"
+
+[[package]]
+name = "num-derive"
+version = "0.4.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ed3955f1a9c7c0c15e092f9c887db08b1fc683305fdf6eb6684f22555355e202"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.117",
+]
 
 [[package]]
 name = "num-format"
@@ -981,18 +946,6 @@ dependencies = [
 
 [[package]]
 name = "object"
-version = "0.36.7"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "62948e14d923ea95ea2c7c86c71013138b66525b86bdc08d2dcc262bdb497b87"
-dependencies = [
- "crc32fast",
- "hashbrown 0.15.5",
- "indexmap",
- "memchr",
-]
-
-[[package]]
-name = "object"
 version = "0.37.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ff76201f031d8863c38aa7f905eca4f53abbfa15f609db4277d44cd8938f33fe"
@@ -1002,12 +955,12 @@ dependencies = [
 
 [[package]]
 name = "object"
-version = "0.38.1"
+version = "0.39.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "271638cd5fa9cca89c4c304675ca658efc4e64a66c716b7cfe1afb4b9611dbbc"
+checksum = "2e5a6c098c7a3b6547378093f5cc30bc54fd361ce711e05293a5cc589562739b"
 dependencies = [
  "crc32fast",
- "hashbrown 0.16.1",
+ "hashbrown 0.17.1",
  "indexmap",
  "memchr",
 ]
@@ -1326,7 +1279,7 @@ name = "rustiflow"
 version = "0.2.0"
 dependencies = [
  "anyhow",
- "aya 0.13.1",
+ "aya",
  "aya-log",
  "bytes",
  "chrono",
@@ -1372,7 +1325,7 @@ dependencies = [
  "errno 0.3.14",
  "libc",
  "linux-raw-sys 0.12.1",
- "windows-sys 0.59.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -1479,7 +1432,7 @@ version = "1.4.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c4db69cba1110affc0e9f7bcd48bbf87b3f4fc7c61fc9155afd4c469eb3d6c1b"
 dependencies = [
- "errno 0.2.8",
+ "errno 0.3.14",
  "libc",
 ]
 
@@ -1600,7 +1553,7 @@ dependencies = [
  "getrandom 0.4.2",
  "once_cell",
  "rustix 1.1.4",
- "windows-sys 0.59.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]

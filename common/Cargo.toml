@@ -8,8 +8,8 @@ default = []
 user = [ "aya" ]
 
 [dependencies]
-aya = { git = "https://github.com/aya-rs/aya", optional=true }
-network-types = "0.0.5"
+aya = { version = "0.14.0", optional = true }
+network-types = { version = "0.2.0", default-features = false }
 
 [lib]
 path = "src/lib.rs"

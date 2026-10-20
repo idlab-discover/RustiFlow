@@ -9,21 +9,30 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7f202df86484c868dbad7eaa557ef785d5c66295e41b460ef922eca0723b842c"
 
 [[package]]
-name = "aya-build"
-version = "0.1.3"
+name = "autocfg"
+version = "1.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "59bc42f3c5ddacc34eca28a420b47e3cbb3f0f484137cb2bf1ad2153d0eae52a"
+checksum = "f2032f911046de80f0a198e0901378627c33f59ea0ac00e363d481118bd70a53"
+
+[[package]]
+name = "aya-build"
+version = "0.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a356366c974ffb737700f9691962d7aabe52b3843702e381773afef5a0f51c9f"
 dependencies = [
  "anyhow",
  "cargo_metadata",
+ "rustc_version",
+ "which",
 ]
 
 [[package]]
 name = "aya-ebpf"
-version = "0.1.1"
+version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d8dbaf5409a1a0982e5c9bdc0f499a55fe5ead39fe9c846012053faf0d404f73"
+checksum = "eace5970943931fea46a8cbdca208a8f6a9e0413d85a5a6c4e168f0b909570bc"
 dependencies = [
+ "aya-build",
  "aya-ebpf-bindings",
  "aya-ebpf-cty",
  "aya-ebpf-macros",
@@ -32,9 +41,9 @@ dependencies = [
 
 [[package]]
 name = "aya-ebpf-bindings"
-version = "0.1.2"
+version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "71ee8e6a617f040d8da7565ec4010aea75e33cda4662f64c019c66ee97d17889"
+checksum = "cf1f19286ebbda6673099b68d049034838f08e4939cef66c998a8d3e62825d76"
 dependencies = [
  "aya-build",
  "aya-ebpf-cty",
@@ -42,18 +51,18 @@ dependencies = [
 
 [[package]]
 name = "aya-ebpf-cty"
-version = "0.2.3"
+version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e6f33396742e7fd0f519c1e0de5141d84e1a8df69146a557c08cc222b0ceace4"
+checksum = "0884264bc8a51a49fed03df8feada3a21d703cf501dae33c28bdba5d2313ef33"
 dependencies = [
  "aya-build",
 ]
 
 [[package]]
 name = "aya-ebpf-macros"
-version = "0.1.2"
+version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "96fd02363736177e7e91d6c95d7effbca07be87502c7b5b32fc194aed8b177a0"
+checksum = "23e3a7f86e914df106dd00f9d757bc93f7d5c93380c51eead23d8d2ccd15a87a"
 dependencies = [
  "proc-macro2",
  "proc-macro2-diagnostics",
@@ -63,18 +72,18 @@ dependencies = [
 
 [[package]]
 name = "aya-log-common"
-version = "0.1.15"
+version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "befef9fe882e63164a2ba0161874e954648a72b0e1c4b361f532d590638c4eec"
+checksum = "d14c56374a63b20cb1d76108bf9ff2a75e137d47f57f32f2841ef74153b2186a"
 dependencies = [
  "num_enum",
 ]
 
 [[package]]
 name = "aya-log-ebpf"
-version = "0.1.0"
+version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2a10bbadd0829895a91eb1cd2bb02d7af145704087f03812bed60cb9fe65dbb3"
+checksum = "9d6b48fdc4454a2474f89970d6c6fdd1f9a9da5190d3c824d9341c6666831316"
 dependencies = [
  "aya-ebpf",
  "aya-log-common",
@@ -83,9 +92,9 @@ dependencies = [
 
 [[package]]
 name = "aya-log-ebpf-macros"
-version = "0.1.0"
+version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f6d8251a75f56077db51892041aa6b77c70ef2723845d7a210979700b2f01bc4"
+checksum = "13a22cc8e903fb5241357d2f48f26afc3fb9dcb7febe54405e94707cf73e5918"
 dependencies = [
  "aya-log-common",
  "aya-log-parser",
@@ -96,9 +105,9 @@ dependencies = [
 
 [[package]]
 name = "aya-log-parser"
-version = "0.1.13"
+version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "14b102eb5c88c9aa0b49102d3fbcee08ecb0dfa81014f39b373311de7a7032cb"
+checksum = "f52d032162a42a191cd9b4ac35a212848c08b9335d2c9a92eaef8f281792757a"
 dependencies = [
  "aya-log-common",
 ]
@@ -140,7 +149,7 @@ dependencies = [
 name = "common"
 version = "0.1.0"
 dependencies = [
- "network-types 0.0.5",
+ "network-types",
 ]
 
 [[package]]
@@ -150,7 +159,7 @@ dependencies = [
  "aya-ebpf",
  "aya-log-ebpf",
  "common",
- "network-types 0.0.7",
+ "network-types",
 ]
 
 [[package]]
@@ -160,6 +169,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8f42a60cbdf9a97f5d2305f08a87dc4e09308d1276d28c869c684d7777685682"
 
 [[package]]
+name = "libc"
+version = "0.2.191"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "65cd87c9a6d60536580b316ad985726104730a5151c99845f2490428ef91240a"
+
+[[package]]
 name = "memchr"
 version = "2.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -167,15 +182,33 @@ checksum = "f8ca58f447f06ed17d5fc4043ce1b10dd205e060fb3ce5b979b8ed8e59ff3f79"
 
 [[package]]
 name = "network-types"
-version = "0.0.5"
+version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f07952b48f02537f3088f517a3cf87372a25372d51991328938531b83a31cb3a"
+checksum = "5b2a639fbb002e28c2db28571f31aacc167fe7b36b33eaf650412b8d5efff26a"
+dependencies = [
+ "num-derive",
+ "num-traits",
+]
 
 [[package]]
-name = "network-types"
-version = "0.0.7"
+name = "num-derive"
+version = "0.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e82e9f64c09f56aa7c80c3fa087997bd99a913f91d9c74d36cf5fd75dd5773e6"
+checksum = "ed3955f1a9c7c0c15e092f9c887db08b1fc683305fdf6eb6684f22555355e202"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
+]
+
+[[package]]
+name = "num-traits"
+version = "0.2.19"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "071dfc062690e90b734c0b2273ce72ad0ffa95f0c74596bc250dcfd960262841"
+dependencies = [
+ "autocfg",
+]
 
 [[package]]
 name = "num_enum"
@@ -226,6 +259,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "41f2619966050689382d2b44f664f4bc593e129785a36d6ee376ddf37259b924"
 dependencies = [
  "proc-macro2",
+]
+
+[[package]]
+name = "rustc_version"
+version = "0.4.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "cfcb3a22ef46e85b45de6ee7e79d063319ebb6594faafcf1c225ea92ab6e9b92"
+dependencies = [
+ "semver",
 ]
 
 [[package]]
@@ -329,6 +371,15 @@ name = "version_check"
 version = "0.9.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0b928f33d975fc6ad9f86c8f283853ad26bdd5b10b7f1542aa2fa15e2289105a"
+
+[[package]]
+name = "which"
+version = "8.0.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bae2f2b2b816647a1cab1acc91f5bd20812d53cb344382635ec2181940c8034f"
+dependencies = [
+ "libc",
+]
 
 [[package]]
 name = "zmij"

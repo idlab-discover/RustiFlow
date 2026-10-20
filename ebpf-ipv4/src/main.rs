@@ -4,7 +4,7 @@
 
 use aya_ebpf::{
     bindings::TC_ACT_PIPE,
-    helpers::gen::bpf_ktime_get_ns,
+    helpers::bpf_ktime_get_ns,
     macros::{classifier, map},
     maps::{PerCpuArray, RingBuf},
     programs::TcContext,
@@ -12,7 +12,7 @@ use aya_ebpf::{
 use aya_log_ebpf::debug;
 
 use common::EbpfEventIpv4;
-use common::IcmpHdr;
+use common::Icmpv4Hdr;
 use common::NetworkHeader;
 use common::REALTIME_EVENT_QUEUE_COUNT;
 use common::REALTIME_EVENT_RINGBUF_BYTES;
@@ -70,20 +70,20 @@ pub fn tc_flow_track(ctx: TcContext) -> i32 {
 }
 
 fn process_packet(ctx: &TcContext) -> Result<i32, ()> {
-    let ether_type = ctx.load::<EthHdr>(0).map_err(|_| ())?.ether_type;
-    if ether_type != EtherType::Ipv4 {
+    let eth_hdr = ctx.load::<EthHdr>(0).map_err(|_| ())?;
+    if !matches!(eth_hdr.ether_type(), Ok(EtherType::Ipv4)) {
         return Ok(TC_ACT_PIPE);
     }
 
     let ipv4hdr = ctx.load::<Ipv4Hdr>(EthHdr::LEN).map_err(|_| ())?;
-    let ip_header_length = (ipv4hdr.ihl() as usize) * 4;
+    let ip_header_length = usize::from(ipv4hdr.ihl());
     let packet_info = PacketInfo::new(&ipv4hdr, ip_header_length)?;
     let hdr_offset = EthHdr::LEN + ip_header_length;
 
-    match ipv4hdr.proto {
-        IpProto::Tcp => process_transport_packet::<TcpHdr>(ctx, &packet_info, hdr_offset),
-        IpProto::Udp => process_transport_packet::<UdpHdr>(ctx, &packet_info, hdr_offset),
-        IpProto::Icmp => process_transport_packet::<IcmpHdr>(ctx, &packet_info, hdr_offset),
+    match ipv4hdr.proto() {
+        Ok(IpProto::Tcp) => process_transport_packet::<TcpHdr>(ctx, &packet_info, hdr_offset),
+        Ok(IpProto::Udp) => process_transport_packet::<UdpHdr>(ctx, &packet_info, hdr_offset),
+        Ok(IpProto::Icmp) => process_transport_packet::<Icmpv4Hdr>(ctx, &packet_info, hdr_offset),
         _ => Ok(TC_ACT_PIPE),
     }
 }
@@ -218,11 +218,11 @@ struct PacketInfo {
 impl PacketInfo {
     fn new(ipv4hdr: &Ipv4Hdr, network_header_length: usize) -> Result<Self, ()> {
         Ok(Self {
-            ipv4_source: ipv4hdr.src_addr,
-            ipv4_destination: ipv4hdr.dst_addr,
-            total_length: u16::from_be(ipv4hdr.tot_len),
+            ipv4_source: u32::from_ne_bytes(ipv4hdr.src_addr),
+            ipv4_destination: u32::from_ne_bytes(ipv4hdr.dst_addr),
+            total_length: ipv4hdr.tot_len(),
             network_header_length: network_header_length as u16,
-            protocol: ipv4hdr.proto as u8,
+            protocol: ipv4hdr.proto,
         })
     }
 
