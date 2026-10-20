@@ -1,18 +1,18 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `rustiflow/src/flow_tui.rs`."><title>flow_tui.rs - source</title><script>if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-6b053e98.ttf.woff2,FiraSans-Italic-81dc35de.woff2,FiraSans-Regular-0fe48ade.woff2,FiraSans-MediumItalic-ccf7e434.woff2,FiraSans-Medium-e1aa3f0a.woff2,SourceCodePro-Regular-8badfe75.ttf.woff2,SourceCodePro-Semibold-aa29a496.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2"href="../../static.files/${f}">`).join(""))</script><link rel="stylesheet" href="../../static.files/normalize-9960930a.css"><link rel="stylesheet" href="../../static.files/rustdoc-203241e4.css"><meta name="rustdoc-vars" data-root-path="../../" data-static-root-path="../../static.files/" data-current-crate="rustiflow" data-themes="" data-resource-suffix="" data-rustdoc-version="1.100.0-nightly (215a8af4b 2026-09-15)" data-channel="nightly" data-search-js="search-b167f383.js" data-stringdex-js="stringdex-b5109af9.js" data-settings-js="settings-170eb4bf.js" ><script src="../../static.files/storage-41dd4d93.js"></script><script defer src="../../static.files/src-script-813739b1.js"></script><script defer src="../../src-files.js"></script><script defer src="../../static.files/main-1814ead3.js"></script><noscript><link rel="stylesheet" href="../../static.files/noscript-9f56287d.css"></noscript><link rel="alternate icon" type="image/png" href="../../static.files/favicon-32x32-eab170b8.png"><link rel="icon" type="image/svg+xml" href="../../static.files/favicon-044be391.svg"></head><body class="rustdoc src"><a class="skip-main-content" href="#main-content">Skip to main content</a><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="src-sidebar-title"><h2>Files</h2></div></nav><div class="sidebar-resizer" title="Drag to resize sidebar"></div><main><section id="main-content" class="content" tabindex="-1"><div class="main-heading"><h1><div class="sub-heading">rustiflow/</div>flow_tui.rs</h1><rustdoc-toolbar></rustdoc-toolbar></div><div class="example-wrap digits-3"><pre class="rust"><code><a href=#1 id=1 data-nosnippet>1</a><span class="kw">use </span>crossterm::event::{<span class="self">self</span>, DisableMouseCapture, EnableMouseCapture, Event, KeyCode};
-<a href=#2 id=2 data-nosnippet>2</a><span class="kw">use </span>crossterm::execute;
-<a href=#3 id=3 data-nosnippet>3</a><span class="kw">use </span>crossterm::terminal::{
-<a href=#4 id=4 data-nosnippet>4</a>    disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen,
-<a href=#5 id=5 data-nosnippet>5</a>};
-<a href=#6 id=6 data-nosnippet>6</a><span class="kw">use </span>std::error::Error;
-<a href=#7 id=7 data-nosnippet>7</a><span class="kw">use </span>std::io;
-<a href=#8 id=8 data-nosnippet>8</a><span class="kw">use </span>std::time::Duration;
-<a href=#9 id=9 data-nosnippet>9</a><span class="kw">use </span>tokio::sync::watch::Receiver;
-<a href=#10 id=10 data-nosnippet>10</a><span class="kw">use </span>tokio::task;
-<a href=#11 id=11 data-nosnippet>11</a><span class="kw">use </span>tui::backend::{Backend, CrosstermBackend};
-<a href=#12 id=12 data-nosnippet>12</a><span class="kw">use </span>tui::layout::{Alignment, Constraint, Direction, Layout};
-<a href=#13 id=13 data-nosnippet>13</a><span class="kw">use </span>tui::style::{Color, Style};
-<a href=#14 id=14 data-nosnippet>14</a><span class="kw">use </span>tui::widgets::{Block, Borders, Paragraph, Sparkline};
-<a href=#15 id=15 data-nosnippet>15</a><span class="kw">use </span>tui::{Frame, Terminal};
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `rustiflow/src/flow_tui.rs`."><title>flow_tui.rs - source</title><script>if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-6b053e98.ttf.woff2,FiraSans-Italic-81dc35de.woff2,FiraSans-Regular-0fe48ade.woff2,FiraSans-MediumItalic-ccf7e434.woff2,FiraSans-Medium-e1aa3f0a.woff2,SourceCodePro-Regular-8badfe75.ttf.woff2,SourceCodePro-Semibold-aa29a496.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2"href="../../static.files/${f}">`).join(""))</script><link rel="stylesheet" href="../../static.files/normalize-9960930a.css"><link rel="stylesheet" href="../../static.files/rustdoc-009149e2.css"><meta name="rustdoc-vars" data-root-path="../../" data-static-root-path="../../static.files/" data-current-crate="rustiflow" data-themes="" data-resource-suffix="" data-rustdoc-version="1.101.0-nightly (07e526db9 2026-10-19)" data-channel="nightly" data-search-js="search-b167f383.js" data-stringdex-js="stringdex-b5109af9.js" data-settings-js="settings-9b351432.js" ><script src="../../static.files/storage-41dd4d93.js"></script><script defer src="../../static.files/src-script-813739b1.js"></script><script defer src="../../src-files.js"></script><script defer src="../../static.files/main-1814ead3.js"></script><noscript><link rel="stylesheet" href="../../static.files/noscript-9f56287d.css"></noscript><link rel="alternate icon" type="image/png" href="../../static.files/favicon-32x32-eab170b8.png"><link rel="icon" type="image/svg+xml" href="../../static.files/favicon-044be391.svg"></head><body class="rustdoc src"><a class="skip-main-content" href="#main-content">Skip to main content</a><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="src-sidebar-title"><h2>Files</h2></div></nav><div class="sidebar-resizer" title="Drag to resize sidebar"></div><main><section id="main-content" class="content" tabindex="-1"><div class="main-heading"><h1><div class="sub-heading">rustiflow/</div>flow_tui.rs</h1><rustdoc-toolbar></rustdoc-toolbar></div><div class="example-wrap digits-3"><pre class="rust"><code><a href=#1 id=1 data-nosnippet>1</a><span class="kw">use </span>ratatui::backend::{Backend, CrosstermBackend};
+<a href=#2 id=2 data-nosnippet>2</a><span class="kw">use </span>ratatui::crossterm::event::{<span class="self">self</span>, DisableMouseCapture, EnableMouseCapture, Event, KeyCode};
+<a href=#3 id=3 data-nosnippet>3</a><span class="kw">use </span>ratatui::crossterm::execute;
+<a href=#4 id=4 data-nosnippet>4</a><span class="kw">use </span>ratatui::crossterm::terminal::{
+<a href=#5 id=5 data-nosnippet>5</a>    disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen,
+<a href=#6 id=6 data-nosnippet>6</a>};
+<a href=#7 id=7 data-nosnippet>7</a><span class="kw">use </span>ratatui::layout::{Alignment, Constraint, Direction, Layout};
+<a href=#8 id=8 data-nosnippet>8</a><span class="kw">use </span>ratatui::style::{Color, Style};
+<a href=#9 id=9 data-nosnippet>9</a><span class="kw">use </span>ratatui::widgets::{Block, Borders, Paragraph, Sparkline};
+<a href=#10 id=10 data-nosnippet>10</a><span class="kw">use </span>ratatui::{Frame, Terminal};
+<a href=#11 id=11 data-nosnippet>11</a><span class="kw">use </span>std::error::Error;
+<a href=#12 id=12 data-nosnippet>12</a><span class="kw">use </span>std::io;
+<a href=#13 id=13 data-nosnippet>13</a><span class="kw">use </span>std::time::Duration;
+<a href=#14 id=14 data-nosnippet>14</a><span class="kw">use </span>tokio::sync::watch::Receiver;
+<a href=#15 id=15 data-nosnippet>15</a><span class="kw">use </span>tokio::task;
 <a href=#16 id=16 data-nosnippet>16</a>
 <a href=#17 id=17 data-nosnippet>17</a><span class="kw">struct </span>PacketData {
 <a href=#18 id=18 data-nosnippet>18</a>    count: u64,
@@ -73,65 +73,68 @@
 <a href=#73 id=73 data-nosnippet>73</a>    terminal: <span class="kw-2">&amp;mut </span>Terminal&lt;B&gt;,
 <a href=#74 id=74 data-nosnippet>74</a>    app: <span class="kw-2">&amp;mut </span>App,
 <a href=#75 id=75 data-nosnippet>75</a>    <span class="kw-2">mut </span>packet_rx: Receiver&lt;Vec&lt;(u64, u64)&gt;&gt;,
-<a href=#76 id=76 data-nosnippet>76</a>) -&gt; <span class="prelude-ty">Result</span>&lt;(), Box&lt;<span class="kw">dyn </span>Error&gt;&gt; {
-<a href=#77 id=77 data-nosnippet>77</a>    <span class="kw">loop </span>{
-<a href=#78 id=78 data-nosnippet>78</a>        terminal.draw(|f| ui_main_screen(f, app))<span class="question-mark">?</span>;
-<a href=#79 id=79 data-nosnippet>79</a>
-<a href=#80 id=80 data-nosnippet>80</a>        <span class="macro">tokio::select!</span> {
-<a href=#81 id=81 data-nosnippet>81</a>            <span class="prelude-val">Ok</span>(<span class="kw">_</span>) = packet_rx.changed() =&gt; {
-<a href=#82 id=82 data-nosnippet>82</a>                <span class="kw">let </span>counts = packet_rx.borrow();
-<a href=#83 id=83 data-nosnippet>83</a>                app.update_packet_data(<span class="kw-2">&amp;</span>counts);
-<a href=#84 id=84 data-nosnippet>84</a>            }
-<a href=#85 id=85 data-nosnippet>85</a>
-<a href=#86 id=86 data-nosnippet>86</a>            poll_result = task::spawn_blocking(|| crossterm::event::poll(Duration::from_millis(<span class="number">100</span>))) =&gt; {
-<a href=#87 id=87 data-nosnippet>87</a>                <span class="kw">if </span>poll_result<span class="question-mark">?? </span>{
-<a href=#88 id=88 data-nosnippet>88</a>                    <span class="kw">if let </span>Event::Key(key) = event::read()<span class="question-mark">? </span>{
-<a href=#89 id=89 data-nosnippet>89</a>                        <span class="kw">if let </span>KeyCode::Char(<span class="string">'q'</span>) = key.code {
-<a href=#90 id=90 data-nosnippet>90</a>                            <span class="kw">return </span><span class="prelude-val">Ok</span>(());
-<a href=#91 id=91 data-nosnippet>91</a>                        }
-<a href=#92 id=92 data-nosnippet>92</a>                    }
-<a href=#93 id=93 data-nosnippet>93</a>                }
-<a href=#94 id=94 data-nosnippet>94</a>            }
-<a href=#95 id=95 data-nosnippet>95</a>        }
-<a href=#96 id=96 data-nosnippet>96</a>    }
-<a href=#97 id=97 data-nosnippet>97</a>}
-<a href=#98 id=98 data-nosnippet>98</a>
-<a href=#99 id=99 data-nosnippet>99</a><span class="kw">fn </span>ui_main_screen&lt;B: Backend&gt;(f: <span class="kw-2">&amp;mut </span>Frame&lt;B&gt;, app: <span class="kw-2">&amp;</span>App) {
-<a href=#100 id=100 data-nosnippet>100</a>    <span class="kw">let </span>size = f.size();
+<a href=#76 id=76 data-nosnippet>76</a>) -&gt; <span class="prelude-ty">Result</span>&lt;(), Box&lt;<span class="kw">dyn </span>Error&gt;&gt;
+<a href=#77 id=77 data-nosnippet>77</a><span class="kw">where
+<a href=#78 id=78 data-nosnippet>78</a>    </span>B::Error: <span class="lifetime">'static</span>,
+<a href=#79 id=79 data-nosnippet>79</a>{
+<a href=#80 id=80 data-nosnippet>80</a>    <span class="kw">loop </span>{
+<a href=#81 id=81 data-nosnippet>81</a>        terminal.draw(|f| ui_main_screen(f, app))<span class="question-mark">?</span>;
+<a href=#82 id=82 data-nosnippet>82</a>
+<a href=#83 id=83 data-nosnippet>83</a>        <span class="macro">tokio::select!</span> {
+<a href=#84 id=84 data-nosnippet>84</a>            <span class="prelude-val">Ok</span>(<span class="kw">_</span>) = packet_rx.changed() =&gt; {
+<a href=#85 id=85 data-nosnippet>85</a>                <span class="kw">let </span>counts = packet_rx.borrow();
+<a href=#86 id=86 data-nosnippet>86</a>                app.update_packet_data(<span class="kw-2">&amp;</span>counts);
+<a href=#87 id=87 data-nosnippet>87</a>            }
+<a href=#88 id=88 data-nosnippet>88</a>
+<a href=#89 id=89 data-nosnippet>89</a>            poll_result = task::spawn_blocking(|| event::poll(Duration::from_millis(<span class="number">100</span>))) =&gt; {
+<a href=#90 id=90 data-nosnippet>90</a>                <span class="kw">if </span>poll_result<span class="question-mark">?? </span>{
+<a href=#91 id=91 data-nosnippet>91</a>                    <span class="kw">if let </span>Event::Key(key) = event::read()<span class="question-mark">? </span>{
+<a href=#92 id=92 data-nosnippet>92</a>                        <span class="kw">if let </span>KeyCode::Char(<span class="string">'q'</span>) = key.code {
+<a href=#93 id=93 data-nosnippet>93</a>                            <span class="kw">return </span><span class="prelude-val">Ok</span>(());
+<a href=#94 id=94 data-nosnippet>94</a>                        }
+<a href=#95 id=95 data-nosnippet>95</a>                    }
+<a href=#96 id=96 data-nosnippet>96</a>                }
+<a href=#97 id=97 data-nosnippet>97</a>            }
+<a href=#98 id=98 data-nosnippet>98</a>        }
+<a href=#99 id=99 data-nosnippet>99</a>    }
+<a href=#100 id=100 data-nosnippet>100</a>}
 <a href=#101 id=101 data-nosnippet>101</a>
-<a href=#102 id=102 data-nosnippet>102</a>    <span class="kw">let </span>background = Block::default().style(Style::default().bg(Color::Black));
-<a href=#103 id=103 data-nosnippet>103</a>
-<a href=#104 id=104 data-nosnippet>104</a>    f.render_widget(background, size);
-<a href=#105 id=105 data-nosnippet>105</a>
-<a href=#106 id=106 data-nosnippet>106</a>    <span class="kw">let </span>layout = Layout::default()
-<a href=#107 id=107 data-nosnippet>107</a>        .direction(Direction::Vertical)
-<a href=#108 id=108 data-nosnippet>108</a>        .constraints([Constraint::Length(<span class="number">5</span>), Constraint::Min(<span class="number">0</span>)].as_ref())
-<a href=#109 id=109 data-nosnippet>109</a>        .split(size);
-<a href=#110 id=110 data-nosnippet>110</a>
-<a href=#111 id=111 data-nosnippet>111</a>    <span class="kw">let </span>rustiflow_art = <span class="string">"
-<a href=#112 id=112 data-nosnippet>112</a>    █▀█ █ █ █▀ ▀█▀ █ █▀▀ █   █▀█ █ █ █
-<a href=#113 id=113 data-nosnippet>113</a>    █▀▄ █▄█ ▄█  █  █ █▀  █▄▄ █▄█ ▀▄▀▄▀            Press 'q' to quit the graph"</span>;
-<a href=#114 id=114 data-nosnippet>114</a>
-<a href=#115 id=115 data-nosnippet>115</a>    <span class="kw">let </span>art_paragraph = Paragraph::new(rustiflow_art)
-<a href=#116 id=116 data-nosnippet>116</a>        .style(Style::default().fg(Color::Yellow))
-<a href=#117 id=117 data-nosnippet>117</a>        .alignment(Alignment::Left);
-<a href=#118 id=118 data-nosnippet>118</a>
-<a href=#119 id=119 data-nosnippet>119</a>    f.render_widget(art_paragraph, layout[<span class="number">0</span>]);
-<a href=#120 id=120 data-nosnippet>120</a>
-<a href=#121 id=121 data-nosnippet>121</a>    <span class="kw">let </span>bar_data: Vec&lt;u64&gt; = app.get_bar_data();
-<a href=#122 id=122 data-nosnippet>122</a>
-<a href=#123 id=123 data-nosnippet>123</a>    <span class="kw">let </span>bar_chart = Sparkline::default()
-<a href=#124 id=124 data-nosnippet>124</a>        .block(Block::default().borders(Borders::NONE))
-<a href=#125 id=125 data-nosnippet>125</a>        .style(Style::default().fg(Color::Yellow))
-<a href=#126 id=126 data-nosnippet>126</a>        .data(<span class="kw-2">&amp;</span>bar_data)
-<a href=#127 id=127 data-nosnippet>127</a>        .max(
-<a href=#128 id=128 data-nosnippet>128</a>            app.packet_data
-<a href=#129 id=129 data-nosnippet>129</a>                .iter()
-<a href=#130 id=130 data-nosnippet>130</a>                .map(|data| data.count)
-<a href=#131 id=131 data-nosnippet>131</a>                .max()
-<a href=#132 id=132 data-nosnippet>132</a>                .unwrap_or((app.max_visible_intervals + <span class="number">1</span>) <span class="kw">as </span>u64),
-<a href=#133 id=133 data-nosnippet>133</a>        );
-<a href=#134 id=134 data-nosnippet>134</a>
-<a href=#135 id=135 data-nosnippet>135</a>    f.render_widget(bar_chart, layout[<span class="number">1</span>]);
-<a href=#136 id=136 data-nosnippet>136</a>}
+<a href=#102 id=102 data-nosnippet>102</a><span class="kw">fn </span>ui_main_screen(f: <span class="kw-2">&amp;mut </span>Frame, app: <span class="kw-2">&amp;</span>App) {
+<a href=#103 id=103 data-nosnippet>103</a>    <span class="kw">let </span>size = f.area();
+<a href=#104 id=104 data-nosnippet>104</a>
+<a href=#105 id=105 data-nosnippet>105</a>    <span class="kw">let </span>background = Block::default().style(Style::default().bg(Color::Black));
+<a href=#106 id=106 data-nosnippet>106</a>
+<a href=#107 id=107 data-nosnippet>107</a>    f.render_widget(background, size);
+<a href=#108 id=108 data-nosnippet>108</a>
+<a href=#109 id=109 data-nosnippet>109</a>    <span class="kw">let </span>layout = Layout::default()
+<a href=#110 id=110 data-nosnippet>110</a>        .direction(Direction::Vertical)
+<a href=#111 id=111 data-nosnippet>111</a>        .constraints([Constraint::Length(<span class="number">5</span>), Constraint::Min(<span class="number">0</span>)].as_ref())
+<a href=#112 id=112 data-nosnippet>112</a>        .split(size);
+<a href=#113 id=113 data-nosnippet>113</a>
+<a href=#114 id=114 data-nosnippet>114</a>    <span class="kw">let </span>rustiflow_art = <span class="string">"
+<a href=#115 id=115 data-nosnippet>115</a>    █▀█ █ █ █▀ ▀█▀ █ █▀▀ █   █▀█ █ █ █
+<a href=#116 id=116 data-nosnippet>116</a>    █▀▄ █▄█ ▄█  █  █ █▀  █▄▄ █▄█ ▀▄▀▄▀            Press 'q' to quit the graph"</span>;
+<a href=#117 id=117 data-nosnippet>117</a>
+<a href=#118 id=118 data-nosnippet>118</a>    <span class="kw">let </span>art_paragraph = Paragraph::new(rustiflow_art)
+<a href=#119 id=119 data-nosnippet>119</a>        .style(Style::default().fg(Color::Yellow))
+<a href=#120 id=120 data-nosnippet>120</a>        .alignment(Alignment::Left);
+<a href=#121 id=121 data-nosnippet>121</a>
+<a href=#122 id=122 data-nosnippet>122</a>    f.render_widget(art_paragraph, layout[<span class="number">0</span>]);
+<a href=#123 id=123 data-nosnippet>123</a>
+<a href=#124 id=124 data-nosnippet>124</a>    <span class="kw">let </span>bar_data: Vec&lt;u64&gt; = app.get_bar_data();
+<a href=#125 id=125 data-nosnippet>125</a>
+<a href=#126 id=126 data-nosnippet>126</a>    <span class="kw">let </span>bar_chart = Sparkline::default()
+<a href=#127 id=127 data-nosnippet>127</a>        .block(Block::default().borders(Borders::NONE))
+<a href=#128 id=128 data-nosnippet>128</a>        .style(Style::default().fg(Color::Yellow))
+<a href=#129 id=129 data-nosnippet>129</a>        .data(<span class="kw-2">&amp;</span>bar_data)
+<a href=#130 id=130 data-nosnippet>130</a>        .max(
+<a href=#131 id=131 data-nosnippet>131</a>            app.packet_data
+<a href=#132 id=132 data-nosnippet>132</a>                .iter()
+<a href=#133 id=133 data-nosnippet>133</a>                .map(|data| data.count)
+<a href=#134 id=134 data-nosnippet>134</a>                .max()
+<a href=#135 id=135 data-nosnippet>135</a>                .unwrap_or((app.max_visible_intervals + <span class="number">1</span>) <span class="kw">as </span>u64),
+<a href=#136 id=136 data-nosnippet>136</a>        );
+<a href=#137 id=137 data-nosnippet>137</a>
+<a href=#138 id=138 data-nosnippet>138</a>    f.render_widget(bar_chart, layout[<span class="number">1</span>]);
+<a href=#139 id=139 data-nosnippet>139</a>}
 </code></pre></div></section></main></body></html>

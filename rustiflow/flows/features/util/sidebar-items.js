@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"fn":["push_csv_display","safe_div","safe_div_int","safe_per_second_rate"],"struct":["FeatureStats"],"trait":["FlowFeature"]};
+window.SIDEBAR_ITEMS = {"constant":["EXACT_INTEGER_F64_LIMIT"],"fn":["push_csv_display","push_csv_f64","push_csv_int","push_i64_digits","safe_div","safe_div_int","safe_per_second_rate"],"struct":["FeatureStats"],"trait":["FlowFeature"]};

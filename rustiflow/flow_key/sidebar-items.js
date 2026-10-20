@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"struct":["EndpointKey","FlowKey"]};
+window.SIDEBAR_ITEMS = {"enum":["KeyOrientation"],"struct":["EndpointKey","FlowKey","ShardSelector"],"type":["FlowKeyHashBuilder"]};

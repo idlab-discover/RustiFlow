@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"constant":["DEFAULT_PROFILE_FREQUENCY_HZ"],"fn":["env_flag","timeval_to_us"],"struct":["ProfilingSession","ResourceUsage"]};
+window.SIDEBAR_ITEMS = {"constant":["DEFAULT_PROFILE_FREQUENCY_HZ"],"enum":["Flamegraph"],"fn":["env_flag","timeval_to_us"],"struct":["ProfilingSession","ResourceUsage"]};

@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"enum":["ExistingFlowUpdate","FlowUpdate"],"struct":["FlowTable"]};
+window.SIDEBAR_ITEMS = {"enum":["FlowUpdate"],"struct":["FlowEntry","FlowTable"]};

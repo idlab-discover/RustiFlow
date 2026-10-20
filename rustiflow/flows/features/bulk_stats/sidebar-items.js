@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"constant":["BULK_IDLE_MS","MIN_BULK_PACKETS"],"struct":["BulkState","BulkStats"]};
+window.SIDEBAR_ITEMS = {"constant":["BULK_IDLE_US","MIN_BULK_PACKETS"],"struct":["BulkState","BulkStats"]};
