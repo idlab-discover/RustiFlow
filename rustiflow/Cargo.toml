@@ -35,7 +35,11 @@ ratatui = { version = "0.30", default-features = false, features = ["crossterm",
 [target.'cfg(target_os = "linux")'.dependencies]
 aya = "0.14.0"
 aya-log = "0.3.0"
-pprof = { version = "0.14.1", features = ["flamegraph"] }
+pprof = { version = "0.14.1", features = ["flamegraph"], optional = true }
+
+[features]
+# Builds in the pprof sampler behind RUSTIFLOW_PROFILE_FLAMEGRAPH (Linux only).
+profiling = ["dep:pprof"]
 
 [[bin]]
 name = "rustiflow"

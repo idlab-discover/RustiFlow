@@ -1,14 +1,12 @@
 use anyhow::{Context, Result};
 use log::info;
-use pprof::{ProfilerGuard, ProfilerGuardBuilder};
-use std::{env, fs::File, path::PathBuf};
+use std::{env, path::PathBuf};
 
 const DEFAULT_PROFILE_FREQUENCY_HZ: i32 = 99;
 
 pub struct ProfilingSession {
     mode: &'static str,
-    flamegraph_path: Option<PathBuf>,
-    guard: Option<ProfilerGuard<'static>>,
+    flamegraph: Option<Flamegraph>,
     usage_start: ResourceUsage,
 }
 
@@ -26,17 +24,10 @@ impl ProfilingSession {
             return Ok(None);
         }
 
-        let guard = if flamegraph_path.is_some() {
-            Some(
-                ProfilerGuardBuilder::default()
-                    .frequency(sampling_frequency_hz)
-                    .blocklist(&["libc", "libgcc", "pthread", "vdso"])
-                    .build()
-                    .context("failed to start userspace profiler")?,
-            )
-        } else {
-            None
-        };
+        let flamegraph = flamegraph_path
+            .clone()
+            .map(|path| Flamegraph::start(path, sampling_frequency_hz))
+            .transpose()?;
 
         info!(
             "Profiling enabled for {}: flamegraph={}, resource_summary={}, frequency_hz={}",
@@ -51,8 +42,7 @@ impl ProfilingSession {
 
         Ok(Some(Self {
             mode,
-            flamegraph_path,
-            guard,
+            flamegraph,
             usage_start: ResourceUsage::read()?,
         }))
     }
@@ -70,24 +60,62 @@ impl ProfilingSession {
             usage_delta.involuntary_context_switches
         );
 
-        if let (Some(guard), Some(flamegraph_path)) = (self.guard, self.flamegraph_path) {
-            let report = guard
-                .report()
-                .build()
-                .context("failed to build flamegraph report")?;
-            let file = File::create(&flamegraph_path)
-                .with_context(|| format!("failed to create {}", flamegraph_path.display()))?;
-            report
-                .flamegraph(file)
-                .with_context(|| format!("failed to write {}", flamegraph_path.display()))?;
-            info!(
-                "Wrote userspace flamegraph for {} to {}",
-                self.mode,
-                flamegraph_path.display()
-            );
+        match self.flamegraph {
+            Some(flamegraph) => flamegraph.finish(self.mode),
+            None => Ok(()),
         }
+    }
+}
 
+/// A running pprof sampler that writes an SVG flamegraph when finished.
+#[cfg(feature = "profiling")]
+struct Flamegraph {
+    path: PathBuf,
+    guard: pprof::ProfilerGuard<'static>,
+}
+
+#[cfg(feature = "profiling")]
+impl Flamegraph {
+    fn start(path: PathBuf, sampling_frequency_hz: i32) -> Result<Self> {
+        let guard = pprof::ProfilerGuardBuilder::default()
+            .frequency(sampling_frequency_hz)
+            .blocklist(&["libc", "libgcc", "pthread", "vdso"])
+            .build()
+            .context("failed to start userspace profiler")?;
+        Ok(Self { path, guard })
+    }
+
+    fn finish(self, mode: &str) -> Result<()> {
+        let report = self
+            .guard
+            .report()
+            .build()
+            .context("failed to build flamegraph report")?;
+        let file = std::fs::File::create(&self.path)
+            .with_context(|| format!("failed to create {}", self.path.display()))?;
+        report
+            .flamegraph(file)
+            .with_context(|| format!("failed to write {}", self.path.display()))?;
+        info!(
+            "Wrote userspace flamegraph for {mode} to {}",
+            self.path.display()
+        );
         Ok(())
+    }
+}
+
+/// Flamegraphs need the `profiling` feature, so without it none can exist.
+#[cfg(not(feature = "profiling"))]
+enum Flamegraph {}
+
+#[cfg(not(feature = "profiling"))]
+impl Flamegraph {
+    fn start(_path: PathBuf, _sampling_frequency_hz: i32) -> Result<Self> {
+        anyhow::bail!("RUSTIFLOW_PROFILE_FLAMEGRAPH requires a build with `--features profiling`")
+    }
+
+    fn finish(self, _mode: &str) -> Result<()> {
+        match self {}
     }
 }
 

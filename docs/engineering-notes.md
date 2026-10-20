@@ -449,6 +449,6 @@ Export path:
 
 Profiling hooks: `RUSTIFLOW_REALTIME_STATS=1` (per-source drain and dispatch
 timing), `RUSTIFLOW_PROFILE_RESOURCE_SUMMARY=1`,
-`RUSTIFLOW_PROFILE_FLAMEGRAPH=<file.svg>` with `RUSTIFLOW_PROFILE_FREQUENCY_HZ`,
-and `RUSTIFLOW_PROFILE_EXPORT_BREAKDOWN=1` (clone, encode and write time).
+`RUSTIFLOW_PROFILE_FLAMEGRAPH=<file.svg>` with `RUSTIFLOW_PROFILE_FREQUENCY_HZ`
+(needs a build with `--features profiling`, which pulls in pprof), and `RUSTIFLOW_PROFILE_EXPORT_BREAKDOWN=1` (clone, encode and write time).
 `scripts/realtime_container_stress.sh` runs the containerized harness baseline.

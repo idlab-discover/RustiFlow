@@ -232,6 +232,11 @@ Use the upstream prebuilt binary. Building current `bpf-linker` releases with
   ```bash
   cargo build
   ```
+- **With flamegraph profiling** (Linux only, pulls in pprof; enables
+  `RUSTIFLOW_PROFILE_FLAMEGRAPH=<file.svg>`):
+  ```bash
+  cargo build --release --features profiling
+  ```
 
 ## Running the Project in dev mode
 
