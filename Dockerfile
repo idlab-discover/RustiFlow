@@ -18,7 +18,7 @@ RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y \
  && . $HOME/.cargo/env \
  && rustup install stable \
  && rustup toolchain install nightly --component rust-src \
- && curl -fL --retry 3 "https://github.com/aya-rs/bpf-linker/releases/download/v0.11.1/bpf-linker-$(uname -m)-unknown-linux-musl.tar.zst" -o /tmp/bpf-linker.tar.zst \
+ && curl -fL --retry 3 "https://github.com/aya-rs/bpf-linker/releases/download/v0.12.0/bpf-linker-$(uname -m)-unknown-linux-musl.tar.zst" -o /tmp/bpf-linker.tar.zst \
  && tar --zstd -xf /tmp/bpf-linker.tar.zst -C "$HOME/.cargo/bin" \
  && rm /tmp/bpf-linker.tar.zst \
  && bpf-linker --version
