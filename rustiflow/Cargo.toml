@@ -31,8 +31,6 @@ libc = "0.2.153"
 num_cpus = "1.14"
 confy = "0.6.1"
 ratatui = { version = "0.30", default-features = false, features = ["crossterm", "layout-cache"] }
-strum = "0.26.3"
-strum_macros = "0.26.4"
 
 [target.'cfg(target_os = "linux")'.dependencies]
 aya = "0.14.0"

@@ -16,7 +16,6 @@ use serde::{Deserialize, Serialize};
 use std::error::Error;
 use std::num::NonZeroU64;
 use std::{fs, io};
-use strum::VariantNames;
 
 use crate::args::{Commands, ConfigFile, ExportConfig, ExportMethodType, FlowType, OutputConfig};
 
@@ -317,15 +316,18 @@ fn handle_flow_type_input(key: KeyEvent, app: &mut App) -> Result<(), Box<dyn Er
         }
         KeyCode::Down => {
             let i = match app.flow_type_state.selected() {
-                Some(i) if i < FlowType::VARIANTS.len() - 1 => i + 1,
-                _ => FlowType::VARIANTS.len() - 1,
+                Some(i) if i < FlowType::ALL.len() - 1 => i + 1,
+                _ => FlowType::ALL.len() - 1,
             };
             app.flow_type_state.select(Some(i));
         }
         KeyCode::Enter => {
-            if let Some(i) = app.flow_type_state.selected() {
-                let selected = FlowType::VARIANTS[i];
-                app.config.config.features = selected.parse().unwrap();
+            if let Some(&flow_type) = app
+                .flow_type_state
+                .selected()
+                .and_then(|i| FlowType::ALL.get(i))
+            {
+                app.config.config.features = flow_type;
                 app.focus = AppFocus::Menu;
             }
         }
@@ -849,9 +851,9 @@ fn render_menu(f: &mut Frame, app: &App, area: Rect) {
 fn render_content(f: &mut Frame, app: &App, area: Rect) {
     match app.main_menu_state.selected() {
         Some(0) => {
-            let items: Vec<ListItem> = FlowType::VARIANTS
-                .iter()
-                .map(|s| ListItem::new(*s))
+            let items: Vec<ListItem> = FlowType::ALL
+                .into_iter()
+                .map(|flow_type| ListItem::new(flow_type.name()))
                 .collect();
             render_selectable_list(
                 f,

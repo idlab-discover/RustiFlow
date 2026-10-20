@@ -4,7 +4,6 @@ use std::{
     fmt,
     num::{NonZeroU64, NonZeroUsize},
 };
-use strum_macros::{EnumString, VariantNames};
 
 #[derive(Debug, Parser)]
 #[clap(author, version, about)]
@@ -215,8 +214,7 @@ pub enum ExportMethodType {
 }
 
 #[allow(clippy::upper_case_acronyms)]
-#[derive(Serialize, Deserialize, clap::ValueEnum, Clone, Debug, EnumString, VariantNames)]
-#[strum(serialize_all = "kebab_case")]
+#[derive(Serialize, Deserialize, clap::ValueEnum, Clone, Copy, Debug, PartialEq, Eq)]
 pub enum FlowType {
     /// A basic flow that stores the basic features of a flow.
     Basic,
@@ -235,6 +233,30 @@ pub enum FlowType {
 
     /// Represents a flow that you can implement yourself.
     Custom,
+}
+
+impl FlowType {
+    /// Every flow type, in the order the config TUI lists them.
+    pub const ALL: [FlowType; 6] = [
+        FlowType::Basic,
+        FlowType::CIC,
+        FlowType::CIDDS,
+        FlowType::Nfstream,
+        FlowType::Rustiflow,
+        FlowType::Custom,
+    ];
+
+    /// The name accepted by `--features`, as clap's `ValueEnum` derives it.
+    pub const fn name(self) -> &'static str {
+        match self {
+            FlowType::Basic => "basic",
+            FlowType::CIC => "cic",
+            FlowType::CIDDS => "cidds",
+            FlowType::Nfstream => "nfstream",
+            FlowType::Rustiflow => "rustiflow",
+            FlowType::Custom => "custom",
+        }
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -262,5 +284,26 @@ impl Default for ConfigFile {
                 packet_graph: false,
             },
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::FlowType;
+    use clap::ValueEnum;
+
+    #[test]
+    fn flow_type_names_match_the_cli() {
+        let cli_names: Vec<String> = FlowType::value_variants()
+            .iter()
+            .filter_map(ValueEnum::to_possible_value)
+            .map(|value| value.get_name().to_owned())
+            .collect();
+        let tui_names: Vec<String> = FlowType::ALL
+            .into_iter()
+            .map(|flow_type| flow_type.name().to_owned())
+            .collect();
+
+        assert_eq!(tui_names, cli_names);
     }
 }
