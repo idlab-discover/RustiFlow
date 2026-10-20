@@ -1,6 +1,6 @@
 use std::collections::VecDeque;
 use std::io;
-use std::num::NonZeroUsize;
+use std::num::{NonZeroU64, NonZeroUsize};
 use std::path::PathBuf;
 use std::sync::{
     atomic::{AtomicU64, Ordering},
@@ -126,7 +126,7 @@ pub async fn handle_realtime<T>(
     num_threads: u8,
     active_timeout: u64,
     idle_timeout: u64,
-    early_export: Option<u64>,
+    early_export: Option<NonZeroU64>,
     expiration_check_interval: u64,
     ingress_only: bool,
     packet_graph_mode: PacketGraphMode,

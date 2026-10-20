@@ -1,4 +1,4 @@
-use std::num::NonZeroUsize;
+use std::num::{NonZeroU64, NonZeroUsize};
 
 use crate::flow_key::ShardSelector;
 use crate::output::FlowSink;
@@ -27,7 +27,7 @@ pub async fn read_pcap_file<T>(
     num_threads: u8,
     active_timeout: u64,
     idle_timeout: u64,
-    early_export: Option<u64>,
+    early_export: Option<NonZeroU64>,
     expiration_check_interval: u64,
 ) -> Result<(), anyhow::Error>
 where
@@ -294,7 +294,7 @@ fn create_shard_senders<T>(
     exporter: impl FlowSink<T>,
     active_timeout: u64,
     idle_timeout: u64,
-    early_export: Option<u64>,
+    early_export: Option<NonZeroU64>,
     expiration_check_interval: u64,
 ) -> Vec<mpsc::Sender<Vec<PacketFeatures>>>
 where

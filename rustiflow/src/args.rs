@@ -1,6 +1,6 @@
 use clap::{ArgGroup, Args, Parser, Subcommand};
 use serde::{Deserialize, Serialize};
-use std::fmt;
+use std::{fmt, num::NonZeroU64};
 use strum_macros::{EnumString, VariantNames};
 
 #[derive(Debug, Parser)]
@@ -23,9 +23,11 @@ pub struct Cli {
     #[clap(long, default_value_t = 120, group = "cli_group")]
     pub idle_timeout: u64,
 
-    /// The print interval for open flows in seconds (optional)
+    /// Export a cumulative snapshot of each open flow every N seconds after its
+    /// first packet (optional; must be at least 1 and smaller than the active timeout).
+    /// Snapshots are triggered by packets and have flow_expire_cause None
     #[clap(long, group = "cli_group")]
-    pub early_export: Option<u64>,
+    pub early_export: Option<NonZeroU64>,
 
     /// Interval (in seconds) for checking and expiring flows in the flowtable.
     /// This represents how often the flowtable should be scanned to remove inactive flows.
@@ -110,9 +112,11 @@ pub struct ExportConfig {
     #[clap(long, default_value_t = 120)]
     pub idle_timeout: u64,
 
-    /// The print interval for open flows in seconds, needs to be smaller than the flow maximum lifespan
+    /// Export a cumulative snapshot of each open flow every N seconds after its
+    /// first packet (optional; must be at least 1 and smaller than the active timeout).
+    /// Snapshots are triggered by packets and have flow_expire_cause None
     #[clap(long)]
-    pub early_export: Option<u64>,
+    pub early_export: Option<NonZeroU64>,
 
     /// Interval (in seconds) for checking and expiring flows in the flowtable.
     /// This represents how often the flowtable should be scanned to remove inactive flows.

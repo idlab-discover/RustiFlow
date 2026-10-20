@@ -1,6 +1,9 @@
 #[cfg(test)]
 mod tests {
-    use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
+    use std::{
+        net::{IpAddr, Ipv4Addr, Ipv6Addr},
+        num::NonZeroU64,
+    };
 
     #[cfg(target_os = "linux")]
     use common::{EbpfEventIpv4, EbpfEventIpv6};
@@ -320,29 +323,114 @@ mod tests {
         assert!(rx.try_recv().is_err());
     }
 
+    fn early_export_every(seconds: u64) -> Option<NonZeroU64> {
+        NonZeroU64::new(seconds)
+    }
+
     #[tokio::test]
-    async fn early_export_keeps_flow_active_for_later_final_export() {
-        let (tx, mut rx) = mpsc::channel::<BasicFlow>(4);
-        let mut flow_table = FlowTable::new(3600, 120, Some(1), tx, 60);
+    async fn early_export_emits_one_snapshot_per_interval() {
+        let (tx, mut rx) = mpsc::channel::<BasicFlow>(8);
+        let mut flow_table = FlowTable::new(3600, 120, early_export_every(2), tx, 60);
+
+        // 1,000 packets, 10 ms apart, from 1 s to 10.99 s.
+        for i in 0..1_000 {
+            flow_table
+                .process_packet(&build_packet(1_000_000 + i * 10_000))
+                .await;
+        }
+        flow_table.export_all_flows(11_000_000).await;
+
+        let mut exports = Vec::new();
+        while let Ok(flow) = rx.try_recv() {
+            exports.push((
+                flow.first_timestamp_us,
+                flow.last_timestamp_us,
+                flow.flow_expire_cause,
+            ));
+        }
+        assert_eq!(
+            exports,
+            vec![
+                (1_000_000, 3_000_000, FlowExpireCause::None),
+                (1_000_000, 5_000_000, FlowExpireCause::None),
+                (1_000_000, 7_000_000, FlowExpireCause::None),
+                (1_000_000, 9_000_000, FlowExpireCause::None),
+                (1_000_000, 10_990_000, FlowExpireCause::ExporterShutdown),
+            ]
+        );
+    }
+
+    #[tokio::test]
+    async fn early_export_only_fires_on_packets_and_skips_missed_boundaries() {
+        let (tx, mut rx) = mpsc::channel::<BasicFlow>(8);
+        let mut flow_table = FlowTable::new(3600, 120, early_export_every(2), tx, 60);
 
         flow_table.process_packet(&build_packet(1_000_000)).await;
-        flow_table.process_packet(&build_packet(3_000_001)).await;
+        flow_table.process_packet(&build_packet(1_500_000)).await;
 
-        let early_export = rx.recv().await.expect("expected early export");
-        assert_eq!(early_export.flow_expire_cause, FlowExpireCause::None);
-        assert_eq!(early_export.first_timestamp_us, 1_000_000);
-        assert_eq!(early_export.last_timestamp_us, 3_000_001);
-
-        flow_table.export_all_flows(4_000_000).await;
-
-        let final_export = rx.recv().await.expect("expected final export");
-        assert_eq!(
-            final_export.flow_expire_cause,
-            FlowExpireCause::ExporterShutdown
-        );
-        assert_eq!(final_export.first_timestamp_us, 1_000_000);
-        assert_eq!(final_export.last_timestamp_us, 3_000_001);
+        // The flow is quiet past the 3 s, 5 s and 7 s boundaries; expiration
+        // sweeps must not produce snapshots for it.
+        flow_table.export_expired_flows(7_500_000).await;
         assert!(rx.try_recv().is_err());
+
+        // One snapshot for the missed boundaries, then the schedule resumes at 9 s.
+        for timestamp_us in [8_200_000, 8_500_000, 9_000_000] {
+            flow_table.process_packet(&build_packet(timestamp_us)).await;
+        }
+
+        let mut snapshots = Vec::new();
+        while let Ok(flow) = rx.try_recv() {
+            snapshots.push((flow.last_timestamp_us, flow.flow_expire_cause));
+        }
+        assert_eq!(
+            snapshots,
+            vec![
+                (8_200_000, FlowExpireCause::None),
+                (9_000_000, FlowExpireCause::None),
+            ]
+        );
+    }
+
+    #[cfg(target_os = "linux")]
+    #[tokio::test]
+    async fn offline_and_realtime_early_exports_match() {
+        let (offline_tx, mut offline_rx) = mpsc::channel::<BasicFlow>(4);
+        let (realtime_tx, mut realtime_rx) = mpsc::channel::<BasicFlow>(4);
+        let mut offline_table = FlowTable::new(3600, 120, early_export_every(1), offline_tx, 60);
+        let mut realtime_table = FlowTable::new(3600, 120, early_export_every(1), realtime_tx, 60);
+
+        for timestamp_us in [1_000_000, 2_000_000, 3_500_000] {
+            offline_table
+                .process_packet(&build_packet(timestamp_us))
+                .await;
+            realtime_table
+                .process_packet(&build_realtime_packet(RealtimePacketIpv4Spec {
+                    source_ip: Ipv4Addr::new(192, 168, 1, 1),
+                    source_port: 12345,
+                    destination_ip: Ipv4Addr::new(192, 168, 1, 2),
+                    destination_port: 443,
+                    timestamp_us,
+                    flags: 0,
+                    sequence_number: 0,
+                    sequence_number_ack: 0,
+                    data_length: 0,
+                }))
+                .await;
+        }
+        offline_table.export_all_flows(4_000_000).await;
+        realtime_table.export_all_flows(4_000_000).await;
+
+        let mut offline_exports = Vec::new();
+        while let Ok(flow) = offline_rx.try_recv() {
+            offline_exports.push(flow.dump());
+        }
+        let mut realtime_exports = Vec::new();
+        while let Ok(flow) = realtime_rx.try_recv() {
+            realtime_exports.push(flow.dump());
+        }
+        // Two snapshots (at 2 s and 3.5 s) and the final export.
+        assert_eq!(offline_exports.len(), 3);
+        assert_eq!(offline_exports, realtime_exports);
     }
 
     #[cfg(target_os = "linux")]

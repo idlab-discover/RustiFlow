@@ -6,6 +6,7 @@ use crossterm::terminal::{
 use log::error;
 use serde::{Deserialize, Serialize};
 use std::error::Error;
+use std::num::NonZeroU64;
 use std::{fs, io};
 use strum::VariantNames;
 use tui::backend::{Backend, CrosstermBackend};
@@ -380,7 +381,7 @@ fn handle_numeric_input(
                             if value == 0 { None } else { Some(value as u8) }
                     }
                     AppFocus::EarlyExportInput => {
-                        app.config.config.early_export = if value == 0 { None } else { Some(value) }
+                        app.config.config.early_export = NonZeroU64::new(value)
                     }
                     _ => {}
                 }

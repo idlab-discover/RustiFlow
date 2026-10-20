@@ -1,5 +1,6 @@
 use std::{
     collections::{hash_map::Entry, HashMap},
+    num::NonZeroU64,
     time::Instant,
 };
 
@@ -25,13 +26,16 @@ struct FlowEntry<T> {
     /// Orientation of the packet that created the flow; packets with the same
     /// orientation travel in the flow's forward direction.
     forward_orientation: KeyOrientation,
+    /// Next early-export boundary, at first packet + k * interval. Unused when
+    /// early export is disabled.
+    next_early_export_us: i64,
 }
 
 pub struct FlowTable<T> {
     flow_map: HashMap<FlowKey, FlowEntry<T>, FlowKeyHashBuilder>, // Keyed by canonical biflow key
     active_timeout: u64,
     idle_timeout: u64,
-    early_export: Option<u64>,
+    early_export_us: Option<i64>,
     export_channel: mpsc::Sender<T>,
     next_check_time_us: Option<i64>, // Track the next time we check for flow expirations
     expiration_check_interval_us: i64, // Check for expired flows every x seconds
@@ -44,7 +48,7 @@ where
     pub fn new(
         active_timeout: u64,
         idle_timeout: u64,
-        early_export: Option<u64>,
+        early_export: Option<NonZeroU64>,
         export_channel: mpsc::Sender<T>,
         expiration_check_interval: u64,
     ) -> Self {
@@ -52,7 +56,7 @@ where
             flow_map: HashMap::default(),
             active_timeout,
             idle_timeout,
-            early_export,
+            early_export_us: early_export.map(|seconds| (seconds.get() * 1_000_000) as i64),
             export_channel,
             next_check_time_us: None,
             expiration_check_interval_us: (expiration_check_interval * 1_000_000) as i64,
@@ -88,12 +92,7 @@ where
                 }
 
                 let is_forward = entry.forward_orientation == orientation;
-                match Self::apply_packet_to_flow(
-                    &mut entry.flow,
-                    packet,
-                    is_forward,
-                    self.early_export,
-                ) {
+                match Self::apply_packet_to_flow(entry, packet, is_forward, self.early_export_us) {
                     FlowUpdate::Active => {}
                     FlowUpdate::EarlyExport(snapshot) => {
                         Self::export(&self.export_channel, snapshot).await;
@@ -118,7 +117,7 @@ where
         biflow_key: FlowKey,
         orientation: KeyOrientation,
     ) {
-        let mut new_flow = T::new(
+        let new_flow = T::new(
             packet.flow_key_value().to_string(),
             packet.source_ip,
             packet.source_port,
@@ -127,47 +126,59 @@ where
             packet.protocol,
             packet.timestamp_us,
         );
+        let mut entry = FlowEntry {
+            flow: new_flow,
+            forward_orientation: orientation,
+            next_early_export_us: packet.timestamp_us + self.early_export_us.unwrap_or(0),
+        };
         let snapshot =
-            match Self::apply_packet_to_flow(&mut new_flow, packet, true, self.early_export) {
+            match Self::apply_packet_to_flow(&mut entry, packet, true, self.early_export_us) {
                 FlowUpdate::Active => None,
                 FlowUpdate::EarlyExport(snapshot) => Some(snapshot),
                 FlowUpdate::Terminated => {
-                    Self::export(&self.export_channel, new_flow).await;
+                    Self::export(&self.export_channel, entry.flow).await;
                     return;
                 }
             };
 
-        self.flow_map.insert(
-            biflow_key,
-            FlowEntry {
-                flow: new_flow,
-                forward_orientation: orientation,
-            },
-        );
+        self.flow_map.insert(biflow_key, entry);
         if let Some(snapshot) = snapshot {
             Self::export(&self.export_channel, snapshot).await;
         }
     }
 
+    /// Applies a packet to a flow and decides whether it terminated the flow or
+    /// reached the flow's next early-export boundary.
+    ///
+    /// Early exports are cumulative snapshots of the flow so far, with cause
+    /// `None`. Only packets trigger them, so a flow that goes quiet gets no
+    /// further snapshots until it expires.
     fn apply_packet_to_flow(
-        flow: &mut T,
+        entry: &mut FlowEntry<T>,
         packet: &PacketFeatures,
         is_forward: bool,
-        early_export: Option<u64>,
+        early_export_us: Option<i64>,
     ) -> FlowUpdate<T> {
-        if flow.update_flow(packet, is_forward) {
-            FlowUpdate::Terminated
-        } else if early_export.is_some_and(|early_export| {
-            ((packet.timestamp_us - flow.get_first_timestamp_us()) / 1_000_000) as u64
-                > early_export
-        }) {
-            let clone_start = Instant::now();
-            let snapshot = flow.clone();
-            export_profile::record_clone(clone_start.elapsed());
-            FlowUpdate::EarlyExport(snapshot)
-        } else {
-            FlowUpdate::Active
+        if entry.flow.update_flow(packet, is_forward) {
+            return FlowUpdate::Terminated;
         }
+        let Some(interval_us) = early_export_us else {
+            return FlowUpdate::Active;
+        };
+        if packet.timestamp_us < entry.next_early_export_us {
+            return FlowUpdate::Active;
+        }
+
+        // Stay on the first packet + k * interval grid, skipping boundaries that
+        // passed without packets, so one packet yields at most one snapshot.
+        let first_timestamp_us = entry.flow.get_first_timestamp_us();
+        let elapsed_intervals = (packet.timestamp_us - first_timestamp_us) / interval_us;
+        entry.next_early_export_us = first_timestamp_us + (elapsed_intervals + 1) * interval_us;
+
+        let clone_start = Instant::now();
+        let snapshot = entry.flow.clone();
+        export_profile::record_clone(clone_start.elapsed());
+        FlowUpdate::EarlyExport(snapshot)
     }
 
     /// Export all flows in the flow map in order of first packet arrival.

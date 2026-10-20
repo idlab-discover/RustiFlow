@@ -281,7 +281,7 @@ Options:
           [default: 120]
 
       --early-export <EARLY_EXPORT>
-          The print interval for open flows in seconds (optional)
+          Export a cumulative snapshot of each open flow every N seconds after its first packet (optional; must be at least 1 and smaller than the active timeout). Snapshots are triggered by packets and have flow_expire_cause None
 
       --expiration-check-interval <EXPIRATION_CHECK_INTERVAL>
           Interval (in seconds) for checking and expiring flows in the flowtable. This represents how often the flowtable should be scanned to remove inactive flows
@@ -318,6 +318,25 @@ Options:
               Print version
 
 ```
+
+### Early export
+
+`--early-export N` (or `early_export = N` in the configuration file) emits
+periodic snapshots of long-lived flows before their final export:
+
+- Snapshots fall on a fixed per-flow schedule: first packet + N, + 2N, ...
+  The first packet at or after a boundary exports one snapshot, so a flow
+  produces about `duration / N` snapshots rather than one per packet.
+  Boundaries that pass without packets are skipped, and a flow that goes quiet
+  gets no further snapshots until it expires.
+- Each snapshot is cumulative: it covers the flow from its first packet up to
+  and including the triggering packet, with the same columns as a final row.
+- Snapshots keep `flow_expire_cause` `None`. Final rows always carry a real
+  expiration cause.
+- The flow itself stays open; its final row repeats everything in the
+  snapshots.
+- `N` must be at least `1` and smaller than `--active-timeout`. Omit the flag to
+  disable early export.
 
 ## Logging in both development or using the binary
 

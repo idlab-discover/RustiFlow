@@ -103,6 +103,16 @@ async fn main() {
 }
 
 async fn run_with_config(config: Config) {
+    if let Some(early_export) = config.config.early_export {
+        if early_export.get() >= config.config.active_timeout {
+            error!(
+                "Early export interval ({early_export} s) must be smaller than the active timeout ({} s)",
+                config.config.active_timeout
+            );
+            std::process::exit(1);
+        }
+    }
+
     // Start the selected command
     match config.command {
         Commands::Realtime {
