@@ -44,10 +44,14 @@ jobs:
             cargo install sarif-fmt
           fi
 
+      # bash implies pipefail, so clippy errors fail the job instead of being
+      # masked by the exit status of sarif-fmt at the end of the pipe.
       - name: Run rust-clippy
-        run: cargo clippy -p rustiflow --all-targets --message-format=json -- -D warnings | clippy-sarif | tee rust-clippy-results.sarif | sarif-fmt
+        shell: bash
+        run: cargo clippy --locked -p rustiflow --all-targets --message-format=json -- -D warnings | clippy-sarif | tee rust-clippy-results.sarif | sarif-fmt
 
       - name: Upload analysis results to GitHub
+        if: success() || failure()
         uses: github/codeql-action/upload-sarif@v4
         with:
           sarif_file: rust-clippy-results.sarif
