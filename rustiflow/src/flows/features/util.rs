@@ -142,14 +142,45 @@ pub fn push_csv_f64(output: &mut String, value: f64) {
     if !output.is_empty() {
         output.push(',');
     }
-    if value.fract() == 0.0
-        && value.abs() < EXACT_INTEGER_F64_LIMIT
+    // The round trip through i64 tests integrality without a libm `trunc` call;
+    // NaN fails the range check.
+    let integer = value as i64;
+    if value.abs() < EXACT_INTEGER_F64_LIMIT
+        && integer as f64 == value
         && !(value == 0.0 && value.is_sign_negative())
     {
-        let _ = write!(output, "{}", value as i64);
+        push_i64_digits(output, integer);
     } else {
         let _ = write!(output, "{value}");
     }
+}
+
+/// Appends an integer CSV field, byte-identical to its `Display` output.
+pub fn push_csv_int(output: &mut String, value: impl Into<i64>) {
+    if !output.is_empty() {
+        output.push(',');
+    }
+    push_i64_digits(output, value.into());
+}
+
+/// Appends the decimal form of `value`, matching its `Display` output without
+/// going through the `fmt` machinery.
+fn push_i64_digits(output: &mut String, value: i64) {
+    if value < 0 {
+        output.push('-');
+    }
+    let mut remaining = value.unsigned_abs();
+    let mut digits = [0u8; 20]; // u64::MAX has 20 decimal digits
+    let mut start = digits.len();
+    loop {
+        start -= 1;
+        digits[start] = b'0' + (remaining % 10) as u8;
+        remaining /= 10;
+        if remaining == 0 {
+            break;
+        }
+    }
+    output.extend(digits[start..].iter().map(|&digit| char::from(digit)));
 }
 
 /// Safely performs floating point division, returning 0.0 if denominator is 0

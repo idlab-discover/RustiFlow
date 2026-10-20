@@ -5,7 +5,7 @@ use crate::{
     packet_features::{PacketFeatures, ACK_FLAG},
 };
 
-use super::util::{push_csv_display, FlowFeature};
+use super::util::{push_csv_int, FlowFeature};
 
 #[derive(Clone, Copy)]
 struct AckObservation {
@@ -98,18 +98,18 @@ impl FlowFeature for TcpQualityStats {
     }
 
     fn append_to_csv(&self, output: &mut String) {
-        push_csv_display(
+        push_csv_int(
             output,
             self.fwd_duplicate_ack_count + self.bwd_duplicate_ack_count,
         );
-        push_csv_display(output, self.fwd_duplicate_ack_count);
-        push_csv_display(output, self.bwd_duplicate_ack_count);
-        push_csv_display(
+        push_csv_int(output, self.fwd_duplicate_ack_count);
+        push_csv_int(output, self.bwd_duplicate_ack_count);
+        push_csv_int(
             output,
             self.fwd_zero_window_count + self.bwd_zero_window_count,
         );
-        push_csv_display(output, self.fwd_zero_window_count);
-        push_csv_display(output, self.bwd_zero_window_count);
+        push_csv_int(output, self.fwd_zero_window_count);
+        push_csv_int(output, self.bwd_zero_window_count);
     }
 
     fn headers() -> String {

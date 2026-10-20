@@ -5,7 +5,7 @@ use crate::{
     packet_features::{PacketFeatures, ACK_FLAG, FIN_FLAG, SYN_FLAG},
 };
 
-use super::util::{push_csv_display, FlowFeature};
+use super::util::{push_csv_int, FlowFeature};
 
 #[derive(Clone)]
 pub struct RetransmissionStats {
@@ -95,12 +95,12 @@ impl FlowFeature for RetransmissionStats {
     }
 
     fn append_to_csv(&self, output: &mut String) {
-        push_csv_display(
+        push_csv_int(
             output,
             self.fwd_retransmission_count + self.bwd_retransmission_count,
         );
-        push_csv_display(output, self.fwd_retransmission_count);
-        push_csv_display(output, self.bwd_retransmission_count);
+        push_csv_int(output, self.fwd_retransmission_count);
+        push_csv_int(output, self.bwd_retransmission_count);
     }
 
     fn headers() -> String {

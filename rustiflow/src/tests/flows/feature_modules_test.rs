@@ -15,7 +15,7 @@ mod tests {
                 subflow_stats::SubflowStats,
                 tcp_quality_stats::TcpQualityStats,
                 timing_stats::TimingStats,
-                util::{push_csv_f64, FeatureStats, FlowFeature},
+                util::{push_csv_f64, push_csv_int, FeatureStats, FlowFeature},
                 window_size_stats::WindowSizeStats,
             },
             util::FlowExpireCause,
@@ -568,6 +568,30 @@ mod tests {
                 "bits {:#x}",
                 value.to_bits()
             );
+        }
+    }
+
+    #[test]
+    fn push_csv_int_matches_display_formatting() {
+        let values = [
+            0,
+            1,
+            -1,
+            9,
+            10,
+            -10,
+            99,
+            100,
+            65_535,
+            i64::MAX,
+            i64::MIN,
+            i64::MIN + 1,
+        ];
+        for value in values {
+            let mut output = String::new();
+            push_csv_int(&mut output, value);
+            push_csv_int(&mut output, value);
+            assert_eq!(output, format!("{value},{value}"));
         }
     }
 }

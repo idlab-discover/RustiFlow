@@ -1,6 +1,6 @@
 use crate::{flows::util::FlowExpireCause, packet_features::PacketFeatures};
 
-use super::util::{push_csv_display, FeatureStats, FlowFeature};
+use super::util::{push_csv_int, FeatureStats, FlowFeature};
 
 #[derive(Clone)]
 pub struct WindowSizeStats {
@@ -44,8 +44,8 @@ impl FlowFeature for WindowSizeStats {
     }
 
     fn append_to_csv(&self, output: &mut String) {
-        push_csv_display(output, self.fwd_init_window_size);
-        push_csv_display(output, self.bwd_init_window_size);
+        push_csv_int(output, self.fwd_init_window_size);
+        push_csv_int(output, self.bwd_init_window_size);
         self.window_size.append_csv_values(output);
         self.fwd_window_size.append_csv_values(output);
         self.bwd_window_size.append_csv_values(output);

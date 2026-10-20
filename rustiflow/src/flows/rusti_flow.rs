@@ -3,7 +3,9 @@ use std::{fmt::Display, fmt::Write as _};
 
 use crate::{
     flows::{
-        features::util::{push_csv_f64, safe_div, safe_div_int, safe_per_second_rate},
+        features::util::{
+            push_csv_f64, push_csv_int, safe_div, safe_div_int, safe_per_second_rate,
+        },
         util::iana_port_mapping,
     },
     packet_features::PacketFeatures,
@@ -133,21 +135,21 @@ impl Flow for RustiFlow {
         let duration_us = self.basic_flow.get_flow_duration_usec();
         push_csv_display(output, &self.basic_flow.flow_key);
         push_csv_display(output, self.basic_flow.ip_source);
-        push_csv_display(output, self.basic_flow.port_source);
+        push_csv_int(output, self.basic_flow.port_source);
         push_csv_display(output, self.basic_flow.ip_destination);
-        push_csv_display(output, self.basic_flow.port_destination);
-        push_csv_display(output, self.basic_flow.protocol);
-        push_csv_display(output, self.basic_flow.get_ip_version());
+        push_csv_int(output, self.basic_flow.port_destination);
+        push_csv_int(output, self.basic_flow.protocol);
+        push_csv_int(output, self.basic_flow.get_ip_version());
         push_csv_display(output, self.basic_flow.get_source_ip_scope().as_str());
         push_csv_display(output, self.basic_flow.get_destination_ip_scope().as_str());
         push_csv_display(output, self.basic_flow.get_path_locality().as_str());
         push_csv_display(output, self.basic_flow.get_first_timestamp());
         push_csv_display(output, self.basic_flow.get_last_timestamp());
-        push_csv_display(output, duration_us);
+        push_csv_int(output, duration_us);
         push_csv_display(output, self.basic_flow.flow_expire_cause.as_str());
-        push_csv_display(output, u8::from(self.basic_flow.tcp_handshake_completed));
-        push_csv_display(output, u8::from(self.basic_flow.tcp_reset_before_handshake));
-        push_csv_display(output, u8::from(self.basic_flow.tcp_reset_after_handshake));
+        push_csv_int(output, u8::from(self.basic_flow.tcp_handshake_completed));
+        push_csv_int(output, u8::from(self.basic_flow.tcp_reset_before_handshake));
+        push_csv_int(output, u8::from(self.basic_flow.tcp_reset_after_handshake));
         push_csv_display(output, self.basic_flow.tcp_close_style.as_str());
         self.timing_stats.append_to_csv(output);
         self.iat_stats.append_to_csv(output);
@@ -293,16 +295,16 @@ impl Flow for RustiFlow {
         let duration_us = self.basic_flow.get_flow_duration_usec();
         push_csv_display(output, iana_port_mapping(self.basic_flow.port_source));
         push_csv_display(output, iana_port_mapping(self.basic_flow.port_destination));
-        push_csv_display(output, self.basic_flow.protocol);
-        push_csv_display(output, self.basic_flow.get_ip_version());
+        push_csv_int(output, self.basic_flow.protocol);
+        push_csv_int(output, self.basic_flow.get_ip_version());
         push_csv_display(output, self.basic_flow.get_source_ip_scope().as_str());
         push_csv_display(output, self.basic_flow.get_destination_ip_scope().as_str());
         push_csv_display(output, self.basic_flow.get_path_locality().as_str());
-        push_csv_display(output, duration_us);
+        push_csv_int(output, duration_us);
         push_csv_display(output, self.basic_flow.flow_expire_cause.as_str());
-        push_csv_display(output, u8::from(self.basic_flow.tcp_handshake_completed));
-        push_csv_display(output, u8::from(self.basic_flow.tcp_reset_before_handshake));
-        push_csv_display(output, u8::from(self.basic_flow.tcp_reset_after_handshake));
+        push_csv_int(output, u8::from(self.basic_flow.tcp_handshake_completed));
+        push_csv_int(output, u8::from(self.basic_flow.tcp_reset_before_handshake));
+        push_csv_int(output, u8::from(self.basic_flow.tcp_reset_after_handshake));
         push_csv_display(output, self.basic_flow.tcp_close_style.as_str());
         push_csv_f64(output, self.timing_stats.get_fwd_duration());
         push_csv_f64(output, self.timing_stats.get_bwd_duration());
