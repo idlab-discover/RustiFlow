@@ -1,6 +1,6 @@
 use crate::{flows::util::FlowExpireCause, packet_features::PacketFeatures};
 
-use super::util::{push_csv_display, FeatureStats, FlowFeature};
+use super::util::{push_csv_display, push_csv_f64, FeatureStats, FlowFeature};
 
 #[derive(Clone)]
 pub struct PacketLengthStats {
@@ -126,11 +126,11 @@ impl FlowFeature for PacketLengthStats {
 
     fn append_to_csv(&self, output: &mut String) {
         push_csv_display(output, self.flow_count());
-        push_csv_display(output, self.flow_total());
-        push_csv_display(output, self.flow_mean());
-        push_csv_display(output, self.flow_max());
-        push_csv_display(output, self.flow_min());
-        push_csv_display(output, self.flow_std());
+        push_csv_f64(output, self.flow_total());
+        push_csv_f64(output, self.flow_mean());
+        push_csv_f64(output, self.flow_max());
+        push_csv_f64(output, self.flow_min());
+        push_csv_f64(output, self.flow_std());
         push_csv_display(output, self.fwd_packet_len.get_count());
         push_csv_display(output, self.bwd_packet_len.get_count());
         self.fwd_packet_len.append_csv_values(output);

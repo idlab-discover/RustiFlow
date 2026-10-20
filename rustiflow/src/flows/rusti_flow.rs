@@ -3,7 +3,7 @@ use std::{fmt::Display, fmt::Write as _};
 
 use crate::{
     flows::{
-        features::util::{safe_div, safe_div_int, safe_per_second_rate},
+        features::util::{push_csv_f64, safe_div, safe_div_int, safe_per_second_rate},
         util::iana_port_mapping,
     },
     packet_features::PacketFeatures,
@@ -169,77 +169,77 @@ impl Flow for RustiFlow {
         push_csv_str(output, &self.tcp_quality_stats.dump());
         self.window_size_stats.append_to_csv(output);
         self.tcp_flags_stats.append_to_csv(output);
-        push_csv_display(
+        push_csv_f64(
             output,
             safe_per_second_rate(
                 self.payload_len_stats.payload_len.get_total(),
                 duration_us as f64,
             ),
         );
-        push_csv_display(
+        push_csv_f64(
             output,
             safe_per_second_rate(
                 self.payload_len_stats.payload_len.get_count() as f64,
                 duration_us as f64,
             ),
         );
-        push_csv_display(
+        push_csv_f64(
             output,
             safe_per_second_rate(
                 self.payload_len_stats.fwd_payload_len.get_total(),
                 duration_us as f64,
             ),
         );
-        push_csv_display(
+        push_csv_f64(
             output,
             safe_per_second_rate(
                 self.payload_len_stats.fwd_payload_len.get_count() as f64,
                 duration_us as f64,
             ),
         );
-        push_csv_display(
+        push_csv_f64(
             output,
             safe_per_second_rate(
                 self.payload_len_stats.bwd_payload_len.get_total(),
                 duration_us as f64,
             ),
         );
-        push_csv_display(
+        push_csv_f64(
             output,
             safe_per_second_rate(
                 self.payload_len_stats.bwd_payload_len.get_count() as f64,
                 duration_us as f64,
             ),
         );
-        push_csv_display(
+        push_csv_f64(
             output,
             safe_div_int(
                 self.payload_len_stats.fwd_payload_len.get_count(),
                 self.subflow_stats.subflow_count,
             ),
         );
-        push_csv_display(
+        push_csv_f64(
             output,
             safe_div(
                 self.payload_len_stats.fwd_payload_len.get_total(),
                 self.subflow_stats.subflow_count as f64,
             ),
         );
-        push_csv_display(
+        push_csv_f64(
             output,
             safe_div_int(
                 self.payload_len_stats.bwd_payload_len.get_count(),
                 self.subflow_stats.subflow_count,
             ),
         );
-        push_csv_display(
+        push_csv_f64(
             output,
             safe_div(
                 self.payload_len_stats.bwd_payload_len.get_total(),
                 self.subflow_stats.subflow_count as f64,
             ),
         );
-        push_csv_display(
+        push_csv_f64(
             output,
             safe_div_int(
                 self.payload_len_stats.bwd_payload_len.get_count(),
@@ -311,8 +311,8 @@ impl Flow for RustiFlow {
         push_csv_display(output, u8::from(self.basic_flow.tcp_reset_before_handshake));
         push_csv_display(output, u8::from(self.basic_flow.tcp_reset_after_handshake));
         push_csv_display(output, self.basic_flow.tcp_close_style.as_str());
-        push_csv_display(output, self.timing_stats.get_fwd_duration());
-        push_csv_display(output, self.timing_stats.get_bwd_duration());
+        push_csv_f64(output, self.timing_stats.get_fwd_duration());
+        push_csv_f64(output, self.timing_stats.get_bwd_duration());
         self.iat_stats.append_to_csv(output);
         self.packet_len_stats.append_to_csv(output);
         push_csv_str(output, &self.header_len_stats.dump());
@@ -325,77 +325,77 @@ impl Flow for RustiFlow {
         push_csv_str(output, &self.tcp_quality_stats.dump());
         self.window_size_stats.append_to_csv(output);
         self.tcp_flags_stats.append_to_csv(output);
-        push_csv_display(
+        push_csv_f64(
             output,
             safe_per_second_rate(
                 self.payload_len_stats.payload_len.get_total(),
                 duration_us as f64,
             ),
         );
-        push_csv_display(
+        push_csv_f64(
             output,
             safe_per_second_rate(
                 self.payload_len_stats.payload_len.get_count() as f64,
                 duration_us as f64,
             ),
         );
-        push_csv_display(
+        push_csv_f64(
             output,
             safe_per_second_rate(
                 self.payload_len_stats.fwd_payload_len.get_total(),
                 duration_us as f64,
             ),
         );
-        push_csv_display(
+        push_csv_f64(
             output,
             safe_per_second_rate(
                 self.payload_len_stats.fwd_payload_len.get_count() as f64,
                 duration_us as f64,
             ),
         );
-        push_csv_display(
+        push_csv_f64(
             output,
             safe_per_second_rate(
                 self.payload_len_stats.bwd_payload_len.get_total(),
                 duration_us as f64,
             ),
         );
-        push_csv_display(
+        push_csv_f64(
             output,
             safe_per_second_rate(
                 self.payload_len_stats.bwd_payload_len.get_count() as f64,
                 duration_us as f64,
             ),
         );
-        push_csv_display(
+        push_csv_f64(
             output,
             safe_div_int(
                 self.payload_len_stats.fwd_payload_len.get_count(),
                 self.subflow_stats.subflow_count,
             ),
         );
-        push_csv_display(
+        push_csv_f64(
             output,
             safe_div(
                 self.payload_len_stats.fwd_payload_len.get_total(),
                 self.subflow_stats.subflow_count as f64,
             ),
         );
-        push_csv_display(
+        push_csv_f64(
             output,
             safe_div_int(
                 self.payload_len_stats.bwd_payload_len.get_count(),
                 self.subflow_stats.subflow_count,
             ),
         );
-        push_csv_display(
+        push_csv_f64(
             output,
             safe_div(
                 self.payload_len_stats.bwd_payload_len.get_total(),
                 self.subflow_stats.subflow_count as f64,
             ),
         );
-        push_csv_display(
+        push_csv_f64(
             output,
             safe_div_int(
                 self.payload_len_stats.bwd_payload_len.get_count(),

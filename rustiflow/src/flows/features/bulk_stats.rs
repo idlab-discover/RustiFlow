@@ -1,6 +1,8 @@
 use crate::{flows::util::FlowExpireCause, packet_features::PacketFeatures};
 
-use super::util::{push_csv_display, safe_per_second_rate, FeatureStats, FlowFeature};
+use super::util::{
+    push_csv_display, push_csv_f64, safe_per_second_rate, FeatureStats, FlowFeature,
+};
 
 const MIN_BULK_PACKETS: u32 = 4;
 const BULK_IDLE_US: i64 = 1_000_000;
@@ -187,8 +189,8 @@ impl FlowFeature for BulkStats {
     }
 
     fn append_to_csv(&self, output: &mut String) {
-        push_csv_display(output, self.fwd_bulk_rate());
-        push_csv_display(output, self.bwd_bulk_rate());
+        push_csv_f64(output, self.fwd_bulk_rate());
+        push_csv_f64(output, self.bwd_bulk_rate());
         push_csv_display(output, self.fwd_bulk_packets.get_count());
         push_csv_display(output, self.bwd_bulk_packets.get_count());
         self.fwd_bulk_packets.append_csv_values(output);

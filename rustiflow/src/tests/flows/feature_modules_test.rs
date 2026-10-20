@@ -15,7 +15,7 @@ mod tests {
                 subflow_stats::SubflowStats,
                 tcp_quality_stats::TcpQualityStats,
                 timing_stats::TimingStats,
-                util::{FeatureStats, FlowFeature},
+                util::{push_csv_f64, FeatureStats, FlowFeature},
                 window_size_stats::WindowSizeStats,
             },
             util::FlowExpireCause,
@@ -520,5 +520,54 @@ mod tests {
         assert!((stats.last_timestamp_fwd_ms() - 1_000.75).abs() < f64::EPSILON);
         assert!((stats.get_fwd_duration() - 0.75).abs() < f64::EPSILON);
         assert!((stats.get_bwd_duration() - 0.875).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn push_csv_f64_matches_display_formatting() {
+        let mut values = vec![
+            0.0,
+            -0.0,
+            1.0,
+            -1.0,
+            0.5,
+            -2.5,
+            146.1,
+            1_700_000_000_003.306,
+            9_007_199_254_740_991.0,
+            9_007_199_254_740_992.0,
+            -9_007_199_254_740_992.0,
+            1e21,
+            1e-7,
+            f64::MAX,
+            f64::MIN,
+            f64::MIN_POSITIVE,
+            f64::EPSILON,
+            f64::INFINITY,
+            f64::NEG_INFINITY,
+            f64::NAN,
+        ];
+        // Deterministic xorshift sweep over integral and fractional magnitudes.
+        let mut state: u64 = 0x9e37_79b9_7f4a_7c15;
+        for _ in 0..10_000 {
+            state ^= state << 13;
+            state ^= state >> 7;
+            state ^= state << 17;
+            let integral = (state >> 11) as f64;
+            values.push(integral);
+            values.push(-integral / 3.0);
+            values.push(f64::from_bits(state));
+        }
+
+        for value in values {
+            let mut output = String::new();
+            push_csv_f64(&mut output, value);
+            push_csv_f64(&mut output, value);
+            assert_eq!(
+                output,
+                format!("{value},{value}"),
+                "bits {:#x}",
+                value.to_bits()
+            );
+        }
     }
 }

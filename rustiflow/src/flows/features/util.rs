@@ -122,11 +122,11 @@ impl FeatureStats {
     }
 
     pub fn append_csv_values(&self, output: &mut String) {
-        push_csv_display(output, self.get_total());
-        push_csv_display(output, self.get_mean());
-        push_csv_display(output, self.get_std());
-        push_csv_display(output, self.get_max());
-        push_csv_display(output, self.get_min());
+        push_csv_f64(output, self.get_total());
+        push_csv_f64(output, self.get_mean());
+        push_csv_f64(output, self.get_std());
+        push_csv_f64(output, self.get_max());
+        push_csv_f64(output, self.get_min());
     }
 }
 
@@ -135,6 +135,29 @@ pub fn push_csv_display(output: &mut String, value: impl Display) {
         output.push(',');
     }
     let _ = write!(output, "{value}");
+}
+
+/// Largest magnitude below which every integral `f64` converts to `i64` exactly.
+const EXACT_INTEGER_F64_LIMIT: f64 = 9_007_199_254_740_992.0; // 2^53
+
+/// Appends `value` as a CSV field, byte-identical to its `Display` output.
+///
+/// `Display` renders integral floats without a fractional part (`3`, `-0`), so
+/// integral values take the much cheaper integer formatter. Most exported
+/// statistics (lengths, counts, totals, empty stats) are integral. Negative zero
+/// keeps the float path because `-0` has no `i64` representation.
+pub fn push_csv_f64(output: &mut String, value: f64) {
+    if !output.is_empty() {
+        output.push(',');
+    }
+    if value.fract() == 0.0
+        && value.abs() < EXACT_INTEGER_F64_LIMIT
+        && !(value == 0.0 && value.is_sign_negative())
+    {
+        let _ = write!(output, "{}", value as i64);
+    } else {
+        let _ = write!(output, "{value}");
+    }
 }
 
 /// Safely performs floating point division, returning 0.0 if denominator is 0
