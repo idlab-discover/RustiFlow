@@ -1,7 +1,9 @@
-use std::hash::{DefaultHasher, Hash, Hasher};
+use std::num::NonZeroUsize;
 
+use crate::flow_key::ShardSelector;
 use crate::Flow;
 use crate::{flow_table::FlowTable, packet_features::PacketFeatures};
+use anyhow::Context;
 use chrono::DateTime;
 use log::{debug, error};
 use pnet::packet::{
@@ -31,6 +33,10 @@ pub async fn read_pcap_file<T>(
 where
     T: Flow,
 {
+    let shard_count =
+        NonZeroUsize::new(usize::from(num_threads)).context("thread count must be at least 1")?;
+    let shard_selector = ShardSelector::new(shard_count);
+
     debug!("Opening the pcap file: {:?} ...", path);
 
     let mut pcap_capture = match pcap::Capture::from_file(path) {
@@ -71,7 +77,7 @@ where
                             &packet,
                             timestamp_us,
                             &shard_senders,
-                            num_threads,
+                            &shard_selector,
                             PacketFeatures::from_ipv4_packet,
                         )
                         .await;
@@ -83,7 +89,7 @@ where
                             &packet,
                             timestamp_us,
                             &shard_senders,
-                            num_threads,
+                            &shard_selector,
                             PacketFeatures::from_ipv6_packet,
                         )
                         .await;
@@ -103,7 +109,7 @@ where
                                         &packet,
                                         timestamp_us,
                                         &shard_senders,
-                                        num_threads,
+                                        &shard_selector,
                                         PacketFeatures::from_ipv4_packet,
                                     )
                                     .await;
@@ -115,7 +121,7 @@ where
                                         &packet,
                                         timestamp_us,
                                         &shard_senders,
-                                        num_threads,
+                                        &shard_selector,
                                         PacketFeatures::from_ipv6_packet,
                                     )
                                     .await;
@@ -145,7 +151,7 @@ where
                                     &packet,
                                     timestamp_us,
                                     &shard_senders,
-                                    num_threads,
+                                    &shard_selector,
                                     PacketFeatures::from_ipv4_packet,
                                 )
                                 .await;
@@ -157,7 +163,7 @@ where
                                     &packet,
                                     timestamp_us,
                                     &shard_senders,
-                                    num_threads,
+                                    &shard_selector,
                                     PacketFeatures::from_ipv6_packet,
                                 )
                                 .await;
@@ -177,7 +183,7 @@ where
                                                 &packet,
                                                 timestamp_us,
                                                 &shard_senders,
-                                                num_threads,
+                                                &shard_selector,
                                                 PacketFeatures::from_ipv4_packet,
                                             )
                                             .await;
@@ -189,7 +195,7 @@ where
                                                 &packet,
                                                 timestamp_us,
                                                 &shard_senders,
-                                                num_threads,
+                                                &shard_selector,
                                                 PacketFeatures::from_ipv6_packet,
                                             )
                                             .await;
@@ -221,7 +227,7 @@ async fn process_packet<T, P>(
     packet: &P,
     timestamp_us: i64,
     shard_senders: &[mpsc::Sender<PacketFeatures>],
-    num_shards: u8,
+    shard_selector: &ShardSelector,
     extractor: fn(&P, i64) -> Option<PacketFeatures>,
 ) where
     T: Flow,
@@ -229,7 +235,7 @@ async fn process_packet<T, P>(
 {
     if let Some(packet_features) = extractor(packet, timestamp_us) {
         let flow_key = packet_features.biflow_key_value();
-        let shard_index = compute_shard_index(&flow_key, num_shards);
+        let shard_index = shard_selector.shard_index(&flow_key);
 
         if let Err(e) = shard_senders[shard_index].send(packet_features).await {
             error!(
@@ -238,14 +244,6 @@ async fn process_packet<T, P>(
             );
         }
     }
-}
-
-fn compute_shard_index<H: Hash>(flow_key: &H, num_shards: u8) -> usize {
-    assert!(num_shards > 0, "num_shards must be greater than 0");
-    let mut hasher = DefaultHasher::new();
-    flow_key.hash(&mut hasher);
-    let hash = hasher.finish();
-    (hash % num_shards as u64) as usize
 }
 
 /// Creates shard channels to FlowTables and spawns processing tasks for each shard.

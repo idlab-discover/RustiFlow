@@ -5,7 +5,7 @@ use std::{
 
 use crate::{
     export_profile,
-    flow_key::{FlowKey, KeyOrientation},
+    flow_key::{FlowKey, FlowKeyHashBuilder, KeyOrientation},
     flows::util::FlowExpireCause,
     packet_features::PacketFeatures,
     Flow,
@@ -28,7 +28,7 @@ struct FlowEntry<T> {
 }
 
 pub struct FlowTable<T> {
-    flow_map: HashMap<FlowKey, FlowEntry<T>>, // Keyed by canonical biflow key
+    flow_map: HashMap<FlowKey, FlowEntry<T>, FlowKeyHashBuilder>, // Keyed by canonical biflow key
     active_timeout: u64,
     idle_timeout: u64,
     early_export: Option<u64>,
@@ -49,7 +49,7 @@ where
         expiration_check_interval: u64,
     ) -> Self {
         Self {
-            flow_map: HashMap::new(),
+            flow_map: HashMap::default(),
             active_timeout,
             idle_timeout,
             early_export,

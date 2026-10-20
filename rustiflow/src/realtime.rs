@@ -1,5 +1,5 @@
-use std::hash::{DefaultHasher, Hash, Hasher};
 use std::io;
+use std::num::NonZeroUsize;
 use std::path::PathBuf;
 use std::sync::{
     atomic::{AtomicU64, Ordering},
@@ -11,7 +11,10 @@ use crate::debug;
 use crate::flow_tui::launch_packet_tui;
 use crate::packet_counts::PacketCountPerSecond;
 use crate::realtime_mode::PacketGraphMode;
-use crate::{flow_table::FlowTable, flows::flow::Flow, packet_features::PacketFeatures};
+use crate::{
+    flow_key::ShardSelector, flow_table::FlowTable, flows::flow::Flow,
+    packet_features::PacketFeatures,
+};
 use anyhow::Context;
 use aya::{
     maps::{MapData, PerCpuArray, RingBuf},
@@ -149,6 +152,10 @@ where
         "RUSTIFLOW_REALTIME_SOURCE_DISPATCH_QUEUE_CAPACITY",
         DEFAULT_SOURCE_DISPATCH_QUEUE_CAPACITY,
     );
+
+    let shard_count =
+        NonZeroUsize::new(usize::from(num_threads)).context("thread count must be at least 1")?;
+    let shard_selector = ShardSelector::new(shard_count);
 
     // Needed for older kernels
     bump_memlock_rlimit();
@@ -298,6 +305,7 @@ where
 
     for (label, ebpf_event_source) in event_sources_v4 {
         let shard_senders_clone = shard_senders.clone();
+        let shard_selector = shard_selector.clone();
         let packet_graph = packet_graph.clone();
         let stats = enable_source_stats.then(|| Arc::new(RealtimeSourceStats::default()));
         source_stats.push((label, stats.clone()));
@@ -336,7 +344,7 @@ where
                     let packet_features =
                         PacketFeatures::from_ebpf_event_ipv4(&ebpf_event_ipv4, realtime_offset_us);
                     let flow_key = packet_features.biflow_key_value();
-                    let shard_index = compute_shard_index(&flow_key, num_threads);
+                    let shard_index = shard_selector.shard_index(&flow_key);
                     if let (Some(stats), Some(decode_start)) = (&stats, decode_start) {
                         stats.add_decode_and_shard_ns(elapsed_ns(decode_start));
                     }
@@ -371,6 +379,7 @@ where
 
     for (label, ebpf_event_source) in event_sources_v6 {
         let shard_senders_clone = shard_senders.clone();
+        let shard_selector = shard_selector.clone();
         let packet_graph = packet_graph.clone();
         let stats = enable_source_stats.then(|| Arc::new(RealtimeSourceStats::default()));
         source_stats.push((label, stats.clone()));
@@ -409,7 +418,7 @@ where
                     let packet_features =
                         PacketFeatures::from_ebpf_event_ipv6(&ebpf_event_ipv6, realtime_offset_us);
                     let flow_key = packet_features.biflow_key_value();
-                    let shard_index = compute_shard_index(&flow_key, num_threads);
+                    let shard_index = shard_selector.shard_index(&flow_key);
                     if let (Some(stats), Some(decode_start)) = (&stats, decode_start) {
                         stats.add_decode_and_shard_ns(elapsed_ns(decode_start));
                     }
@@ -625,14 +634,6 @@ impl PacketGraphState {
         let recent_counts = counter.get_counts_for_last_intervals(100);
         let _ = self.packet_tx.send(recent_counts);
     }
-}
-
-fn compute_shard_index<H: Hash>(flow_key: &H, num_shards: u8) -> usize {
-    assert!(num_shards > 0, "num_shards must be greater than 0");
-    let mut hasher = DefaultHasher::new();
-    flow_key.hash(&mut hasher);
-    let hash = hasher.finish();
-    (hash % num_shards as u64) as usize
 }
 
 fn compute_realtime_offset_us() -> Result<i64, anyhow::Error> {
