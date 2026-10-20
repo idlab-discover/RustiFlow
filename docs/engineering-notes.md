@@ -3,6 +3,69 @@
 This file keeps short-lived design choices and execution notes that would make
 `AGENTS.md` too long.
 
+## 2026-10-20: userspace hot-path pass toward 40G
+
+Branch `perf/hot-path-40g`. Userspace only: no eBPF change, and no live
+realtime run (no root on the development host). Realtime still needs
+validation on the `rustiflow-t0` harness with the 2026-10-18 measurement plan.
+
+Harnesses, all on a Ryzen 9 5950X with outputs compared as sorted row sets:
+
+- Offline: a deterministic synthetic pcap with 2.97M packets and 150k TCP/UDP
+  biflows (handshake, data, FIN or RST teardown), run with `perf stat -r 5`.
+  This path is bounded by the pcap reader, so it hides shard-side gains.
+- In-memory FlowTable replay: 4M packets over 200k concurrent flows, one shard,
+  no reader and no channels. This gives ns/packet for the flow-table path.
+- Row encoding: one RustiFlow flow encoded 200k times.
+
+| Change | Measurement | Before | After |
+| --- | --- | --- | --- |
+| Integral `f64` CSV fields use the integer formatter | rustiflow dump time | 1204 ms | 1077 ms |
+| `append_to_csv` required for every `FlowFeature` | rustiflow dump time | 1077 ms | 883 ms |
+| One canonical-key lookup per packet; no clone on termination | replay, basic | 184 ns/pkt | 175 ns/pkt |
+| Seeded foldhash for the flow map and `ShardSelector` | replay, basic / rustiflow | 175 / ~404 ns/pkt | 142 / 357 ns/pkt |
+| Sort shutdown exports by `(timestamp, key)` | shutdown with 200k flows, rustiflow | 595 ms | ~124 ms |
+| Per-shard CSV encoder tasks feed the writer | offline wall, rustiflow | 1.13 s | 0.74 s |
+| Offline packets batched per shard (128 per send) | offline CPU, basic / rustiflow | 2.32 / 3.72 s | 1.13 / 2.54 s |
+| Direct digit writer for integral fields | encode one RustiFlow row | 4.57 us | 2.98 us |
+
+The packet-graph change removes a per-event tokio Mutex, sort and watch send.
+It is opt-in and was not measured.
+
+Notes:
+
+- Basic shutdown export went from 42 ms to 55 ms with the key sort, since
+  120-byte flows were cheap to sort directly. This was accepted.
+- The writer is no longer the export ceiling. Rows from one shard keep their
+  order; rows from different shards interleave, as before.
+- Zero `--threads` is rejected at startup. It used to assert on the first packet.
+- The foldhash seeds are random per process and per instance. A remote sender
+  cannot precompute collisions, and the shard choice does not correlate with
+  bucket choice inside each shard's map.
+
+Measured and rejected:
+
+- Making the FlowTable core synchronous to shrink the per-packet future from
+  9.9 KB to 368 B: no cycle or instruction change.
+- `lto = "fat"` with `codegen-units = 1`: instructions changed by 1-3% and wall
+  time stayed within noise. Not worth about 40 s of extra build time.
+
+Open candidates, with the evidence for each:
+
+- Early export re-exports on every packet once a flow is older than the
+  interval, because there is no last-export tracking. That explains the export
+  volume recorded on 2026-03-31. Fixing it changes row counts, so it needs a
+  semantics decision first.
+- Fractional floats are about 44% of row encoding. A faster shortest-digit
+  algorithm would also need Display-identical output.
+- The expiration scan iterates every flow each interval. A timer wheel or an
+  incremental scan would bound the per-shard stall when tables are large.
+- The eBPF programs bump `MATCHED_PACKETS` on every packet, but it always equals
+  submitted plus dropped, so it could be derived in userspace. Verify the saving
+  with `bpf_stats_enabled`.
+- A RustiFlow flow is 1,576 bytes, so with large tables the remaining per-packet
+  cost is mostly cache misses on flow state.
+
 ## 2026-10-15: bulk timing and AuthStorm regeneration
 
 - Bulk state now retains integer microseconds. The idle threshold is exactly
