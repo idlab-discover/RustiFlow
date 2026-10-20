@@ -1,5 +1,8 @@
 use std::num::NonZeroU64;
 
+use tokio::task::JoinHandle;
+
+use crate::args::{ExportConfig, ReplayBenchArgs};
 use crate::flows::flow::Flow;
 use crate::output::FlowSink;
 use crate::realtime_mode::PacketGraphMode;
@@ -21,5 +24,19 @@ where
 {
     Err(anyhow::anyhow!(
         "Realtime capture on interface {interface:?} is only supported on Linux"
+    ))
+}
+
+/// The replay benchmark drives the realtime pipeline and decodes eBPF events,
+/// so it is only available on Linux.
+pub async fn replay_bench<T: Flow>(
+    _replay_args: &ReplayBenchArgs,
+    _config: &ExportConfig,
+    _num_threads: u8,
+    _exporter: impl FlowSink<T>,
+    _output_task: JoinHandle<()>,
+) -> Result<(), anyhow::Error> {
+    Err(anyhow::anyhow!(
+        "The replay benchmark is only supported on Linux"
     ))
 }

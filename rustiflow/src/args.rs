@@ -1,6 +1,9 @@
 use clap::{ArgGroup, Args, Parser, Subcommand};
 use serde::{Deserialize, Serialize};
-use std::{fmt, num::NonZeroU64};
+use std::{
+    fmt,
+    num::{NonZeroU64, NonZeroUsize},
+};
 use strum_macros::{EnumString, VariantNames};
 
 #[derive(Debug, Parser)]
@@ -59,9 +62,9 @@ pub struct Cli {
     #[clap(long, action = clap::ArgAction::SetTrue, group = "cli_group")]
     pub drop_contaminant_features: bool,
 
-    /// Subcommands (Real-time or Pcap)
+    /// Subcommands (Real-time, Pcap or the replay benchmark)
     #[clap(subcommand)]
-    pub command: Commands,
+    pub command: CliCommand,
 }
 
 #[derive(Serialize, Deserialize, Debug, Subcommand, Clone)]
@@ -81,6 +84,55 @@ pub enum Commands {
         path: String,
     },
 }
+
+// Command-line subcommands: the capture modes plus developer benchmarks that
+// the TUI and configuration files do not offer. A plain comment, because clap
+// would use a doc comment as the program description.
+#[derive(Debug, Subcommand)]
+pub enum CliCommand {
+    #[clap(flatten)]
+    Capture(Commands),
+
+    /// Benchmark the realtime userspace pipeline with synthetic eBPF events
+    /// (no capture, no root needed). Prints throughput and CPU time per packet
+    ReplayBench(ReplayBenchArgs),
+}
+
+#[derive(Args, Debug)]
+pub struct ReplayBenchArgs {
+    /// Number of events to replay
+    #[clap(long, default_value = "10000000")]
+    pub packets: NonZeroU64,
+
+    /// Number of concurrent flows; each event picks one uniformly at random
+    #[clap(long, default_value_t = 100_000, value_parser = clap::value_parser!(u32).range(1..=MAX_REPLAY_FLOWS))]
+    pub flows: u32,
+
+    /// Number of event sources drained in parallel, like the per-family rings
+    #[clap(long, default_value = "8")]
+    pub sources: NonZeroUsize,
+
+    /// Events drained per source before its partial batches are flushed, like
+    /// one ring wakeup
+    #[clap(long, default_value = "4096")]
+    pub drain_burst: NonZeroUsize,
+
+    /// Transport payload bytes per packet
+    #[clap(long, default_value_t = 1400, value_parser = clap::value_parser!(u16).range(0..=9000))]
+    pub payload_bytes: u16,
+
+    /// Packet rate used to space event timestamps; sets the virtual time seen by
+    /// timeouts, expiration checks and early export
+    #[clap(long, default_value = "1000000")]
+    pub virtual_pps: NonZeroU64,
+
+    /// Generate IPv6 events instead of IPv4
+    #[clap(long, action = clap::ArgAction::SetTrue)]
+    pub ipv6: bool,
+}
+
+/// Each replay flow gets its own client address inside 10.0.0.0/8.
+pub const MAX_REPLAY_FLOWS: i64 = 1 << 24;
 
 impl fmt::Display for Commands {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {

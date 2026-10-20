@@ -24,8 +24,10 @@ mod tui;
 
 use crate::flows::{cic_flow::CicFlow, rusti_flow::RustiFlow};
 use crate::pcap::read_pcap_file;
-use crate::realtime::handle_realtime;
-use args::{Cli, Commands, ConfigFile, ExportConfig, FlowType, OutputConfig};
+use crate::realtime::{handle_realtime, replay_bench};
+use args::{
+    Cli, CliCommand, Commands, ConfigFile, ExportConfig, FlowType, OutputConfig, ReplayBenchArgs,
+};
 use clap::Parser;
 use flows::{
     basic_flow::BasicFlow, cidds_flow::CiddsFlow, custom_flow::CustomFlow, flow::Flow,
@@ -63,14 +65,10 @@ async fn main() {
         let cli = Cli::parse();
 
         // If a config file is provided, load it
-        let config: Config = if let Some(config_path) = cli.config_file {
+        let (config, output) = if let Some(config_path) = cli.config_file {
             // Try to load config from file
             match confy::load_path::<ConfigFile>(config_path) {
-                Ok(cfg_file) => Config {
-                    config: cfg_file.config,
-                    output: cfg_file.output,
-                    command: cli.command,
-                },
+                Ok(cfg_file) => (cfg_file.config, cfg_file.output),
                 Err(e) => {
                     error!("Error loading configuration file: {:?}", e);
                     return;
@@ -78,8 +76,8 @@ async fn main() {
             }
         } else {
             // No config file: build config from CLI arguments
-            Config {
-                config: ExportConfig {
+            (
+                ExportConfig {
                     features: cli.features.unwrap(),
                     active_timeout: cli.active_timeout,
                     idle_timeout: cli.idle_timeout,
@@ -87,31 +85,81 @@ async fn main() {
                     threads: cli.threads,
                     expiration_check_interval: cli.expiration_check_interval,
                 },
-                output: OutputConfig {
+                OutputConfig {
                     output: cli.output.unwrap(),
                     export_path: cli.export_path,
                     header: cli.header,
                     drop_contaminant_features: cli.drop_contaminant_features,
                     packet_graph: cli.packet_graph,
                 },
-                command: cli.command,
-            }
+            )
         };
 
-        run_with_config(config).await;
+        match cli.command {
+            CliCommand::Capture(command) => {
+                run_with_config(Config {
+                    config,
+                    output,
+                    command,
+                })
+                .await
+            }
+            CliCommand::ReplayBench(replay_args) => {
+                run_replay_bench(config, output, replay_args).await
+            }
+        }
     }
 }
 
-async fn run_with_config(config: Config) {
-    if let Some(early_export) = config.config.early_export {
-        if early_export.get() >= config.config.active_timeout {
+/// Exits when settings that clap and serde cannot check on their own conflict.
+fn exit_on_invalid_export_config(config: &ExportConfig) {
+    if let Some(early_export) = config.early_export {
+        if early_export.get() >= config.active_timeout {
             error!(
                 "Early export interval ({early_export} s) must be smaller than the active timeout ({} s)",
-                config.config.active_timeout
+                config.active_timeout
             );
             std::process::exit(1);
         }
     }
+}
+
+async fn run_replay_bench(
+    config: ExportConfig,
+    output: OutputConfig,
+    replay_args: ReplayBenchArgs,
+) {
+    exit_on_invalid_export_config(&config);
+
+    macro_rules! execute_replay {
+        ($flow_ty:ty) => {{
+            let (exporter, output_task) = spawn_output_writer::<$flow_ty>(output);
+            if let Err(err) = replay_bench::<$flow_ty>(
+                &replay_args,
+                &config,
+                resolve_realtime_threads(config.threads),
+                exporter,
+                output_task,
+            )
+            .await
+            {
+                error!("Error during replay benchmark: {:?}", err);
+            }
+        }};
+    }
+
+    match config.features {
+        FlowType::Basic => execute_replay!(BasicFlow),
+        FlowType::CIC => execute_replay!(CicFlow),
+        FlowType::CIDDS => execute_replay!(CiddsFlow),
+        FlowType::Nfstream => execute_replay!(NfFlow),
+        FlowType::Rustiflow => execute_replay!(RustiFlow),
+        FlowType::Custom => execute_replay!(CustomFlow),
+    }
+}
+
+async fn run_with_config(config: Config) {
+    exit_on_invalid_export_config(&config.config);
 
     // Start the selected command
     match config.command {

@@ -1,3 +1,7 @@
+mod replay;
+
+pub use replay::replay_bench;
+
 use std::collections::VecDeque;
 use std::io;
 use std::num::{NonZeroU64, NonZeroUsize};
