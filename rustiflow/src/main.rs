@@ -6,8 +6,6 @@ mod flow_table;
 mod flow_tui;
 mod flows;
 mod output;
-#[cfg(target_os = "linux")]
-mod packet_counts;
 mod packet_features;
 mod pcap;
 #[cfg(target_os = "linux")]

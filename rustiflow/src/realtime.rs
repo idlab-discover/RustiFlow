@@ -1,3 +1,4 @@
+use std::collections::VecDeque;
 use std::io;
 use std::num::NonZeroUsize;
 use std::path::PathBuf;
@@ -5,12 +6,11 @@ use std::sync::{
     atomic::{AtomicU64, Ordering},
     Arc,
 };
-use std::time::Instant;
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use crate::debug;
 use crate::flow_tui::launch_packet_tui;
 use crate::output::FlowSink;
-use crate::packet_counts::PacketCountPerSecond;
 use crate::realtime_mode::PacketGraphMode;
 use crate::{
     flow_key::ShardSelector, flow_table::FlowTable, flows::flow::Flow,
@@ -34,8 +34,8 @@ use tokio::{
     io::unix::AsyncFd,
     signal,
     sync::mpsc::{self, Receiver, Sender},
-    sync::Mutex,
     task::JoinSet,
+    time::MissedTickBehavior,
 };
 
 #[derive(Default)]
@@ -44,7 +44,6 @@ struct RealtimeSourceStats {
     decode_and_shard_ns: AtomicU64,
     dispatch_enqueue_ns: AtomicU64,
     shard_send_wait_ns: AtomicU64,
-    packet_graph_ns: AtomicU64,
     total_event_ns: AtomicU64,
     send_errors: AtomicU64,
 }
@@ -69,10 +68,6 @@ impl RealtimeSourceStats {
         self.shard_send_wait_ns.fetch_add(value, Ordering::Relaxed);
     }
 
-    fn add_packet_graph_ns(&self, value: u64) {
-        self.packet_graph_ns.fetch_add(value, Ordering::Relaxed);
-    }
-
     fn add_total_event_ns(&self, value: u64) {
         self.total_event_ns.fetch_add(value, Ordering::Relaxed);
     }
@@ -95,7 +90,6 @@ fn log_source_stats(label: &str, stats: &RealtimeSourceStats) {
     let decode_and_shard_ns = stats.decode_and_shard_ns.load(Ordering::Relaxed);
     let dispatch_enqueue_ns = stats.dispatch_enqueue_ns.load(Ordering::Relaxed);
     let shard_send_wait_ns = stats.shard_send_wait_ns.load(Ordering::Relaxed);
-    let packet_graph_ns = stats.packet_graph_ns.load(Ordering::Relaxed);
     let total_event_ns = stats.total_event_ns.load(Ordering::Relaxed);
     let send_errors = stats.send_errors.load(Ordering::Relaxed);
 
@@ -105,14 +99,13 @@ fn log_source_stats(label: &str, stats: &RealtimeSourceStats) {
     }
 
     info!(
-        "Realtime source {}: events={} total_ms={:.3} decode_ms={:.3} enqueue_wait_ms={:.3} shard_send_wait_ms={:.3} packet_graph_ms={:.3} avg_event_us={:.3} avg_enqueue_wait_us={:.3} avg_shard_send_wait_us={:.3} send_errors={}",
+        "Realtime source {}: events={} total_ms={:.3} decode_ms={:.3} enqueue_wait_ms={:.3} shard_send_wait_ms={:.3} avg_event_us={:.3} avg_enqueue_wait_us={:.3} avg_shard_send_wait_us={:.3} send_errors={}",
         label,
         events,
         total_event_ns as f64 / 1_000_000.0,
         decode_and_shard_ns as f64 / 1_000_000.0,
         dispatch_enqueue_ns as f64 / 1_000_000.0,
         shard_send_wait_ns as f64 / 1_000_000.0,
-        packet_graph_ns as f64 / 1_000_000.0,
         total_event_ns as f64 / events as f64 / 1_000.0,
         dispatch_enqueue_ns as f64 / events as f64 / 1_000.0,
         shard_send_wait_ns as f64 / events as f64 / 1_000.0,
@@ -256,16 +249,15 @@ where
 
     let mut shard_senders = Vec::with_capacity(num_threads as usize);
     let enable_source_stats = std::env::var_os("RUSTIFLOW_REALTIME_STATS").is_some();
+    let mut handle_set = JoinSet::new();
     let (packet_graph, packet_rx) = match packet_graph_mode {
         PacketGraphMode::Enabled => {
             let (packet_tx, packet_rx) = watch::channel(Vec::new());
-            (
-                Some(PacketGraphState {
-                    packet_counter: Arc::new(Mutex::new(PacketCountPerSecond::new())),
-                    packet_tx,
-                }),
-                Some(packet_rx),
-            )
+            let packet_graph = PacketGraphState {
+                packets_since_tick: Arc::new(AtomicU64::new(0)),
+            };
+            handle_set.spawn(packet_graph.clone().publish_intervals(packet_tx));
+            (Some(packet_graph), Some(packet_rx))
         }
         PacketGraphMode::Disabled => (None, None),
     };
@@ -301,7 +293,6 @@ where
     debug!("Sharded FlowTables created");
 
     // Spawn a task per event source
-    let mut handle_set = JoinSet::new();
     let mut source_stats = Vec::new();
 
     for (label, ebpf_event_source) in event_sources_v4 {
@@ -328,16 +319,15 @@ where
                 let mut guard = async_ring_buf.readable_mut().await.unwrap();
 
                 let ring_buf = guard.get_inner_mut();
+                let mut drained_events = 0;
                 while let Some(event) = ring_buf.next() {
                     let event_start = enable_source_stats.then(Instant::now);
-                    if let Some(packet_graph) = &packet_graph {
-                        let packet_graph_start = enable_source_stats.then(Instant::now);
-                        packet_graph.record_packet().await;
-                        if let (Some(stats), Some(packet_graph_start)) =
-                            (&stats, packet_graph_start)
-                        {
-                            stats.add_packet_graph_ns(elapsed_ns(packet_graph_start));
+                    drained_events += 1;
+                    if drained_events == PACKET_GRAPH_RECORD_BATCH {
+                        if let Some(packet_graph) = &packet_graph {
+                            packet_graph.record_packets(drained_events);
                         }
+                        drained_events = 0;
                     }
                     let decode_start = enable_source_stats.then(Instant::now);
                     let ebpf_event_ipv4: EbpfEventIpv4 =
@@ -369,6 +359,9 @@ where
                     }
                 }
 
+                if let Some(packet_graph) = &packet_graph {
+                    packet_graph.record_packets(drained_events);
+                }
                 enqueue_pending_batches(&dispatch_sender, &mut pending_batches, stats.as_ref())
                     .await;
 
@@ -402,16 +395,15 @@ where
                 let mut guard = async_ring_buf.readable_mut().await.unwrap();
 
                 let ring_buf = guard.get_inner_mut();
+                let mut drained_events = 0;
                 while let Some(event) = ring_buf.next() {
                     let event_start = enable_source_stats.then(Instant::now);
-                    if let Some(packet_graph) = &packet_graph {
-                        let packet_graph_start = enable_source_stats.then(Instant::now);
-                        packet_graph.record_packet().await;
-                        if let (Some(stats), Some(packet_graph_start)) =
-                            (&stats, packet_graph_start)
-                        {
-                            stats.add_packet_graph_ns(elapsed_ns(packet_graph_start));
+                    drained_events += 1;
+                    if drained_events == PACKET_GRAPH_RECORD_BATCH {
+                        if let Some(packet_graph) = &packet_graph {
+                            packet_graph.record_packets(drained_events);
                         }
+                        drained_events = 0;
                     }
                     let decode_start = enable_source_stats.then(Instant::now);
                     let ebpf_event_ipv6: EbpfEventIpv6 =
@@ -443,6 +435,9 @@ where
                     }
                 }
 
+                if let Some(packet_graph) = &packet_graph {
+                    packet_graph.record_packets(drained_events);
+                }
                 enqueue_pending_batches(&dispatch_sender, &mut pending_batches, stats.as_ref())
                     .await;
 
@@ -622,18 +617,44 @@ fn read_env_usize(var_name: &str, default_value: usize) -> usize {
         .unwrap_or(default_value)
 }
 
+const PACKET_GRAPH_INTERVAL: Duration = Duration::from_millis(100);
+const PACKET_GRAPH_INTERVALS: usize = 100;
+/// Events a source counts locally before adding them to the graph counter, so a
+/// ring that never drains empty still reports progress.
+const PACKET_GRAPH_RECORD_BATCH: u64 = 1024;
+
+/// Packets counted for the realtime graph since its last tick.
 #[derive(Clone)]
 struct PacketGraphState {
-    packet_counter: Arc<Mutex<PacketCountPerSecond>>,
-    packet_tx: watch::Sender<Vec<(u64, u64)>>,
+    packets_since_tick: Arc<AtomicU64>,
 }
 
 impl PacketGraphState {
-    async fn record_packet(&self) {
-        let mut counter = self.packet_counter.lock().await;
-        counter.increment();
-        let recent_counts = counter.get_counts_for_last_intervals(100);
-        let _ = self.packet_tx.send(recent_counts);
+    /// Sources add once per drained batch, keeping the shared counter off the
+    /// per-packet path.
+    fn record_packets(&self, packets: u64) {
+        self.packets_since_tick
+            .fetch_add(packets, Ordering::Relaxed);
+    }
+
+    /// Publishes per-interval packet counts, newest first, for the last
+    /// `PACKET_GRAPH_INTERVALS` ticks. Intervals without packets count as zero.
+    async fn publish_intervals(self, packet_tx: watch::Sender<Vec<(u64, u64)>>) {
+        let mut intervals = VecDeque::with_capacity(PACKET_GRAPH_INTERVALS + 1);
+        let mut ticker = tokio::time::interval(PACKET_GRAPH_INTERVAL);
+        ticker.set_missed_tick_behavior(MissedTickBehavior::Delay);
+        loop {
+            ticker.tick().await;
+            let interval_id = SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .map_or(0, |since_epoch| {
+                    (since_epoch.as_millis() / PACKET_GRAPH_INTERVAL.as_millis()) as u64
+                });
+            let packets = self.packets_since_tick.swap(0, Ordering::Relaxed);
+            intervals.push_front((interval_id, packets));
+            intervals.truncate(PACKET_GRAPH_INTERVALS);
+            let _ = packet_tx.send(intervals.iter().copied().collect());
+        }
     }
 }
 
