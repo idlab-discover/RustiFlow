@@ -117,6 +117,211 @@ const DEFAULT_SHARD_BATCH_SIZE: usize = 128;
 const DEFAULT_SHARD_QUEUE_CAPACITY: usize = 512;
 const DEFAULT_SOURCE_DISPATCH_QUEUE_CAPACITY: usize = 1024;
 
+/// Queue and batch sizes of the userspace stages behind the event rings.
+struct PipelineSettings {
+    shard_batch_size: usize,
+    shard_queue_capacity: usize,
+    source_dispatch_queue_capacity: usize,
+}
+
+impl PipelineSettings {
+    fn from_env() -> Self {
+        Self {
+            shard_batch_size: read_env_usize(
+                "RUSTIFLOW_REALTIME_SHARD_BATCH_SIZE",
+                DEFAULT_SHARD_BATCH_SIZE,
+            ),
+            shard_queue_capacity: read_env_usize(
+                "RUSTIFLOW_REALTIME_SHARD_QUEUE_CAPACITY",
+                DEFAULT_SHARD_QUEUE_CAPACITY,
+            ),
+            source_dispatch_queue_capacity: read_env_usize(
+                "RUSTIFLOW_REALTIME_SOURCE_DISPATCH_QUEUE_CAPACITY",
+                DEFAULT_SOURCE_DISPATCH_QUEUE_CAPACITY,
+            ),
+        }
+    }
+}
+
+struct FlowTableSettings {
+    active_timeout: u64,
+    idle_timeout: u64,
+    early_export: Option<NonZeroU64>,
+    expiration_check_interval: u64,
+}
+
+/// Spawns one flow-table worker per shard. Each worker exports its remaining
+/// flows once every sender for its shard is dropped.
+fn spawn_shard_workers<T: Flow>(
+    shard_count: NonZeroUsize,
+    shard_queue_capacity: usize,
+    flow_table_settings: &FlowTableSettings,
+    exporter: &impl FlowSink<T>,
+) -> Vec<Sender<Vec<PacketFeatures>>> {
+    debug!("Creating {} sharded FlowTables...", shard_count);
+    let shard_senders = (0..shard_count.get())
+        .map(|_| {
+            let (tx, mut rx) = mpsc::channel::<Vec<PacketFeatures>>(shard_queue_capacity);
+            let mut flow_table = FlowTable::new(
+                flow_table_settings.active_timeout,
+                flow_table_settings.idle_timeout,
+                flow_table_settings.early_export,
+                exporter.shard_sender(),
+                flow_table_settings.expiration_check_interval,
+            );
+
+            tokio::spawn(async move {
+                let mut last_timestamp = None;
+                while let Some(packet_batch) = rx.recv().await {
+                    for packet_features in packet_batch {
+                        last_timestamp = Some(packet_features.timestamp_us);
+                        flow_table.process_packet(&packet_features).await;
+                    }
+                }
+                debug!("Shard finished processing packets");
+                // Handle flow exporting when the receiver is closed
+                if let Some(timestamp) = last_timestamp {
+                    flow_table.export_all_flows(timestamp).await;
+                }
+            });
+            tx
+        })
+        .collect();
+    debug!("Sharded FlowTables created");
+    shard_senders
+}
+
+/// Decodes one raw ring-buffer record into packet features.
+type DecodeEvent = fn(&[u8], i64) -> PacketFeatures;
+
+fn decode_ipv4_event(event: &[u8], realtime_offset_us: i64) -> PacketFeatures {
+    // SAFETY: the IPv4 programs only submit `EbpfEventIpv4` records to their rings.
+    let event: EbpfEventIpv4 = unsafe { std::ptr::read(event.as_ptr() as *const _) };
+    PacketFeatures::from_ebpf_event_ipv4(&event, realtime_offset_us)
+}
+
+fn decode_ipv6_event(event: &[u8], realtime_offset_us: i64) -> PacketFeatures {
+    // SAFETY: the IPv6 programs only submit `EbpfEventIpv6` records to their rings.
+    let event: EbpfEventIpv6 = unsafe { std::ptr::read(event.as_ptr() as *const _) };
+    PacketFeatures::from_ebpf_event_ipv6(&event, realtime_offset_us)
+}
+
+/// One event source's userspace stage: pick a shard per packet, batch per
+/// shard, and hand batches to the source's own dispatcher task so draining
+/// never waits on a shard queue directly.
+struct SourceBatcher {
+    shard_selector: ShardSelector,
+    shard_batch_size: usize,
+    pending_batches: Vec<Vec<PacketFeatures>>,
+    dispatch_sender: Sender<ShardDispatchBatch>,
+    stats: Option<Arc<RealtimeSourceStats>>,
+}
+
+impl SourceBatcher {
+    /// Creates the batcher and spawns its dispatcher into `handle_set`.
+    fn new(
+        handle_set: &mut JoinSet<()>,
+        shard_senders: &[Sender<Vec<PacketFeatures>>],
+        shard_selector: &ShardSelector,
+        settings: &PipelineSettings,
+        stats: Option<Arc<RealtimeSourceStats>>,
+    ) -> Self {
+        let dispatch_sender = spawn_source_dispatcher(
+            handle_set,
+            shard_senders.to_vec(),
+            settings.source_dispatch_queue_capacity,
+            stats.clone(),
+        );
+        Self {
+            shard_selector: shard_selector.clone(),
+            shard_batch_size: settings.shard_batch_size,
+            pending_batches: create_pending_batches(shard_senders.len(), settings.shard_batch_size),
+            dispatch_sender,
+            stats,
+        }
+    }
+
+    /// Decodes one event and queues it for its shard, dispatching the shard's
+    /// batch once it is full.
+    async fn push_event(&mut self, decode: impl FnOnce() -> PacketFeatures) {
+        let event_start = self.stats.is_some().then(Instant::now);
+        let packet_features = decode();
+        let shard_index = self
+            .shard_selector
+            .shard_index(&packet_features.biflow_key_value());
+        if let (Some(stats), Some(event_start)) = (&self.stats, event_start) {
+            stats.add_decode_and_shard_ns(elapsed_ns(event_start));
+        }
+
+        let pending_batch = &mut self.pending_batches[shard_index];
+        pending_batch.push(packet_features);
+        if pending_batch.len() >= self.shard_batch_size {
+            enqueue_shard_batch(
+                &self.dispatch_sender,
+                pending_batch,
+                self.stats.as_ref(),
+                shard_index,
+            )
+            .await;
+        }
+
+        if let (Some(stats), Some(event_start)) = (&self.stats, event_start) {
+            stats.increment_events();
+            stats.add_total_event_ns(elapsed_ns(event_start));
+        }
+    }
+
+    /// Dispatches every partial batch, as a source does when its ring runs empty.
+    async fn flush(&mut self) {
+        enqueue_pending_batches(
+            &self.dispatch_sender,
+            &mut self.pending_batches,
+            self.stats.as_ref(),
+        )
+        .await;
+    }
+}
+
+/// Drains one ring buffer for as long as the task runs.
+async fn drain_ring_source(
+    ring_buf: RingBuf<MapData>,
+    mut batcher: SourceBatcher,
+    packet_graph: Option<PacketGraphState>,
+    decode_event: DecodeEvent,
+    realtime_offset_us: i64,
+) {
+    // Wrap the RingBuf in AsyncFd to poll it with tokio
+    let mut async_ring_buf = AsyncFd::new(ring_buf).unwrap();
+
+    loop {
+        // Wait for data to be available in the ring buffer
+        let mut guard = async_ring_buf.readable_mut().await.unwrap();
+
+        let ring_buf = guard.get_inner_mut();
+        let mut drained_events = 0;
+        while let Some(event) = ring_buf.next() {
+            drained_events += 1;
+            if drained_events == PACKET_GRAPH_RECORD_BATCH {
+                if let Some(packet_graph) = &packet_graph {
+                    packet_graph.record_packets(drained_events);
+                }
+                drained_events = 0;
+            }
+            batcher
+                .push_event(|| decode_event(&event, realtime_offset_us))
+                .await;
+        }
+
+        if let Some(packet_graph) = &packet_graph {
+            packet_graph.record_packets(drained_events);
+        }
+        batcher.flush().await;
+
+        // Clear the readiness state for the next iteration
+        guard.clear_ready();
+    }
+}
+
 /// Starts the realtime processing of packets on the given interface.
 /// The function will return the number of packets dropped by the eBPF program.
 #[allow(clippy::too_many_arguments)]
@@ -134,19 +339,7 @@ pub async fn handle_realtime<T>(
 where
     T: Flow,
 {
-    let shard_batch_size = read_env_usize(
-        "RUSTIFLOW_REALTIME_SHARD_BATCH_SIZE",
-        DEFAULT_SHARD_BATCH_SIZE,
-    );
-    let shard_queue_capacity = read_env_usize(
-        "RUSTIFLOW_REALTIME_SHARD_QUEUE_CAPACITY",
-        DEFAULT_SHARD_QUEUE_CAPACITY,
-    );
-    let source_dispatch_queue_capacity = read_env_usize(
-        "RUSTIFLOW_REALTIME_SOURCE_DISPATCH_QUEUE_CAPACITY",
-        DEFAULT_SOURCE_DISPATCH_QUEUE_CAPACITY,
-    );
-
+    let settings = PipelineSettings::from_env();
     let shard_count =
         NonZeroUsize::new(usize::from(num_threads)).context("thread count must be at least 1")?;
     let shard_selector = ShardSelector::new(shard_count);
@@ -247,7 +440,6 @@ where
         ];
     }
 
-    let mut shard_senders = Vec::with_capacity(num_threads as usize);
     let enable_source_stats = std::env::var_os("RUSTIFLOW_REALTIME_STATS").is_some();
     let mut handle_set = JoinSet::new();
     let (packet_graph, packet_rx) = match packet_graph_mode {
@@ -262,190 +454,49 @@ where
         PacketGraphMode::Disabled => (None, None),
     };
 
-    debug!("Creating {} sharded FlowTables...", num_threads);
-    for _ in 0..num_threads {
-        let (tx, mut rx) = mpsc::channel::<Vec<PacketFeatures>>(shard_queue_capacity);
-        let mut flow_table = FlowTable::new(
+    let shard_senders = spawn_shard_workers(
+        shard_count,
+        settings.shard_queue_capacity,
+        &FlowTableSettings {
             active_timeout,
             idle_timeout,
             early_export,
-            exporter.shard_sender(),
             expiration_check_interval,
-        );
+        },
+        &exporter,
+    );
 
-        // Spawn a task per shard
-        tokio::spawn(async move {
-            let mut last_timestamp = None;
-            while let Some(packet_batch) = rx.recv().await {
-                for packet_features in packet_batch {
-                    last_timestamp = Some(packet_features.timestamp_us);
-                    flow_table.process_packet(&packet_features).await;
-                }
-            }
-            debug!("Shard finished processing packets");
-            // Handle flow exporting when the receiver is closed
-            if let Some(timestamp) = last_timestamp {
-                flow_table.export_all_flows(timestamp).await;
-            }
-        });
-        shard_senders.push(tx);
-    }
-    debug!("Sharded FlowTables created");
-
-    // Spawn a task per event source
+    // Spawn a drain task and a dispatcher per event source
     let mut source_stats = Vec::new();
-
-    for (label, ebpf_event_source) in event_sources_v4 {
-        let shard_senders_clone = shard_senders.clone();
-        let shard_selector = shard_selector.clone();
-        let packet_graph = packet_graph.clone();
+    let sources = event_sources_v4
+        .into_iter()
+        .map(|(label, ring_buf)| (label, ring_buf, decode_ipv4_event as DecodeEvent))
+        .chain(
+            event_sources_v6
+                .into_iter()
+                .map(|(label, ring_buf)| (label, ring_buf, decode_ipv6_event as DecodeEvent)),
+        );
+    for (label, ring_buf, decode_event) in sources {
         let stats = enable_source_stats.then(|| Arc::new(RealtimeSourceStats::default()));
         source_stats.push((label, stats.clone()));
-        let dispatch_sender = spawn_source_dispatcher(
+        let batcher = SourceBatcher::new(
             &mut handle_set,
-            shard_senders_clone.clone(),
-            source_dispatch_queue_capacity,
-            stats.clone(),
+            &shard_senders,
+            &shard_selector,
+            &settings,
+            stats,
         );
-
-        handle_set.spawn(async move {
-            // Wrap the RingBuf in AsyncFd to poll it with tokio
-            let mut async_ring_buf = AsyncFd::new(ebpf_event_source).unwrap();
-            let mut pending_batches =
-                create_pending_batches(num_threads as usize, shard_batch_size);
-
-            loop {
-                // Wait for data to be available in the ring buffer
-                let mut guard = async_ring_buf.readable_mut().await.unwrap();
-
-                let ring_buf = guard.get_inner_mut();
-                let mut drained_events = 0;
-                while let Some(event) = ring_buf.next() {
-                    let event_start = enable_source_stats.then(Instant::now);
-                    drained_events += 1;
-                    if drained_events == PACKET_GRAPH_RECORD_BATCH {
-                        if let Some(packet_graph) = &packet_graph {
-                            packet_graph.record_packets(drained_events);
-                        }
-                        drained_events = 0;
-                    }
-                    let decode_start = enable_source_stats.then(Instant::now);
-                    let ebpf_event_ipv4: EbpfEventIpv4 =
-                        unsafe { std::ptr::read(event.as_ptr() as *const _) };
-                    let packet_features =
-                        PacketFeatures::from_ebpf_event_ipv4(&ebpf_event_ipv4, realtime_offset_us);
-                    let flow_key = packet_features.biflow_key_value();
-                    let shard_index = shard_selector.shard_index(&flow_key);
-                    if let (Some(stats), Some(decode_start)) = (&stats, decode_start) {
-                        stats.add_decode_and_shard_ns(elapsed_ns(decode_start));
-                    }
-                    pending_batches[shard_index].push(packet_features);
-
-                    if pending_batches[shard_index].len() >= shard_batch_size {
-                        enqueue_shard_batch(
-                            &dispatch_sender,
-                            &mut pending_batches[shard_index],
-                            stats.as_ref(),
-                            shard_index,
-                        )
-                        .await;
-                    }
-
-                    if let Some(stats) = &stats {
-                        stats.increment_events();
-                        if let Some(event_start) = event_start {
-                            stats.add_total_event_ns(elapsed_ns(event_start));
-                        }
-                    }
-                }
-
-                if let Some(packet_graph) = &packet_graph {
-                    packet_graph.record_packets(drained_events);
-                }
-                enqueue_pending_batches(&dispatch_sender, &mut pending_batches, stats.as_ref())
-                    .await;
-
-                // Clear the readiness state for the next iteration
-                guard.clear_ready();
-            }
-        });
+        handle_set.spawn(drain_ring_source(
+            ring_buf,
+            batcher,
+            packet_graph.clone(),
+            decode_event,
+            realtime_offset_us,
+        ));
     }
-
-    for (label, ebpf_event_source) in event_sources_v6 {
-        let shard_senders_clone = shard_senders.clone();
-        let shard_selector = shard_selector.clone();
-        let packet_graph = packet_graph.clone();
-        let stats = enable_source_stats.then(|| Arc::new(RealtimeSourceStats::default()));
-        source_stats.push((label, stats.clone()));
-        let dispatch_sender = spawn_source_dispatcher(
-            &mut handle_set,
-            shard_senders_clone.clone(),
-            source_dispatch_queue_capacity,
-            stats.clone(),
-        );
-
-        handle_set.spawn(async move {
-            // Wrap the RingBuf in AsyncFd to poll it with tokio
-            let mut async_ring_buf = AsyncFd::new(ebpf_event_source).unwrap();
-            let mut pending_batches =
-                create_pending_batches(num_threads as usize, shard_batch_size);
-
-            loop {
-                // Wait for data to be available in the ring buffer
-                let mut guard = async_ring_buf.readable_mut().await.unwrap();
-
-                let ring_buf = guard.get_inner_mut();
-                let mut drained_events = 0;
-                while let Some(event) = ring_buf.next() {
-                    let event_start = enable_source_stats.then(Instant::now);
-                    drained_events += 1;
-                    if drained_events == PACKET_GRAPH_RECORD_BATCH {
-                        if let Some(packet_graph) = &packet_graph {
-                            packet_graph.record_packets(drained_events);
-                        }
-                        drained_events = 0;
-                    }
-                    let decode_start = enable_source_stats.then(Instant::now);
-                    let ebpf_event_ipv6: EbpfEventIpv6 =
-                        unsafe { std::ptr::read(event.as_ptr() as *const _) };
-                    let packet_features =
-                        PacketFeatures::from_ebpf_event_ipv6(&ebpf_event_ipv6, realtime_offset_us);
-                    let flow_key = packet_features.biflow_key_value();
-                    let shard_index = shard_selector.shard_index(&flow_key);
-                    if let (Some(stats), Some(decode_start)) = (&stats, decode_start) {
-                        stats.add_decode_and_shard_ns(elapsed_ns(decode_start));
-                    }
-                    pending_batches[shard_index].push(packet_features);
-
-                    if pending_batches[shard_index].len() >= shard_batch_size {
-                        enqueue_shard_batch(
-                            &dispatch_sender,
-                            &mut pending_batches[shard_index],
-                            stats.as_ref(),
-                            shard_index,
-                        )
-                        .await;
-                    }
-
-                    if let Some(stats) = &stats {
-                        stats.increment_events();
-                        if let Some(event_start) = event_start {
-                            stats.add_total_event_ns(elapsed_ns(event_start));
-                        }
-                    }
-                }
-
-                if let Some(packet_graph) = &packet_graph {
-                    packet_graph.record_packets(drained_events);
-                }
-                enqueue_pending_batches(&dispatch_sender, &mut pending_batches, stats.as_ref())
-                    .await;
-
-                // Clear the readiness state for the next iteration
-                guard.clear_ready();
-            }
-        });
-    }
+    // Only the dispatchers keep the shards' senders, so aborting them on
+    // shutdown lets each shard export its remaining flows.
+    drop(shard_senders);
 
     info!("Waiting for Ctrl-C...");
 
