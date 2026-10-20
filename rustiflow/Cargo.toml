@@ -12,7 +12,7 @@ serde = { version = "1.0.196", features = ["derive"] }
 common = { path = "../common" }
 anyhow = "1"
 log = "0.4"
-tokio = { version = "1.25", features = [
+tokio = { version = "1.54", features = [
     "macros",
     "rt",
     "rt-multi-thread",

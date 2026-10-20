@@ -294,8 +294,10 @@ async fn drain_ring_source(
     decode_event: DecodeEvent,
     realtime_offset_us: i64,
 ) {
-    // Wrap the RingBuf in AsyncFd to poll it with tokio
-    let mut async_ring_buf = AsyncFd::new(ring_buf).unwrap();
+    // Wrap the RingBuf in AsyncFd to poll it with tokio.
+    // SAFETY: the ring buffer owns its map file descriptor and reports that
+    // same descriptor from `as_raw_fd` until it is dropped with the `AsyncFd`.
+    let mut async_ring_buf = unsafe { AsyncFd::register(ring_buf) }.unwrap();
 
     loop {
         // Wait for data to be available in the ring buffer
