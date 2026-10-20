@@ -4,6 +4,46 @@ This file keeps short-lived design choices and execution notes that would make
 `AGENTS.md` too long. Newest entries come first. Older entries are condensed to
 the decisions and results that still describe the current code.
 
+## 2026-10-20: realtime userspace replay benchmark
+
+`rustiflow ... replay-bench` (README, "Replay benchmark") generates synthetic
+eBPF events in memory and drains them through the realtime userspace pipeline:
+per-source batching, dispatcher, shard flow tables, per-shard encoders and the
+writer. To keep it on the same code as live capture, `realtime.rs` now shares
+`PipelineSettings`, `spawn_shard_workers` and `SourceBatcher` between the ring
+drain tasks and the replay; the IPv4 and IPv6 drain loops became one
+`drain_ring_source`. The subcommand sits in a CLI-only `CliCommand` wrapper, so
+the TUI and config files keep the capture-only `Commands`.
+
+What it does not model: ring-buffer reads and wakeups, the eBPF programs and
+the kernel receive path; uneven queue fanout (sources are evenly balanced);
+handshakes, teardown and flow churn (flows never terminate). The final export
+of all open flows is inside the measured interval.
+
+First observations, Ryzen 9 5950X, no CPU pinning, 30M IPv4 events over 100k
+flows, 1400-byte payloads, 8 sources, CSV to `/dev/null`. Run-to-run variation
+was about +-3% on repeated 10M-event runs.
+
+| `--threads` | `basic` Mpps | `basic` CPU ns/pkt | `rustiflow` Mpps | `rustiflow` CPU ns/pkt |
+| --- | --- | --- | --- | --- |
+| 1 | 8.8 | 208 | 2.9 | 440 |
+| 2 | 17.4 | 181 | 5.3 | 450 |
+| 4 | 35.9 | 172 | 8.4 | 538 |
+| 8 | 69.6 | 195 | 12.3 | 712 |
+| 12 | 62.3 | 227 | 15.7 | 853 |
+| 16 | 61.8 | 228 | 17.2 | 1031 |
+
+- `basic` scales almost linearly to 8 shards and then flattens. With 8
+  sources, the source and dispatcher stages are a candidate limit; not yet
+  verified.
+- `rustiflow` scales sublinearly and its CPU per packet more than doubles from 1
+  to 16 shards. With 100k flows of about 1.6 KB each, flow state alone is about
+  160 MB, so cache and memory contention are candidates, as are SMT sharing
+  (16 shards plus source, dispatcher and encoder tasks on 16 physical cores)
+  and the two CCDs. Pinning and `perf` sampling should come before conclusions.
+- CPU ns/packet is whole-process CPU, including tokio scheduling and idle
+  spinning, so it is an upper bound on the pipeline's own work.
+
 ## 2026-10-20: early export on a fixed per-flow schedule
 
 Branch `perf/hot-path-40g`, commits `f426f95` and `8a556aa`.
@@ -194,10 +234,11 @@ or a 1230-byte mean frame. This is a capacity equivalence, not a wire-rate resul
 - Use `RUSTIFLOW_REALTIME_STATS` to attribute realtime decode, enqueue, and shard
   send waits. Its elapsed-time counters include waits and do not measure all
   shard processing. Do not sum overlapping stage timings into CPU ns/packet.
-- For a generator-independent realtime userspace ceiling, add a controlled event
-  replay benchmark through the consumer/dispatcher/shard path, preserving event
-  shape and flow distribution. This benchmark is future work. Until it exists,
-  label realtime timings as observations at the offered harness rate.
+- For a generator-independent realtime userspace ceiling, use `replay-bench`
+  (added 2026-10-20). It replays synthetic events through the
+  consumer/dispatcher/shard/export path; ring reads, eBPF and the kernel receive
+  path are excluded. Label realtime harness timings as observations at the
+  offered rate.
 
 ### 4. Run the scaling sweep
 
