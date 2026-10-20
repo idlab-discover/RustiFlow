@@ -38,10 +38,10 @@ jobs:
       run: cargo xtask ebpf-ipv6
 
     - name: Build userspace program
-      run: cargo build --verbose
+      run: cargo build --locked --verbose
 
     - name: Run Clippy
-      run: cargo clippy -p rustiflow --all-targets -- -D warnings
+      run: cargo clippy --locked -p rustiflow --all-targets -- -D warnings
 
     - name: Fetch gh-pages branch
       run: git fetch origin gh-pages:gh-pages
@@ -53,7 +53,7 @@ jobs:
         git checkout -
       
     - name: Run tests
-      run: cargo test --verbose
+      run: cargo test --locked --verbose
       
     - name: Generate documentation
       run: cargo doc --no-deps

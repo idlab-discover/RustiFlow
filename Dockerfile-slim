@@ -22,7 +22,7 @@ ENV PATH="/root/.cargo/bin:${PATH}"
 
 # Copy source code
 WORKDIR /usr/src/app
-COPY Cargo.toml ./
+COPY Cargo.toml Cargo.lock ./
 COPY .cargo ./.cargo
 COPY common ./common
 COPY rustiflow ./rustiflow
@@ -34,7 +34,7 @@ COPY ebpf-ipv6 ./ebpf-ipv6
 # Build the project
 RUN cargo xtask ebpf-ipv4 --release && \
     cargo xtask ebpf-ipv6 --release && \
-    cargo build --release
+    cargo build --release --locked
 
 # Stage 2: Runtime
 FROM debian:bookworm-slim
