@@ -12,7 +12,10 @@ mod tests {
     use crate::{
         flow_table::FlowTable,
         flows::{
-            basic_flow::BasicFlow, cidds_flow::CiddsFlow, flow::Flow, rusti_flow::RustiFlow,
+            basic_flow::{BasicFlow, TcpCloseStyle},
+            cidds_flow::CiddsFlow,
+            flow::Flow,
+            rusti_flow::RustiFlow,
             util::FlowExpireCause,
         },
         packet_features::PacketFeatures,
@@ -389,6 +392,48 @@ mod tests {
                 (9_000_000, FlowExpireCause::None),
             ]
         );
+    }
+
+    #[tokio::test]
+    async fn early_export_snapshot_is_closed_without_closing_the_live_flow() {
+        let (tx, mut rx) = mpsc::channel::<RustiFlow>(4);
+        let mut flow_table = FlowTable::new(3600, 120, early_export_every(1), tx, 60);
+
+        let mut forward_fin = build_packet(1_500_000);
+        forward_fin.fin_flag = 1;
+
+        flow_table.process_packet(&build_packet(1_000_000)).await;
+        flow_table.process_packet(&forward_fin).await;
+        flow_table.process_packet(&build_packet(2_000_000)).await;
+
+        let snapshot = rx.recv().await.expect("expected early export");
+        assert_eq!(snapshot.basic_flow.flow_expire_cause, FlowExpireCause::None);
+        assert_eq!(
+            snapshot.basic_flow.tcp_close_style,
+            TcpCloseStyle::HalfClose
+        );
+        // The open active period is counted in the snapshot.
+        let snapshot_active = &snapshot.active_idle_stats.active_stats;
+        assert_eq!(
+            (snapshot_active.get_count(), snapshot_active.get_max()),
+            (1, 1_000.0)
+        );
+
+        flow_table.process_packet(&build_packet(2_500_000)).await;
+        flow_table.export_all_flows(3_000_000).await;
+
+        // Closing the snapshot did not close the live flow's active period.
+        let final_export = rx.recv().await.expect("expected final export");
+        assert_eq!(
+            final_export.basic_flow.flow_expire_cause,
+            FlowExpireCause::ExporterShutdown
+        );
+        let final_active = &final_export.active_idle_stats.active_stats;
+        assert_eq!(
+            (final_active.get_count(), final_active.get_max()),
+            (1, 1_500.0)
+        );
+        assert!(rx.try_recv().is_err());
     }
 
     #[cfg(target_os = "linux")]

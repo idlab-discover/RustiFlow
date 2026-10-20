@@ -150,9 +150,9 @@ where
     /// Applies a packet to a flow and decides whether it terminated the flow or
     /// reached the flow's next early-export boundary.
     ///
-    /// Early exports are cumulative snapshots of the flow so far, with cause
-    /// `None`. Only packets trigger them, so a flow that goes quiet gets no
-    /// further snapshots until it expires.
+    /// Early exports are cumulative snapshots of the flow so far, closed like a
+    /// final export but with cause `None`. Only packets trigger them, so a flow
+    /// that goes quiet gets no further snapshots until it expires.
     fn apply_packet_to_flow(
         entry: &mut FlowEntry<T>,
         packet: &PacketFeatures,
@@ -176,8 +176,9 @@ where
         entry.next_early_export_us = first_timestamp_us + (elapsed_intervals + 1) * interval_us;
 
         let clone_start = Instant::now();
-        let snapshot = entry.flow.clone();
+        let mut snapshot = entry.flow.clone();
         export_profile::record_clone(clone_start.elapsed());
+        snapshot.close_flow(packet.timestamp_us, FlowExpireCause::None);
         FlowUpdate::EarlyExport(snapshot)
     }
 

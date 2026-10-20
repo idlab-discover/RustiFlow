@@ -331,8 +331,9 @@ periodic snapshots of long-lived flows before their final export:
   gets no further snapshots until it expires.
 - Each snapshot is cumulative: it covers the flow from its first packet up to
   and including the triggering packet, with the same columns as a final row.
-- Snapshots keep `flow_expire_cause` `None`. Final rows always carry a real
-  expiration cause.
+- Snapshots are closed like a final export (open bulks and the current active
+  period are counted, TCP close style reflects the FINs seen so far) but keep
+  `flow_expire_cause` `None`. Final rows always carry a real expiration cause.
 - The flow itself stays open; its final row repeats everything in the
   snapshots.
 - `N` must be at least `1` and smaller than `--active-timeout`. Omit the flag to
