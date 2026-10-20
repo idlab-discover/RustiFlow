@@ -10,12 +10,15 @@ pub trait FlowFeature: Send + Sync + Clone {
     /// Finalizes any active state when the flow is terminated
     fn close(&mut self, last_timestamp: i64, cause: FlowExpireCause);
 
-    /// Dumps the current state as a CSV string
-    fn dump(&self) -> String;
-
     /// Appends the current state as CSV fields to an existing row buffer.
-    fn append_to_csv(&self, output: &mut String) {
-        output.push_str(&self.dump());
+    fn append_to_csv(&self, output: &mut String);
+
+    /// Dumps the current state as a standalone CSV string.
+    #[cfg(test)]
+    fn dump(&self) -> String {
+        let mut output = String::new();
+        self.append_to_csv(&mut output);
+        output
     }
 
     /// Returns the CSV headers for this feature
@@ -108,17 +111,6 @@ impl FeatureStats {
 
     pub fn dump_headers(prefix: &str) -> String {
         format!("{prefix}_total,{prefix}_mean,{prefix}_std,{prefix}_max,{prefix}_min")
-    }
-
-    pub fn dump_values(&self) -> String {
-        format!(
-            "{},{},{},{},{}",
-            self.get_total(),
-            self.get_mean(),
-            self.get_std(),
-            self.get_max(),
-            self.get_min(),
-        )
     }
 
     pub fn append_csv_values(&self, output: &mut String) {

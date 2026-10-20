@@ -55,15 +55,6 @@ impl FlowFeature for IATStats {
         // No active state to close
     }
 
-    fn dump(&self) -> String {
-        format!(
-            "{},{},{}",
-            self.iat.dump_values(),
-            self.fwd_iat.dump_values(),
-            self.bwd_iat.dump_values(),
-        )
-    }
-
     fn append_to_csv(&self, output: &mut String) {
         self.iat.append_csv_values(output);
         self.fwd_iat.append_csv_values(output);

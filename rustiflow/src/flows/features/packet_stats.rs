@@ -108,22 +108,6 @@ impl FlowFeature for PacketLengthStats {
         // No active state to close
     }
 
-    fn dump(&self) -> String {
-        format!(
-            "{},{},{},{},{},{},{},{},{},{}",
-            self.flow_count(),
-            self.flow_total(),
-            self.flow_mean(),
-            self.flow_max(),
-            self.flow_min(),
-            self.flow_std(),
-            self.fwd_packet_len.get_count(),
-            self.bwd_packet_len.get_count(),
-            self.fwd_packet_len.dump_values(),
-            self.bwd_packet_len.dump_values(),
-        )
-    }
-
     fn append_to_csv(&self, output: &mut String) {
         push_csv_display(output, self.flow_count());
         push_csv_f64(output, self.flow_total());

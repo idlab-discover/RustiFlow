@@ -43,18 +43,6 @@ impl FlowFeature for PayloadLengthStats {
         // No active state to close
     }
 
-    fn dump(&self) -> String {
-        format!(
-            "{},{},{},{},{},{}",
-            self.payload_len.dump_values(),
-            self.payload_len.get_std().powi(2),
-            self.fwd_payload_len.dump_values(),
-            self.bwd_payload_len.dump_values(),
-            self.fwd_non_zero_payload_packets,
-            self.bwd_non_zero_payload_packets,
-        )
-    }
-
     fn append_to_csv(&self, output: &mut String) {
         self.payload_len.append_csv_values(output);
         push_csv_f64(output, self.payload_len.get_std().powi(2));

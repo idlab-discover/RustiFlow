@@ -54,12 +54,9 @@ impl FlowFeature for ActiveIdleStats {
         }
     }
 
-    fn dump(&self) -> String {
-        format!(
-            "{},{}",
-            self.active_stats.dump_values(),
-            self.idle_stats.dump_values(),
-        )
+    fn append_to_csv(&self, output: &mut String) {
+        self.active_stats.append_csv_values(output);
+        self.idle_stats.append_csv_values(output);
     }
 
     fn headers() -> String {

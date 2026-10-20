@@ -172,22 +172,6 @@ impl FlowFeature for BulkStats {
         self.finalize_current_bulk(false);
     }
 
-    fn dump(&self) -> String {
-        format!(
-            "{},{},{},{},{},{},{},{},{},{}",
-            self.fwd_bulk_rate(),
-            self.bwd_bulk_rate(),
-            self.fwd_bulk_packets.get_count(),
-            self.bwd_bulk_packets.get_count(),
-            self.fwd_bulk_packets.dump_values(),
-            self.bwd_bulk_packets.dump_values(),
-            self.fwd_bulk_payload_size.dump_values(),
-            self.bwd_bulk_payload_size.dump_values(),
-            self.fwd_bulk_duration.dump_values(),
-            self.bwd_bulk_duration.dump_values(),
-        )
-    }
-
     fn append_to_csv(&self, output: &mut String) {
         push_csv_f64(output, self.fwd_bulk_rate());
         push_csv_f64(output, self.bwd_bulk_rate());

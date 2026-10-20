@@ -33,13 +33,10 @@ impl FlowFeature for HeaderLengthStats {
         // No active state to close
     }
 
-    fn dump(&self) -> String {
-        format!(
-            "{},{},{}",
-            self.header_len.dump_values(),
-            self.fwd_header_len.dump_values(),
-            self.bwd_header_len.dump_values(),
-        )
+    fn append_to_csv(&self, output: &mut String) {
+        self.header_len.append_csv_values(output);
+        self.fwd_header_len.append_csv_values(output);
+        self.bwd_header_len.append_csv_values(output);
     }
 
     fn headers() -> String {

@@ -109,40 +109,6 @@ impl FlowFeature for TcpFlagStats {
         // No active state to close
     }
 
-    fn dump(&self) -> String {
-        format!(
-            "{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{}\
-            ,{},{},{},{},{},{},{},{},{}",
-            self.fwd_fin_flag_count,
-            self.fwd_syn_flag_count,
-            self.fwd_rst_flag_count,
-            self.fwd_psh_flag_count,
-            self.fwd_ack_flag_count,
-            self.fwd_urg_flag_count,
-            self.fwd_cwr_flag_count,
-            self.fwd_ece_flag_count,
-            self.bwd_fin_flag_count,
-            self.bwd_syn_flag_count,
-            self.bwd_rst_flag_count,
-            self.bwd_psh_flag_count,
-            self.bwd_ack_flag_count,
-            self.bwd_urg_flag_count,
-            self.bwd_cwr_flag_count,
-            self.bwd_ece_flag_count,
-            // Totals
-            self.fwd_fin_flag_count + self.bwd_fin_flag_count,
-            self.fwd_syn_flag_count + self.bwd_syn_flag_count,
-            self.fwd_rst_flag_count + self.bwd_rst_flag_count,
-            self.fwd_psh_flag_count + self.bwd_psh_flag_count,
-            self.fwd_ack_flag_count + self.bwd_ack_flag_count,
-            self.fwd_urg_flag_count + self.bwd_urg_flag_count,
-            self.fwd_cwr_flag_count + self.bwd_cwr_flag_count,
-            self.fwd_ece_flag_count + self.bwd_ece_flag_count,
-            // Flags as a string
-            self.get_flags()
-        )
-    }
-
     fn append_to_csv(&self, output: &mut String) {
         push_csv_display(output, self.fwd_fin_flag_count);
         push_csv_display(output, self.fwd_syn_flag_count);

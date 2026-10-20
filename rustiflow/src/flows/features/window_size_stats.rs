@@ -43,17 +43,6 @@ impl FlowFeature for WindowSizeStats {
         // No active state to close
     }
 
-    fn dump(&self) -> String {
-        format!(
-            "{},{},{},{},{}",
-            self.fwd_init_window_size,
-            self.bwd_init_window_size,
-            self.window_size.dump_values(),
-            self.fwd_window_size.dump_values(),
-            self.bwd_window_size.dump_values(),
-        )
-    }
-
     fn append_to_csv(&self, output: &mut String) {
         push_csv_display(output, self.fwd_init_window_size);
         push_csv_display(output, self.bwd_init_window_size);
