@@ -1,6 +1,7 @@
 use std::num::NonZeroUsize;
 
 use crate::flow_key::ShardSelector;
+use crate::output::FlowSink;
 use crate::Flow;
 use crate::{flow_table::FlowTable, packet_features::PacketFeatures};
 use anyhow::Context;
@@ -13,7 +14,6 @@ use pnet::packet::{
     Packet,
 };
 use tokio::sync::mpsc;
-use tokio::sync::mpsc::Sender;
 
 // Define constants for Linux cooked capture EtherTypes
 const SLL_IPV4: u16 = 0x0800;
@@ -23,7 +23,7 @@ const ETHERTYPE_VLAN: u16 = 0x8100;
 
 pub async fn read_pcap_file<T>(
     path: &str,
-    output_channel: Sender<T>,
+    exporter: impl FlowSink<T>,
     num_threads: u8,
     active_timeout: u64,
     idle_timeout: u64,
@@ -52,7 +52,7 @@ where
     let shard_senders = create_shard_senders::<T>(
         num_threads,
         buffer_num_packets,
-        output_channel,
+        exporter,
         active_timeout,
         idle_timeout,
         early_export,
@@ -250,7 +250,7 @@ async fn process_packet<T, P>(
 fn create_shard_senders<T>(
     num_shards: u8,
     buffer_num_packets: usize,
-    output_channel: Sender<T>,
+    exporter: impl FlowSink<T>,
     active_timeout: u64,
     idle_timeout: u64,
     early_export: Option<u64>,
@@ -267,7 +267,7 @@ where
             active_timeout,
             idle_timeout,
             early_export,
-            output_channel.clone(),
+            exporter.shard_sender(),
             expiration_check_interval,
         );
 

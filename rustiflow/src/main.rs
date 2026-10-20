@@ -34,7 +34,7 @@ use flows::{
     nf_flow::NfFlow,
 };
 use log::{debug, error, info};
-use output::OutputWriter;
+use output::{FlowExporter, OutputWriter, ENCODED_CHUNK_QUEUE_CAPACITY};
 use profiling::ProfilingSession;
 use realtime_mode::packet_graph_mode;
 use std::time::Instant;
@@ -126,14 +126,17 @@ async fn run_with_config(config: Config) {
                     // Synchronous initialization to ensure headers are written
                     output_writer.init();
 
-                    // Create channel for exporting flows
-                    let (sender, mut receiver) = mpsc::channel::<$flow_ty>(1000);
+                    // Shards encode their own CSV rows; the writer task only writes them
+                    let (chunk_sender, mut chunk_receiver) =
+                        mpsc::channel::<Vec<u8>>(ENCODED_CHUNK_QUEUE_CAPACITY);
+                    let exporter =
+                        FlowExporter::new(config.output.drop_contaminant_features, chunk_sender);
 
                     // Start the output writer in a separate task
                     let output_task = tokio::spawn(async move {
-                        while let Some(flow) = receiver.recv().await {
-                            if let Err(e) = output_writer.write_flow(flow) {
-                                error!("Error writing flow: {:?}", e);
+                        while let Some(rows) = chunk_receiver.recv().await {
+                            if let Err(e) = output_writer.write_encoded(&rows) {
+                                error!("Error writing flows: {:?}", e);
                             }
                         }
 
@@ -155,7 +158,7 @@ async fn run_with_config(config: Config) {
                     };
                     let result = handle_realtime::<$flow_ty>(
                         &interface,
-                        sender,
+                        exporter,
                         resolve_realtime_threads(config.config.threads),
                         config.config.active_timeout,
                         config.config.idle_timeout,
@@ -222,14 +225,17 @@ async fn run_with_config(config: Config) {
                     // Synchronous initialization to ensure headers are written
                     output_writer.init();
 
-                    // Create channel for exporting flows
-                    let (sender, mut receiver) = mpsc::channel::<$flow_ty>(1000);
+                    // Shards encode their own CSV rows; the writer task only writes them
+                    let (chunk_sender, mut chunk_receiver) =
+                        mpsc::channel::<Vec<u8>>(ENCODED_CHUNK_QUEUE_CAPACITY);
+                    let exporter =
+                        FlowExporter::new(config.output.drop_contaminant_features, chunk_sender);
 
                     // Start the output writer in a separate task
                     let output_task = tokio::spawn(async move {
-                        while let Some(flow) = receiver.recv().await {
-                            if let Err(e) = output_writer.write_flow(flow) {
-                                error!("Error writing flow: {:?}", e);
+                        while let Some(rows) = chunk_receiver.recv().await {
+                            if let Err(e) = output_writer.write_encoded(&rows) {
+                                error!("Error writing flows: {:?}", e);
                             }
                         }
 
@@ -251,7 +257,7 @@ async fn run_with_config(config: Config) {
 
                     if let Err(err) = read_pcap_file::<$flow_ty>(
                         &path,
-                        sender,
+                        exporter,
                         resolve_offline_threads(config.config.threads),
                         config.config.active_timeout,
                         config.config.idle_timeout,

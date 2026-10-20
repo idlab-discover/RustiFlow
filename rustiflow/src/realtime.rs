@@ -9,6 +9,7 @@ use std::time::Instant;
 
 use crate::debug;
 use crate::flow_tui::launch_packet_tui;
+use crate::output::FlowSink;
 use crate::packet_counts::PacketCountPerSecond;
 use crate::realtime_mode::PacketGraphMode;
 use crate::{
@@ -128,7 +129,7 @@ const DEFAULT_SOURCE_DISPATCH_QUEUE_CAPACITY: usize = 1024;
 #[allow(clippy::too_many_arguments)]
 pub async fn handle_realtime<T>(
     interface: &str,
-    output_channel: Sender<T>,
+    exporter: impl FlowSink<T>,
     num_threads: u8,
     active_timeout: u64,
     idle_timeout: u64,
@@ -276,7 +277,7 @@ where
             active_timeout,
             idle_timeout,
             early_export,
-            output_channel.clone(),
+            exporter.shard_sender(),
             expiration_check_interval,
         );
 
