@@ -754,6 +754,36 @@ fn take_ring_buf_maps(
     Ok(ring_bufs)
 }
 
+/// Forwards `aya-log` records from the eBPF program to the userspace logger.
+fn spawn_ebpf_logger(bpf: &mut Ebpf) {
+    let logger = match EbpfLogger::init(bpf) {
+        Ok(logger) => logger,
+        Err(e) => {
+            debug!("eBPF logger unavailable: {e}");
+            return;
+        }
+    };
+    // SAFETY: the logger owns its ring buffer map file descriptor and reports
+    // that same descriptor from `as_raw_fd` until it is dropped with the `AsyncFd`.
+    let mut logger = match unsafe { AsyncFd::register(logger) } {
+        Ok(logger) => logger,
+        Err(e) => {
+            error!("Failed to poll the eBPF logger: {e}");
+            return;
+        }
+    };
+
+    tokio::spawn(async move {
+        loop {
+            let Ok(mut guard) = logger.readable_mut().await else {
+                return;
+            };
+            guard.get_inner_mut().flush();
+            guard.clear_ready();
+        }
+    });
+}
+
 fn read_clock_us(clock_id: libc::clockid_t) -> Result<i64, anyhow::Error> {
     let mut ts = libc::timespec {
         tv_sec: 0,
@@ -821,7 +851,7 @@ fn load_ebpf_ipv4(interface: &str, tc_attach_type: TcAttachType) -> Result<Ebpf,
     })?;
 
     // Attach the eBPF program function
-    let _ = EbpfLogger::init(&mut bpf_ipv4);
+    spawn_ebpf_logger(&mut bpf_ipv4);
     match tc::qdisc_add_clsact(interface) {
         Ok(()) => info!("Ensured clsact qdisc on {}", interface),
         Err(e) => debug!("qdisc_add_clsact({}): {:?}", interface, e),
@@ -876,7 +906,7 @@ fn load_ebpf_ipv6(interface: &str, tc_attach_type: TcAttachType) -> Result<Ebpf,
     })?;
 
     // Attach the eBPF program function
-    let _ = EbpfLogger::init(&mut bpf_ipv6);
+    spawn_ebpf_logger(&mut bpf_ipv6);
     match tc::qdisc_add_clsact(interface) {
         Ok(()) => info!("Ensured clsact qdisc on {}", interface),
         Err(e) => debug!("qdisc_add_clsact({}): {:?}", interface, e),
