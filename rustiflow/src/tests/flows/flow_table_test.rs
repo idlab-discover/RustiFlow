@@ -266,6 +266,33 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn shutdown_exports_flows_in_first_packet_order() {
+        let (tx, mut rx) = mpsc::channel::<BasicFlow>(8);
+        let mut flow_table = FlowTable::new(3600, 120, None, tx, 3600);
+        let first_timestamps_us = [3_000_000, 1_000_000, 4_000_000, 2_000_000];
+        for (port, timestamp_us) in (1000..).zip(first_timestamps_us) {
+            flow_table
+                .process_packet(&PacketFeatures {
+                    source_port: port,
+                    ..build_packet(timestamp_us)
+                })
+                .await;
+        }
+
+        flow_table.export_all_flows(5_000_000).await;
+
+        let mut exported = Vec::new();
+        while let Ok(flow) = rx.try_recv() {
+            exported.push((flow.first_timestamp_us, flow.flow_expire_cause));
+        }
+        assert_eq!(
+            exported,
+            [1_000_000, 2_000_000, 3_000_000, 4_000_000]
+                .map(|timestamp_us| (timestamp_us, FlowExpireCause::ExporterShutdown))
+        );
+    }
+
+    #[tokio::test]
     async fn expired_flow_is_replaced_by_new_flow_for_the_same_key() {
         let (tx, mut rx) = mpsc::channel::<BasicFlow>(4);
         let mut flow_table = FlowTable::new(3600, 1, None, tx, 60);

@@ -172,19 +172,20 @@ where
 
     /// Export all flows in the flow map in order of first packet arrival.
     pub async fn export_all_flows(&mut self, timestamp_us: i64) {
-        let mut flows_to_export: Vec<_> = self
+        // Sort small (timestamp, key) pairs rather than the flows themselves, so
+        // each flow is moved exactly once, out of the map and into the channel.
+        let mut export_order: Vec<_> = self
             .flow_map
-            .drain() // Drain all entries from the map
-            .map(|(_, entry)| entry.flow) // Collect all flows
+            .iter()
+            .map(|(key, entry)| (entry.flow.get_first_timestamp_us(), *key))
             .collect();
+        export_order.sort_by_key(|&(first_timestamp_us, _)| first_timestamp_us);
 
-        // Sort flows by `first_timestamp`
-        flows_to_export.sort_by_key(|flow| flow.get_first_timestamp_us());
-
-        // Export each flow in order of `first_timestamp`
-        for mut flow in flows_to_export {
-            flow.close_flow(timestamp_us, FlowExpireCause::ExporterShutdown);
-            Self::export(&self.export_channel, flow).await;
+        for (_, key) in export_order {
+            if let Some(FlowEntry { mut flow, .. }) = self.flow_map.remove(&key) {
+                flow.close_flow(timestamp_us, FlowExpireCause::ExporterShutdown);
+                Self::export(&self.export_channel, flow).await;
+            }
         }
     }
 
