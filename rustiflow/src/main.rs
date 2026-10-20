@@ -36,7 +36,7 @@ use output::{FlowExporter, OutputWriter, ENCODED_CHUNK_QUEUE_CAPACITY};
 use profiling::ProfilingSession;
 use realtime_mode::packet_graph_mode;
 use std::time::Instant;
-use tokio::sync::mpsc;
+use tokio::{sync::mpsc, task::JoinHandle};
 use tui::{launch_tui, Config};
 
 const DEFAULT_OFFLINE_THREADS: u8 = 5;
@@ -121,39 +121,8 @@ async fn run_with_config(config: Config) {
         } => {
             macro_rules! execute_realtime {
                 ($flow_ty:ty) => {{
-                    // Create output writer and initialize it
                     let packet_graph_mode = packet_graph_mode(&config.output);
-
-                    let mut output_writer = OutputWriter::<$flow_ty>::new(
-                        config.output.output,
-                        config.output.header,
-                        config.output.drop_contaminant_features,
-                        config.output.export_path,
-                    );
-
-                    // Synchronous initialization to ensure headers are written
-                    output_writer.init();
-
-                    // Shards encode their own CSV rows; the writer task only writes them
-                    let (chunk_sender, mut chunk_receiver) =
-                        mpsc::channel::<Vec<u8>>(ENCODED_CHUNK_QUEUE_CAPACITY);
-                    let exporter =
-                        FlowExporter::new(config.output.drop_contaminant_features, chunk_sender);
-
-                    // Start the output writer in a separate task
-                    let output_task = tokio::spawn(async move {
-                        while let Some(rows) = chunk_receiver.recv().await {
-                            if let Err(e) = output_writer.write_encoded(&rows) {
-                                error!("Error writing flows: {:?}", e);
-                            }
-                        }
-
-                        // Ensure that all remaining flows are flushed properly before ending
-                        output_writer.flush_and_close().unwrap_or_else(|e| {
-                            error!("Error flushing and closing the writer: {:?}", e);
-                        });
-                        debug!("OutputWriter task finished");
-                    });
+                    let (exporter, output_task) = spawn_output_writer::<$flow_ty>(config.output);
 
                     debug!("Starting realtime processing...");
                     let start = Instant::now();
@@ -222,37 +191,7 @@ async fn run_with_config(config: Config) {
         Commands::Pcap { path } => {
             macro_rules! execute_offline {
                 ($flow_ty:ty) => {{
-                    // Create output writer and initialize it
-                    let mut output_writer = OutputWriter::<$flow_ty>::new(
-                        config.output.output,
-                        config.output.header,
-                        config.output.drop_contaminant_features,
-                        config.output.export_path,
-                    );
-
-                    // Synchronous initialization to ensure headers are written
-                    output_writer.init();
-
-                    // Shards encode their own CSV rows; the writer task only writes them
-                    let (chunk_sender, mut chunk_receiver) =
-                        mpsc::channel::<Vec<u8>>(ENCODED_CHUNK_QUEUE_CAPACITY);
-                    let exporter =
-                        FlowExporter::new(config.output.drop_contaminant_features, chunk_sender);
-
-                    // Start the output writer in a separate task
-                    let output_task = tokio::spawn(async move {
-                        while let Some(rows) = chunk_receiver.recv().await {
-                            if let Err(e) = output_writer.write_encoded(&rows) {
-                                error!("Error writing flows: {:?}", e);
-                            }
-                        }
-
-                        // Ensure that all remaining flows are flushed properly before ending
-                        output_writer.flush_and_close().unwrap_or_else(|e| {
-                            error!("Error flushing and closing the writer: {:?}", e);
-                        });
-                        debug!("OutputWriter task finished");
-                    });
+                    let (exporter, output_task) = spawn_output_writer::<$flow_ty>(config.output);
 
                     let start = Instant::now();
                     let profiling_session = match ProfilingSession::start_from_env("offline") {
@@ -308,6 +247,40 @@ async fn run_with_config(config: Config) {
             }
         }
     }
+}
+
+/// Starts the output writer task. Shards encode their own CSV rows through the
+/// returned exporter; the writer task only writes them, and it finishes once
+/// every shard's encoder has dropped its chunk sender.
+fn spawn_output_writer<T: Flow>(output: OutputConfig) -> (FlowExporter, JoinHandle<()>) {
+    let mut output_writer = OutputWriter::<T>::new(
+        output.output,
+        output.header,
+        output.drop_contaminant_features,
+        output.export_path,
+    );
+
+    // Synchronous initialization to ensure headers are written
+    output_writer.init();
+
+    let (chunk_sender, mut chunk_receiver) = mpsc::channel::<Vec<u8>>(ENCODED_CHUNK_QUEUE_CAPACITY);
+    let exporter = FlowExporter::new(output.drop_contaminant_features, chunk_sender);
+
+    let output_task = tokio::spawn(async move {
+        while let Some(rows) = chunk_receiver.recv().await {
+            if let Err(e) = output_writer.write_encoded(&rows) {
+                error!("Error writing flows: {:?}", e);
+            }
+        }
+
+        // Ensure that all remaining flows are flushed properly before ending
+        output_writer.flush_and_close().unwrap_or_else(|e| {
+            error!("Error flushing and closing the writer: {:?}", e);
+        });
+        debug!("OutputWriter task finished");
+    });
+
+    (exporter, output_task)
 }
 
 fn resolve_realtime_threads(config_threads: Option<u8>) -> u8 {
