@@ -43,12 +43,25 @@ impl FlowKey {
     }
 
     pub fn canonical(self) -> Self {
+        self.canonicalize().0
+    }
+
+    /// Returns the canonical biflow key together with the orientation `self`
+    /// had relative to it. A key whose endpoints are equal is canonical.
+    pub fn canonicalize(self) -> (Self, KeyOrientation) {
         if self.source <= self.destination {
-            self
+            (self, KeyOrientation::Canonical)
         } else {
-            self.reverse()
+            (self.reverse(), KeyOrientation::Reversed)
         }
     }
+}
+
+/// Direction of a packet's 5-tuple relative to its canonical biflow key.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum KeyOrientation {
+    Canonical,
+    Reversed,
 }
 
 impl fmt::Display for FlowKey {

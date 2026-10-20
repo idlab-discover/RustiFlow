@@ -190,6 +190,82 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn direction_follows_the_initiator_for_either_key_orientation() {
+        fn reply_to(packet: &PacketFeatures, timestamp_us: i64) -> PacketFeatures {
+            PacketFeatures {
+                source_ip: packet.destination_ip,
+                destination_ip: packet.source_ip,
+                source_port: packet.destination_port,
+                destination_port: packet.source_port,
+                protocol: packet.protocol,
+                timestamp_us,
+                ..Default::default()
+            }
+        }
+
+        let canonical_initiator = build_packet(1_000_000);
+        // The higher endpoint initiates, so its key is the reverse of the canonical key.
+        let reversed_initiator = reply_to(&canonical_initiator, 1_000_000);
+
+        for initiator in [canonical_initiator, reversed_initiator] {
+            let (tx, mut rx) = mpsc::channel::<CiddsFlow>(4);
+            let mut flow_table = FlowTable::new(3600, 120, None, tx, 60);
+
+            flow_table.process_packet(&initiator).await;
+            flow_table
+                .process_packet(&reply_to(&initiator, 1_000_100))
+                .await;
+            flow_table
+                .process_packet(&PacketFeatures {
+                    timestamp_us: 1_000_200,
+                    ..reply_to(&reply_to(&initiator, 0), 0)
+                })
+                .await;
+            flow_table.export_all_flows(2_000_000).await;
+
+            let exported_flow = rx.recv().await.expect("expected exported flow");
+            assert_eq!(
+                (
+                    exported_flow.basic_flow.flow_key,
+                    exported_flow.packet_stats.fwd_packet_len.get_count(),
+                    exported_flow.packet_stats.bwd_packet_len.get_count(),
+                ),
+                (initiator.flow_key_value().to_string(), 2, 1)
+            );
+            assert!(rx.try_recv().is_err());
+        }
+    }
+
+    #[tokio::test]
+    async fn equal_endpoint_packets_are_all_forward() {
+        let (tx, mut rx) = mpsc::channel::<CiddsFlow>(4);
+        let mut flow_table = FlowTable::new(3600, 120, None, tx, 60);
+        let loopback = PacketFeatures {
+            destination_ip: build_packet(0).source_ip,
+            destination_port: build_packet(0).source_port,
+            ..build_packet(1_000_000)
+        };
+
+        flow_table.process_packet(&loopback).await;
+        flow_table
+            .process_packet(&PacketFeatures {
+                timestamp_us: 1_000_100,
+                ..loopback
+            })
+            .await;
+        flow_table.export_all_flows(2_000_000).await;
+
+        let exported_flow = rx.recv().await.expect("expected exported flow");
+        assert_eq!(
+            (
+                exported_flow.packet_stats.fwd_packet_len.get_count(),
+                exported_flow.packet_stats.bwd_packet_len.get_count(),
+            ),
+            (2, 0)
+        );
+    }
+
+    #[tokio::test]
     async fn expired_flow_is_replaced_by_new_flow_for_the_same_key() {
         let (tx, mut rx) = mpsc::channel::<BasicFlow>(4);
         let mut flow_table = FlowTable::new(3600, 1, None, tx, 60);
