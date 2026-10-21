@@ -299,6 +299,22 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn retransmitted_fin_does_not_undo_its_acknowledgment() {
+        for family in FAMILIES {
+            let mut arrivals = clean_connection(1000, 5000);
+            let retransmission = Segment {
+                timestamp_us: 650,
+                ..arrivals[5]
+            };
+            arrivals.insert(7, retransmission);
+            let mut expected = expected_clean_close(family);
+            expected.packets += 1;
+            expected.fwd_packets += 1;
+            assert_eq!(summaries(&run(family, &arrivals).await), vec![expected]);
+        }
+    }
+
+    #[tokio::test]
     async fn baseline_in_order_connection_closes_cleanly() {
         for family in FAMILIES {
             let flows = run(family, &clean_connection(1000, 5000)).await;

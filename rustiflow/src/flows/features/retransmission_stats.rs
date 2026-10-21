@@ -136,6 +136,35 @@ mod tests {
     use super::{SequenceHistory, MAX_SEQUENCE_RANGES};
 
     #[test]
+    fn range_tracking_matches_byte_coverage_across_wrap() {
+        let mut history = SequenceHistory::default();
+        let mut seen = [false; 520];
+        let mut seed = 17_u32;
+        for _ in 0..2000 {
+            seed = seed.wrapping_mul(1664525).wrapping_add(1013904223);
+            let offset = (seed % 500) as usize;
+            let length = ((seed >> 16) % 20 + 1) as usize;
+            let bytes = &mut seen[offset..offset + length];
+            let expected = bytes.iter().any(|seen| *seen);
+            let sequence = (u32::MAX - 200).wrapping_add(offset as u32);
+            assert_eq!(history.observe(sequence, length as u32), expected);
+            bytes.fill(true);
+        }
+    }
+
+    #[test]
+    fn reused_sequence_numbers_in_a_later_epoch_are_new_data() {
+        let mut history = SequenceHistory::default();
+        for epoch in 0..3 {
+            for quarter in 0..4 {
+                let sequence = quarter * (1 << 30);
+                assert!(!history.observe(sequence, 100), "epoch {epoch}");
+                assert!(history.observe(sequence, 100));
+            }
+        }
+    }
+
+    #[test]
     fn sparse_sequence_history_stays_bounded_and_merges_adjacent_ranges() {
         let mut history = SequenceHistory::default();
         for index in 0..40_000 {

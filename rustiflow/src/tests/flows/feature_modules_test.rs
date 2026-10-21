@@ -31,6 +31,23 @@ mod tests {
     }
 
     #[test]
+    fn late_packets_do_not_create_an_extra_idle_period() {
+        let mut active = ActiveIdleStats::new(0);
+        for timestamp in [0, 6_000_000, 1_000_000, 6_100_000] {
+            active.update(&packet(timestamp), true, 0);
+        }
+        active.close(6_100_000, FlowExpireCause::ExporterShutdown);
+        assert_eq!(
+            (
+                active.idle_stats.get_count(),
+                active.idle_stats.get_total(),
+                active.active_stats.get_total()
+            ),
+            (1, 6000.0, 100.0)
+        );
+    }
+
+    #[test]
     fn retransmission_history_is_bounded_and_preserves_recent_gaps() {
         for forward in [true, false] {
             let mut stats = RetransmissionStats::new();

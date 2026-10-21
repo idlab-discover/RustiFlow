@@ -4,6 +4,33 @@ This file keeps short-lived design choices and execution notes that would make
 `AGENTS.md` too long. Newest entries come first. Older entries are condensed to
 the decisions and results that still describe the current code.
 
+## 2026-10-22: adversarial flow and parser fixes
+
+Resolved the eight synthetic-event findings documented in
+[the adversarial findings record](handoff-realtime-adversarial.md). TCP sequence
+arithmetic wraps explicitly, expiration rejects negative elapsed time, and
+handshake/close observations survive cross-direction reordering. A first SYN-ACK
+identifies the forward endpoint as its destination. Normal three-segment closes
+now use `four_way_fin`; genuine simultaneous FIN exchanges remain distinct.
+
+The user selected these policies:
+
+- Preserve late post-close packets in a separate flow.
+- Keep bounded streaming timing, with timestamp bounds for duration and zero IAT
+  samples for late packets against a nondecreasing reference.
+- Bound retransmission history, accepting missed retransmissions into evicted
+  ranges. The implementation retains 1,024 merged ranges per direction in an
+  ordered map and handles sequence rollover.
+
+The tests that encoded suppression or incorrect close classification were
+corrected. The machine-dependent performance assertion was replaced with
+bounded-history and overlap tests. All adversarial cases are active.
+
+Also aligned eBPF fragment handling and IPv6 AH/ESP parsing with offline capture.
+IPv6 extension interpretation is shared through `common`. Workspace tests,
+all-feature Clippy, and both eBPF builds pass. Live veth validation is still
+outstanding: this session had no `rustiflow-t0` and no passwordless sudo.
+
 ## 2026-10-20: aya 0.14 and network-types 0.2; realtime byte order
 
 Moved to aya 0.14, aya-log 0.3, aya-ebpf 0.2, aya-log-ebpf 0.2 and
