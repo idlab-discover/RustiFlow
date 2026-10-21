@@ -278,7 +278,6 @@ mod tests {
     }
 
     #[tokio::test]
-    #[ignore = "finding 2: older timestamps trigger premature expiration"]
     async fn one_direction_lagging_by_seconds_stays_one_flow() {
         // The egress ring is drained 1.5 s ahead of the ingress ring: the
         // client's data at t=2 s reaches the shard before the server's reply
@@ -308,7 +307,6 @@ mod tests {
     }
 
     #[tokio::test]
-    #[ignore = "finding 3: older timestamps corrupt duration and IAT"]
     async fn sub_second_lag_never_yields_negative_duration_or_iat() {
         for family in FAMILIES {
             let arrivals = [

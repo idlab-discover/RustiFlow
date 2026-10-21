@@ -31,6 +31,54 @@ mod tests {
     }
 
     #[test]
+    fn out_of_order_timing_uses_timestamp_bounds_and_monotonic_intervals() {
+        for forward in [true, false] {
+            let mut timing = TimingStats::new();
+            let mut iat = IATStats::new();
+            let mut bulk = BulkStats::new();
+            let mut active = ActiveIdleStats::new(500_000);
+            for timestamp in [500_000, 900_000, 100_000, 1_000_000] {
+                let mut p = packet(timestamp);
+                p.length = 100;
+                timing.update(&p, forward, 0);
+                iat.update(&p, forward, 0);
+                bulk.update(&p, forward, 0);
+                active.update(&p, forward, 0);
+            }
+            let (first, last, duration, directional_iat) = if forward {
+                (
+                    timing.first_timestamp_fwd_ms(),
+                    timing.last_timestamp_fwd_ms(),
+                    timing.get_fwd_duration(),
+                    &iat.fwd_iat,
+                )
+            } else {
+                (
+                    timing.first_timestamp_bwd_ms(),
+                    timing.last_timestamp_bwd_ms(),
+                    timing.get_bwd_duration(),
+                    &iat.bwd_iat,
+                )
+            };
+            assert_eq!((first, last, duration), (100.0, 1000.0, 900.0));
+            assert_eq!(
+                (iat.iat.get_count(), iat.iat.get_min(), iat.iat.get_total()),
+                (3, 0.0, 500.0)
+            );
+            assert_eq!(directional_iat.get_total(), 500.0);
+            bulk.close(1_000_000, FlowExpireCause::ExporterShutdown);
+            let duration = if forward {
+                &bulk.fwd_bulk_duration
+            } else {
+                &bulk.bwd_bulk_duration
+            };
+            assert_eq!(duration.get_total(), 900.0);
+            active.close(1_000_000, FlowExpireCause::ExporterShutdown);
+            assert_eq!(active.active_stats.get_total(), 500.0);
+        }
+    }
+
+    #[test]
     fn bulk_rates_preserve_microseconds_and_use_seconds() {
         for forward in [true, false] {
             for (times, duration_ms, rate) in [

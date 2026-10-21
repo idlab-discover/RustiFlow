@@ -243,6 +243,16 @@ affected lockfile explicitly before rebuilding. Direct Cargo commands need
   cargo build --release --features profiling
   ```
 
+## Out-of-order packet timing
+
+Flow and directional durations use the earliest and latest observed packet
+timestamps. IAT statistics follow processing order with a nondecreasing timestamp
+reference: late packets contribute a zero interval and do not move that reference
+backwards. Active/idle periods also advance monotonically; completed periods are
+not reconstructed. Bulk durations retain the timestamp bounds of their current
+bulk. These bounded streaming statistics do not reconstruct chronological IATs.
+The same rules apply to offline and realtime input.
+
 ## Running the Project in dev mode
 
 ```bash

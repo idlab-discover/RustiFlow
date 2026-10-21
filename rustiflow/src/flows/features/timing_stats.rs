@@ -63,15 +63,23 @@ impl FlowFeature for TimingStats {
     fn update(&mut self, packet: &PacketFeatures, is_forward: bool, _last_timestamp_us: i64) {
         let current_ts = packet.timestamp_us;
         if is_forward {
-            if self.first_timestamp_fwd_us.is_none() {
-                self.first_timestamp_fwd_us = Some(current_ts);
-            }
-            self.last_timestamp_fwd_us = Some(current_ts);
+            self.first_timestamp_fwd_us = Some(
+                self.first_timestamp_fwd_us
+                    .map_or(current_ts, |first| first.min(current_ts)),
+            );
+            self.last_timestamp_fwd_us = Some(
+                self.last_timestamp_fwd_us
+                    .map_or(current_ts, |last| last.max(current_ts)),
+            );
         } else {
-            if self.first_timestamp_bwd_us.is_none() {
-                self.first_timestamp_bwd_us = Some(current_ts);
-            }
-            self.last_timestamp_bwd_us = Some(current_ts);
+            self.first_timestamp_bwd_us = Some(
+                self.first_timestamp_bwd_us
+                    .map_or(current_ts, |first| first.min(current_ts)),
+            );
+            self.last_timestamp_bwd_us = Some(
+                self.last_timestamp_bwd_us
+                    .map_or(current_ts, |last| last.max(current_ts)),
+            );
         }
     }
 

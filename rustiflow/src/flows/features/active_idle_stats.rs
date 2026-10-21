@@ -25,7 +25,7 @@ impl ActiveIdleStats {
 
 impl FlowFeature for ActiveIdleStats {
     fn update(&mut self, packet: &PacketFeatures, _is_forward: bool, _last_timestamp_us: i64) {
-        let current_ts = packet.timestamp_us;
+        let current_ts = packet.timestamp_us.max(self.active_end);
         let idle_gap_us = current_ts - self.active_end;
 
         if idle_gap_us > ACTIVE_IDLE_TIMEOUT_US {

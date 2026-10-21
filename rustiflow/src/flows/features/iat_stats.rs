@@ -30,24 +30,34 @@ impl FlowFeature for IATStats {
         let current_ts_us = packet.timestamp_us;
 
         let duration_ms = |last_timestamp_us: Option<i64>| {
-            last_timestamp_us.map(|ts_us| (current_ts_us - ts_us) as f64 / 1_000.0)
+            last_timestamp_us
+                .map(|ts_us| current_ts_us.saturating_sub(ts_us).max(0) as f64 / 1_000.0)
         };
 
         if let Some(dur) = duration_ms(self.last_timestamp_us) {
             self.iat.add_value(dur);
         }
-        self.last_timestamp_us = Some(current_ts_us);
+        self.last_timestamp_us = Some(
+            self.last_timestamp_us
+                .map_or(current_ts_us, |last| last.max(current_ts_us)),
+        );
 
         if is_forward {
             if let Some(dur) = duration_ms(self.last_timestamp_fwd_us) {
                 self.fwd_iat.add_value(dur);
             }
-            self.last_timestamp_fwd_us = Some(current_ts_us);
+            self.last_timestamp_fwd_us = Some(
+                self.last_timestamp_fwd_us
+                    .map_or(current_ts_us, |last| last.max(current_ts_us)),
+            );
         } else {
             if let Some(dur) = duration_ms(self.last_timestamp_bwd_us) {
                 self.bwd_iat.add_value(dur);
             }
-            self.last_timestamp_bwd_us = Some(current_ts_us);
+            self.last_timestamp_bwd_us = Some(
+                self.last_timestamp_bwd_us
+                    .map_or(current_ts_us, |last| last.max(current_ts_us)),
+            );
         }
     }
 

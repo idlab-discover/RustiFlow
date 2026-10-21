@@ -27,7 +27,8 @@ impl BulkState {
     pub fn update(&mut self, packet_len: u16, timestamp: i64) {
         self.packet_count += 1;
         self.size += packet_len as u32;
-        self.last_time = timestamp;
+        self.start_time = self.start_time.min(timestamp);
+        self.last_time = self.last_time.max(timestamp);
     }
 }
 

@@ -293,7 +293,8 @@ impl Flow for BasicFlow {
     }
 
     fn update_flow(&mut self, packet: &PacketFeatures, fwd: bool) -> bool {
-        self.last_timestamp_us = packet.timestamp_us;
+        self.first_timestamp_us = self.first_timestamp_us.min(packet.timestamp_us);
+        self.last_timestamp_us = self.last_timestamp_us.max(packet.timestamp_us);
         self.observe_tcp_handshake(packet, fwd);
 
         if self.is_tcp_finished(packet, fwd) {
