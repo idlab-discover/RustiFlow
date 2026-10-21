@@ -30,6 +30,38 @@ mod tests {
     }
 
     #[test]
+    fn older_timestamps_do_not_expire_a_flow() {
+        let mut flow = BasicFlow::new(
+            "time-order".to_string(),
+            "10.0.0.1".parse().unwrap(),
+            40000,
+            "10.0.0.2".parse().unwrap(),
+            443,
+            6,
+            5_000_000,
+        );
+        flow.last_timestamp_us = 10_000_000;
+        for timestamp in [i64::MIN, 0, 5_000_000, 9_000_000, 10_000_000] {
+            assert_eq!(
+                flow.is_expired(timestamp, 120, 60),
+                (false, FlowExpireCause::None)
+            );
+        }
+        assert_eq!(
+            flow.is_expired(70_000_000, 120, 60),
+            (false, FlowExpireCause::None)
+        );
+        assert_eq!(
+            flow.is_expired(71_000_000, 120, 60),
+            (true, FlowExpireCause::IdleTimeout)
+        );
+        assert_eq!(
+            flow.is_expired(126_000_000, 120, 600),
+            (true, FlowExpireCause::ActiveTimeout)
+        );
+    }
+
+    #[test]
     fn close_flow_records_expiration_cause() {
         let ip_source = IpAddr::V4(Ipv4Addr::new(192, 168, 1, 10));
         let ip_destination = IpAddr::V4(Ipv4Addr::new(192, 168, 1, 20));

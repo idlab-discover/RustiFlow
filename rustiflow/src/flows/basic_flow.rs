@@ -366,11 +366,15 @@ impl Flow for BasicFlow {
             return (true, self.flow_expire_cause);
         }
 
-        if ((timestamp_us - self.first_timestamp_us) / 1_000_000) as u64 > active_timeout {
+        if (timestamp_us.saturating_sub(self.first_timestamp_us).max(0) / 1_000_000) as u64
+            > active_timeout
+        {
             return (true, FlowExpireCause::ActiveTimeout);
         }
 
-        if ((timestamp_us - self.last_timestamp_us) / 1_000_000) as u64 > idle_timeout {
+        if (timestamp_us.saturating_sub(self.last_timestamp_us).max(0) / 1_000_000) as u64
+            > idle_timeout
+        {
             return (true, FlowExpireCause::IdleTimeout);
         }
 
