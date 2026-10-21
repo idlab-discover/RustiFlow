@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"constant":["REALTIME_EVENT_QUEUE_COUNT","REALTIME_EVENT_RINGBUF_BYTES"],"struct":["EbpfEventIpv4","EbpfEventIpv6","Icmpv4Hdr","Icmpv6Hdr","TcpHdr","UdpHdr"],"trait":["NetworkHeader"]};
+window.SIDEBAR_ITEMS = {"constant":["REALTIME_EVENT_QUEUE_COUNT","REALTIME_EVENT_RINGBUF_BYTES"],"mod":["ipv6_extensions"],"struct":["EbpfEventIpv4","EbpfEventIpv6","Icmpv4Hdr","Icmpv6Hdr","TcpHdr","UdpHdr"],"trait":["NetworkHeader"]};

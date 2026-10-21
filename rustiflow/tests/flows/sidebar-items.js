@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"mod":["basic_flow_test","cidds_flow_test","feature_modules_test","flow_table_test","nf_flow_test","packet_features_test","pcap_fixture_test","pcap_reader_test","replay_bench_test","rusti_flow_test"]};
+window.SIDEBAR_ITEMS = {"mod":["basic_flow_test","cidds_flow_test","feature_modules_test","flow_table_test","nf_flow_test","packet_features_test","pcap_fixture_test","pcap_reader_test","realtime_adversarial_test","replay_bench_test","rusti_flow_test"]};

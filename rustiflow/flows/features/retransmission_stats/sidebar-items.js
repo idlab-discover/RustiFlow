@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"fn":["insert_sequence_range","sequence_range"],"struct":["RetransmissionStats","SequenceRange"]};
+window.SIDEBAR_ITEMS = {"constant":["MAX_SEQUENCE_RANGES"],"struct":["RetransmissionStats","SequenceHistory"]};

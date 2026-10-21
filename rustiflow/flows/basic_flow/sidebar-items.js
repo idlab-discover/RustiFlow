@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"enum":["FlowState","TcpCloseStyle"],"fn":["push_csv_display"],"struct":["BasicFlow"]};
+window.SIDEBAR_ITEMS = {"enum":["FlowState","TcpCloseStyle"],"fn":["acknowledges","push_csv_display"],"struct":["BasicFlow"]};
