@@ -1,5 +1,7 @@
 #![no_std]
 
+pub mod ipv6_extensions;
+
 pub use network_types::{
     icmp::{Icmpv4Hdr, Icmpv6Hdr},
     tcp::TcpHdr,

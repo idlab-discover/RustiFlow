@@ -2,6 +2,7 @@
 use std::net::Ipv6Addr;
 use std::net::{IpAddr, Ipv4Addr};
 
+use common::ipv6_extensions::Ipv6Extension;
 #[cfg(target_os = "linux")]
 use common::{EbpfEventIpv4, EbpfEventIpv6};
 use log::debug;
@@ -217,49 +218,15 @@ fn skip_ipv6_extension_headers<'a>(
     packet: &'a Ipv6Packet<'a>,
 ) -> Option<(IpNextHeaderProtocol, &'a [u8])> {
     const MAX_EXTENSION_HEADERS: usize = 8;
-    const HOP_BY_HOP: u8 = 0;
-    const ROUTING: u8 = 43;
-    const FRAGMENT: u8 = 44;
-    const ESP: u8 = 50;
-    const AUTHENTICATION: u8 = 51;
-    const DESTINATION_OPTIONS: u8 = 60;
-    const MOBILITY: u8 = 135;
-    const HIP: u8 = 139;
-    const SHIM6: u8 = 140;
-
     let mut next_header = packet.get_next_header();
     let mut payload = packet.payload();
 
     for _ in 0..MAX_EXTENSION_HEADERS {
-        let header_len = match next_header.0 {
-            HOP_BY_HOP | ROUTING | DESTINATION_OPTIONS | MOBILITY | HIP | SHIM6 => {
-                if payload.len() < 8 {
-                    return None;
-                }
-                (usize::from(payload[1]) + 1) * 8
-            }
-            FRAGMENT => {
-                if payload.len() < 8 {
-                    return None;
-                }
-
-                let fragment_offset_field = u16::from_be_bytes([payload[2], payload[3]]);
-                let fragment_offset = (fragment_offset_field & 0xfff8) >> 3;
-                if fragment_offset > 0 {
-                    return None;
-                }
-
-                8
-            }
-            AUTHENTICATION => {
-                if payload.len() < 8 {
-                    return None;
-                }
-                (usize::from(payload[1]) + 2) * 4
-            }
-            ESP => return None,
-            _ => return Some((next_header, payload)),
+        let Some(extension) = Ipv6Extension::from_next_header(next_header.0) else {
+            return Some((next_header, payload));
         };
+        let prefix = payload.get(..4)?.try_into().ok()?;
+        let header_len = extension.header_length(prefix)?;
 
         if payload.len() < header_len {
             return None;

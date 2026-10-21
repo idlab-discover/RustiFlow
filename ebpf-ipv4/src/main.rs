@@ -76,6 +76,9 @@ fn process_packet(ctx: &TcContext) -> Result<i32, ()> {
     }
 
     let ipv4hdr = ctx.load::<Ipv4Hdr>(EthHdr::LEN).map_err(|_| ())?;
+    if ipv4hdr.frag_offset() != 0 {
+        return Ok(TC_ACT_PIPE);
+    }
     let ip_header_length = usize::from(ipv4hdr.ihl());
     let packet_info = PacketInfo::new(&ipv4hdr, ip_header_length)?;
     let hdr_offset = EthHdr::LEN + ip_header_length;

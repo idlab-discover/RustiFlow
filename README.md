@@ -243,6 +243,14 @@ affected lockfile explicitly before rebuilding. Direct Cargo commands need
   cargo build --release --features profiling
   ```
 
+## Fragmented and encrypted packets
+
+Offline and realtime capture skip non-initial IPv4 and IPv6 fragments because
+those fragments do not contain the original transport header. Initial fragments
+remain eligible for extraction; RustiFlow does not reassemble fragmented packets.
+IPv6 AH uses its four-byte length units. IPv6 ESP is skipped because its encrypted
+payload cannot be parsed as a transport header.
+
 ## TCP flow lifecycle
 
 A flow first observed as SYN-ACK uses that packet's destination as the forward

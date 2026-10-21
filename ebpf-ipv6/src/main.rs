@@ -11,6 +11,7 @@ use aya_ebpf::{
 };
 use aya_log_ebpf::debug;
 
+use common::ipv6_extensions::Ipv6Extension;
 use common::{
     EbpfEventIpv6, Icmpv6Hdr, NetworkHeader, TcpHdr, UdpHdr, REALTIME_EVENT_QUEUE_COUNT,
     REALTIME_EVENT_RINGBUF_BYTES,
@@ -67,32 +68,7 @@ pub fn tc_flow_track(ctx: TcContext) -> i32 {
     }
 }
 
-#[repr(C, packed)]
-#[derive(Debug, Copy, Clone)]
-pub struct Ipv6ExtensionHdr {
-    pub next_hdr: u8,
-    pub hdr_ext_len: u8,
-    // The rest is variable-length, but for the first 2 bytes, this is enough
-}
-
-const MAX_EXT_HEADERS: usize = 8; // Arbitrary safe limit
-
-fn is_extension_header(proto: u8) -> bool {
-    matches!(
-        IpProto::from_u8(proto),
-        Some(
-            IpProto::HopOpt     // 0   Hop-by-Hop
-            | IpProto::Ipv6Route    // 43  Routing
-            | IpProto::Ipv6Frag   // 44  Fragment
-            | IpProto::Esp       // 50  ESP
-            | IpProto::Ah        // 51  Auth
-            | IpProto::Ipv6Opts // 60 Destination Options
-            | IpProto::MobilityHeader    // 135 Mobility
-            | IpProto::Hip         // 139 HIP
-            | IpProto::Shim6 // 140 Shim6
-        )
-    )
-}
+const MAX_EXT_HEADERS: usize = 8;
 
 fn skip_ipv6_ext_headers(ctx: &TcContext, start_offset: usize) -> Result<(u8, usize), ()> {
     // Load the base IPv6 header
@@ -104,18 +80,15 @@ fn skip_ipv6_ext_headers(ctx: &TcContext, start_offset: usize) -> Result<(u8, us
 
     // Unrolled loop using a fixed number of iterations
     for _ in 0..MAX_EXT_HEADERS {
-        if !is_extension_header(next_hdr) {
+        let Some(extension) = Ipv6Extension::from_next_header(next_hdr) else {
             break;
-        }
-
-        // Load the extension header
-        let ext_hdr = ctx.load::<Ipv6ExtensionHdr>(offset).map_err(|_| ())?;
-
-        // Compute the total length of this extension header in bytes
-        let ext_len_bytes = (ext_hdr.hdr_ext_len as usize + 1) * 8;
-
-        offset += ext_len_bytes;
-        next_hdr = ext_hdr.next_hdr;
+        };
+        let prefix = ctx.load::<[u8; 4]>(offset).map_err(|_| ())?;
+        let length = extension.header_length(prefix).ok_or(())?;
+        // Validate the full extension, not just the prefix used to decode it.
+        ctx.load::<u8>(offset + length - 1).map_err(|_| ())?;
+        offset += length;
+        next_hdr = prefix[0];
     }
 
     Ok((next_hdr, offset))
