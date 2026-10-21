@@ -264,7 +264,6 @@ mod tests {
     }
 
     #[tokio::test]
-    #[ignore = "finding 5: TCP sequence arithmetic overflows"]
     async fn sequence_numbers_crossing_the_wrap_close_cleanly() {
         // Server ISN u32::MAX: the SYN-ACK's expected ACK is 0. Client ISN
         // chosen so its FIN sits right before the wrap.

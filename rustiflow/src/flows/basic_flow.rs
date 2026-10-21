@@ -103,7 +103,7 @@ impl BasicFlow {
 
         if !forward && self.saw_syn_fwd && packet.syn_flag > 0 && packet.ack_flag > 0 {
             self.saw_syn_ack_bwd = true;
-            self.expected_handshake_ack_seq_fwd = Some(packet.sequence_number + 1);
+            self.expected_handshake_ack_seq_fwd = Some(packet.sequence_number.wrapping_add(1));
             return;
         }
 
@@ -161,16 +161,24 @@ impl BasicFlow {
                 }
                 self.saw_fin_fwd = true;
                 self.state_fwd = FlowState::FinSent;
-                self.expected_ack_seq_bwd =
-                    Some(packet.sequence_number + packet.data_length as u32 + 1);
+                self.expected_ack_seq_bwd = Some(
+                    packet
+                        .sequence_number
+                        .wrapping_add(u32::from(packet.data_length))
+                        .wrapping_add(1),
+                );
             } else {
                 if self.state_fwd == FlowState::FinSent {
                     self.tcp_simultaneous_close = true;
                 }
                 self.saw_fin_bwd = true;
                 self.state_bwd = FlowState::FinSent;
-                self.expected_ack_seq_fwd =
-                    Some(packet.sequence_number + packet.data_length as u32 + 1);
+                self.expected_ack_seq_fwd = Some(
+                    packet
+                        .sequence_number
+                        .wrapping_add(u32::from(packet.data_length))
+                        .wrapping_add(1),
+                );
             }
         }
 
