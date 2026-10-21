@@ -67,7 +67,7 @@ jobs:
       run: cargo test --locked --verbose
       
     - name: Generate documentation
-      run: cargo doc --no-deps
+      run: cargo doc --locked --no-deps
 
     - name: Restore custom index.html
       if: github.event_name == 'push'

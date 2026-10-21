@@ -42,7 +42,7 @@ pub struct Options {
 pub fn build_ebpf(opts: Options, target: String) -> Result<(), anyhow::Error> {
     let dir = PathBuf::from(target);
     let target = format!("--target={}", opts.target);
-    let mut args = vec!["build", target.as_str(), "-Z", "build-std=core"];
+    let mut args = vec!["build", "--locked", target.as_str(), "-Z", "build-std=core"];
     if opts.release {
         args.push("--release")
     }

@@ -223,6 +223,11 @@ Use the upstream prebuilt binary. Building current `bpf-linker` releases with
 
 ## <img src="figures/RustiFlow_nobg.png" width="60px"/> Building the Project
 
+`cargo xtask` enforces the committed lockfiles for the helper and every build it
+launches. If a manifest change requires a lockfile update, update and commit the
+affected lockfile explicitly before rebuilding. Direct Cargo commands need
+`--locked` for the same enforcement.
+
 - **eBPF Programs**:
   ```bash
   cargo xtask ebpf-ipv4
