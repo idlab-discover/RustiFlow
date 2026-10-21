@@ -243,6 +243,16 @@ affected lockfile explicitly before rebuilding. Direct Cargo commands need
   cargo build --release --features profiling
   ```
 
+## TCP flow lifecycle
+
+A flow first observed as SYN-ACK uses that packet's destination as the forward
+endpoint. Other flows use the first observed packet's source. Handshake and FIN
+acknowledgments tolerate reordered observations using TCP sequence arithmetic.
+The `four_way_fin` close style includes a three-segment FIN, FIN|ACK, ACK close;
+`simultaneous_fin` requires both FIN packets to carry ACKs that do not acknowledge
+the peer's FIN. Packets observed after a completed flow was exported start a new
+flow, including retransmitted FINs. This preserves observed packet counts.
+
 ## Out-of-order packet timing
 
 Flow and directional durations use the earliest and latest observed packet

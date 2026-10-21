@@ -81,7 +81,11 @@ pub struct BasicFlow {
     pub tcp_close_style: TcpCloseStyle,
     saw_fin_fwd: bool,
     saw_fin_bwd: bool,
-    tcp_simultaneous_close: bool,
+    highest_ack_fwd: Option<u32>,
+    highest_ack_bwd: Option<u32>,
+    fin_ack_fwd: Option<u32>,
+    fin_ack_bwd: Option<u32>,
+    handshake_ack_fwd: Option<u32>,
 }
 
 impl BasicFlow {
@@ -96,26 +100,17 @@ impl BasicFlow {
 
         if forward && packet.syn_flag > 0 && packet.ack_flag == 0 {
             self.saw_syn_fwd = true;
-            self.saw_syn_ack_bwd = false;
-            self.expected_handshake_ack_seq_fwd = None;
-            return;
         }
-
-        if !forward && self.saw_syn_fwd && packet.syn_flag > 0 && packet.ack_flag > 0 {
+        if !forward && packet.syn_flag > 0 && packet.ack_flag > 0 {
             self.saw_syn_ack_bwd = true;
             self.expected_handshake_ack_seq_fwd = Some(packet.sequence_number.wrapping_add(1));
-            return;
         }
-
-        if forward
-            && self.saw_syn_fwd
+        if forward && packet.ack_flag > 0 && packet.syn_flag == 0 {
+            self.handshake_ack_fwd = Some(packet.sequence_number_ack);
+        }
+        self.tcp_handshake_completed = self.saw_syn_fwd
             && self.saw_syn_ack_bwd
-            && packet.ack_flag > 0
-            && packet.syn_flag == 0
-            && Some(packet.sequence_number_ack) == self.expected_handshake_ack_seq_fwd
-        {
-            self.tcp_handshake_completed = true;
-        }
+            && acknowledges(self.handshake_ack_fwd, self.expected_handshake_ack_seq_fwd);
     }
 
     fn update_tcp_close_style(&mut self, cause: FlowExpireCause) {
@@ -125,7 +120,11 @@ impl BasicFlow {
             TcpCloseStyle::Reset
         } else if self.saw_fin_fwd && self.saw_fin_bwd {
             if self.state_fwd == FlowState::FinAcked && self.state_bwd == FlowState::FinAcked {
-                if self.tcp_simultaneous_close {
+                if self.fin_ack_fwd.is_some()
+                    && self.fin_ack_bwd.is_some()
+                    && !acknowledges(self.fin_ack_fwd, self.expected_ack_seq_fwd)
+                    && !acknowledges(self.fin_ack_bwd, self.expected_ack_seq_bwd)
+                {
                     TcpCloseStyle::SimultaneousFin
                 } else {
                     TcpCloseStyle::FourWayFin
@@ -153,48 +152,53 @@ impl BasicFlow {
     ///
     /// A boolean indicating if the flow is finished.
     pub fn is_tcp_finished(&mut self, packet: &PacketFeatures, forward: bool) -> bool {
-        // Update state when receiving FIN flag
-        if packet.fin_flag > 0 {
-            if forward {
-                if self.state_bwd == FlowState::FinSent {
-                    self.tcp_simultaneous_close = true;
-                }
-                self.saw_fin_fwd = true;
-                self.state_fwd = FlowState::FinSent;
-                self.expected_ack_seq_bwd = Some(
-                    packet
-                        .sequence_number
-                        .wrapping_add(u32::from(packet.data_length))
-                        .wrapping_add(1),
-                );
+        if !self.is_tcp() {
+            return false;
+        }
+        if packet.ack_flag > 0 {
+            let highest = if forward {
+                &mut self.highest_ack_fwd
             } else {
-                if self.state_fwd == FlowState::FinSent {
-                    self.tcp_simultaneous_close = true;
-                }
-                self.saw_fin_bwd = true;
-                self.state_bwd = FlowState::FinSent;
-                self.expected_ack_seq_fwd = Some(
-                    packet
-                        .sequence_number
-                        .wrapping_add(u32::from(packet.data_length))
-                        .wrapping_add(1),
-                );
+                &mut self.highest_ack_bwd
+            };
+            if highest.is_none() || acknowledges(Some(packet.sequence_number_ack), *highest) {
+                *highest = Some(packet.sequence_number_ack);
             }
         }
-
-        if self.state_bwd == FlowState::FinSent
-            && forward
-            && Some(packet.sequence_number_ack) == self.expected_ack_seq_fwd
-        {
-            self.state_bwd = FlowState::FinAcked;
-        } else if self.state_fwd == FlowState::FinSent
-            && !forward
-            && Some(packet.sequence_number_ack) == self.expected_ack_seq_bwd
-        {
-            self.state_fwd = FlowState::FinAcked;
+        if packet.fin_flag > 0 {
+            let expected = packet
+                .sequence_number
+                .wrapping_add(u32::from(packet.data_length))
+                .wrapping_add(1);
+            if forward {
+                self.saw_fin_fwd = true;
+                self.expected_ack_seq_bwd.get_or_insert(expected);
+                if packet.ack_flag > 0 {
+                    self.fin_ack_fwd.get_or_insert(packet.sequence_number_ack);
+                }
+            } else {
+                self.saw_fin_bwd = true;
+                self.expected_ack_seq_fwd.get_or_insert(expected);
+                if packet.ack_flag > 0 {
+                    self.fin_ack_bwd.get_or_insert(packet.sequence_number_ack);
+                }
+            }
         }
-
-        // Return true if both sides are finished and acknowledged the termination
+        // Re-evaluate both directions: the ACK may have arrived before its FIN.
+        if self.saw_fin_fwd {
+            self.state_fwd = if acknowledges(self.highest_ack_bwd, self.expected_ack_seq_bwd) {
+                FlowState::FinAcked
+            } else {
+                FlowState::FinSent
+            };
+        }
+        if self.saw_fin_bwd {
+            self.state_bwd = if acknowledges(self.highest_ack_fwd, self.expected_ack_seq_fwd) {
+                FlowState::FinAcked
+            } else {
+                FlowState::FinSent
+            };
+        }
         self.state_fwd == FlowState::FinAcked && self.state_bwd == FlowState::FinAcked
     }
 
@@ -248,6 +252,12 @@ impl BasicFlow {
     }
 }
 
+// TCP serial comparisons are defined within half the 32-bit sequence space.
+fn acknowledges(ack: Option<u32>, expected: Option<u32>) -> bool {
+    ack.zip(expected)
+        .is_some_and(|(ack, expected)| (ack.wrapping_sub(expected) as i32) >= 0)
+}
+
 fn push_csv_display(output: &mut String, value: impl Display) {
     if !output.is_empty() {
         output.push(',');
@@ -288,7 +298,11 @@ impl Flow for BasicFlow {
             tcp_close_style: TcpCloseStyle::None,
             saw_fin_fwd: false,
             saw_fin_bwd: false,
-            tcp_simultaneous_close: false,
+            highest_ack_fwd: None,
+            highest_ack_bwd: None,
+            fin_ack_fwd: None,
+            fin_ack_bwd: None,
+            handshake_ack_fwd: None,
         }
     }
 

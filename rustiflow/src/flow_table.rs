@@ -23,7 +23,7 @@ enum FlowUpdate<T> {
 /// A tracked flow, stored under its canonical biflow key.
 struct FlowEntry<T> {
     flow: T,
-    /// Orientation of the packet that created the flow; packets with the same
+    /// Orientation of the initiator inferred at creation; packets with the same
     /// orientation travel in the flow's forward direction.
     forward_orientation: KeyOrientation,
     /// Next early-export boundary, at first packet + k * interval. Unused when
@@ -117,29 +117,46 @@ where
         biflow_key: FlowKey,
         orientation: KeyOrientation,
     ) {
+        // A first SYN-ACK identifies the responder even if its SYN is still queued.
+        let packet_key = packet.flow_key_value();
+        let is_forward = !(packet.protocol == 6 && packet.syn_flag > 0 && packet.ack_flag > 0);
+        let forward_key = if is_forward {
+            packet_key
+        } else {
+            packet_key.reverse()
+        };
+        let forward_orientation = if is_forward {
+            orientation
+        } else {
+            forward_key.canonicalize().1
+        };
         let new_flow = T::new(
-            packet.flow_key_value().to_string(),
-            packet.source_ip,
-            packet.source_port,
-            packet.destination_ip,
-            packet.destination_port,
+            forward_key.to_string(),
+            forward_key.source.ip,
+            forward_key.source.port,
+            forward_key.destination.ip,
+            forward_key.destination.port,
             packet.protocol,
             packet.timestamp_us,
         );
         let mut entry = FlowEntry {
             flow: new_flow,
-            forward_orientation: orientation,
+            forward_orientation,
             next_early_export_us: packet.timestamp_us + self.early_export_us.unwrap_or(0),
         };
-        let snapshot =
-            match Self::apply_packet_to_flow(&mut entry, packet, true, self.early_export_us) {
-                FlowUpdate::Active => None,
-                FlowUpdate::EarlyExport(snapshot) => Some(snapshot),
-                FlowUpdate::Terminated => {
-                    Self::export(&self.export_channel, entry.flow).await;
-                    return;
-                }
-            };
+        let snapshot = match Self::apply_packet_to_flow(
+            &mut entry,
+            packet,
+            is_forward,
+            self.early_export_us,
+        ) {
+            FlowUpdate::Active => None,
+            FlowUpdate::EarlyExport(snapshot) => Some(snapshot),
+            FlowUpdate::Terminated => {
+                Self::export(&self.export_channel, entry.flow).await;
+                return;
+            }
+        };
 
         self.flow_map.insert(biflow_key, entry);
         if let Some(snapshot) = snapshot {

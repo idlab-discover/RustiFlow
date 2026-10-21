@@ -217,6 +217,90 @@ mod tests {
         flows.iter().map(summarize).collect()
     }
 
+    fn direction_interleavings(segments: &[Segment]) -> Vec<Vec<Segment>> {
+        fn merge(
+            client: &[Segment],
+            server: &[Segment],
+            prefix: &mut Vec<Segment>,
+            output: &mut Vec<Vec<Segment>>,
+        ) {
+            if client.is_empty() && server.is_empty() {
+                output.push(prefix.clone());
+                return;
+            }
+            if let Some((first, rest)) = client.split_first() {
+                prefix.push(*first);
+                merge(rest, server, prefix, output);
+                prefix.pop();
+            }
+            if let Some((first, rest)) = server.split_first() {
+                prefix.push(*first);
+                merge(client, rest, prefix, output);
+                prefix.pop();
+            }
+        }
+        let (client, server): (Vec<_>, Vec<_>) = segments
+            .iter()
+            .copied()
+            .partition(|segment| segment.direction == ClientToServer);
+        let mut output = Vec::new();
+        merge(&client, &server, &mut Vec::new(), &mut output);
+        output
+    }
+
+    #[tokio::test]
+    async fn all_direction_preserving_interleavings_close_cleanly() {
+        for family in FAMILIES {
+            for (client, server) in [(1000, 5000), (u32::MAX - 100, u32::MAX)] {
+                for arrivals in direction_interleavings(&clean_connection(client, server)) {
+                    let flows = run(family, &arrivals).await;
+                    assert_eq!(
+                        summaries(&flows),
+                        vec![expected_clean_close(family)],
+                        "{family:?}"
+                    );
+                }
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn simultaneous_fin_exchange_is_classified_independently_of_arrival_order() {
+        for family in FAMILIES {
+            let mut segments = clean_connection(1000, 5000);
+            segments.truncate(5);
+            segments.extend([
+                segment(500, ClientToServer, FIN_FLAG | ACK_FLAG, 1101, 5201, 0),
+                segment(600, ServerToClient, FIN_FLAG | ACK_FLAG, 5201, 1101, 0),
+                segment(700, ClientToServer, ACK_FLAG, 1102, 5202, 0),
+                segment(800, ServerToClient, ACK_FLAG, 5202, 1102, 0),
+            ]);
+            let mut expected = expected_clean_close(family);
+            expected.close_style = TcpCloseStyle::SimultaneousFin;
+            for arrivals in direction_interleavings(&segments) {
+                assert_eq!(
+                    summaries(&run(family, &arrivals).await),
+                    vec![FlowSummary { ..expected }],
+                    "{family:?}"
+                );
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn acknowledgment_numbers_without_ack_flags_do_not_close_a_flow() {
+        for family in FAMILIES {
+            let mut arrivals = clean_connection(1000, 5000);
+            for segment in &mut arrivals[6..] {
+                segment.flags &= !ACK_FLAG;
+            }
+            let mut expected = expected_clean_close(family);
+            expected.expire_cause = FlowExpireCause::ExporterShutdown;
+            expected.close_style = TcpCloseStyle::BidirectionalFin;
+            assert_eq!(summaries(&run(family, &arrivals).await), vec![expected]);
+        }
+    }
+
     #[tokio::test]
     async fn baseline_in_order_connection_closes_cleanly() {
         for family in FAMILIES {
@@ -230,7 +314,6 @@ mod tests {
     }
 
     #[tokio::test]
-    #[ignore = "finding 1: reordered SYN-ACK changes flow orientation"]
     async fn syn_ack_drained_before_syn_keeps_client_as_forward() {
         // The ingress ring delivers the SYN-ACK before the egress ring
         // delivers the SYN it answers.
@@ -247,7 +330,6 @@ mod tests {
     }
 
     #[tokio::test]
-    #[ignore = "finding 4: reordered FIN acknowledgments prevent termination"]
     async fn peer_fin_drained_before_own_fin_still_terminates() {
         // The server's ACK and FIN reach the shard before the client FIN they
         // answer.
@@ -329,8 +411,7 @@ mod tests {
     }
 
     #[tokio::test]
-    #[ignore = "finding 6: post-close straggler semantics need a decision"]
-    async fn straggler_ack_after_teardown_does_not_open_a_new_flow() {
+    async fn straggler_fin_after_teardown_is_preserved_in_a_separate_flow() {
         // The server retransmits its FIN because it has not seen the final ACK
         // yet, after the four-way close already exported the flow.
         for family in FAMILIES {
@@ -346,14 +427,25 @@ mod tests {
             let flows = run(family, &arrivals).await;
             assert_eq!(
                 summaries(&flows),
-                vec![expected_clean_close(family)],
+                vec![
+                    expected_clean_close(family),
+                    FlowSummary {
+                        source_ip: decode(family, arrivals.last().unwrap()).source_ip,
+                        source_port: SERVER_PORT,
+                        packets: 1,
+                        fwd_packets: 1,
+                        duration_us: 0,
+                        handshake_completed: false,
+                        expire_cause: FlowExpireCause::ExporterShutdown,
+                        close_style: TcpCloseStyle::HalfClose,
+                    }
+                ],
                 "{family:?}"
             );
         }
     }
 
     #[tokio::test]
-    #[ignore = "finding 7: three-segment close classification needs a decision"]
     async fn fin_ack_answer_to_a_fin_is_not_a_simultaneous_close() {
         // The server acknowledges the client FIN in its own FIN|ACK, the usual
         // three-segment close. Its FIN is sent after it saw the client's.

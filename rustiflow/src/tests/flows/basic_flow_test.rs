@@ -340,7 +340,7 @@ mod tests {
     }
 
     #[test]
-    fn simultaneous_tcp_close_terminates_after_final_ack() {
+    fn three_segment_tcp_close_terminates_after_final_ack() {
         let ip_source = IpAddr::V4(Ipv4Addr::new(10, 0, 5, 1));
         let ip_destination = IpAddr::V4(Ipv4Addr::new(10, 0, 5, 2));
         let mut flow = BasicFlow::new(
@@ -377,18 +377,18 @@ mod tests {
         let mut fin_ack_bwd = build_packet(ip_destination, 443, ip_source, 50013, 1_000_500);
         fin_ack_bwd.fin_flag = 1;
         fin_ack_bwd.ack_flag = 1;
-        fin_ack_bwd.sequence_number = 200;
+        fin_ack_bwd.sequence_number = 701;
         fin_ack_bwd.sequence_number_ack = 101;
         assert!(!flow.update_flow(&fin_ack_bwd, false));
 
         let mut final_ack = build_packet(ip_source, 50013, ip_destination, 443, 1_000_600);
         final_ack.ack_flag = 1;
-        final_ack.sequence_number_ack = 201;
+        final_ack.sequence_number_ack = 702;
         assert!(flow.update_flow(&final_ack, true));
 
         assert_eq!(flow.flow_expire_cause, FlowExpireCause::TcpTermination);
         assert!(flow.tcp_handshake_completed);
-        assert_eq!(flow.tcp_close_style, TcpCloseStyle::SimultaneousFin);
+        assert_eq!(flow.tcp_close_style, TcpCloseStyle::FourWayFin);
     }
 
     #[test]
