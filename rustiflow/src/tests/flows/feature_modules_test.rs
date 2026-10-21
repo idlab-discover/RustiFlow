@@ -31,6 +31,63 @@ mod tests {
     }
 
     #[test]
+    fn retransmission_history_is_bounded_and_preserves_recent_gaps() {
+        for forward in [true, false] {
+            let mut stats = RetransmissionStats::new();
+            let mut p = packet(0);
+            p.protocol = 6;
+            p.data_length = 100;
+            for index in 0..40_000 {
+                p.sequence_number = index * 200;
+                stats.update(&p, forward, 0);
+            }
+            p.sequence_number = 0;
+            stats.update(&p, forward, 0);
+            assert_eq!(
+                stats.fwd_retransmission_count + stats.bwd_retransmission_count,
+                0
+            );
+            p.sequence_number = 39_999 * 200;
+            stats.update(&p, forward, 0);
+            assert_eq!(
+                stats.fwd_retransmission_count + stats.bwd_retransmission_count,
+                1
+            );
+            p.sequence_number += 100;
+            stats.update(&p, forward, 0);
+            assert_eq!(
+                stats.fwd_retransmission_count + stats.bwd_retransmission_count,
+                1
+            );
+        }
+    }
+
+    #[test]
+    fn retransmission_ranges_cross_the_sequence_wrap() {
+        for forward in [true, false] {
+            let mut stats = RetransmissionStats::new();
+            let mut p = packet(0);
+            p.protocol = 6;
+            p.sequence_number = u32::MAX - 49;
+            p.data_length = 100;
+            stats.update(&p, forward, 0);
+            p.sequence_number = 0;
+            p.data_length = 50;
+            stats.update(&p, forward, 0);
+            assert_eq!(
+                stats.fwd_retransmission_count + stats.bwd_retransmission_count,
+                1
+            );
+            p.sequence_number = 50;
+            stats.update(&p, forward, 0);
+            assert_eq!(
+                stats.fwd_retransmission_count + stats.bwd_retransmission_count,
+                1
+            );
+        }
+    }
+
+    #[test]
     fn out_of_order_timing_uses_timestamp_bounds_and_monotonic_intervals() {
         for forward in [true, false] {
             let mut timing = TimingStats::new();

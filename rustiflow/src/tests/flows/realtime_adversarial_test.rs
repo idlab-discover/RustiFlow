@@ -6,10 +6,7 @@
 //! table in such orders, for IPv4 and IPv6 alike.
 #[cfg(all(test, target_os = "linux"))]
 mod tests {
-    use std::{
-        net::{IpAddr, Ipv4Addr, Ipv6Addr},
-        time::Instant,
-    };
+    use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 
     use common::{EbpfEventIpv4, EbpfEventIpv6};
     use tokio::sync::mpsc;
@@ -465,12 +462,9 @@ mod tests {
     }
 
     #[tokio::test]
-    #[ignore = "finding 8: manual timing probe; machine-dependent threshold"]
-    async fn sparse_sequence_numbers_keep_per_packet_cost_flat() {
-        // Segments that never touch leave one tracked range each. Compare the
-        // per-packet cost of a short and a long flow made of such segments.
-        async fn time_per_packet(packets: u32) -> f64 {
-            let arrivals: Vec<_> = (0..packets)
+    async fn sparse_sequence_history_preserves_recent_retransmissions() {
+        for family in FAMILIES {
+            let mut arrivals: Vec<_> = (0..40_000)
                 .map(|index| {
                     segment(
                         i64::from(index),
@@ -482,21 +476,23 @@ mod tests {
                     )
                 })
                 .collect();
-            let start = Instant::now();
-            run(Family::Ipv4, &arrivals).await;
-            start.elapsed().as_secs_f64() / f64::from(packets)
+            arrivals.push(segment(
+                40_000,
+                ClientToServer,
+                ACK_FLAG | PSH_FLAG,
+                39_999 * 200,
+                1,
+                100,
+            ));
+            let flows = run(family, &arrivals).await;
+            assert_eq!(flows.len(), 1);
+            assert_eq!(
+                (
+                    flows[0].packet_len_stats.flow_count(),
+                    flows[0].retransmission_stats.fwd_retransmission_count
+                ),
+                (40_001, 1)
+            );
         }
-        let short = time_per_packet(2_000).await;
-        let long = time_per_packet(40_000).await;
-        eprintln!(
-            "sparse segments: {:.0} ns/pkt at 2k, {:.0} ns/pkt at 40k",
-            short * 1e9,
-            long * 1e9
-        );
-        assert!(
-            long < short * 4.0,
-            "per-packet cost grew {:.1}x",
-            long / short
-        );
     }
 }

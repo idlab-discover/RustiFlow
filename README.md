@@ -253,6 +253,12 @@ The `four_way_fin` close style includes a three-segment FIN, FIN|ACK, ACK close;
 the peer's FIN. Packets observed after a completed flow was exported start a new
 flow, including retransmitted FINs. This preserves observed packet counts.
 
+Retransmission counters retain at most 1,024 merged TCP sequence ranges per
+direction. The lowest sequence ranges are evicted first; retransmissions that
+overlap only evicted history may be missed. Sequence numbers are unwrapped across
+32-bit rollover, assuming observations are less than half the sequence space
+apart. These counters do not perform full TCP stream reassembly.
+
 ## Out-of-order packet timing
 
 Flow and directional durations use the earliest and latest observed packet
