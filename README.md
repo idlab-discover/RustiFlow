@@ -179,7 +179,7 @@ If you want a more graphical interface, you can use the tui interface by just ru
 > **NOTE:** When using the save button, you will be prompted for a filename. You can reuse this file with following command:
 
 ```bash
-rustiflow --config-file <filename> realtime <interface> [--only-ingress]
+rustiflow --config-file <filename> realtime <interface> [--ingress-only]
 ```
 
 ```bash
