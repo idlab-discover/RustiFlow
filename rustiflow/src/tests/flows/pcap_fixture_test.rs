@@ -37,6 +37,34 @@ mod tests {
         flows
     }
 
+    /// Exported CSV rows of a fixture, sorted.
+    async fn exported_rows(name: &str) -> Vec<String> {
+        let mut rows: Vec<String> = extract_fixture(name).await.iter().map(Flow::dump).collect();
+        rows.sort();
+        rows
+    }
+
+    /// The fixtures from `scripts/generate_pcap_fixtures.py` re-encode the
+    /// packets of `nmap_tcp_syn_version.pcap`, so they must export its flows.
+    #[tokio::test]
+    async fn capture_format_variants_export_the_same_flows() {
+        let expected = exported_rows("nmap_tcp_syn_version.pcap").await;
+        assert_eq!(expected.len(), 17);
+
+        for name in [
+            "nmap_tcp_syn_version_nsec.pcap",
+            "nmap_tcp_syn_version_be.pcap",
+            "nmap_tcp_syn_version_two_if.pcapng",
+            "nmap_tcp_syn_version_be_binary_tsresol.pcapng",
+            "nmap_tcp_syn_version_sll.pcap",
+            "nmap_tcp_syn_version_vlan.pcap",
+            // Ends inside the record of one extra packet, which is dropped.
+            "nmap_tcp_syn_version_truncated.pcap",
+        ] {
+            assert_eq!(exported_rows(name).await, expected, "{name}");
+        }
+    }
+
     #[tokio::test]
     async fn tiny_concap_tcp_syn_fixture_extracts_expected_flows() {
         let flows = extract_fixture("nmap_tcp_syn_version.pcap").await;
