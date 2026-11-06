@@ -37,6 +37,14 @@ fn build(opts: &Options) -> Result<(), anyhow::Error> {
 
 /// Build and run the project
 pub fn run(opts: Options) -> Result<(), anyhow::Error> {
+    match opts.bpf_target {
+        Architecture::BpfEl => {}
+        Architecture::BpfEb => anyhow::bail!(
+            "the realtime loader only supports {} objects; big-endian hosts are unsupported",
+            Architecture::BpfEl
+        ),
+    }
+
     // build our ebpf program followed by our application
     build_ebpf(
         BuildOptions {

@@ -1,0 +1,72 @@
+# RustiFlow realtime capture on one interface: rustiflow@<interface>.service.
+# The installer replaces @BINDIR@ and @LIBDIR@ with the install prefix paths.
+#
+# Required: /etc/rustiflow/<interface>.toml (start from
+#           share/rustiflow/config.toml.example).
+# Optional: /etc/rustiflow/<interface>.env (start from
+#           share/rustiflow/environment.example).
+# Relative CSV export paths are written to /var/lib/rustiflow/<interface>/.
+
+[Unit]
+Description=RustiFlow realtime flow extraction on %i
+Documentation=https://github.com/idlab-discover/RustiFlow
+Wants=network-online.target
+After=network-online.target
+# Stop retrying a unit that keeps failing, such as one without a config file.
+StartLimitIntervalSec=300
+StartLimitBurst=5
+
+[Service]
+Type=exec
+Environment=RUST_LOG=info
+Environment=RUSTIFLOW_REALTIME_ARGS=
+EnvironmentFile=-/etc/rustiflow/%i.env
+ConfigurationDirectory=rustiflow
+ConfigurationDirectoryMode=0755
+StateDirectory=rustiflow/%i
+WorkingDirectory=%S/rustiflow/%i
+
+# rustiflow would otherwise try to create a default config, and refuse to
+# start without the installed eBPF objects; fail early with a clear unit log.
+ExecStartPre=test -r /etc/rustiflow/%i.toml
+ExecStartPre=test -r @LIBDIR@/rustiflow/rustiflow-ebpf-ipv4
+ExecStartPre=test -r @LIBDIR@/rustiflow/rustiflow-ebpf-ipv6
+ExecStart=@BINDIR@/rustiflow --config-file /etc/rustiflow/%i.toml realtime $RUSTIFLOW_REALTIME_ARGS %i
+
+# Realtime capture flushes open flows and the CSV writer only on SIGINT.
+KillSignal=SIGINT
+TimeoutStopSec=60
+Restart=on-failure
+RestartSec=5s
+
+# Loading tc classifiers and reading their ring buffers needs these
+# capabilities and nothing else; the process runs as a transient user.
+DynamicUser=yes
+AmbientCapabilities=CAP_BPF CAP_NET_ADMIN CAP_PERFMON
+CapabilityBoundingSet=CAP_BPF CAP_NET_ADMIN CAP_PERFMON
+LimitMEMLOCK=infinity
+
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectClock=yes
+ProtectHostname=yes
+ProtectKernelLogs=yes
+ProtectKernelModules=yes
+ProtectKernelTunables=yes
+ProtectControlGroups=yes
+ProtectProc=invisible
+RestrictNamespaces=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+RestrictAddressFamilies=AF_UNIX AF_NETLINK AF_INET AF_INET6
+SystemCallArchitectures=native
+SystemCallFilter=@system-service bpf perf_event_open
+SystemCallErrorNumber=EPERM
+
+[Install]
+WantedBy=multi-user.target

@@ -1,5 +1,6 @@
 use std::{path::PathBuf, process::Command};
 
+use anyhow::{bail, Context as _};
 use clap::Parser;
 
 #[derive(Debug, Copy, Clone)]
@@ -56,8 +57,10 @@ pub fn build_ebpf(opts: Options, target: String) -> Result<(), anyhow::Error> {
         .env_remove("RUSTUP_TOOLCHAIN")
         .args(&args)
         .status()
-        .expect("failed to build bpf program");
-    assert!(status.success());
+        .context("failed to run cargo for the eBPF program")?;
+    if !status.success() {
+        bail!("building the eBPF program in {} failed", dir.display());
+    }
 
     Ok(())
 }

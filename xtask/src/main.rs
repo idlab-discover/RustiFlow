@@ -1,4 +1,6 @@
 mod build_ebpf;
+mod dist;
+mod install;
 mod run;
 
 use std::process::exit;
@@ -18,6 +20,10 @@ enum Command {
     #[clap(name = "ebpf-ipv6")]
     BuildEbpfIpv6(build_ebpf::Options),
     Run(run::Options),
+    /// Build and stage the canonical release bundle and its tarball
+    Dist(dist::Options),
+    /// Install a staged release bundle without rebuilding it
+    Install(install::Options),
 }
 
 fn main() {
@@ -28,6 +34,8 @@ fn main() {
         BuildEbpfIpv4(opts) => build_ebpf::build_ebpf(opts, "ebpf-ipv4".to_string()),
         BuildEbpfIpv6(opts) => build_ebpf::build_ebpf(opts, "ebpf-ipv6".to_string()),
         Run(opts) => run::run(opts),
+        Dist(opts) => dist::dist(opts).map(drop),
+        Install(opts) => install::install(opts),
     };
 
     if let Err(e) = ret {

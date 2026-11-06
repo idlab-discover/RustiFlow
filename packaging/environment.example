@@ -1,0 +1,12 @@
+# Environment for rustiflow@<interface>.service.
+# Copy to /etc/rustiflow/<interface>.env; every line is optional.
+
+# Log level: error, warn, info, debug, or trace.
+RUST_LOG=info
+
+# Extra options for the realtime subcommand, for example --ingress-only.
+RUSTIFLOW_REALTIME_ARGS=
+
+# Load the eBPF objects from this directory instead of the installed ones.
+# The unit's start checks still require the installed objects to exist.
+#RUSTIFLOW_EBPF_DIR=/usr/lib/rustiflow
