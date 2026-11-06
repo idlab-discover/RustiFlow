@@ -1,21 +1,48 @@
 #!/usr/bin/make -f
+# Packages a release bundle produced by `cargo xtask dist`; it never builds.
+# Point RUSTIFLOW_BUNDLE at the tarball when it is not in target/dist:
+#   cargo xtask dist && dpkg-buildpackage -b -uc -us
+#   RUSTIFLOW_BUNDLE=/path/rustiflow-<version>-x86_64-linux.tar.gz dpkg-buildpackage -b -uc -us
+
+include /usr/share/dpkg/pkg-info.mk
+
+BUNDLE_NAME := rustiflow-$(DEB_VERSION_UPSTREAM)-x86_64-linux
+RUSTIFLOW_BUNDLE ?= target/dist/$(BUNDLE_NAME).tar.gz
+STAGE := debian/bundle
+
 %:
-	dh $@ --buildsystem=cargo
+	dh $@
+
+override_dh_auto_clean:
+	rm -rf $(STAGE)
 
 override_dh_auto_configure:
-	# Skip cargo-checksum.json as it's not needed
-	true
 
 override_dh_auto_build:
-	# Build eBPF programs
-	cargo xtask ebpf-ipv4 --release
-	cargo xtask ebpf-ipv6 --release
-	# Build the main project
-	cargo build --release
-
-override_dh_auto_install:
-	dh_install
+	@test -f "$(RUSTIFLOW_BUNDLE)" || { \
+		echo "missing $(RUSTIFLOW_BUNDLE); run cargo xtask dist or set RUSTIFLOW_BUNDLE" >&2; \
+		exit 1; }
+	rm -rf $(STAGE)
+	mkdir -p $(STAGE)
+	tar -xzf "$(RUSTIFLOW_BUNDLE)" -C $(STAGE)
+	@grep -qx 'version=$(DEB_VERSION_UPSTREAM)' $(STAGE)/$(BUNDLE_NAME)/MANIFEST || { \
+		echo "bundle version does not match debian/changelog ($(DEB_VERSION_UPSTREAM))" >&2; \
+		exit 1; }
 
 override_dh_auto_test:
-	# Skip tests during build
-	true
+	cd $(STAGE)/$(BUNDLE_NAME) && sha256sum --quiet --strict -c SHA256SUMS
+
+override_dh_auto_install:
+	sh $(STAGE)/$(BUNDLE_NAME)/install.sh --prefix /usr --destdir $(CURDIR)/debian/rustiflow
+
+# The bundle is installed byte-for-byte: stripping would change the checksummed
+# binary and corrupt the BPF ELF objects.
+override_dh_strip:
+override_dh_dwz:
+
+override_dh_shlibdeps:
+	dh_shlibdeps -X usr/lib/rustiflow
+
+# rustiflow@.service is a template; administrators enable it per interface.
+override_dh_installsystemd:
+	dh_installsystemd --no-enable --no-start

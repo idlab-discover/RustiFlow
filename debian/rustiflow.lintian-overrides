@@ -1,0 +1,7 @@
+# The release bundle is installed byte-for-byte so its checksums stay valid.
+unstripped-binary-or-object [usr/bin/rustiflow]
+# These are eBPF objects loaded into the kernel, not host-architecture code.
+binary-from-other-architecture [usr/lib/rustiflow/rustiflow-ebpf-ipv4]
+binary-from-other-architecture [usr/lib/rustiflow/rustiflow-ebpf-ipv6]
+unstripped-binary-or-object [usr/lib/rustiflow/rustiflow-ebpf-ipv4]
+unstripped-binary-or-object [usr/lib/rustiflow/rustiflow-ebpf-ipv6]

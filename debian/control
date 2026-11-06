@@ -2,14 +2,20 @@ Source: rustiflow
 Section: net
 Priority: optional
 Maintainer: IDLab <miel.verkerken@ugent.be>
-Build-Depends: debhelper-compat (= 12), dh-cargo, libpcap-dev
+Build-Depends: debhelper-compat (= 13), libpcap-dev
 Standards-Version: 4.7.1
 Homepage: https://github.com/idlab-discover/RustiFlow
+Rules-Requires-Root: no
 
 Package: rustiflow
-Architecture: any
+Architecture: amd64
 Depends: ${shlibs:Depends}, ${misc:Depends}
+Recommends: iproute2
 Description: Rust-based network flow analysis tool
  RustiFlow is a network flow analysis tool written in Rust. It supports
  real-time feature extraction and analysis from network interfaces or
  pcap files. It includes a TUI for configuration and monitoring.
+ .
+ Realtime capture uses eBPF tc classifiers. The rustiflow@<interface>
+ systemd template unit runs it as a service configured from
+ /etc/rustiflow/<interface>.toml.
