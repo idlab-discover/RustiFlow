@@ -6,7 +6,6 @@ on:
       - .github/workflows/docker.yml
       - .dockerignore
       - Dockerfile
-      - Dockerfile-slim
       - Cargo.toml
       - Cargo.lock
       - .cargo/**
@@ -16,6 +15,11 @@ on:
       - ebpf-ipv4/**
       - ebpf-ipv6/**
       - rustfmt.toml
+      - rust-toolchain.toml
+      - config.toml
+      - packaging/**
+      - LICENSE
+      - README.md
   push:
     branches:
       - main
@@ -25,7 +29,6 @@ on:
       - .github/workflows/docker.yml
       - .dockerignore
       - Dockerfile
-      - Dockerfile-slim
       - Cargo.toml
       - Cargo.lock
       - .cargo/**
@@ -35,6 +38,11 @@ on:
       - ebpf-ipv4/**
       - ebpf-ipv6/**
       - rustfmt.toml
+      - rust-toolchain.toml
+      - config.toml
+      - packaging/**
+      - LICENSE
+      - README.md
   workflow_dispatch:
 
 concurrency:
@@ -57,12 +65,12 @@ jobs:
       matrix:
         variant:
           - name: default
-            dockerfile: Dockerfile
+            target: default
             latest_tag: latest
             tag_suffix: ""
             cache_scope: docker-default
           - name: slim
-            dockerfile: Dockerfile-slim
+            target: slim
             latest_tag: slim
             tag_suffix: -slim
             cache_scope: docker-slim
@@ -104,7 +112,8 @@ jobs:
         uses: docker/build-push-action@v7
         with:
           context: ${{ github.workspace }}
-          file: ${{ github.workspace }}/${{ matrix.variant.dockerfile }}
+          file: ${{ github.workspace }}/Dockerfile
+          target: ${{ matrix.variant.target }}
           platforms: linux/amd64
           push: ${{ github.event_name != 'pull_request' }}
           provenance: false

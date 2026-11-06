@@ -20,33 +20,38 @@ echo "Using existing Docker login for $GHCR_REGISTRY as $GHCR_USER"
 docker buildx create --name "$BUILDER_NAME" --use >/dev/null 2>&1 || docker buildx use "$BUILDER_NAME"
 docker buildx inspect --bootstrap
 
-echo "Building and pushing $IMAGE_REF for $PLATFORM"
+# Build the release bundle once, then install that exact bundle into both
+# variants, as the GHCR workflow does.
+BUNDLE_DIR="$(mktemp -d)"
+trap 'rm -rf -- "$BUNDLE_DIR"' EXIT
+echo "Building the release bundle for $PLATFORM"
 docker buildx build \
     --progress plain \
     --platform "$PLATFORM" \
-    --provenance false \
-    --sbom false \
-    -f "$REPO_ROOT/Dockerfile" \
-    -t "$IMAGE_REF:sha-$GIT_SHA" \
-    --load \
+    --target bundle \
+    --build-arg "RUSTIFLOW_COMMIT=$(git -C "$REPO_ROOT" rev-parse HEAD)" \
+    --build-arg "SOURCE_DATE_EPOCH=$(git -C "$REPO_ROOT" log -1 --format=%ct)" \
+    --output "type=local,dest=$BUNDLE_DIR" \
     "$REPO_ROOT"
-docker tag "$IMAGE_REF:sha-$GIT_SHA" "$IMAGE_REF:$BRANCH_TAG"
-docker push "$IMAGE_REF:sha-$GIT_SHA"
-docker push "$IMAGE_REF:$BRANCH_TAG"
 
-echo "Building and pushing slim variant for $PLATFORM"
-docker buildx build \
-    --progress plain \
-    --platform "$PLATFORM" \
-    --provenance false \
-    --sbom false \
-    -f "$REPO_ROOT/Dockerfile-slim" \
-    -t "$IMAGE_REF:sha-$GIT_SHA-slim" \
-    --load \
-    "$REPO_ROOT"
-docker tag "$IMAGE_REF:sha-$GIT_SHA-slim" "$IMAGE_REF:$BRANCH_TAG-slim"
-docker push "$IMAGE_REF:sha-$GIT_SHA-slim"
-docker push "$IMAGE_REF:$BRANCH_TAG-slim"
+for variant in default slim; do
+    suffix=""
+    [ "$variant" = slim ] && suffix="-slim"
+    echo "Building and pushing the $variant variant of $IMAGE_REF for $PLATFORM"
+    docker buildx build \
+        --progress plain \
+        --platform "$PLATFORM" \
+        --provenance false \
+        --sbom false \
+        --target "$variant" \
+        --build-context "bundle=$BUNDLE_DIR" \
+        -t "$IMAGE_REF:sha-$GIT_SHA$suffix" \
+        --load \
+        "$REPO_ROOT"
+    docker tag "$IMAGE_REF:sha-$GIT_SHA$suffix" "$IMAGE_REF:$BRANCH_TAG$suffix"
+    docker push "$IMAGE_REF:sha-$GIT_SHA$suffix"
+    docker push "$IMAGE_REF:$BRANCH_TAG$suffix"
+done
 
 echo "Pushed:"
 echo "  $IMAGE_REF:sha-$GIT_SHA"
