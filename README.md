@@ -61,14 +61,84 @@ Notes:
 
 ![RustiFlow Architecture Offline](figures/offline.png)
 
-## <img src="figures/RustiFlow_nobg.png" width="60px"/> Using the release binary:
+## <img src="figures/RustiFlow_nobg.png" width="60px"/> Installing a release:
 
-Copy the rustiflow binary that you can find in this repo in releases to a location of your choice or to the `/usr/local/bin` folder.
-If it does not have the right permissions, you can run the following command:
+Every release consumer (the installer, the Debian package and both container
+images) installs the same release bundle,
+`rustiflow-<version>-x86_64-linux.tar.gz`. It holds the `rustiflow` binary, the
+two eBPF objects that realtime capture loads, a systemd template unit, example
+configuration, an `install.sh`, a `MANIFEST` recording how it was built, and
+`SHA256SUMS`. Releases target x86_64 Linux with glibc 2.36 or newer (Debian
+bookworm, Ubuntu 24.04 and later) and need libpcap at runtime.
+
+### Installing the bundle
 
 ```bash
-chmod +x /path/to/rustiflow
+tar -xzf rustiflow-<version>-x86_64-linux.tar.gz
+sudo sh rustiflow-<version>-x86_64-linux/install.sh            # into /usr/local
+sudo sh rustiflow-<version>-x86_64-linux/install.sh --prefix /opt/rustiflow
 ```
+
+The installer verifies the bundle checksums, installs `bin/rustiflow`, the eBPF
+objects in `lib/rustiflow/`, examples in `share/rustiflow/` and
+`lib/systemd/system/rustiflow@.service` under the prefix, and never writes to
+`/etc`, so reinstalling keeps your configuration. Check an installation later
+with:
+
+```bash
+cd /usr/local && sha256sum -c share/rustiflow/INSTALLED.sha256
+```
+
+The binary finds its eBPF objects in `<prefix>/lib/rustiflow/` next to its own
+`<prefix>/bin/`, so keep that layout or point `RUSTIFLOW_EBPF_DIR` at the
+directory holding `rustiflow-ebpf-ipv4` and `rustiflow-ebpf-ipv6`.
+
+### Debian package
+
+`debian/` packages a bundle without rebuilding it, installing into `/usr`:
+
+```bash
+RUSTIFLOW_BUNDLE=/path/to/rustiflow-<version>-x86_64-linux.tar.gz dpkg-buildpackage -b -uc -us
+sudo apt install ../rustiflow_<version>-1_amd64.deb
+```
+
+`RUSTIFLOW_BUNDLE` defaults to `target/dist/`. The bundle version must match
+`debian/changelog`. Use a bundle built on bookworm (see below): one built on a
+newer host links a libpcap and glibc that Debian does not provide.
+
+### Running realtime capture as a service
+
+`rustiflow@<interface>.service` runs realtime capture on one interface with
+only the `CAP_BPF`, `CAP_NET_ADMIN` and `CAP_PERFMON` capabilities. It is
+installed but never enabled:
+
+```bash
+sudo install -D -m 0644 /usr/share/rustiflow/config.toml.example /etc/rustiflow/eth0.toml
+sudo install -D -m 0644 /usr/share/rustiflow/environment.example /etc/rustiflow/eth0.env  # optional
+sudo systemctl daemon-reload
+sudo systemctl enable --now rustiflow@eth0.service
+```
+
+Use `/usr/local/share/rustiflow/...` for a bundle installed into the default
+prefix. Relative CSV export paths in the config are written below
+`/var/lib/rustiflow/eth0/`.
+
+### Building a release bundle
+
+The canonical bundle is built in the Dockerfile's bookworm `dist` stage, so the
+binary runs on every supported distribution:
+
+```bash
+docker build --target bundle \
+  --build-arg RUSTIFLOW_COMMIT=$(git rev-parse HEAD) \
+  --build-arg SOURCE_DATE_EPOCH=$(git log -1 --format=%ct) \
+  --output type=local,dest=target/dist .
+```
+
+`cargo xtask dist` builds the same layout on the current host into
+`target/dist/`, and `cargo xtask install [--prefix DIR]` installs that staged
+bundle without rebuilding. A host build only runs on systems with the same or
+newer glibc and libpcap soname as the build host.
 
 ### Using commands:
 
@@ -149,8 +219,12 @@ Make sure that you don't use docker desktop and that you don't have it installed
 
 - **Build the Container**:
   ```bash
-  docker build -t rustiflow .
+  docker build -t rustiflow .                     # Ubuntu 24.04 runtime
+  docker build --target slim -t rustiflow:slim .  # Debian bookworm-slim runtime
   ```
+  Both images build the release bundle from source and install it. To install
+  an existing bundle instead, pass the directory holding its tarball:
+  `docker build --build-context bundle=target/dist -t rustiflow .`
 - **Run the Container**:
   ```bash
   docker run --rm --network host -v /path/on/host:/app rustiflow [ARGS]
@@ -206,14 +280,14 @@ Use the upstream prebuilt binary. Building current `bpf-linker` releases with
 - **For Linux x86_64**:
   ```bash
   sudo apt install zstd # Debian/Ubuntu; use your distribution's package manager elsewhere
-  curl -fL --retry 3 https://github.com/aya-rs/bpf-linker/releases/download/v0.11.1/bpf-linker-x86_64-unknown-linux-musl.tar.zst -o /tmp/bpf-linker.tar.zst
+  curl -fL --retry 3 https://github.com/aya-rs/bpf-linker/releases/download/v0.12.0/bpf-linker-x86_64-unknown-linux-musl.tar.zst -o /tmp/bpf-linker.tar.zst
   mkdir -p "$HOME/.cargo/bin"
   tar --zstd -xf /tmp/bpf-linker.tar.zst -C "$HOME/.cargo/bin"
   rm /tmp/bpf-linker.tar.zst
   bpf-linker --version
   ```
 - **For macOS/Linux (Other Architectures)**: choose the matching archive from
-  the [upstream releases](https://github.com/aya-rs/bpf-linker/releases/tag/v0.11.1),
+  the [upstream releases](https://github.com/aya-rs/bpf-linker/releases/tag/v0.12.0),
   or follow the [upstream installation guide](https://github.com/aya-rs/bpf-linker#installation).
 - **Ubuntu 20.04 LTS Specific**:
   ```bash
