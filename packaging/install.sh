@@ -49,7 +49,7 @@ installed=
 
 # Each file is written beside its destination and renamed into place, so a
 # running service never observes a partially written binary or object.
-place() {
+install_file() {
     mode=$1 source=$2 relative=$3
     target=$root/$relative
     mkdir -p -- "$(dirname -- "$target")"
@@ -57,7 +57,12 @@ place() {
     cp -- "$source" "$tmp"
     chmod "$mode" "$tmp"
     mv -f -- "$tmp" "$target"
-    installed="$installed $relative"
+}
+
+# Installs a file and records it in INSTALLED.sha256.
+place() {
+    install_file "$@"
+    installed="$installed $3"
 }
 
 place 0755 "$bundle/bin/rustiflow" bin/rustiflow
@@ -66,8 +71,10 @@ place 0644 "$bundle/lib/rustiflow/rustiflow-ebpf-ipv6" lib/rustiflow/rustiflow-e
 place 0644 "$bundle/share/rustiflow/config.toml.example" share/rustiflow/config.toml.example
 place 0644 "$bundle/share/rustiflow/environment.example" share/rustiflow/environment.example
 place 0644 "$bundle/MANIFEST" share/rustiflow/MANIFEST
-place 0644 "$bundle/share/doc/rustiflow/LICENSE" share/doc/rustiflow/LICENSE
-place 0644 "$bundle/share/doc/rustiflow/README.md" share/doc/rustiflow/README.md
+# Documentation is not recorded: distributions compress it, and minimal images
+# drop share/doc entirely, which would make the installed check fail.
+install_file 0644 "$bundle/share/doc/rustiflow/LICENSE" share/doc/rustiflow/LICENSE
+install_file 0644 "$bundle/share/doc/rustiflow/README.md" share/doc/rustiflow/README.md
 
 unit=$(mktemp)
 trap 'rm -f -- "$unit"' EXIT
