@@ -112,8 +112,9 @@ newer host needs a newer glibc than Debian provides.
 ### Running realtime capture as a service
 
 `rustiflow@<interface>.service` runs realtime capture on one interface with
-only the `CAP_BPF`, `CAP_NET_ADMIN` and `CAP_PERFMON` capabilities. It is
-installed but never enabled:
+only the `CAP_BPF`, `CAP_NET_ADMIN`, `CAP_NET_RAW` and `CAP_PERFMON`
+capabilities (`CAP_NET_RAW` is used only by `--promiscuous`). It is installed
+but never enabled:
 
 ```bash
 sudo install -D -m 0644 /usr/share/rustiflow/config.toml.example /etc/rustiflow/eth0.toml
@@ -121,6 +122,9 @@ sudo install -D -m 0644 /usr/share/rustiflow/environment.example /etc/rustiflow/
 sudo systemctl daemon-reload
 sudo systemctl enable --now rustiflow@eth0.service
 ```
+
+On a tap or SPAN/mirror port, set `RUSTIFLOW_REALTIME_ARGS=--promiscuous` in
+`/etc/rustiflow/eth0.env`; see [Promiscuous capture](#promiscuous-capture).
 
 Use `/usr/local/share/rustiflow/...` for a bundle installed into the default
 prefix. Relative CSV export paths in the config are written below
@@ -179,7 +183,7 @@ If you want a more graphical interface, you can use the tui interface by just ru
 > **NOTE:** When using the save button, you will be prompted for a filename. You can reuse this file with following command:
 
 ```bash
-rustiflow --config-file <filename> realtime <interface> [--only-ingress]
+rustiflow --config-file <filename> realtime <interface> [--ingress-only] [--promiscuous]
 ```
 
 ```bash
@@ -238,6 +242,31 @@ or with:
 ```bash
 rustiflow ... -o csv --export-path out.csv --packet-graph realtime <interface>
 ```
+
+### Promiscuous capture
+
+Realtime capture sees only the frames the network card passes up to the
+kernel. A physical card drops unicast frames addressed to other MAC addresses,
+so on a tap, a SPAN/mirror port or a backbone link most of the traffic never
+reaches RustiFlow. Pass `--promiscuous` there:
+
+```bash
+rustiflow ... realtime --promiscuous <interface>
+```
+
+A host that only captures its own traffic does not need it.
+
+RustiFlow does not set the interface's `PROMISC` flag. It joins a promiscuous
+membership on a packet socket that receives no packets, and the kernel counts
+memberships (`promiscuity` in `ip -d link show <interface>`). The kernel drops
+the membership when the socket closes, also when RustiFlow crashes or is
+killed, so the interface returns to its previous state. A `promisc on` set by
+an operator or another tool stays in place.
+
+The option needs `CAP_NET_RAW` and the `AF_PACKET` socket family, in addition
+to what realtime capture already needs. Configuration files store only the
+`[config]` and `[output]` sections, so pass the flag on the command line or
+through `RUSTIFLOW_REALTIME_ARGS` for the systemd unit.
 
 ## <img src="figures/RustiFlow_nobg.png" width="60px"/> Using the Container:
 
@@ -460,6 +489,24 @@ Options:
       -V, --version
               Print version
 
+```
+
+```bash
+rustiflow realtime --help
+```
+
+```bash
+Real-time feature extraction
+
+Usage: rustiflow realtime [OPTIONS] <INTERFACE>
+
+Arguments:
+  <INTERFACE>  The network interface to capture packets from
+
+Options:
+      --ingress-only  Whether to capture only ingress packets
+      --promiscuous   Hold the interface in promiscuous mode while capturing, for taps, SPAN/mirror ports and backbone links (needs CAP_NET_RAW)
+  -h, --help          Print help
 ```
 
 ### Early export

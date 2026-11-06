@@ -5,6 +5,7 @@
 RUST_LOG=info
 
 # Extra options for the realtime subcommand, for example --ingress-only.
+# Use --promiscuous on a tap, SPAN/mirror port or backbone link.
 RUSTIFLOW_REALTIME_ARGS=
 
 # Load the eBPF objects from this directory instead of the installed ones.

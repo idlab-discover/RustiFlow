@@ -39,11 +39,13 @@ TimeoutStopSec=60
 Restart=on-failure
 RestartSec=5s
 
-# Loading tc classifiers and reading their ring buffers needs these
-# capabilities and nothing else; the process runs as a transient user.
+# Loading tc classifiers and reading their ring buffers needs CAP_BPF,
+# CAP_NET_ADMIN and CAP_PERFMON. --promiscuous also opens a packet socket,
+# which needs CAP_NET_RAW and AF_PACKET; that socket receives no packets.
+# The process runs as a transient user.
 DynamicUser=yes
-AmbientCapabilities=CAP_BPF CAP_NET_ADMIN CAP_PERFMON
-CapabilityBoundingSet=CAP_BPF CAP_NET_ADMIN CAP_PERFMON
+AmbientCapabilities=CAP_BPF CAP_NET_ADMIN CAP_NET_RAW CAP_PERFMON
+CapabilityBoundingSet=CAP_BPF CAP_NET_ADMIN CAP_NET_RAW CAP_PERFMON
 LimitMEMLOCK=infinity
 
 NoNewPrivileges=yes
@@ -63,7 +65,7 @@ RestrictRealtime=yes
 RestrictSUIDSGID=yes
 LockPersonality=yes
 MemoryDenyWriteExecute=yes
-RestrictAddressFamilies=AF_UNIX AF_NETLINK AF_INET AF_INET6
+RestrictAddressFamilies=AF_UNIX AF_NETLINK AF_INET AF_INET6 AF_PACKET
 SystemCallArchitectures=native
 SystemCallFilter=@system-service bpf perf_event_open
 SystemCallErrorNumber=EPERM

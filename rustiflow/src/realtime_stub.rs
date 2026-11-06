@@ -5,7 +5,7 @@ use tokio::task::JoinHandle;
 use crate::args::{ExportConfig, ReplayBenchArgs};
 use crate::flows::flow::Flow;
 use crate::output::FlowSink;
-use crate::realtime_mode::PacketGraphMode;
+use crate::realtime_mode::{PacketGraphMode, PromiscuousMode};
 
 /// Realtime capture depends on Aya/eBPF and is only available on Linux.
 pub async fn handle_realtime<T>(
@@ -17,6 +17,7 @@ pub async fn handle_realtime<T>(
     _early_export: Option<NonZeroU64>,
     _expiration_check_interval: u64,
     _ingress_only: bool,
+    _promiscuous_mode: PromiscuousMode,
     _packet_graph_mode: PacketGraphMode,
 ) -> Result<u64, anyhow::Error>
 where

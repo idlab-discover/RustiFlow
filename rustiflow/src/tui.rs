@@ -47,6 +47,7 @@ impl Config {
             command: Commands::Realtime {
                 interface: String::from("eth0"),
                 ingress_only: false,
+                promiscuous: false,
             },
         }
     }
@@ -154,7 +155,7 @@ impl App {
     }
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum AppFocus {
     TitleBar,
     Menu,
@@ -167,6 +168,7 @@ enum AppFocus {
     CommandArgumentInput,
     OutputArgumentInput,
     IngressOnlyInput,
+    PromiscuousInput,
     PacketGraphInput,
     ThreadsInput,
     EarlyExportInput,
@@ -207,6 +209,7 @@ where
                     AppFocus::CommandArgumentInput => handle_command_argument_input(key, app)?,
                     AppFocus::OutputArgumentInput => handle_output_argument_input(key, app)?,
                     AppFocus::IngressOnlyInput
+                    | AppFocus::PromiscuousInput
                     | AppFocus::PacketGraphInput
                     | AppFocus::HeaderInput
                     | AppFocus::DropContaminantFeaturesInput => {
@@ -431,6 +434,11 @@ fn handle_boolean_input(
                     *ingress_only = !*ingress_only;
                 }
             }
+            AppFocus::PromiscuousInput => {
+                if let Commands::Realtime { promiscuous, .. } = &mut app.config.command {
+                    *promiscuous = !*promiscuous;
+                }
+            }
             AppFocus::PacketGraphInput => {
                 if let ExportMethodType::Csv = &app.config.output.output {
                     app.config.output.packet_graph = !app.config.output.packet_graph;
@@ -446,13 +454,21 @@ fn handle_boolean_input(
             _ => {}
         },
         KeyCode::Enter => {
-            app.focus = AppFocus::Menu;
+            app.focus = match focus {
+                AppFocus::IngressOnlyInput => AppFocus::PromiscuousInput,
+                _ => AppFocus::Menu,
+            };
         }
         KeyCode::Esc => {
             match focus {
                 AppFocus::IngressOnlyInput => {
                     if let Commands::Realtime { ingress_only, .. } = &mut app.config.command {
                         *ingress_only = false;
+                    }
+                }
+                AppFocus::PromiscuousInput => {
+                    if let Commands::Realtime { promiscuous, .. } = &mut app.config.command {
+                        *promiscuous = false;
                     }
                 }
                 AppFocus::PacketGraphInput => {
@@ -506,6 +522,7 @@ fn handle_selection_input(
                     app.config.command = Commands::Realtime {
                         interface: String::new(),
                         ingress_only: false,
+                        promiscuous: false,
                     };
                     app.focus = AppFocus::CommandArgumentInput;
                 }
@@ -571,9 +588,11 @@ fn handle_command_argument_input(key: KeyEvent, app: &mut App) -> Result<(), Box
                 Commands::Realtime {
                     interface,
                     ingress_only,
+                    promiscuous,
                 } => {
                     interface.clear();
                     *ingress_only = false;
+                    *promiscuous = false;
                 }
                 Commands::Pcap { path } => {
                     path.clear();
@@ -631,6 +650,7 @@ fn handle_config_file_input(key: KeyEvent, app: &mut App) -> Result<(), Box<dyn 
                         command: Commands::Realtime {
                             interface: String::from("eth0"),
                             ingress_only: false,
+                            promiscuous: false,
                         },
                     },
                     Err(_) => Config::reset(),
@@ -1092,6 +1112,7 @@ fn render_current_selections(f: &mut Frame, app: &App, area: Rect) {
         Commands::Realtime {
             interface,
             ingress_only,
+            promiscuous,
         } => {
             let mut text = Text::from(Line::from(vec![
                 Span::raw("Mode: "),
@@ -1109,6 +1130,11 @@ fn render_current_selections(f: &mut Frame, app: &App, area: Rect) {
                     format!("{}", ingress_only),
                     Style::default().fg(Color::Yellow),
                 ),
+            ])]);
+
+            text.extend(vec![Line::from(vec![
+                Span::raw("Promiscuous: "),
+                Span::styled(format!("{promiscuous}"), Style::default().fg(Color::Yellow)),
             ])]);
 
             ListItem::new(text)
@@ -1167,6 +1193,28 @@ fn render_popups(f: &mut Frame, app: &App, size: Rect) {
 
         let boolean_input_block = Block::default()
             .title("Ingress Only?")
+            .borders(Borders::ALL)
+            .style(Style::default().bg(Color::Black))
+            .border_style(Style::default().fg(Color::Yellow));
+
+        let inner_area = boolean_input_block.inner(popup_area);
+
+        f.render_widget(boolean_input_block, popup_area);
+
+        render_boolean_choice(f, inner_area, is_true_selected);
+    }
+
+    if matches!(app.focus, AppFocus::PromiscuousInput) {
+        let is_true_selected = match &app.config.command {
+            Commands::Realtime { promiscuous, .. } => *promiscuous,
+            Commands::Pcap { .. } => false,
+        };
+
+        let popup_area = centered_rect(50, 25, size);
+        f.render_widget(Clear, popup_area);
+
+        let boolean_input_block = Block::default()
+            .title("Promiscuous mode? (taps, SPAN ports)")
             .borders(Borders::ALL)
             .style(Style::default().bg(Color::Black))
             .border_style(Style::default().fg(Color::Yellow));
@@ -1287,4 +1335,36 @@ fn render_config_file_save(f: &mut Frame, app: &App, area: Rect) {
         .style(Style::default().fg(Color::Yellow));
 
     f.render_widget(config_file_save, area);
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{handle_boolean_input, App, AppFocus, Config};
+    use crate::args::Commands;
+    use ratatui::crossterm::event::{KeyCode, KeyEvent};
+
+    fn press(app: &mut App, code: KeyCode) {
+        handle_boolean_input(KeyEvent::from(code), app, app.focus).unwrap();
+    }
+
+    #[test]
+    fn realtime_toggles_lead_from_ingress_only_to_promiscuous() {
+        let mut app = App::new(Config::default());
+        app.focus = AppFocus::IngressOnlyInput;
+
+        press(&mut app, KeyCode::Enter);
+        assert_eq!(app.focus, AppFocus::PromiscuousInput);
+        press(&mut app, KeyCode::Right);
+        press(&mut app, KeyCode::Enter);
+
+        assert_eq!(app.focus, AppFocus::Menu);
+        assert_eq!(
+            app.config.command,
+            Commands::Realtime {
+                interface: "eth0".to_owned(),
+                ingress_only: false,
+                promiscuous: true,
+            }
+        );
+    }
 }
