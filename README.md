@@ -320,9 +320,11 @@ affected lockfile explicitly before rebuilding. Direct Cargo commands need
   cargo build
   ```
 - **With flamegraph profiling** (Linux only, pulls in pprof; enables
-  `RUSTIFLOW_PROFILE_FLAMEGRAPH=<file.svg>`):
+  `RUSTIFLOW_PROFILE_FLAMEGRAPH=<file.svg>`). The `profiling` profile is the
+  release profile with symbols and line tables kept, so it also suits `perf`;
+  the binary is `target/profiling/rustiflow`:
   ```bash
-  cargo build --release --features profiling
+  cargo build --profile profiling --features profiling
   ```
 
 ## Fragmented and encrypted packets
