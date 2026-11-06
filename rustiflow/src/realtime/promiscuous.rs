@@ -40,6 +40,10 @@ impl PromiscuousMembership {
             let err = io::Error::last_os_error();
             let hint = match err.raw_os_error() {
                 Some(libc::EPERM) => " (opening a packet socket needs CAP_NET_RAW)",
+                Some(libc::EAFNOSUPPORT) => {
+                    " (AF_PACKET is unavailable; a sandbox such as systemd's \
+                     RestrictAddressFamilies may block it)"
+                }
                 _ => "",
             };
             return Err(err).with_context(|| {
