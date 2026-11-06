@@ -20,6 +20,8 @@ ARG BPF_LINKER_VERSION
 # Recorded in the bundle MANIFEST; .git is not part of the build context.
 ARG RUSTIFLOW_COMMIT=
 ARG SOURCE_DATE_EPOCH=
+# CPU the binary is tuned for and requires; see `cargo xtask dist --help`.
+ARG RUSTIFLOW_TARGET_CPU=x86-64-v3
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     zstd \
@@ -45,7 +47,7 @@ COPY xtask ./xtask
 COPY ebpf-ipv4 ./ebpf-ipv4
 COPY ebpf-ipv6 ./ebpf-ipv6
 COPY packaging ./packaging
-RUN cargo xtask dist --out-dir /out
+RUN cargo xtask dist --out-dir /out --target-cpu "$RUSTIFLOW_TARGET_CPU"
 
 FROM scratch AS bundle
 COPY --from=dist /out/ /

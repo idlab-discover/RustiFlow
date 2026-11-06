@@ -4,6 +4,39 @@ This file keeps short-lived design choices and execution notes that would make
 `AGENTS.md` too long. Newest entries come first. Older entries are condensed to
 the decisions and results that still describe the current code.
 
+## 2026-11-06: lean, CPU-targeted release build
+
+Branch `build/lean-release`.
+
+- The workspace release profile now uses fat LTO, one codegen unit and stripped
+  symbols. A `profiling` profile inherits it but keeps symbols and line tables
+  for pprof and `perf`. Without them a stripped release build would produce
+  unreadable flamegraphs.
+- `pprof` stays behind the optional `profiling` feature; a default release build
+  has no `pprof` in its dependency graph. `pnet` became `pnet_packet`, which
+  removes `pnet_datalink`, `pnet_transport`, `pnet_sys` and `ipnetwork`.
+- `cargo xtask dist --target-cpu` (default `x86-64-v3`) sets the CPU the binary
+  requires. The CPU is recorded as `target_cpu` in MANIFEST, and `install.sh`
+  refuses a live install on a CPU without that x86-64 level. It does not check
+  `--destdir` staging, which runs on a build host. Unwinding stays enabled, so
+  panics still run `Drop`, which detaches the tc classifiers.
+
+`replay-bench`, Ryzen 9 5950X, 100k flows, three runs each, Mpps (min-max):
+
+| Build | `rustiflow` t=1 | `rustiflow` t=8 | `basic` t=1 |
+| --- | --- | --- | --- |
+| previous release profile | 2.38-2.39 | 10.27-10.55 | 7.16-7.67 |
+| fat LTO, cgu 1, stripped | 2.39-2.41 | 10.25-10.39 | 7.21-7.35 |
+| + `x86-64-v3` | 2.44-2.45 | 10.63-10.73 | 7.32-7.39 |
+| + `native` (znver3) | 2.46-2.47 | 10.51-10.73 | 7.03-7.19 |
+
+LTO's throughput effect is within noise. With stripping, the binary shrinks from
+8.2 MB to 4.5 MB. `x86-64-v3` gives a small but consistent 2-3% on the full
+feature set. `native` does not beat `x86-64-v3`, so the portable level is the
+default. The pipeline is memory-bound at this cardinality, and code generation
+is not its limit. A v3 bundle captured TCP, ICMP and ICMPv6 flows on the veth
+harness and left no tc filters behind.
+
 ## 2026-11-06: integrate capture reader fixes into main
 
 Merged `fix/offline-robustness` and `fix/offline-determinism` into local `main`,
