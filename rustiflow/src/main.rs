@@ -70,8 +70,8 @@ async fn main() {
             match confy::load_path::<ConfigFile>(config_path) {
                 Ok(cfg_file) => (cfg_file.config, cfg_file.output),
                 Err(e) => {
-                    error!("Error loading configuration file: {:?}", e);
-                    return;
+                    error!("Error loading configuration file: {e:?}");
+                    std::process::exit(1);
                 }
             }
         } else {
