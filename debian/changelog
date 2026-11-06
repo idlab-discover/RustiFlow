@@ -1,3 +1,17 @@
+rustiflow (0.3.0-1) unstable; urgency=medium
+
+  * Read capture files with a pure-Rust parser; libpcap is no longer needed.
+  * Ship a release bundle (binary, eBPF objects, systemd unit, installer) that
+    the Debian package and both container images install unchanged.
+  * Build releases with fat LTO and stripped symbols, tuned for x86-64-v3.
+  * Update aya to 0.16 and fix realtime byte order and tc attachment.
+  * Make offline expiration deterministic and reject corrupt timestamps.
+  * Harden TCP lifecycle, fragment and IPv6 extension handling, and add TCP
+    quality, ICMP and IP scope features.
+  * Speed up the realtime and offline hot paths and add a replay benchmark.
+
+ -- Laurens D'hooge <laurens.dhooge@ugent.be>  Fri, 06 Nov 2026 17:00:00 +0100
+
 rustiflow (0.2.0-1) unstable; urgency=low
 
   * Updated the Dockerfile for improved logging.
