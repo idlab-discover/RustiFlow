@@ -4,6 +4,49 @@ This file keeps short-lived design choices and execution notes that would make
 `AGENTS.md` too long. Newest entries come first. Older entries are condensed to
 the decisions and results that still describe the current code.
 
+## 2026-11-06: opt-in promiscuous capture
+
+Branch `feat/promiscuous-capture`.
+
+- tc only sees frames the NIC passes up. On a tap or SPAN port a physical NIC
+  drops most traffic in its MAC filter, so `realtime --promiscuous` joins a
+  `PACKET_MR_PROMISC` membership on an `AF_PACKET` socket with protocol 0,
+  which receives no packets. The kernel reference-counts the membership and
+  drops it on close, including on SIGKILL. The 2024
+  `bug/possible-promiscuous-fix` branch set `IFF_PROMISC` with `SIOCSIFFLAGS`,
+  never cleared it, panicked on error and was always on. It was not revived.
+- The membership is joined before the classifiers attach and released after
+  they detach (`rustiflow/src/realtime/promiscuous.rs`).
+- Opening the socket needs `CAP_NET_RAW`, not `CAP_NET_ADMIN`. With only the
+  unit's former `CAP_BPF CAP_NET_ADMIN CAP_PERFMON`, `socket()` fails with
+  `EPERM`; with the unit's former `RestrictAddressFamilies` it fails with
+  `EAFNOSUPPORT`. The unit now grants `CAP_NET_RAW` and `AF_PACKET`. This was
+  checked with `setpriv --bounding-set` and a `systemd-run` unit that copies
+  the unit's sandbox.
+- Config files store only `[config]` and `[output]`, so the flag comes from
+  the command line, the TUI or `RUSTIFLOW_REALTIME_ARGS`.
+
+`promiscuity` on `rustiflow-t0` (veth harness):
+
+| Run | Before | During | After |
+| --- | --- | --- | --- |
+| no flag, SIGINT | 0 | 0 | 0 |
+| `--promiscuous`, SIGINT | 0 | 1 | 0 |
+| `--promiscuous`, SIGKILL | 0 | 1 | 0 |
+| `--promiscuous`, operator `promisc on`, SIGINT | 1 | 2 | 1 |
+| `--promiscuous` under the unit's sandbox, `systemctl stop` | 0 | 1 | 0 |
+
+No tc filters remained after the SIGINT and unit runs. After SIGKILL the
+netlink-attached filters stay on the interface, as they did before this change,
+and were removed by hand. An unknown interface reports `No such device`, and a
+run without root reports `EPERM` with the `CAP_NET_RAW` hint; neither panics.
+
+With `--promiscuous`, three pings from `rustiflow-peer` to `10.203.0.1` with a
+bogus permanent neighbour MAC got no reply because the host stack dropped them.
+`ingress-ipv4` still matched all three, and the flow was exported. The NIC
+hardware filter cannot be reproduced on veth, so the effect of the flag on a
+physical NIC still needs a check on a real tap or SPAN port.
+
 ## 2026-11-06: lean, CPU-targeted release build
 
 Branch `build/lean-release`.
