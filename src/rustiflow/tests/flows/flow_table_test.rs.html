@@ -865,5 +865,25 @@
 <a href=#865 id=865 data-nosnippet>865</a>        <span class="macro">assert!</span>(offline_rx.try_recv().is_err());
 <a href=#866 id=866 data-nosnippet>866</a>        <span class="macro">assert!</span>(realtime_rx.try_recv().is_err());
 <a href=#867 id=867 data-nosnippet>867</a>    }
-<a href=#868 id=868 data-nosnippet>868</a>}
+<a href=#868 id=868 data-nosnippet>868</a>    <span class="attr">#[tokio::test]
+<a href=#869 id=869 data-nosnippet>869</a>    </span><span class="kw">async fn </span>idle_features_do_not_depend_on_sweep_time() {
+<a href=#870 id=870 data-nosnippet>870</a>        <span class="kw">let </span><span class="kw-2">mut </span>rows = Vec::new();
+<a href=#871 id=871 data-nosnippet>871</a>        <span class="kw">for </span>(interval, sweep_us) <span class="kw">in </span>[(<span class="number">1</span>, <span class="number">130_000_000</span>), (<span class="number">60</span>, <span class="number">180_000_000</span>)] {
+<a href=#872 id=872 data-nosnippet>872</a>            <span class="kw">let </span>(tx, <span class="kw-2">mut </span>rx) = mpsc::channel(<span class="number">8</span>);
+<a href=#873 id=873 data-nosnippet>873</a>            <span class="kw">let </span><span class="kw-2">mut </span>table = FlowTable::&lt;RustiFlow&gt;::new(<span class="number">3600</span>, <span class="number">120</span>, <span class="prelude-val">None</span>, tx, interval);
+<a href=#874 id=874 data-nosnippet>874</a>            table.process_packet(<span class="kw-2">&amp;</span>build_packet(<span class="number">0</span>)).<span class="kw">await</span>;
+<a href=#875 id=875 data-nosnippet>875</a>            table.process_packet(<span class="kw-2">&amp;</span>build_packet(<span class="number">1_000_000</span>)).<span class="kw">await</span>;
+<a href=#876 id=876 data-nosnippet>876</a>            <span class="kw">let </span><span class="kw-2">mut </span>trigger = build_packet(sweep_us);
+<a href=#877 id=877 data-nosnippet>877</a>            trigger.source_port += <span class="number">1</span>;
+<a href=#878 id=878 data-nosnippet>878</a>            table.process_packet(<span class="kw-2">&amp;</span>trigger).<span class="kw">await</span>;
+<a href=#879 id=879 data-nosnippet>879</a>            <span class="kw">let </span>flow = rx.recv().<span class="kw">await</span>.unwrap();
+<a href=#880 id=880 data-nosnippet>880</a>            <span class="macro">assert_eq!</span>(
+<a href=#881 id=881 data-nosnippet>881</a>                flow.basic_flow.flow_expire_cause,
+<a href=#882 id=882 data-nosnippet>882</a>                FlowExpireCause::IdleTimeout
+<a href=#883 id=883 data-nosnippet>883</a>            );
+<a href=#884 id=884 data-nosnippet>884</a>            rows.push(flow.dump());
+<a href=#885 id=885 data-nosnippet>885</a>        }
+<a href=#886 id=886 data-nosnippet>886</a>        <span class="macro">assert_eq!</span>(rows[<span class="number">0</span>], rows[<span class="number">1</span>]);
+<a href=#887 id=887 data-nosnippet>887</a>    }
+<a href=#888 id=888 data-nosnippet>888</a>}
 </code></pre></div></section></main></body></html>
