@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"constant":["EBPF_DIR_ENV","EBPF_TARGET","INSTALLED_SUBDIR"],"fn":["development_target_dir","ebpf_object_path","ebpf_search_dirs"]};

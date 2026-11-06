@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"constant":["EBPF_PROGRAMS","EBPF_TARGET","PLATFORM","SUPPORTED_ARCH","SUPPORTED_OS","USERSPACE_TARGET"],"fn":["bundle_name","capture","check_supported_host","collect_files","dist","release_version","run","set_mode","stage","write_checksums","write_tarball"],"struct":["Options","Provenance"]};

@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"enum":["Command"],"fn":["main"],"mod":["build_ebpf","run"],"struct":["Options"]};
+window.SIDEBAR_ITEMS = {"enum":["Command"],"fn":["main"],"mod":["build_ebpf","dist","install","run"],"struct":["Options"]};
