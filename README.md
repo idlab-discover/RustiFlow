@@ -144,6 +144,10 @@ newer glibc as the build host.
 
 You can then run the binary with the following commands displayed on the [help menu](#usage-instructions).
 
+When using command-line arguments, both `--features` (`-f`) and `--output`
+(`-o`) are required unless `--config-file` (`-c`) is provided. Missing options
+produce a usage error. Running without arguments still opens the TUI.
+
 ### Using the tui interface:
 
 If you want a more graphical interface, you can use the tui interface by just running `rustiflow` without any arguments. This will open a field where you can enter a configuration file you want to edit or you can choose to start new. After that, the following interface will show up:

@@ -14,7 +14,12 @@ pub struct Cli {
     pub config_file: Option<String>,
 
     /// The feature set to use (required if no config file is provided)
-    #[clap(long, short, group = "cli_group")]
+    #[clap(
+        long,
+        short,
+        group = "cli_group",
+        required_unless_present = "config_file"
+    )]
     pub features: Option<FlowType>,
 
     /// The maximum time a flow is allowed to last in seconds (optional)
@@ -42,7 +47,12 @@ pub struct Cli {
     pub threads: Option<u8>,
 
     /// Output method (required if no config file is provided)
-    #[clap(long, short, group = "cli_group")]
+    #[clap(
+        long,
+        short,
+        group = "cli_group",
+        required_unless_present = "config_file"
+    )]
     pub output: Option<ExportMethodType>,
 
     /// File path for output (used if method is Csv)
@@ -289,8 +299,8 @@ impl Default for ConfigFile {
 
 #[cfg(test)]
 mod tests {
-    use super::FlowType;
-    use clap::ValueEnum;
+    use super::{Cli, FlowType};
+    use clap::{error::ErrorKind, Parser, ValueEnum};
 
     #[test]
     fn flow_type_names_match_the_cli() {
@@ -305,5 +315,32 @@ mod tests {
             .collect();
 
         assert_eq!(tui_names, cli_names);
+    }
+    #[test]
+    fn capture_requires_features_and_output_without_config() {
+        for args in [
+            vec!["rustiflow", "pcap", "input.pcap"],
+            vec!["rustiflow", "-f", "basic", "pcap", "input.pcap"],
+            vec!["rustiflow", "-o", "print", "pcap", "input.pcap"],
+        ] {
+            assert_eq!(
+                Cli::try_parse_from(args).unwrap_err().kind(),
+                ErrorKind::MissingRequiredArgument
+            );
+        }
+        for args in [
+            vec!["rustiflow", "-c", "config.toml", "pcap", "input.pcap"],
+            vec![
+                "rustiflow",
+                "-f",
+                "basic",
+                "-o",
+                "print",
+                "pcap",
+                "input.pcap",
+            ],
+        ] {
+            assert!(Cli::try_parse_from(args).is_ok());
+        }
     }
 }
