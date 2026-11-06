@@ -47,6 +47,7 @@ impl Config {
             command: Commands::Realtime {
                 interface: String::from("eth0"),
                 ingress_only: false,
+                promiscuous: false,
             },
         }
     }
@@ -506,6 +507,7 @@ fn handle_selection_input(
                     app.config.command = Commands::Realtime {
                         interface: String::new(),
                         ingress_only: false,
+                        promiscuous: false,
                     };
                     app.focus = AppFocus::CommandArgumentInput;
                 }
@@ -571,6 +573,7 @@ fn handle_command_argument_input(key: KeyEvent, app: &mut App) -> Result<(), Box
                 Commands::Realtime {
                     interface,
                     ingress_only,
+                    ..
                 } => {
                     interface.clear();
                     *ingress_only = false;
@@ -631,6 +634,7 @@ fn handle_config_file_input(key: KeyEvent, app: &mut App) -> Result<(), Box<dyn 
                         command: Commands::Realtime {
                             interface: String::from("eth0"),
                             ingress_only: false,
+                            promiscuous: false,
                         },
                     },
                     Err(_) => Config::reset(),
@@ -1092,6 +1096,7 @@ fn render_current_selections(f: &mut Frame, app: &App, area: Rect) {
         Commands::Realtime {
             interface,
             ingress_only,
+            ..
         } => {
             let mut text = Text::from(Line::from(vec![
                 Span::raw("Mode: "),

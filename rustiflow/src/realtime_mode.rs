@@ -6,6 +6,24 @@ pub enum PacketGraphMode {
     Enabled,
 }
 
+/// Whether realtime capture holds the interface in promiscuous mode, so a
+/// physical NIC passes up frames addressed to other MAC addresses.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum PromiscuousMode {
+    Disabled,
+    Enabled,
+}
+
+impl PromiscuousMode {
+    pub fn from_flag(promiscuous: bool) -> Self {
+        if promiscuous {
+            PromiscuousMode::Enabled
+        } else {
+            PromiscuousMode::Disabled
+        }
+    }
+}
+
 pub fn packet_graph_mode(output: &OutputConfig) -> PacketGraphMode {
     packet_graph_mode_with_debug(output, debug_logging_enabled())
 }

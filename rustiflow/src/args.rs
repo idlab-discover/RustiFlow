@@ -76,7 +76,7 @@ pub struct Cli {
     pub command: CliCommand,
 }
 
-#[derive(Serialize, Deserialize, Debug, Subcommand, Clone)]
+#[derive(Serialize, Deserialize, Debug, Subcommand, Clone, PartialEq, Eq)]
 pub enum Commands {
     /// Real-time feature extraction
     Realtime {
@@ -85,6 +85,11 @@ pub enum Commands {
         /// Whether to capture only ingress packets
         #[clap(long, action = clap::ArgAction::SetTrue)]
         ingress_only: bool,
+        /// Hold the interface in promiscuous mode while capturing, for taps,
+        /// SPAN/mirror ports and backbone links (needs CAP_NET_RAW)
+        #[clap(long, action = clap::ArgAction::SetTrue)]
+        #[serde(default)]
+        promiscuous: bool,
     },
 
     /// Feature extraction from a pcap file
@@ -149,10 +154,10 @@ impl fmt::Display for Commands {
             Commands::Realtime {
                 interface,
                 ingress_only,
+                promiscuous,
             } => write!(
                 f,
-                "Realtime/Interface: {}/Ingress only: {}",
-                interface, ingress_only
+                "Realtime/Interface: {interface}/Ingress only: {ingress_only}/Promiscuous: {promiscuous}"
             ),
             Commands::Pcap { path } => write!(f, "Pcap/Path: {}", path),
         }
@@ -299,8 +304,75 @@ impl Default for ConfigFile {
 
 #[cfg(test)]
 mod tests {
-    use super::{Cli, FlowType};
+    use super::{Cli, CliCommand, Commands, FlowType};
     use clap::{error::ErrorKind, Parser, ValueEnum};
+    use serde::{Deserialize, Serialize};
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    fn parse_capture_command(args: &[&str]) -> Commands {
+        let cli = Cli::try_parse_from(
+            ["rustiflow", "-f", "basic", "-o", "print"]
+                .iter()
+                .chain(args),
+        )
+        .unwrap();
+        match cli.command {
+            CliCommand::Capture(command) => command,
+            CliCommand::ReplayBench(_) => panic!("expected a capture command"),
+        }
+    }
+
+    #[test]
+    fn realtime_promiscuous_is_opt_in() {
+        assert_eq!(
+            parse_capture_command(&["realtime", "eth1"]),
+            Commands::Realtime {
+                interface: "eth1".to_owned(),
+                ingress_only: false,
+                promiscuous: false,
+            }
+        );
+        assert_eq!(
+            parse_capture_command(&["realtime", "--promiscuous", "--ingress-only", "eth1"]),
+            Commands::Realtime {
+                interface: "eth1".to_owned(),
+                ingress_only: true,
+                promiscuous: true,
+            }
+        );
+    }
+
+    #[test]
+    fn saved_realtime_command_without_promiscuous_loads_as_disabled() {
+        // confy needs a default to fall back to; `None` means the file was
+        // not read.
+        #[derive(Serialize, Deserialize, Default)]
+        struct Saved {
+            command: Option<Commands>,
+        }
+
+        let unique = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let path = std::env::temp_dir().join(format!("rustiflow-old-command-{unique}.toml"));
+        std::fs::write(
+            &path,
+            "[command.Realtime]\ninterface = \"eth1\"\ningress_only = true\n",
+        )
+        .unwrap();
+        let saved = confy::load_path::<Saved>(&path);
+        std::fs::remove_file(&path).unwrap();
+
+        assert_eq!(
+            saved.unwrap().command,
+            Some(Commands::Realtime {
+                interface: "eth1".to_owned(),
+                ingress_only: true,
+                promiscuous: false,
+            })
+        );
+    }
 
     #[test]
     fn flow_type_names_match_the_cli() {

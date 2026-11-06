@@ -1,4 +1,5 @@
 mod ebpf_objects;
+mod promiscuous;
 mod replay;
 
 pub use replay::replay_bench;
@@ -16,7 +17,7 @@ use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use crate::debug;
 use crate::flow_tui::launch_packet_tui;
 use crate::output::FlowSink;
-use crate::realtime_mode::PacketGraphMode;
+use crate::realtime_mode::{PacketGraphMode, PromiscuousMode};
 use crate::{
     flow_key::ShardSelector, flow_table::FlowTable, flows::flow::Flow,
     packet_features::PacketFeatures,
@@ -35,6 +36,7 @@ use aya_log::EbpfLogger;
 use common::{EbpfEventIpv4, EbpfEventIpv6, REALTIME_EVENT_QUEUE_COUNT};
 use ebpf_objects::ebpf_object_path;
 use log::{error, info};
+use promiscuous::PromiscuousMembership;
 use tokio::sync::watch;
 use tokio::{
     io::unix::AsyncFd,
@@ -342,6 +344,7 @@ pub async fn handle_realtime<T>(
     early_export: Option<NonZeroU64>,
     expiration_check_interval: u64,
     ingress_only: bool,
+    promiscuous_mode: PromiscuousMode,
     packet_graph_mode: PacketGraphMode,
 ) -> Result<u64, anyhow::Error>
 where
@@ -356,6 +359,17 @@ where
     bump_memlock_rlimit();
 
     let realtime_offset_us = compute_realtime_offset_us()?;
+
+    // Join before attaching and declare first, so the membership is dropped
+    // only after every classifier has been detached.
+    let _promiscuous_membership = match promiscuous_mode {
+        PromiscuousMode::Enabled => {
+            let membership = PromiscuousMembership::join(interface)?;
+            info!("Holding {interface} in promiscuous mode until capture stops");
+            Some(membership)
+        }
+        PromiscuousMode::Disabled => None,
+    };
 
     // Load the eBPF programs and attach to the event arrays
     let mut bpf_ingress_ipv4 = load_ebpf_ipv4(interface, TcAttachType::Ingress)?;

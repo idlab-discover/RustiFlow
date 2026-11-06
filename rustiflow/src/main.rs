@@ -36,7 +36,7 @@ use flows::{
 use log::{debug, error, info};
 use output::{FlowExporter, OutputWriter, ENCODED_CHUNK_QUEUE_CAPACITY};
 use profiling::ProfilingSession;
-use realtime_mode::packet_graph_mode;
+use realtime_mode::{packet_graph_mode, PromiscuousMode};
 use std::time::Instant;
 use tokio::{sync::mpsc, task::JoinHandle};
 use tui::{launch_tui, Config};
@@ -166,6 +166,7 @@ async fn run_with_config(config: Config) {
         Commands::Realtime {
             interface,
             ingress_only,
+            promiscuous,
         } => {
             macro_rules! execute_realtime {
                 ($flow_ty:ty) => {{
@@ -190,6 +191,7 @@ async fn run_with_config(config: Config) {
                         config.config.early_export,
                         config.config.expiration_check_interval,
                         ingress_only,
+                        PromiscuousMode::from_flag(promiscuous),
                         packet_graph_mode,
                     )
                     .await;
