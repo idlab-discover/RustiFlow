@@ -22,7 +22,6 @@ ARG RUSTIFLOW_COMMIT=
 ARG SOURCE_DATE_EPOCH=
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    libpcap-dev \
     zstd \
     && rm -rf /var/lib/apt/lists/* \
     && curl -fL --retry 3 "https://github.com/aya-rs/bpf-linker/releases/download/v${BPF_LINKER_VERSION}/bpf-linker-$(uname -m)-unknown-linux-musl.tar.zst" -o /tmp/bpf-linker.tar.zst \
@@ -54,7 +53,6 @@ COPY --from=dist /out/ /
 FROM debian:bookworm-slim AS slim
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
-    libpcap0.8 \
     iproute2 \
     && rm -rf /var/lib/apt/lists/*
 RUN --mount=type=bind,from=bundle,target=/bundle \
@@ -68,7 +66,6 @@ ENTRYPOINT ["rustiflow"]
 FROM ubuntu:24.04 AS default
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
-    libpcap0.8t64 \
     iproute2 \
     && rm -rf /var/lib/apt/lists/*
 RUN --mount=type=bind,from=bundle,target=/bundle \

@@ -17,7 +17,7 @@ This tool is engineered for robust and efficient feature extraction, particularl
 
 - **High Throughput:** Utilizes Rust and the [Aya](https://aya-rs.dev/) library for eBPF program compilation and execution, ensuring exceptional performance and resource efficiency.
 - **Versatile Feature Sets:** Offers a variety of pre-defined feature sets (flows) and the flexibility to create custom feature sets tailored to specific requirements. An example of the custom flow is shown [here](https://github.com/idlab-discover/RustiFlow/blob/main/rustiflow/src/flows/custom_flow.rs).
-- **Pcap File Support:** Facilitates packet analysis from pcap files, compatible with both Linux and Windows generated files.
+- **Pcap File Support:** Facilitates packet analysis from classic pcap and pcapng files, compatible with both Linux and Windows generated files. A capture that ends inside a record is read up to that record with a warning; a corrupt record stops the read with an error.
 - **Diverse Output Options:** Features can be outputted to the console, a CSV file, or other formats with minimal effort.
 - **Richer TCP Quality Signals:** The RustiFlow feature set exports duplicate ACK counts, zero-window observations, and TCP close style in addition to the existing lifecycle and retransmission fields.
 - **Endpoint-Aware IP Context:** The RustiFlow feature set exports `ip_version`, endpoint IP scope, and coarse `path_locality` derived from normalized addresses without expanding the eBPF event payload.
@@ -69,7 +69,7 @@ images) installs the same release bundle,
 two eBPF objects that realtime capture loads, a systemd template unit, example
 configuration, an `install.sh`, a `MANIFEST` recording how it was built, and
 `SHA256SUMS`. Releases target x86_64 Linux with glibc 2.36 or newer (Debian
-bookworm, Ubuntu 24.04 and later) and need libpcap at runtime.
+bookworm, Ubuntu 24.04 and later) and need nothing beyond glibc at runtime.
 
 ### Installing the bundle
 
@@ -104,7 +104,7 @@ sudo apt install ../rustiflow_<version>-1_amd64.deb
 
 `RUSTIFLOW_BUNDLE` defaults to `target/dist/`. The bundle version must match
 `debian/changelog`. Use a bundle built on bookworm (see below): one built on a
-newer host links a libpcap and glibc that Debian does not provide.
+newer host needs a newer glibc than Debian provides.
 
 ### Running realtime capture as a service
 
@@ -138,7 +138,7 @@ docker build --target bundle \
 `cargo xtask dist` builds the same layout on the current host into
 `target/dist/`, and `cargo xtask install [--prefix DIR]` installs that staged
 bundle without rebuilding. A host build only runs on systems with the same or
-newer glibc and libpcap soname as the build host.
+newer glibc as the build host.
 
 ### Using commands:
 
@@ -257,10 +257,6 @@ Notes:
 
 ### Prerequisites:
 
-- **libpcap-dev**:
-  ```sh
-  sudo apt install libpcap-dev
-  ```
 - **Rust Installation**:
   ```bash
   curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh

@@ -2,7 +2,7 @@ Source: rustiflow
 Section: net
 Priority: optional
 Maintainer: IDLab <miel.verkerken@ugent.be>
-Build-Depends: debhelper-compat (= 13), libpcap-dev
+Build-Depends: debhelper-compat (= 13)
 Standards-Version: 4.7.1
 Homepage: https://github.com/idlab-discover/RustiFlow
 Rules-Requires-Root: no
