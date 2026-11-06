@@ -1,3 +1,4 @@
+mod ebpf_objects;
 mod replay;
 
 pub use replay::replay_bench;
@@ -5,7 +6,6 @@ pub use replay::replay_bench;
 use std::collections::VecDeque;
 use std::io;
 use std::num::{NonZeroU64, NonZeroUsize};
-use std::path::PathBuf;
 use std::sync::{
     atomic::{AtomicU64, Ordering},
     Arc,
@@ -32,6 +32,7 @@ use aya::{
 };
 use aya_log::EbpfLogger;
 use common::{EbpfEventIpv4, EbpfEventIpv6, REALTIME_EVENT_QUEUE_COUNT};
+use ebpf_objects::ebpf_object_path;
 use log::{error, info};
 use tokio::sync::watch;
 use tokio::{
@@ -810,22 +811,6 @@ fn bump_memlock_rlimit() {
     }
 }
 
-fn ebpf_binary_path(program_name: &str) -> PathBuf {
-    let target_dir = std::env::var_os("CARGO_TARGET_DIR")
-        .map(PathBuf::from)
-        .unwrap_or_else(|| PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../target"));
-    let profile = if cfg!(debug_assertions) {
-        "debug"
-    } else {
-        "release"
-    };
-
-    target_dir
-        .join("bpfel-unknown-none")
-        .join(profile)
-        .join(program_name)
-}
-
 fn tc_attach_type_label(tc_attach_type: TcAttachType) -> &'static str {
     match tc_attach_type {
         TcAttachType::Ingress => "ingress",
@@ -835,7 +820,7 @@ fn tc_attach_type_label(tc_attach_type: TcAttachType) -> &'static str {
 }
 
 fn load_ebpf_ipv4(interface: &str, tc_attach_type: TcAttachType) -> Result<Ebpf, anyhow::Error> {
-    let binary_path = ebpf_binary_path("rustiflow-ebpf-ipv4");
+    let binary_path = ebpf_object_path("rustiflow-ebpf-ipv4")?;
     let attach_label = tc_attach_type_label(tc_attach_type);
     info!(
         "Loading IPv4 eBPF binary {} for {} on {}",
@@ -845,7 +830,7 @@ fn load_ebpf_ipv4(interface: &str, tc_attach_type: TcAttachType) -> Result<Ebpf,
     );
     let mut bpf_ipv4 = Ebpf::load_file(&binary_path).with_context(|| {
         format!(
-            "Failed to load eBPF IPv4 binary from {}. Build it first with `cargo xtask ebpf-ipv4`.",
+            "Failed to load eBPF IPv4 binary from {}",
             binary_path.display()
         )
     })?;
@@ -890,7 +875,7 @@ fn load_ebpf_ipv4(interface: &str, tc_attach_type: TcAttachType) -> Result<Ebpf,
 }
 
 fn load_ebpf_ipv6(interface: &str, tc_attach_type: TcAttachType) -> Result<Ebpf, anyhow::Error> {
-    let binary_path = ebpf_binary_path("rustiflow-ebpf-ipv6");
+    let binary_path = ebpf_object_path("rustiflow-ebpf-ipv6")?;
     let attach_label = tc_attach_type_label(tc_attach_type);
     info!(
         "Loading IPv6 eBPF binary {} for {} on {}",
@@ -900,7 +885,7 @@ fn load_ebpf_ipv6(interface: &str, tc_attach_type: TcAttachType) -> Result<Ebpf,
     );
     let mut bpf_ipv6 = Ebpf::load_file(&binary_path).with_context(|| {
         format!(
-            "Failed to load eBPF IPv6 binary from {}. Build it first with `cargo xtask ebpf-ipv6`.",
+            "Failed to load eBPF IPv6 binary from {}",
             binary_path.display()
         )
     })?;
