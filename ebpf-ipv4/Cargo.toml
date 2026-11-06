@@ -4,8 +4,8 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-aya-ebpf = "0.2.1"
-aya-log-ebpf = "0.2.0"
+aya-ebpf = "0.3.0"
+aya-log-ebpf = "0.3.0"
 common = { path = "../common" }
 network-types = { version = "0.2.0", default-features = false }
 

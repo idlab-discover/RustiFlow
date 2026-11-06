@@ -4,6 +4,7 @@ mod replay;
 pub use replay::replay_bench;
 
 use std::collections::VecDeque;
+use std::ffi::CString;
 use std::io;
 use std::num::{NonZeroU64, NonZeroUsize};
 use std::sync::{
@@ -25,7 +26,7 @@ use aya::{
     maps::{MapData, PerCpuArray, RingBuf},
     programs::{
         tc,
-        tc::{NlOptions, TcAttachOptions},
+        tc::{NlOptions, TcAttach},
         SchedClassifier, TcAttachType,
     },
     Ebpf,
@@ -815,7 +816,6 @@ fn tc_attach_type_label(tc_attach_type: TcAttachType) -> &'static str {
     match tc_attach_type {
         TcAttachType::Ingress => "ingress",
         TcAttachType::Egress => "egress",
-        TcAttachType::Custom(_) => "custom",
     }
 }
 
@@ -835,9 +835,12 @@ fn load_ebpf_ipv4(interface: &str, tc_attach_type: TcAttachType) -> Result<Ebpf,
         )
     })?;
 
+    let interface_name = CString::new(interface)
+        .with_context(|| format!("interface name {interface:?} contains a NUL byte"))?;
+
     // Attach the eBPF program function
     spawn_ebpf_logger(&mut bpf_ipv4);
-    match tc::qdisc_add_clsact(interface) {
+    match tc::qdisc_add_clsact(&interface_name) {
         Ok(()) => info!("Ensured clsact qdisc on {}", interface),
         Err(e) => debug!("qdisc_add_clsact({}): {:?}", interface, e),
     }
@@ -857,10 +860,12 @@ fn load_ebpf_ipv4(interface: &str, tc_attach_type: TcAttachType) -> Result<Ebpf,
         attach_label, interface
     );
     program_egress_ipv4
-        .attach_with_options(
-            interface,
-            tc_attach_type,
-            TcAttachOptions::Netlink(NlOptions::default()),
+        .attach(
+            &interface_name,
+            TcAttach::Netlink {
+                parent: tc_attach_type.into(),
+                options: NlOptions::default(),
+            },
         )
         .map_err(|e| {
             error!("Failed to attach eBPF program: {:?}", e);
@@ -890,9 +895,12 @@ fn load_ebpf_ipv6(interface: &str, tc_attach_type: TcAttachType) -> Result<Ebpf,
         )
     })?;
 
+    let interface_name = CString::new(interface)
+        .with_context(|| format!("interface name {interface:?} contains a NUL byte"))?;
+
     // Attach the eBPF program function
     spawn_ebpf_logger(&mut bpf_ipv6);
-    match tc::qdisc_add_clsact(interface) {
+    match tc::qdisc_add_clsact(&interface_name) {
         Ok(()) => info!("Ensured clsact qdisc on {}", interface),
         Err(e) => debug!("qdisc_add_clsact({}): {:?}", interface, e),
     }
@@ -908,10 +916,12 @@ fn load_ebpf_ipv6(interface: &str, tc_attach_type: TcAttachType) -> Result<Ebpf,
         "Attaching IPv6 tc classifier to {} on {}",
         attach_label, interface
     );
-    program_egress_ipv6.attach_with_options(
-        interface,
-        tc_attach_type,
-        TcAttachOptions::Netlink(NlOptions::default()),
+    program_egress_ipv6.attach(
+        &interface_name,
+        TcAttach::Netlink {
+            parent: tc_attach_type.into(),
+            options: NlOptions::default(),
+        },
     )?;
     info!(
         "Attached IPv6 tc classifier to {} on {}",
