@@ -1,3 +1,17 @@
 [workspace]
 members = ["rustiflow", "common", "xtask"]
 resolver = "2"
+
+# Lean release binary: whole-program optimization and no symbol tables. CPU
+# tuning is chosen per build (`cargo xtask dist --target-cpu`), not here.
+[profile.release]
+lto = "fat"
+codegen-units = 1
+strip = "symbols"
+
+# Release code generation with symbols and line tables kept, for the pprof
+# flamegraph (`--features profiling`) and for perf.
+[profile.profiling]
+inherits = "release"
+debug = "line-tables-only"
+strip = "none"

@@ -70,6 +70,9 @@ two eBPF objects that realtime capture loads, a systemd template unit, example
 configuration, an `install.sh`, a `MANIFEST` recording how it was built, and
 `SHA256SUMS`. Releases target x86_64 Linux with glibc 2.36 or newer (Debian
 bookworm, Ubuntu 24.04 and later) and need nothing beyond glibc at runtime.
+They are built for x86-64-v3 CPUs (AVX2, BMI2, FMA, MOVBE: Intel Haswell, AMD
+Zen and newer); `MANIFEST` records the CPU as `target_cpu`, and the installer
+refuses a host CPU that cannot run it.
 
 ### Installing the bundle
 
@@ -139,6 +142,17 @@ docker build --target bundle \
 `target/dist/`, and `cargo xtask install [--prefix DIR]` installs that staged
 bundle without rebuilding. A host build only runs on systems with the same or
 newer glibc as the build host.
+
+The release profile uses fat LTO, one codegen unit and stripped symbols, and
+leaves out the `profiling` feature. `--target-cpu` (default `x86-64-v3`) sets
+the CPU the binary is tuned for and requires. `native` tunes for the build
+host, and `MANIFEST` then names its model, for example `znver3`. Use a lower
+level such as `x86-64-v2` for older CPUs. In the container build, pass it as
+`--build-arg RUSTIFLOW_TARGET_CPU=<cpu>`.
+
+```bash
+cargo xtask dist --target-cpu native   # bundle for this machine only
+```
 
 ### Using commands:
 
@@ -320,9 +334,11 @@ affected lockfile explicitly before rebuilding. Direct Cargo commands need
   cargo build
   ```
 - **With flamegraph profiling** (Linux only, pulls in pprof; enables
-  `RUSTIFLOW_PROFILE_FLAMEGRAPH=<file.svg>`):
+  `RUSTIFLOW_PROFILE_FLAMEGRAPH=<file.svg>`). The `profiling` profile is the
+  release profile with symbols and line tables kept, so it also suits `perf`;
+  the binary is `target/profiling/rustiflow`:
   ```bash
-  cargo build --release --features profiling
+  cargo build --profile profiling --features profiling
   ```
 
 ## Fragmented and encrypted packets

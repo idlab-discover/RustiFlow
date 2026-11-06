@@ -36,19 +36,27 @@ const PLATFORM: &str = "x86_64-linux";
 const USERSPACE_TARGET: &str = "x86_64-unknown-linux-gnu";
 const EBPF_TARGET: Architecture = Architecture::BpfEl;
 const EBPF_PROGRAMS: [&str; 2] = ["ebpf-ipv4", "ebpf-ipv6"];
+/// Haswell (2013) and newer, and every AMD Zen: AVX2, BMI2, FMA, MOVBE.
+const DEFAULT_TARGET_CPU: &str = "x86-64-v3";
 
 #[derive(Debug, Parser)]
 pub struct Options {
     /// Directory that receives the staged bundle and its tarball
     #[clap(long, default_value = "target/dist")]
     pub out_dir: PathBuf,
+    /// CPU the userspace binary is tuned for and requires, as for rustc's
+    /// `-C target-cpu`: an x86-64 level (`x86-64`, `x86-64-v2`,
+    /// `x86-64-v3`, `x86-64-v4`), a model such as `znver3`, or `native`
+    #[clap(long, default_value = DEFAULT_TARGET_CPU)]
+    pub target_cpu: String,
 }
 
 /// Builds every release artifact and stages the bundle; returns its directory.
 pub fn dist(opts: Options) -> Result<PathBuf, anyhow::Error> {
     check_supported_host(std::env::consts::OS, std::env::consts::ARCH)?;
     let version = release_version()?;
-    let provenance = Provenance::detect(&version)?;
+    let target_cpu = resolve_target_cpu(&opts.target_cpu)?;
+    let provenance = Provenance::detect(&version, target_cpu)?;
 
     for program in EBPF_PROGRAMS {
         build_ebpf(
@@ -60,8 +68,15 @@ pub fn dist(opts: Options) -> Result<PathBuf, anyhow::Error> {
         )
         .with_context(|| format!("Error while building the {program} program"))?;
     }
-    run(Command::new("cargo").args(["build", "--locked", "--release", "-p", "rustiflow"]))
-        .context("Error while building the userspace application")?;
+    // Replaces any caller RUSTFLAGS so the bundle depends only on its options.
+    run(Command::new("cargo")
+        .args(["build", "--locked", "--release", "-p", "rustiflow"])
+        .env_remove("CARGO_ENCODED_RUSTFLAGS")
+        .env(
+            "RUSTFLAGS",
+            format!("-C target-cpu={}", provenance.target_cpu),
+        ))
+    .context("Error while building the userspace application")?;
 
     let name = bundle_name(&version);
     let bundle = opts.out_dir.join(&name);
@@ -97,6 +112,30 @@ pub fn release_version() -> Result<String, anyhow::Error> {
         .context("rustiflow/Cargo.toml has no package version")
 }
 
+/// Resolves `native` to the host CPU model, so MANIFEST names what the binary
+/// actually requires.
+fn resolve_target_cpu(target_cpu: &str) -> Result<String, anyhow::Error> {
+    if target_cpu != "native" {
+        return Ok(target_cpu.to_owned());
+    }
+    let cpus = capture(Command::new("rustc").args([
+        "--print",
+        "target-cpus",
+        "--target",
+        USERSPACE_TARGET,
+    ]))?;
+    parse_native_cpu(&cpus).context("rustc did not report the native CPU")
+}
+
+/// Extracts `znver3` from rustc's `native - ... (currently znver3).` line.
+fn parse_native_cpu(target_cpus: &str) -> Option<String> {
+    let line = target_cpus
+        .lines()
+        .find(|line| line.trim_start().starts_with("native "))?;
+    let model = line.split("(currently ").nth(1)?.split(')').next()?;
+    Some(model.to_owned())
+}
+
 fn check_supported_host(os: &str, arch: &str) -> Result<(), anyhow::Error> {
     if os != SUPPORTED_OS || arch != SUPPORTED_ARCH {
         bail!(
@@ -110,6 +149,7 @@ fn check_supported_host(os: &str, arch: &str) -> Result<(), anyhow::Error> {
 /// Where a release came from, recorded in MANIFEST so the binary, eBPF
 /// objects, and any image or package built from them identify one release.
 struct Provenance {
+    target_cpu: String,
     commit: String,
     source_tree: &'static str,
     source_date_epoch: u64,
@@ -118,7 +158,7 @@ struct Provenance {
 impl Provenance {
     /// Reads Git when available; container builds without `.git` pass
     /// `RUSTIFLOW_COMMIT` and `SOURCE_DATE_EPOCH` instead.
-    fn detect(version: &str) -> Result<Self, anyhow::Error> {
+    fn detect(version: &str, target_cpu: String) -> Result<Self, anyhow::Error> {
         let git_commit = capture(Command::new("git").args(["rev-parse", "HEAD"])).ok();
 
         if git_commit.is_some() {
@@ -163,6 +203,7 @@ impl Provenance {
         };
 
         Ok(Self {
+            target_cpu,
             commit,
             source_tree,
             source_date_epoch,
@@ -171,6 +212,7 @@ impl Provenance {
 
     fn manifest(&self, version: &str) -> Result<String, anyhow::Error> {
         let Self {
+            target_cpu,
             commit,
             source_tree,
             source_date_epoch,
@@ -189,6 +231,7 @@ impl Provenance {
              version={version}\n\
              platform={PLATFORM}\n\
              target={USERSPACE_TARGET}\n\
+             target_cpu={target_cpu}\n\
              ebpf_target={EBPF_TARGET}\n\
              profile=release\n\
              commit={commit}\n\
@@ -370,6 +413,15 @@ mod tests {
         assert!(check_supported_host("linux", "x86_64").is_ok());
         assert!(check_supported_host("linux", "aarch64").is_err());
         assert!(check_supported_host("macos", "x86_64").is_err());
+    }
+
+    #[test]
+    fn native_cpu_is_read_from_rustc_target_cpus() {
+        let listing = "Available CPUs for this target:\n    \
+            native                  - Select the CPU of the current host (currently znver3).\n    \
+            alderlake\n";
+        assert_eq!(parse_native_cpu(listing).as_deref(), Some("znver3"));
+        assert_eq!(parse_native_cpu("Available CPUs for this target:\n"), None);
     }
 
     #[test]

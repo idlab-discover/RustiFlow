@@ -2,7 +2,7 @@
 mod tests {
     #[cfg(target_os = "linux")]
     use common::{EbpfEventIpv4, EbpfEventIpv6};
-    use pnet::packet::{ip::IpNextHeaderProtocols, ipv4::Ipv4Packet, ipv6::Ipv6Packet};
+    use pnet_packet::{ip::IpNextHeaderProtocols, ipv4::Ipv4Packet, ipv6::Ipv6Packet};
     use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 
     use crate::packet_features::PacketFeatures;

@@ -44,6 +44,25 @@ bundle=$(cd -- "$(dirname -- "$0")" && pwd)
 (cd "$bundle" && sha256sum --quiet --strict -c SHA256SUMS) ||
     die "bundle checksum verification failed; refusing to install"
 
+# The binary uses the instructions of the CPU named in MANIFEST and dies with
+# SIGILL on an older one, so refuse to install it live on such a host. Staging
+# below --destdir happens on a build host, which is not the target.
+target_cpu=$(sed -n 's/^target_cpu=//p' "$bundle/MANIFEST")
+if [ -z "$destdir" ]; then
+    case $target_cpu in
+        '' | x86-64) ;;
+        x86-64-v[234])
+            loader=/lib64/ld-linux-x86-64.so.2
+            if [ ! -x "$loader" ]; then
+                echo "install.sh: warning: cannot check that this CPU supports $target_cpu" >&2
+            elif ! "$loader" --help | grep -q "^ *$target_cpu (supported"; then
+                die "this CPU does not support $target_cpu, which the bundle requires; rebuild it with a lower cargo xtask dist --target-cpu"
+            fi
+            ;;
+        *) echo "install.sh: warning: this bundle requires a $target_cpu CPU; not verified" >&2 ;;
+    esac
+fi
+
 root=$destdir$prefix
 installed=
 

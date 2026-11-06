@@ -10,7 +10,7 @@ use chrono::DateTime;
 use log::{debug, error, warn};
 use pcap_parser::traits::PcapReaderIterator;
 use pcap_parser::{create_reader, Block, OptionCode, PcapBlockOwned, PcapError, PcapNGOption};
-use pnet::packet::{
+use pnet_packet::{
     ethernet::{EtherTypes, EthernetPacket},
     ipv4::Ipv4Packet,
     ipv6::Ipv6Packet,
