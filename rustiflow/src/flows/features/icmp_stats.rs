@@ -1,5 +1,5 @@
 use crate::{flows::util::FlowExpireCause, packet_features::PacketFeatures};
-use pnet::packet::ip::IpNextHeaderProtocols;
+use pnet_packet::ip::IpNextHeaderProtocols;
 
 use super::util::{push_csv_int, FlowFeature};
 

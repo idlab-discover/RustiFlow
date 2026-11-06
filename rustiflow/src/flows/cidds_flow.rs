@@ -1,6 +1,6 @@
 use std::net::IpAddr;
 
-use pnet::packet::ip::IpNextHeaderProtocols;
+use pnet_packet::ip::IpNextHeaderProtocols;
 
 use crate::flows::util::iana_port_mapping;
 use crate::packet_features::PacketFeatures;

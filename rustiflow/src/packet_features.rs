@@ -6,7 +6,7 @@ use common::ipv6_extensions::Ipv6Extension;
 #[cfg(target_os = "linux")]
 use common::{EbpfEventIpv4, EbpfEventIpv6};
 use log::debug;
-use pnet::packet::{
+use pnet_packet::{
     icmp::IcmpPacket,
     ip::{IpNextHeaderProtocol, IpNextHeaderProtocols},
     ipv4::Ipv4Packet,

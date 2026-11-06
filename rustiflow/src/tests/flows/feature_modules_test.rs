@@ -1,6 +1,6 @@
 #[cfg(test)]
 mod tests {
-    use pnet::packet::ip::IpNextHeaderProtocols;
+    use pnet_packet::ip::IpNextHeaderProtocols;
 
     use crate::{
         flows::{

@@ -2,7 +2,7 @@ use std::net::IpAddr;
 use std::{fmt::Display, fmt::Write as _};
 
 use chrono::{DateTime, Utc};
-use pnet::packet::ip::IpNextHeaderProtocols;
+use pnet_packet::ip::IpNextHeaderProtocols;
 
 use crate::{
     flows::util::{
