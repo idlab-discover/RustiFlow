@@ -1,4 +1,4 @@
-rustiflow (0.3.0-1) unstable; urgency=medium
+rustiflow (1.1.0-1) unstable; urgency=medium
 
   * Read capture files with a pure-Rust parser; libpcap is no longer needed.
   * Ship a release bundle (binary, eBPF objects, systemd unit, installer) that
