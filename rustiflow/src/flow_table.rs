@@ -71,7 +71,11 @@ where
         // Check if enough virtual time has passed to trigger flow expiration checks
         self.check_and_export_expired_flows(packet.timestamp_us)
             .await;
+        self.process_packet_without_expiration_scan(packet).await;
+    }
 
+    /// Processes a packet when the caller schedules expiration scans separately.
+    pub(crate) async fn process_packet_without_expiration_scan(&mut self, packet: &PacketFeatures) {
         let (biflow_key, orientation) = packet.flow_key_value().canonicalize();
         match self.flow_map.entry(biflow_key) {
             Entry::Occupied(mut occupied) => {

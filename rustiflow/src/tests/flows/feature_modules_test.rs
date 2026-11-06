@@ -581,8 +581,8 @@ mod tests {
 
         assert_eq!(stats.active_stats.get_total(), 1_000.0);
         assert_eq!(stats.active_stats.get_count(), 1);
-        assert_eq!(stats.idle_stats.get_total(), 9_000.0);
-        assert_eq!(stats.idle_stats.get_count(), 2);
+        assert_eq!(stats.idle_stats.get_total(), 6_000.0);
+        assert_eq!(stats.idle_stats.get_count(), 1);
     }
 
     #[test]

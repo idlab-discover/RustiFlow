@@ -4,6 +4,83 @@ This file keeps short-lived design choices and execution notes that would make
 `AGENTS.md` too long. Newest entries come first. Older entries are condensed to
 the decisions and results that still describe the current code.
 
+## 2026-11-06: deterministic offline expiration and observed idle periods
+
+Branch `fix/offline-determinism`, based directly on `850c5c7`, separate from
+`fix/offline-robustness`. The user chose to exclude trailing silence from idle
+statistics and require sorted offline exports to match across thread counts.
+
+`ActiveIdleStats::close` now finalizes only the observed active period. Idle
+samples come exclusively from packet-to-packet gaps above five seconds within
+a flow. `BasicFlow` already ignores the close timestamp for duration and end
+time; other reusable features either ignore it or finalize packet-derived
+state. The shared idle rule changes realtime exports too. Realtime's scan and
+shutdown scheduling are unchanged. The user authorized passwordless-sudo
+validation on the existing veth setup.
+
+Offline capture sends ordered expiration messages to every shard using the
+capture record clock. Pending packet batches flush before each scan. Workers
+still check the target flow's timeout when processing each packet, but no
+longer schedule independent scans. EOF and corrupt-record termination perform
+a final scan at the last readable record's timestamp, then export survivors
+with Exporter Shutdown. Unsupported frames also advance the capture clock.
+Random hash seeds remain in both modes; they no longer select offline scan
+times. Sorting is still needed because concurrent export order can vary.
+Out-of-order records retain file order, including the common scan ordering.
+
+Validation on Linux:
+
+- `cargo fmt`, `cargo clippy -p rustiflow --all-targets`, and all 105 main-crate
+  tests pass. The sweep-time regression failed before the fix. Another test
+  covers repeated one/eight-shard extraction with out-of-order records.
+- All nine checked-in captures produce unchanged sorted CSVs versus `850c5c7`.
+- The synthetic workload contains 1,675,048 packets across 100,000 original
+  biflows, with 50 to 400,000 us gaps and 130 s gaps for a subset. It exports
+  109,585 rows in both classic pcap and pcapng. Baseline versus fix changes
+  exactly 94,540 values in each of `idle_min`, `idle_max`, `idle_mean`, and
+  `idle_total`, plus 495 `flow_expire_cause` values. No other columns or flow
+  counts change. Both formats have identical counts.
+- For each of those 11 captures, two fixed runs at one thread and two at eight
+  threads produce identical sorted CSV rows.
+
+Performance gate: no observed regression above 5%. Release builds, warm-cache
+classic pcap input, RustiFlow feature set, CSV with headers, defaults for
+expiration, seven measured runs per side after warmup. Baseline and fix
+alternate order. Every timed run successfully writes all 109,585 rows.
+
+| Threads | Baseline median, range | Fixed median, range | Median runtime change |
+| --- | --- | --- | --- |
+| 1 | 0.983 s, 0.968 to 0.987 s | 0.950 s, 0.942 to 0.960 s | -3.43% |
+| 8 | 0.283 s, 0.263 to 0.311 s | 0.267 s, 0.262 to 0.314 s | -5.69% |
+
+Eight-thread ranges overlap, so this is not evidence of a repeatable speedup.
+The host had 32 logical CPUs and load averages 2.29/1.46/1.52 before timing.
+Separate `/proc` sampling of the fixed eight-thread run found the capture
+reader thread used 0.27 CPU seconds in 0.308 elapsed seconds, while reading
+359,715,878 bytes. The serial input/dispatch path limits further scaling on
+this warm-cache workload. Total process CPU was 1.44 user + 0.18 system seconds.
+Kernel permissions blocked perf events; no system settings were changed.
+
+Realtime validation used the existing eBPF objects and legacy netlink attach
+on `rustiflow-t0`, ingress only, with IPv4 and IPv6 UDP from `rustiflow-peer`.
+Three packets create a short active period and an observed 6.1-second gap;
+a later packet on another flow triggers expiration with an 8-second idle
+timeout. The baseline records about 15.56 seconds of idle time including
+trailing silence. Fixed runs at 1-second and 5-second sweep intervals record
+only the measured 6.1-second gap: idle min/max/mean/total equal IAT max, idle
+std is zero, packet count is three, and the cause is Idle Timeout. All six
+IP-family/run combinations pass. Every eBPF source reports zero dropped
+events, and the classifiers detach on shutdown. No container, linker, eBPF
+source, or system settings were changed. Logs and the runnable test are
+`realtime-*.log`, `realtime-results.json`, and `realtime_check.py` in the
+artifact directory below.
+
+Reproduction artifacts, binaries, scripts, raw comparisons, and timing samples
+are in `/tmp/rustiflow-found-bugs/`. `gen_big.py` is a copy of the supplied
+session generator with a 130-second gap after packet index 2 for every tenth
+flow. `compare.py` checks all columns and sorted determinism; `bench.py` times
+the full command and checks exit status, diagnostics, and row count.
+
 ## 2026-11-06: pure-Rust capture-file reader
 
 Branch `feat/pure-rust-pcap`. The offline reader in `rustiflow/src/pcap.rs`

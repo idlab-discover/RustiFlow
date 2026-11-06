@@ -66,6 +66,9 @@ where
     // A corrupt record ends the read like end of file, but is reported once
     // the packets before it have been dispatched.
     let mut read_error = None;
+    let mut next_check_time_us = None;
+    let mut last_timestamp_us = None;
+    let check_interval_us = (expiration_check_interval * 1_000_000) as i64;
     loop {
         let packet = match pcap_capture.next_packet() {
             Ok(Some(packet)) => packet,
@@ -79,6 +82,11 @@ where
         let timestamp_us = DateTime::from_timestamp(packet.ts_sec, (packet.ts_usec * 1000) as u32)
             .unwrap()
             .timestamp_micros();
+        last_timestamp_us = Some(timestamp_us);
+        if next_check_time_us.is_none_or(|next_check| timestamp_us >= next_check) {
+            dispatcher.expire(timestamp_us).await;
+            next_check_time_us = Some(timestamp_us.saturating_add(check_interval_us));
+        }
 
         if let Some(ethernet) = EthernetPacket::new(packet.data) {
             match ethernet.get_ethertype() {
@@ -221,7 +229,14 @@ where
             error!("Error parsing packet...");
         }
     }
-    dispatcher.flush().await;
+    if let Some(timestamp_us) = last_timestamp_us {
+        dispatcher.expire(timestamp_us).await;
+        for sender in &dispatcher.senders {
+            if let Err(e) = sender.send(ShardMessage::Finish(timestamp_us)).await {
+                error!("Failed to finish offline shard: {e}");
+            }
+        }
+    }
     if let Some(e) = read_error {
         return Err(e.context(format!("stopped reading {path}")));
     }
@@ -601,16 +616,21 @@ const SHARD_BATCH_SIZE: usize = 128;
 /// Batches that may wait for a shard (about 10k packets).
 const SHARD_QUEUE_CAPACITY: usize = 10_000 / SHARD_BATCH_SIZE;
 
-/// Routes packets to shard tasks in per-shard batches, preserving each shard's
-/// packet order while amortizing channel sends and wakeups.
+enum ShardMessage {
+    Packets(Vec<PacketFeatures>),
+    Expire(i64),
+    Finish(i64),
+}
+
+/// Routes packets and capture-clock sweeps in the same order to every shard.
 struct ShardDispatcher {
     selector: ShardSelector,
-    senders: Vec<mpsc::Sender<Vec<PacketFeatures>>>,
+    senders: Vec<mpsc::Sender<ShardMessage>>,
     pending: Vec<Vec<PacketFeatures>>,
 }
 
 impl ShardDispatcher {
-    fn new(shard_count: NonZeroUsize, senders: Vec<mpsc::Sender<Vec<PacketFeatures>>>) -> Self {
+    fn new(shard_count: NonZeroUsize, senders: Vec<mpsc::Sender<ShardMessage>>) -> Self {
         Self {
             selector: ShardSelector::new(shard_count),
             pending: senders
@@ -640,12 +660,25 @@ impl ShardDispatcher {
         }
     }
 
+    /// Flush packets before sending the same capture-clock sweep to every shard.
+    async fn expire(&mut self, timestamp_us: i64) {
+        self.flush().await;
+        for sender in &self.senders {
+            if let Err(e) = sender.send(ShardMessage::Expire(timestamp_us)).await {
+                error!("Failed to expire offline shard: {e}");
+            }
+        }
+    }
+
     async fn send_pending(&mut self, shard_index: usize) {
         let batch = std::mem::replace(
             &mut self.pending[shard_index],
             Vec::with_capacity(SHARD_BATCH_SIZE),
         );
-        if let Err(e) = self.senders[shard_index].send(batch).await {
+        if let Err(e) = self.senders[shard_index]
+            .send(ShardMessage::Packets(batch))
+            .await
+        {
             error!(
                 "Failed to send packet batch to shard {}: {}",
                 shard_index, e
@@ -677,14 +710,14 @@ fn create_shard_senders<T>(
     idle_timeout: u64,
     early_export: Option<NonZeroU64>,
     expiration_check_interval: u64,
-) -> Vec<mpsc::Sender<Vec<PacketFeatures>>>
+) -> Vec<mpsc::Sender<ShardMessage>>
 where
     T: Flow,
 {
     debug!("Creating {} sharded FlowTables...", num_shards);
     let mut shard_senders = Vec::with_capacity(num_shards as usize);
     for _ in 0..num_shards {
-        let (tx, mut rx) = mpsc::channel::<Vec<PacketFeatures>>(SHARD_QUEUE_CAPACITY);
+        let (tx, mut rx) = mpsc::channel::<ShardMessage>(SHARD_QUEUE_CAPACITY);
         let mut flow_table = FlowTable::new(
             active_timeout,
             idle_timeout,
@@ -694,16 +727,22 @@ where
         );
 
         tokio::spawn(async move {
-            let mut last_timestamp = None;
-            while let Some(packet_batch) = rx.recv().await {
-                for packet_features in packet_batch {
-                    last_timestamp = Some(packet_features.timestamp_us);
-                    flow_table.process_packet(&packet_features).await;
+            while let Some(message) = rx.recv().await {
+                match message {
+                    ShardMessage::Packets(packets) => {
+                        for packet in packets {
+                            flow_table
+                                .process_packet_without_expiration_scan(&packet)
+                                .await;
+                        }
+                    }
+                    ShardMessage::Expire(timestamp_us) => {
+                        flow_table.export_expired_flows(timestamp_us).await;
+                    }
+                    ShardMessage::Finish(timestamp_us) => {
+                        flow_table.export_all_flows(timestamp_us).await;
+                    }
                 }
-            }
-            // Handle flow exporting when the receiver is closed
-            if let Some(timestamp) = last_timestamp {
-                flow_table.export_all_flows(timestamp).await;
             }
         });
         shard_senders.push(tx);

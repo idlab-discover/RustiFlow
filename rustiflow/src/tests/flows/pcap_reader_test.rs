@@ -8,7 +8,10 @@ mod tests {
 
     use tokio::sync::mpsc;
 
-    use crate::{flows::rusti_flow::RustiFlow, pcap::read_pcap_file};
+    use crate::{
+        flows::{flow::Flow, rusti_flow::RustiFlow, util::FlowExpireCause},
+        pcap::read_pcap_file,
+    };
 
     fn temp_pcap_path(name: &str) -> PathBuf {
         let unique = SystemTime::now()
@@ -125,5 +128,44 @@ mod tests {
             flow_keys.push(flow.basic_flow.flow_key);
         }
         assert_eq!(flow_keys, ["10.99.0.1:40000-10.99.0.2:53-17"]);
+    }
+    #[tokio::test]
+    async fn offline_sweeps_and_shutdown_are_independent_of_shards() {
+        let (source, offset) = corrupt_record_after_one_packet_pcap();
+        let mut bytes = source[..24].to_vec();
+        // Many flows at time zero, one packet that advances the capture clock,
+        // then a late packet. Every shard must observe the same sweep ordering.
+        for (seconds, port) in (0..64_u16)
+            .map(|id| (0_u32, 40000 + id))
+            .chain([(200, 40064), (1, 40000)])
+        {
+            let mut record = source[24..offset].to_vec();
+            record[..4].copy_from_slice(&seconds.to_le_bytes());
+            record[50..52].copy_from_slice(&port.to_be_bytes());
+            bytes.extend_from_slice(&record);
+        }
+        let path = temp_pcap_path("offline-shard-determinism");
+        fs::write(&path, bytes).unwrap();
+        let mut runs = Vec::new();
+        for threads in [1, 1, 8, 8] {
+            let (tx, mut rx) = mpsc::channel::<RustiFlow>(128);
+            read_pcap_file::<RustiFlow>(path.to_str().unwrap(), tx, threads, 3600, 120, None, 60)
+                .await
+                .unwrap();
+            let mut rows = Vec::new();
+            let mut idle_count = 0;
+            while let Some(flow) = rx.recv().await {
+                idle_count +=
+                    usize::from(flow.basic_flow.flow_expire_cause == FlowExpireCause::IdleTimeout);
+                rows.push(flow.dump());
+            }
+            assert_eq!((rows.len(), idle_count), (66, 64));
+            rows.sort();
+            runs.push(rows);
+        }
+        fs::remove_file(path).unwrap();
+        for run in &runs[1..] {
+            assert_eq!(run, &runs[0]);
+        }
     }
 }
