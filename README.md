@@ -17,7 +17,7 @@ This tool is engineered for robust and efficient feature extraction, particularl
 
 - **High Throughput:** Utilizes Rust and the [Aya](https://aya-rs.dev/) library for eBPF program compilation and execution, ensuring exceptional performance and resource efficiency.
 - **Versatile Feature Sets:** Offers a variety of pre-defined feature sets (flows) and the flexibility to create custom feature sets tailored to specific requirements. An example of the custom flow is shown [here](https://github.com/idlab-discover/RustiFlow/blob/main/rustiflow/src/flows/custom_flow.rs).
-- **Pcap File Support:** Facilitates packet analysis from classic pcap and pcapng files, compatible with both Linux and Windows generated files. A capture that ends inside a record is read up to that record with a warning; a corrupt record stops the read with an error naming its file offset, after exporting earlier packets. Timestamp fractions must be below 1,000,000 for microsecond pcap or 1,000,000,000 for nanosecond pcap; invalid fractions are rejected, not normalized. Out-of-range pcapng timestamps are also rejected.
+- **Pcap File Support:** Facilitates packet analysis from classic pcap and pcapng files, compatible with both Linux and Windows generated files. A capture that ends inside a record is read up to that record with a warning; a corrupt record stops the read with an error naming its file offset, after exporting earlier packets. Timestamp fractions must be below 1,000,000 for microsecond pcap or 1,000,000,000 for nanosecond pcap; invalid fractions are rejected, not normalized. Out-of-range pcapng timestamps are also rejected. Sorted offline CSV rows are deterministic across runs and thread counts. Expiration scans use one capture clock shared by all shards, including a final scan at the last readable record's timestamp.
 - **Diverse Output Options:** Features can be outputted to the console, a CSV file, or other formats with minimal effort.
 - **Richer TCP Quality Signals:** The RustiFlow feature set exports duplicate ACK counts, zero-window observations, and TCP close style in addition to the existing lifecycle and retransmission fields.
 - **Endpoint-Aware IP Context:** The RustiFlow feature set exports `ip_version`, endpoint IP scope, and coarse `path_locality` derived from normalized addresses without expanding the eBPF event payload.
@@ -147,6 +147,14 @@ You can then run the binary with the following commands displayed on the [help m
 When using command-line arguments, both `--features` (`-f`) and `--output`
 (`-o`) are required unless `--config-file` (`-c`) is provided. Missing options
 produce a usage error. Running without arguments still opens the TUI.
+
+### Active and idle measurements
+
+Idle statistics count gaps longer than five seconds that end with another
+packet in the same flow. Trailing silence at expiration or shutdown does not
+count as an observed idle period. Active periods, flow duration, and end time
+remain based on packet timestamps. This rule applies to offline and realtime
+exports.
 
 ### Using the tui interface:
 

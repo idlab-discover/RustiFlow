@@ -865,4 +865,24 @@ mod tests {
         assert!(offline_rx.try_recv().is_err());
         assert!(realtime_rx.try_recv().is_err());
     }
+    #[tokio::test]
+    async fn idle_features_do_not_depend_on_sweep_time() {
+        let mut rows = Vec::new();
+        for (interval, sweep_us) in [(1, 130_000_000), (60, 180_000_000)] {
+            let (tx, mut rx) = mpsc::channel(8);
+            let mut table = FlowTable::<RustiFlow>::new(3600, 120, None, tx, interval);
+            table.process_packet(&build_packet(0)).await;
+            table.process_packet(&build_packet(1_000_000)).await;
+            let mut trigger = build_packet(sweep_us);
+            trigger.source_port += 1;
+            table.process_packet(&trigger).await;
+            let flow = rx.recv().await.unwrap();
+            assert_eq!(
+                flow.basic_flow.flow_expire_cause,
+                FlowExpireCause::IdleTimeout
+            );
+            rows.push(flow.dump());
+        }
+        assert_eq!(rows[0], rows[1]);
+    }
 }

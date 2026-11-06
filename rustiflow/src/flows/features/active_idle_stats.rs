@@ -40,17 +40,11 @@ impl FlowFeature for ActiveIdleStats {
         self.active_end = current_ts;
     }
 
-    fn close(&mut self, last_timestamp_us: i64, cause: FlowExpireCause) {
+    fn close(&mut self, _last_timestamp_us: i64, _cause: FlowExpireCause) {
         // If the active period is not empty, we add it to the active stats
         let duration = self.active_end - self.active_start;
         if duration > 0 {
             self.active_stats.add_value(duration as f64 / 1_000.0);
-        }
-
-        // If flow expired because of inactivity, we add the idle period to the idle stats
-        if cause == FlowExpireCause::IdleTimeout {
-            self.idle_stats
-                .add_value((last_timestamp_us - self.active_end) as f64 / 1_000.0);
         }
     }
 
