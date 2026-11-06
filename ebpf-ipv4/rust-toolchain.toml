@@ -1,2 +1,6 @@
 [toolchain]
-channel = "nightly"
+# Pinned so release eBPF objects are reproducible; bump deliberately and
+# re-validate against the bpf-linker version used by CI and the Dockerfile.
+channel = "nightly-2026-10-01"
+components = ["rust-src"]
+profile = "minimal"

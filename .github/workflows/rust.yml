@@ -17,10 +17,13 @@ jobs:
     steps:
     - uses: actions/checkout@v7
 
-    - name: Set up Rust
-      uses: dtolnay/rust-toolchain@nightly
-      with:
-        components: rust-src, clippy, rustfmt
+    # rust-toolchain.toml files pin the userspace stable and eBPF nightly
+    # toolchains; install exactly those instead of a floating channel.
+    - name: Install pinned Rust toolchains
+      run: |
+        rustup toolchain install
+        (cd ebpf-ipv4 && rustup toolchain install)
+        (cd ebpf-ipv6 && rustup toolchain install)
     - name: Install system dependencies
       run: |
         sudo apt-get update
