@@ -377,6 +377,9 @@ where
     let event_sources_v4;
     let event_sources_v6;
     let ebpf_counters;
+    // Dropping an `Ebpf` detaches its classifiers, so the egress programs must
+    // outlive the block that loads them, like the ingress ones above.
+    let _egress_programs;
 
     if !ingress_only {
         let mut bpf_egress_ipv4 = load_ebpf_ipv4(interface, TcAttachType::Egress)?;
@@ -429,7 +432,9 @@ where
                 submitted_events: submitted_events_ingress_ipv6,
             },
         ];
+        _egress_programs = Some([bpf_egress_ipv4, bpf_egress_ipv6]);
     } else {
+        _egress_programs = None;
         event_sources_v4 = labeled_ringbuf_sources("ingress-ipv4", events_ingress_ipv4);
         event_sources_v6 = labeled_ringbuf_sources("ingress-ipv6", events_ingress_ipv6);
         ebpf_counters = vec![
