@@ -75,10 +75,8 @@ where
                 break;
             }
         };
-        // Convert TimeVal from packet capture to DateTime<Utc>
-        let timestamp_us = DateTime::from_timestamp(packet.ts_sec, (packet.ts_usec * 1000) as u32)
-            .unwrap()
-            .timestamp_micros();
+        // CaptureReader validates the timestamp before returning a packet.
+        let timestamp_us = packet.ts_sec * 1_000_000 + packet.ts_usec;
 
         if let Some(ethernet) = EthernetPacket::new(packet.data) {
             match ethernet.get_ethertype() {
@@ -363,6 +361,9 @@ impl CaptureReader {
                 }
                 Err(e) => bail!("corrupt record at offset {offset}: {e}"),
             };
+            if DateTime::from_timestamp(ts_sec, (ts_usec * 1000) as u32).is_none() {
+                bail!("corrupt record at offset {offset}: timestamp out of range");
+            }
             let buffer = self.blocks.data();
             assert_eq!(buffer.as_ptr() as usize, buffer_start);
             return Ok(Some(CapturedPacket {
@@ -392,6 +393,14 @@ impl CaptureFormat {
                 PcapBlockOwned::Legacy(record),
             ) => {
                 check_legacy_caplen(record.caplen, offset)?;
+                let fraction_limit = if *nanosecond {
+                    1_000_000_000
+                } else {
+                    1_000_000
+                };
+                if record.ts_usec >= fraction_limit {
+                    bail!("corrupt record at offset {offset}: timestamp fraction out of range");
+                }
                 let ts_usec = if *nanosecond {
                     record.ts_usec / 1000
                 } else {

@@ -4,6 +4,15 @@ This file keeps short-lived design choices and execution notes that would make
 `AGENTS.md` too long. Newest entries come first. Older entries are condensed to
 the decisions and results that still describe the current code.
 
+## 2026-11-06: reject corrupt capture timestamps
+
+Classic pcap fractional timestamps must be less than one second in the file's
+precision. Reject invalid fractions before nanosecond truncation rather than
+normalizing them into seconds. The reader reports the record offset and exports
+earlier packets. Both formats also reject timestamps outside Chrono's supported
+range before dispatch, preserving the existing pcapng offset-overflow error.
+Valid capture timestamps and exported values are unchanged.
+
 ## 2026-11-06: pure-Rust capture-file reader
 
 Branch `feat/pure-rust-pcap`. The offline reader in `rustiflow/src/pcap.rs`

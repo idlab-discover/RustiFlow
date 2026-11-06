@@ -126,4 +126,83 @@ mod tests {
         }
         assert_eq!(flow_keys, ["10.99.0.1:40000-10.99.0.2:53-17"]);
     }
+    #[tokio::test]
+    async fn invalid_timestamp_exports_only_earlier_packets() {
+        for (magic, fraction) in [
+            (0xa1b2c3d4_u32, 1_000_000_u32),
+            (0xa1b2c3d4, 3_000_000),
+            (0xa1b23c4d, 1_000_000_000),
+            (0xa1b23c4d, u32::MAX),
+        ] {
+            let (mut bytes, offset) = corrupt_record_after_one_packet_pcap();
+            // Replace the corrupt length record with two complete UDP records.
+            let record = bytes[24..offset].to_vec();
+            bytes.truncate(offset);
+            bytes.extend_from_slice(&record);
+            bytes.extend_from_slice(&record);
+            bytes[..4].copy_from_slice(&magic.to_le_bytes());
+            bytes[offset + 4..offset + 8].copy_from_slice(&fraction.to_le_bytes());
+            let path = temp_pcap_path("invalid-timestamp");
+            fs::write(&path, bytes).unwrap();
+            let (tx, mut rx) = mpsc::channel::<RustiFlow>(8);
+            let result =
+                read_pcap_file::<RustiFlow>(path.to_str().unwrap(), tx, 1, 3600, 120, None, 60)
+                    .await;
+            fs::remove_file(path).unwrap();
+            let error = format!("{:#}", result.unwrap_err());
+            assert!(
+                error.contains(&format!(
+                    "corrupt record at offset {offset}: timestamp fraction out of range"
+                )),
+                "{error}"
+            );
+            let flow = rx.recv().await.unwrap();
+            assert_eq!(flow.basic_flow.flow_key, "10.99.0.1:40000-10.99.0.2:53-17");
+            assert_eq!(flow.packet_len_stats.flow_count(), 1);
+            assert!(rx.recv().await.is_none());
+        }
+    }
+    #[tokio::test]
+    async fn pcapng_timestamp_range_and_offset_overflow_are_errors() {
+        for offset_seconds in [i64::MAX, 10_000_000_000_000] {
+            // A section, an interface with if_tsoffset, and a packet at one second.
+            let mut bytes = Vec::new();
+            for (kind, body) in [
+                (0x0a0d0d0a_u32, vec![0x1a2b3c4d, 1, u32::MAX, u32::MAX]),
+                (
+                    1,
+                    vec![
+                        1,
+                        65535,
+                        0x0008000e,
+                        offset_seconds as u32,
+                        (offset_seconds >> 32) as u32,
+                        0,
+                    ],
+                ),
+                (6, vec![0, 0, 1_000_000, 0, 0]),
+            ] {
+                let len = 12 + body.len() as u32 * 4;
+                bytes.extend_from_slice(&kind.to_le_bytes());
+                bytes.extend_from_slice(&len.to_le_bytes());
+                for word in body {
+                    bytes.extend_from_slice(&word.to_le_bytes());
+                }
+                bytes.extend_from_slice(&len.to_le_bytes());
+            }
+            let path = temp_pcap_path("pcapng-timestamp-range");
+            fs::write(&path, bytes).unwrap();
+            let (tx, mut rx) = mpsc::channel::<RustiFlow>(8);
+            let result =
+                read_pcap_file::<RustiFlow>(path.to_str().unwrap(), tx, 1, 3600, 120, None, 60)
+                    .await;
+            fs::remove_file(path).unwrap();
+            let error = format!("{:#}", result.unwrap_err());
+            assert!(
+                error.contains("offset 64: timestamp out of range"),
+                "{error}"
+            );
+            assert!(rx.recv().await.is_none());
+        }
+    }
 }
