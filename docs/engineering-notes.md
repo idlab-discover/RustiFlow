@@ -4,6 +4,71 @@ This file keeps short-lived design choices and execution notes that would make
 `AGENTS.md` too long. Newest entries come first. Older entries are condensed to
 the decisions and results that still describe the current code.
 
+## 2026-11-06: pure-Rust capture-file reader
+
+Branch `feat/pure-rust-pcap`. The offline reader in `rustiflow/src/pcap.rs`
+uses `pcap-parser` instead of the `pcap` crate, so RustiFlow no longer links
+libpcap. The link-layer guessing (Ethernet, 802.1Q, Linux cooked capture) is
+unchanged; the file's linktype is still not read.
+
+Crate choice:
+
+| | `pcap-parser` 0.17.0 | `pcap-file` |
+| --- | --- | --- |
+| Release state | stable, July 2025, rusticata project | 2.0.0 from February 2023; 3.0.0 still at rc.3 |
+| Formats | pcap and pcapng behind one probing reader | separate pcap and pcapng readers |
+| Large files | streams through a fixed circular buffer; blocks borrow it | streams through an internal buffer |
+| pcapng timestamps | raw `ts_high`/`ts_low`; scaling left to the caller | decoded to `Duration` |
+| MSRV, license | 1.65, MIT or Apache-2.0 | 1.93 (3.0 rc), MIT |
+
+`pcap-parser` won on release state, a single reader for both formats, and a
+clean distinction between end of file (`Eof`) and a record cut short
+(`UnexpectedEof`). Scaling timestamps ourselves is also what lets the reader
+match libpcap's truncation exactly. Two `pcap-parser` defects are worked around
+in our code and are worth reporting upstream:
+
+- `build_ts_resolution` rejects every binary `if_tsresol`, because it compares
+  the raw byte, flag bit 0x80 included, against 63.
+- `if_tsoffset` is always decoded as little-endian, also in big-endian sections.
+
+The reader reproduces what libpcap's `pcap_next_ex` returned at its default
+microsecond precision: nanosecond and finer timestamps are truncated, frames are
+cut to the snapshot length (0 or above 262,144 means 262,144), pcapng uses the
+first interface's snapshot length, `if_tsoffset` is added, and a Simple Packet
+Block is stamped at the interface offset.
+
+Error policy. Before, `while let Ok(..)` ended quietly on any read error:
+
+- A record cut off by the end of the file ends the read with a warning that
+  gives its offset. This is the usual shape of a capture whose writer was
+  killed, so the flows are exported as before.
+- A record that cannot be framed (a classic pcap capture length above 262,144,
+  a malformed pcapng block, an unknown interface ID, an invalid
+  `if_tsresol`) or an obsolete pcapng Packet Block ends the read with an error
+  that gives its offset. Packets before it are dispatched and their flows
+  exported first; the CLI logs the error.
+- Deliberate divergence: libpcap refuses pcapng files whose interfaces have
+  different linktypes. The reader accepts them, since link layers are guessed
+  per packet anyway.
+
+Validation, against a libpcap build of `c04b3b5`:
+
+- Fixtures from `scripts/generate_pcap_fixtures.py`: the committed variants and
+  uncommitted edge cases (snapshot shorter than frames, corrupt capture length
+  mid-file, big-endian pcapng with binary `if_tsresol`, `if_tsoffset` and an SPB,
+  two pcapng sections, truncated pcapng, header-only and non-capture files). With
+  `-f rustiflow --threads 1`, every CSV is byte-identical to the baseline; only
+  the new warnings and errors differ.
+- A synthetic capture of 1.68M packets and 100k TCP/UDP biflows, written as pcap
+  and as nanosecond pcapng: identical row sets at one thread.
+- Multi-thread outputs cannot be compared, even after sorting: two baseline runs
+  with `--threads 8` differ in about 149k Idle Timeout rows. Shard assignment
+  uses a per-process random hash seed, and idle sweeps run on each shard's packet
+  clock, so idle-expiry timing varies between runs. This predates the change.
+- Throughput, median of 7 alternating runs on the synthetic capture: at one
+  thread +1.6% wall (pcap) and +2.3% (pcapng) with equal or lower CPU time; at
+  the default 5 threads 12% and 7% faster.
+
 ## 2026-10-22: adversarial flow and parser fixes
 
 Resolved the eight synthetic-event findings documented in
