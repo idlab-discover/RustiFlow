@@ -1,3 +1,4 @@
+use crate::flows::row::{fields, Record};
 use std::net::IpAddr;
 
 use crate::flows::{features::timing_stats::TimingStats, util::iana_port_mapping};
@@ -126,18 +127,12 @@ impl Flow for NfFlow {
         self.timing_stats.close(timestamp_us, cause);
     }
 
-    fn dump(&self) -> String {
-        format!(
-            "{},{},{},{},{},{},{},{},{},{},{},\
-            {},{},{},{},{},{},{},{},{},{},\
-            {},{},{},{},{},{},{},{},{},{},\
-            {},{},{},{},{},{},{},{},{},{},\
-            {},{},{},{},{},{},{},{},{},{},\
-            {},{},{},{},{},{},{},{},{},{},\
-            {},{},{},{},{},{},{},{},{},{}",
+    fn write_fields(&self, output: &mut impl Record) {
+        fields!(
+            output,
             // NFlow Core Features
             // 6 features are missing: src_mac, src_oui, dst_mac, dst_oui, vlan_id, tunner_id
-            self.basic_flow.flow_key,
+            self.basic_flow.flow_key.as_str(),
             self.get_expiration_id(),
             self.basic_flow.ip_source,
             self.basic_flow.port_source,
@@ -209,7 +204,7 @@ impl Flow for NfFlow {
             self.tcp_flags_stats.bwd_psh_flag_count,
             self.tcp_flags_stats.bwd_rst_flag_count,
             self.tcp_flags_stats.bwd_fin_flag_count,
-        )
+        );
     }
 
     fn get_features() -> String {
@@ -289,14 +284,9 @@ impl Flow for NfFlow {
         .join(",")
     }
 
-    fn dump_without_contamination(&self) -> String {
-        format!(
-            "{},{},{},{},{},{},{},{},{},{},{},\
-            {},{},{},{},{},{},{},{},{},{},\
-            {},{},{},{},{},{},{},{},{},{},\
-            {},{},{},{},{},{},{},{},{},{},\
-            {},{},{},{},{},{},{},{},{},{},\
-            {},{},{},{},{},{},{},{},{},{}",
+    fn write_clean_fields(&self, output: &mut impl Record) {
+        fields!(
+            output,
             // NFlow Core Features
             iana_port_mapping(self.basic_flow.port_source),
             iana_port_mapping(self.basic_flow.port_destination),
@@ -360,7 +350,7 @@ impl Flow for NfFlow {
             self.tcp_flags_stats.bwd_psh_flag_count,
             self.tcp_flags_stats.bwd_rst_flag_count,
             self.tcp_flags_stats.bwd_fin_flag_count,
-        )
+        );
     }
 
     fn get_features_without_contamination() -> String {

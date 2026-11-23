@@ -8,11 +8,11 @@ use crate::{
     export_profile,
     flow_key::{FlowKey, FlowKeyHashBuilder, KeyOrientation},
     flows::util::FlowExpireCause,
+    output::ShardOutput,
     packet_features::PacketFeatures,
     Flow,
 };
-use log::{debug, error};
-use tokio::sync::mpsc;
+use log::debug;
 
 enum FlowUpdate<T> {
     Active,
@@ -36,7 +36,7 @@ pub struct FlowTable<T> {
     active_timeout: u64,
     idle_timeout: u64,
     early_export_us: Option<i64>,
-    export_channel: mpsc::Sender<T>,
+    output: ShardOutput<T>,
     next_check_time_us: Option<i64>, // Track the next time we check for flow expirations
     expiration_check_interval_us: i64, // Check for expired flows every x seconds
 }
@@ -49,7 +49,7 @@ where
         active_timeout: u64,
         idle_timeout: u64,
         early_export: Option<NonZeroU64>,
-        export_channel: mpsc::Sender<T>,
+        output: impl Into<ShardOutput<T>>,
         expiration_check_interval: u64,
     ) -> Self {
         Self {
@@ -57,7 +57,7 @@ where
             active_timeout,
             idle_timeout,
             early_export_us: early_export.map(|seconds| (seconds.get() * 1_000_000) as i64),
-            export_channel,
+            output: output.into(),
             next_check_time_us: None,
             expiration_check_interval_us: (expiration_check_interval * 1_000_000) as i64,
         }
@@ -89,7 +89,7 @@ where
                 if is_expired {
                     let mut expired_flow = occupied.remove().flow;
                     expired_flow.close_flow(packet.timestamp_us, cause);
-                    Self::export(&self.export_channel, expired_flow).await;
+                    self.output.export(expired_flow).await;
                     self.create_and_insert_flow(packet, biflow_key, orientation)
                         .await;
                     return;
@@ -99,11 +99,11 @@ where
                 match Self::apply_packet_to_flow(entry, packet, is_forward, self.early_export_us) {
                     FlowUpdate::Active => {}
                     FlowUpdate::EarlyExport(snapshot) => {
-                        Self::export(&self.export_channel, snapshot).await;
+                        self.output.export(snapshot).await;
                     }
                     FlowUpdate::Terminated => {
                         let terminated_flow = occupied.remove().flow;
-                        Self::export(&self.export_channel, terminated_flow).await;
+                        self.output.export(terminated_flow).await;
                     }
                 }
             }
@@ -157,14 +157,14 @@ where
             FlowUpdate::Active => None,
             FlowUpdate::EarlyExport(snapshot) => Some(snapshot),
             FlowUpdate::Terminated => {
-                Self::export(&self.export_channel, entry.flow).await;
+                self.output.export(entry.flow).await;
                 return;
             }
         };
 
         self.flow_map.insert(biflow_key, entry);
         if let Some(snapshot) = snapshot {
-            Self::export(&self.export_channel, snapshot).await;
+            self.output.export(snapshot).await;
         }
     }
 
@@ -206,7 +206,7 @@ where
     /// Export all flows in the flow map in order of first packet arrival.
     pub async fn export_all_flows(&mut self, timestamp_us: i64) {
         // Sort small (timestamp, key) pairs rather than the flows themselves, so
-        // each flow is moved exactly once, out of the map and into the channel.
+        // each flow is moved exactly once, out of the map for export.
         let mut export_order: Vec<_> = self
             .flow_map
             .iter()
@@ -217,18 +217,10 @@ where
         for (_, key) in export_order {
             if let Some(FlowEntry { mut flow, .. }) = self.flow_map.remove(&key) {
                 flow.close_flow(timestamp_us, FlowExpireCause::ExporterShutdown);
-                Self::export(&self.export_channel, flow).await;
+                self.output.export(flow).await;
             }
         }
-    }
-
-    /// Exports a single flow.
-    async fn export(export_channel: &mpsc::Sender<T>, flow: T) {
-        if export_channel.is_closed() {
-            error!("Failed to send flow: export channel is closed");
-        } else if let Err(e) = export_channel.send(flow).await {
-            error!("Failed to send flow: {}", e);
-        }
+        self.output.flush().await;
     }
 
     /// Checks if enough time has passed to trigger flow expiration checks and exports expired flows.
@@ -269,7 +261,7 @@ where
         for (key, cause) in expired_flows {
             if let Some(FlowEntry { mut flow, .. }) = self.flow_map.remove(&key) {
                 flow.close_flow(timestamp_us, cause);
-                Self::export(&self.export_channel, flow).await;
+                self.output.export(flow).await;
             }
         }
     }

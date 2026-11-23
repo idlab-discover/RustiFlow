@@ -38,7 +38,8 @@ fn packet_graph_mode_with_debug(
         output.packet_graph,
         debug_logging_enabled,
     ) {
-        (ExportMethodType::Csv, true, true, false) => PacketGraphMode::Enabled,
+        (ExportMethodType::Csv, true, true, false)
+        | (ExportMethodType::Parquet, _, true, false) => PacketGraphMode::Enabled,
         _ => PacketGraphMode::Disabled,
     }
 }

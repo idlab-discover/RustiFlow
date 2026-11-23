@@ -4,8 +4,8 @@ set -euo pipefail
 out=${1:?usage: allocations.sh OUTPUT_DIRECTORY PCAP}
 pcap=${2:?usage: allocations.sh OUTPUT_DIRECTORY PCAP}
 mkdir -p "$out"
-bin=target/profiling/rustiflow
-opts=(-f rustiflow -o csv --export-path /dev/null --threads 4)
+bin=${RUSTIFLOW_PROFILE_BIN:-target/profiling/rustiflow}
+opts=(-f rustiflow -o "${RUSTIFLOW_PROFILE_FORMAT:-parquet}" --export-path /dev/null --threads 4)
 for workload in offline replay4; do
     case "$workload" in
         offline) input=(pcap "$pcap") ;;

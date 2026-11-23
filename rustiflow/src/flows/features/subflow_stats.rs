@@ -1,6 +1,7 @@
+use crate::flows::row::Record;
 use crate::{flows::util::FlowExpireCause, packet_features::PacketFeatures};
 
-use super::util::{push_csv_int, FlowFeature};
+use super::util::FlowFeature;
 
 const SUBFLOW_TIMEOUT: i64 = 1_000_000; // 1s
 
@@ -37,8 +38,8 @@ impl FlowFeature for SubflowStats {
         // No active state to close
     }
 
-    fn append_to_csv(&self, output: &mut String) {
-        push_csv_int(output, self.subflow_count);
+    fn write_fields(&self, output: &mut impl Record) {
+        output.field(self.subflow_count);
     }
 
     fn headers() -> String {

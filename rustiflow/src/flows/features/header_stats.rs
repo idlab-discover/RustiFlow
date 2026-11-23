@@ -1,3 +1,4 @@
+use crate::flows::row::Record;
 use crate::{flows::util::FlowExpireCause, packet_features::PacketFeatures};
 
 use super::util::{FeatureStats, FlowFeature};
@@ -33,10 +34,10 @@ impl FlowFeature for HeaderLengthStats {
         // No active state to close
     }
 
-    fn append_to_csv(&self, output: &mut String) {
-        self.header_len.append_csv_values(output);
-        self.fwd_header_len.append_csv_values(output);
-        self.bwd_header_len.append_csv_values(output);
+    fn write_fields(&self, output: &mut impl Record) {
+        self.header_len.write_fields(output);
+        self.fwd_header_len.write_fields(output);
+        self.bwd_header_len.write_fields(output);
     }
 
     fn headers() -> String {

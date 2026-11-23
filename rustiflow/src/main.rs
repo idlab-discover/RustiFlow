@@ -34,18 +34,18 @@ use flows::{
     nf_flow::NfFlow,
 };
 use log::{debug, error, info};
-use output::{FlowExporter, OutputWriter, ENCODED_CHUNK_QUEUE_CAPACITY};
+use output::spawn_output_writer;
 use profiling::ProfilingSession;
 use realtime_mode::{packet_graph_mode, PromiscuousMode};
 use std::time::Instant;
-use tokio::{sync::mpsc, task::JoinHandle};
+
 use tui::{launch_tui, Config};
 
 const DEFAULT_OFFLINE_THREADS: u8 = 5;
 const DEFAULT_REALTIME_THREADS: u8 = 12;
 
 #[tokio::main]
-async fn main() {
+async fn main() -> anyhow::Result<()> {
     env_logger::init();
 
     if std::env::args().len() == 1 {
@@ -56,7 +56,7 @@ async fn main() {
         });
 
         if let Some(config) = config {
-            run_with_config(config).await;
+            run_with_config(config).await?;
         } else {
             error!("No configuration provided.");
             std::process::exit(1);
@@ -86,7 +86,7 @@ async fn main() {
                     expiration_check_interval: cli.expiration_check_interval,
                 },
                 OutputConfig {
-                    output: cli.output.unwrap(),
+                    output: cli.output,
                     export_path: cli.export_path,
                     header: cli.header,
                     drop_contaminant_features: cli.drop_contaminant_features,
@@ -102,13 +102,14 @@ async fn main() {
                     output,
                     command,
                 })
-                .await
+                .await?
             }
             CliCommand::ReplayBench(replay_args) => {
-                run_replay_bench(config, output, replay_args).await
+                run_replay_bench(config, output, replay_args).await?
             }
         }
     }
+    Ok(())
 }
 
 /// Exits when settings that clap and serde cannot check on their own conflict.
@@ -128,23 +129,20 @@ async fn run_replay_bench(
     config: ExportConfig,
     output: OutputConfig,
     replay_args: ReplayBenchArgs,
-) {
+) -> anyhow::Result<()> {
     exit_on_invalid_export_config(&config);
 
     macro_rules! execute_replay {
         ($flow_ty:ty) => {{
-            let (exporter, output_task) = spawn_output_writer::<$flow_ty>(output);
-            if let Err(err) = replay_bench::<$flow_ty>(
+            let (exporter, output_task) = spawn_output_writer::<$flow_ty>(output)?;
+            replay_bench::<$flow_ty>(
                 &replay_args,
                 &config,
                 resolve_realtime_threads(config.threads),
                 exporter,
                 output_task,
             )
-            .await
-            {
-                error!("Error during replay benchmark: {:?}", err);
-            }
+            .await?;
         }};
     }
 
@@ -156,9 +154,10 @@ async fn run_replay_bench(
         FlowType::Rustiflow => execute_replay!(RustiFlow),
         FlowType::Custom => execute_replay!(CustomFlow),
     }
+    Ok(())
 }
 
-async fn run_with_config(config: Config) {
+async fn run_with_config(config: Config) -> anyhow::Result<()> {
     exit_on_invalid_export_config(&config.config);
 
     // Start the selected command
@@ -171,7 +170,7 @@ async fn run_with_config(config: Config) {
             macro_rules! execute_realtime {
                 ($flow_ty:ty) => {{
                     let packet_graph_mode = packet_graph_mode(&config.output);
-                    let (exporter, output_task) = spawn_output_writer::<$flow_ty>(config.output);
+                    let (exporter, output_task) = spawn_output_writer::<$flow_ty>(config.output)?;
 
                     debug!("Starting realtime processing...");
                     let start = Instant::now();
@@ -197,9 +196,7 @@ async fn run_with_config(config: Config) {
                     .await;
 
                     // Wait for the output task to finish (flush and close the writer)
-                    if let Err(e) = output_task.await {
-                        error!("Error waiting for output task: {:?}", e);
-                    }
+                    output_task.await??;
 
                     if let Some(profiling_session) = profiling_session {
                         if let Err(err) = profiling_session.finish() {
@@ -241,7 +238,7 @@ async fn run_with_config(config: Config) {
         Commands::Pcap { path } => {
             macro_rules! execute_offline {
                 ($flow_ty:ty) => {{
-                    let (exporter, output_task) = spawn_output_writer::<$flow_ty>(config.output);
+                    let (exporter, output_task) = spawn_output_writer::<$flow_ty>(config.output)?;
 
                     let start = Instant::now();
                     let profiling_session = match ProfilingSession::start_from_env("offline") {
@@ -267,9 +264,7 @@ async fn run_with_config(config: Config) {
                     }
 
                     // Wait for the output task to finish
-                    output_task.await.unwrap_or_else(|e| {
-                        error!("Error waiting for output task: {:?}", e);
-                    });
+                    output_task.await??;
 
                     export_profile::log_summary("offline");
 
@@ -297,40 +292,7 @@ async fn run_with_config(config: Config) {
             }
         }
     }
-}
-
-/// Starts the output writer task. Shards encode their own CSV rows through the
-/// returned exporter; the writer task only writes them, and it finishes once
-/// every shard's encoder has dropped its chunk sender.
-fn spawn_output_writer<T: Flow>(output: OutputConfig) -> (FlowExporter, JoinHandle<()>) {
-    let mut output_writer = OutputWriter::<T>::new(
-        output.output,
-        output.header,
-        output.drop_contaminant_features,
-        output.export_path,
-    );
-
-    // Synchronous initialization to ensure headers are written
-    output_writer.init();
-
-    let (chunk_sender, mut chunk_receiver) = mpsc::channel::<Vec<u8>>(ENCODED_CHUNK_QUEUE_CAPACITY);
-    let exporter = FlowExporter::new(output.drop_contaminant_features, chunk_sender);
-
-    let output_task = tokio::spawn(async move {
-        while let Some(rows) = chunk_receiver.recv().await {
-            if let Err(e) = output_writer.write_encoded(&rows) {
-                error!("Error writing flows: {:?}", e);
-            }
-        }
-
-        // Ensure that all remaining flows are flushed properly before ending
-        output_writer.flush_and_close().unwrap_or_else(|e| {
-            error!("Error flushing and closing the writer: {:?}", e);
-        });
-        debug!("OutputWriter task finished");
-    });
-
-    (exporter, output_task)
+    Ok(())
 }
 
 fn resolve_realtime_threads(config_threads: Option<u8>) -> u8 {

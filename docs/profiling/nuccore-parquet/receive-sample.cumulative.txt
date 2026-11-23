@@ -1,0 +1,22 @@
+# To display the perf.data header info, please use --header/--header-only options.
+#
+#
+# Total Lost Samples: 0
+#
+# Samples: 1K of event 'cpu_core/cycles/u'
+# Event count (approx.): 1099541058
+#
+# Children      Self  Command          Shared Object     Symbol
+# ........  ........  ...............  ................  ..................................................................................................................................................................................................................................................................................................................................................................................................................................................................
+#
+    11.87%    11.77%  tokio-rt-worker  rustiflow         [.] <rustiflow::flow_table::FlowTable<rustiflow::flows::rusti_flow::RustiFlow>>::process_packet_without_expiration_scan::{closure#0}
+     9.73%     9.73%  tokio-rt-worker  rustiflow         [.] rustiflow::realtime::drain_ring_source::{closure#0}
+     7.05%     6.77%  tokio-rt-worker  rustiflow         [.] tokio::runtime::task::raw::poll::<tokio::runtime::blocking::task::BlockingTask<<tokio::runtime::scheduler::multi_thread::worker::Launch>::launch::{closure#0}>, tokio::runtime::blocking::schedule::BlockingSchedule>
+     6.80%     6.80%  tokio-rt-worker  rustiflow         [.] rustiflow::realtime::spawn_source_dispatcher::{closure#0}
+     6.20%     6.20%  tokio-rt-worker  rustiflow         [.] rustiflow::realtime::enqueue_shard_batch::{closure#0}
+     4.21%     4.11%  tokio-rt-worker  rustiflow         [.] <tokio::runtime::io::registration::Registration>::readiness::{closure#0}
+
+
+#
+# (Tip: To record every process run by a user: perf record -u <user>)
+#

@@ -5,7 +5,7 @@
 #           share/rustiflow/config.toml.example).
 # Optional: /etc/rustiflow/<interface>.env (start from
 #           share/rustiflow/environment.example).
-# Relative CSV export paths are written to /var/lib/rustiflow/<interface>/.
+# Relative export paths are written to /var/lib/rustiflow/<interface>/.
 
 [Unit]
 Description=RustiFlow realtime flow extraction on %i
@@ -33,7 +33,7 @@ ExecStartPre=test -r @LIBDIR@/rustiflow/rustiflow-ebpf-ipv4
 ExecStartPre=test -r @LIBDIR@/rustiflow/rustiflow-ebpf-ipv6
 ExecStart=@BINDIR@/rustiflow --config-file /etc/rustiflow/%i.toml realtime $RUSTIFLOW_REALTIME_ARGS %i
 
-# Realtime capture flushes open flows and the CSV writer only on SIGINT.
+# Realtime capture flushes open flows and the output writer only on SIGINT.
 KillSignal=SIGINT
 TimeoutStopSec=60
 Restart=on-failure

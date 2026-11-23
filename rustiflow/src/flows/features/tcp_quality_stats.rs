@@ -1,3 +1,4 @@
+use crate::flows::row::Record;
 use pnet_packet::ip::IpNextHeaderProtocols;
 
 use crate::{
@@ -5,7 +6,7 @@ use crate::{
     packet_features::{PacketFeatures, ACK_FLAG},
 };
 
-use super::util::{push_csv_int, FlowFeature};
+use super::util::FlowFeature;
 
 #[derive(Clone, Copy)]
 struct AckObservation {
@@ -97,19 +98,13 @@ impl FlowFeature for TcpQualityStats {
         // No active state to close.
     }
 
-    fn append_to_csv(&self, output: &mut String) {
-        push_csv_int(
-            output,
-            self.fwd_duplicate_ack_count + self.bwd_duplicate_ack_count,
-        );
-        push_csv_int(output, self.fwd_duplicate_ack_count);
-        push_csv_int(output, self.bwd_duplicate_ack_count);
-        push_csv_int(
-            output,
-            self.fwd_zero_window_count + self.bwd_zero_window_count,
-        );
-        push_csv_int(output, self.fwd_zero_window_count);
-        push_csv_int(output, self.bwd_zero_window_count);
+    fn write_fields(&self, output: &mut impl Record) {
+        output.field(self.fwd_duplicate_ack_count + self.bwd_duplicate_ack_count);
+        output.field(self.fwd_duplicate_ack_count);
+        output.field(self.bwd_duplicate_ack_count);
+        output.field(self.fwd_zero_window_count + self.bwd_zero_window_count);
+        output.field(self.fwd_zero_window_count);
+        output.field(self.bwd_zero_window_count);
     }
 
     fn headers() -> String {

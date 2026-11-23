@@ -1,0 +1,14 @@
+live ipv4
+Error: prog FD 3 doesn't have valid btf
+live-btf ipv4
+
+            193709 run_cnt
+         398187820 cycles
+         322795427 instructions        #     0.81 insns per cycle
+live ipv6
+Error: prog FD 3 doesn't have valid btf
+live-btf ipv6
+
+            194207 run_cnt
+         424720730 cycles
+         366565129 instructions        #     0.86 insns per cycle

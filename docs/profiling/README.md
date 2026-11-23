@@ -2,6 +2,10 @@
 
 [Nuccore baseline for `67a8109`](nuccore-67a8109/README.md) records the initial comparison point for optimization branches.
 
+The [Parquet candidate profile](nuccore-parquet/README.md) repeats those workloads,
+adds a fresh run of the archived CSV binary, and measures the time spent
+finishing regular-file exports.
+
 ## Reproduce on nuccore
 
 Run from the repository root. Keep timings on CPUs 0–5, which are the six P-cores on this host. Use the same Rust toolchains, packet counts, flow counts, worker counts, and output destination for before/after comparisons. The scripts are Bash and take an output directory and a pcap path.
@@ -19,6 +23,11 @@ bash docs/profiling/userspace.sh target/profile-baseline/userspace target/profil
 sudo bash docs/profiling/realtime.sh target/profile-baseline/realtime target/profile-baseline/mixed.pcap
 bash docs/profiling/allocations.sh target/profile-baseline/allocations target/profile-baseline/mixed.pcap
 ```
+
+The profiling scripts default to Parquet. Set `RUSTIFLOW_PROFILE_FORMAT=csv` to
+reproduce the historical CSV runs. Set `RUSTIFLOW_PROFILE_BIN` to an absolute
+path to compare an archived executable. Pass these variables through `sudo env`
+when running the live harness.
 
 The deterministic pcap defaults to 2 million Ethernet packets, spread evenly over 10,000 bidirectional UDP flows. IPv4 and IPv6 are equally represented, as are 24- and 448-byte UDP payloads. Endpoints and ports are stable per flow, packet direction alternates after every 10,000 packets, and pcap timestamps are 1 µs apart. The entire file is read offline. Live tests send the first 300,000 frames into a temporary veth with both endpoints in network namespaces. This measures the local software path. The live script temporarily changes `kernel.bpf_stats_enabled` for its instrumented passes and restores the previous setting on exit.
 
@@ -66,3 +75,28 @@ RUST_LOG=info RUSTIFLOW_PROFILE_RESOURCE_SUMMARY=1 RUSTIFLOW_PROFILE_EXPORT_BREA
     tail -n +2 target/profile-baseline/offline.csv | LC_ALL=C sort
 } | sha256sum
 ```
+
+To compare the regular-file export tail, supply the archived CSV binary and a
+profiling build of the candidate. The script runs one warmup and five measured
+repetitions per writer, rotating their order, and writes its measurements to
+`export-heavy.csv` in the output directory.
+
+```bash
+python docs/profiling/export_tail.py target/profile-parquet/baseline-rustiflow \
+    target/profiling/rustiflow target/profile-baseline/mixed.pcap target/profile-parquet/tail
+```
+
+To compare CSV and Parquet in the same executable, omit the archived binary.
+The matrix adds basic features for the offline capture and replays 10 million
+IPv4 and IPv6 events to `/dev/null` with each feature set. The offline capture
+and the short, export-heavy IPv4 replay write regular files. An even run count
+gives each format the same number of first and second runs after warmup.
+
+```bash
+python docs/profiling/export_tail.py --matrix --runs 8 target/profiling/rustiflow \
+    target/profile-baseline/mixed.pcap target/parquet-parity/final
+```
+
+The output directory contains the final regular files and all repetitions in
+`writer-matrix.csv`. Use `command_s` for whole-command offline timing and
+`replay_s` for replay timing including file close.

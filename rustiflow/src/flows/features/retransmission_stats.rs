@@ -1,3 +1,4 @@
+use crate::flows::row::Record;
 use std::collections::BTreeMap;
 
 use pnet_packet::ip::IpNextHeaderProtocols;
@@ -7,7 +8,7 @@ use crate::{
     packet_features::{PacketFeatures, ACK_FLAG, FIN_FLAG, SYN_FLAG},
 };
 
-use super::util::{push_csv_int, FlowFeature};
+use super::util::FlowFeature;
 
 const MAX_SEQUENCE_RANGES: usize = 1024;
 
@@ -117,13 +118,10 @@ impl FlowFeature for RetransmissionStats {
         // No active state to close
     }
 
-    fn append_to_csv(&self, output: &mut String) {
-        push_csv_int(
-            output,
-            self.fwd_retransmission_count + self.bwd_retransmission_count,
-        );
-        push_csv_int(output, self.fwd_retransmission_count);
-        push_csv_int(output, self.bwd_retransmission_count);
+    fn write_fields(&self, output: &mut impl Record) {
+        output.field(self.fwd_retransmission_count + self.bwd_retransmission_count);
+        output.field(self.fwd_retransmission_count);
+        output.field(self.bwd_retransmission_count);
     }
 
     fn headers() -> String {

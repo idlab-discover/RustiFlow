@@ -5,7 +5,7 @@ unset RUST_LOG RUSTIFLOW_REALTIME_STATS RUSTIFLOW_PROFILE_FLAMEGRAPH
 out=${1:?usage: userspace.sh OUTPUT_DIRECTORY PCAP}
 pcap=${2:?usage: userspace.sh OUTPUT_DIRECTORY PCAP}
 mkdir -p "$out"
-bin=target/profiling/rustiflow
+bin=${RUSTIFLOW_PROFILE_BIN:-target/profiling/rustiflow}
 cpus=0-5
 events=cpu_core/cycles/u,cpu_core/instructions/u,cpu_core/branch-misses/u,cpu_core/cache-misses/u
 for workload in offline replay4 replay6; do
@@ -16,7 +16,7 @@ for workload in offline replay4 replay6; do
     esac
     for feature in basic rustiflow; do
         prefix="$out/$workload-$feature"
-        args=("$bin" -f "$feature" -o csv --export-path /dev/null --threads 4 "${input[@]}")
+        args=("$bin" -f "$feature" -o "${RUSTIFLOW_PROFILE_FORMAT:-parquet}" --export-path /dev/null --threads 4 "${input[@]}")
         taskset -c "$cpus" "${args[@]}" >"$prefix.warmup.txt" 2>&1
         for run in 1 2 3 4 5; do
             TIMEFORMAT=%R

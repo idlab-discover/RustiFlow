@@ -90,9 +90,9 @@ mod tests {
             ] {
                 let mut appended = String::new();
                 if clean {
-                    flow.append_to_csv_row_without_contamination(&mut appended);
+                    flow.write_clean_fields(&mut crate::flows::row::CsvRow::new(&mut appended));
                 } else {
-                    flow.append_to_csv_row(&mut appended);
+                    flow.write_fields(&mut crate::flows::row::CsvRow::new(&mut appended));
                 }
                 assert_eq!(appended, dump);
                 let values: std::collections::HashMap<_, _> =

@@ -28,22 +28,10 @@ pub struct Config {
 
 impl Config {
     fn reset() -> Self {
+        let defaults = ConfigFile::default();
         Config {
-            config: ExportConfig {
-                features: FlowType::Basic,
-                active_timeout: 3600,
-                idle_timeout: 120,
-                early_export: None,
-                threads: None,
-                expiration_check_interval: 60,
-            },
-            output: OutputConfig {
-                output: ExportMethodType::Print,
-                export_path: None,
-                header: false,
-                drop_contaminant_features: false,
-                packet_graph: false,
-            },
+            config: defaults.config,
+            output: defaults.output,
             command: Commands::Realtime {
                 interface: String::from("eth0"),
                 ingress_only: false,
@@ -440,7 +428,8 @@ fn handle_boolean_input(
                 }
             }
             AppFocus::PacketGraphInput => {
-                if let ExportMethodType::Csv = &app.config.output.output {
+                if let ExportMethodType::Csv | ExportMethodType::Parquet = &app.config.output.output
+                {
                     app.config.output.packet_graph = !app.config.output.packet_graph;
                 }
             }
@@ -472,7 +461,9 @@ fn handle_boolean_input(
                     }
                 }
                 AppFocus::PacketGraphInput => {
-                    if let ExportMethodType::Csv = &app.config.output.output {
+                    if let ExportMethodType::Csv | ExportMethodType::Parquet =
+                        &app.config.output.output
+                    {
                         app.config.output.packet_graph = false;
                     }
                 }
@@ -498,7 +489,7 @@ fn handle_selection_input(
 ) -> Result<(), Box<dyn Error>> {
     let (state, max_index) = match focus {
         AppFocus::CommandSelection => (&mut app.command_state, 1),
-        AppFocus::OutputSelection => (&mut app.output_state, 1),
+        AppFocus::OutputSelection => (&mut app.output_state, 2),
         _ => return Ok(()),
     };
     match key.code {
@@ -536,6 +527,11 @@ fn handle_selection_input(
             },
             AppFocus::OutputSelection => match state.selected() {
                 Some(0) => {
+                    app.config.output.output = ExportMethodType::Parquet;
+                    app.config.output.export_path = None;
+                    app.focus = AppFocus::OutputArgumentInput;
+                }
+                Some(2) => {
                     app.config.output.output = ExportMethodType::Print;
                     app.config.output.export_path = None;
                     app.focus = AppFocus::Menu;
@@ -608,9 +604,11 @@ fn handle_command_argument_input(key: KeyEvent, app: &mut App) -> Result<(), Box
 fn handle_output_argument_input(key: KeyEvent, app: &mut App) -> Result<(), Box<dyn Error>> {
     match key.code {
         KeyCode::Char(c) => {
-            if let Some(ref mut export_path) = app.config.output.export_path {
-                export_path.push(c);
-            }
+            app.config
+                .output
+                .export_path
+                .get_or_insert_with(String::new)
+                .push(c);
         }
         KeyCode::Backspace => {
             if let Some(ref mut export_path) = app.config.output.export_path {
@@ -618,12 +616,13 @@ fn handle_output_argument_input(key: KeyEvent, app: &mut App) -> Result<(), Box<
             }
         }
         KeyCode::Enter => {
+            if app.config.output.export_path.as_deref() == Some("") {
+                app.config.output.export_path = None;
+            }
             app.focus = AppFocus::PacketGraphInput;
         }
         KeyCode::Left | KeyCode::Esc => {
-            if let Some(ref mut export_path) = app.config.output.export_path {
-                export_path.clear();
-            }
+            app.config.output.export_path = None;
             app.focus = AppFocus::Menu;
         }
         _ => {}
@@ -896,7 +895,11 @@ fn render_content(f: &mut Frame, app: &App, area: Rect) {
             );
         }
         Some(2) => {
-            let items = vec![ListItem::new("Print"), ListItem::new("Csv")];
+            let items = vec![
+                ListItem::new("Parquet"),
+                ListItem::new("Csv"),
+                ListItem::new("Print"),
+            ];
             render_selectable_list(
                 f,
                 area,
@@ -1039,7 +1042,12 @@ fn render_current_selections(f: &mut Frame, app: &App, area: Rect) {
         ListItem::new(Line::from(vec![
             Span::raw("Output Path: "),
             Span::styled(
-                format!("{:?}", app.config.output.export_path),
+                app.config.output.export_path.as_deref().unwrap_or(
+                    match app.config.output.output {
+                        ExportMethodType::Parquet => "output.parquet",
+                        ExportMethodType::Csv | ExportMethodType::Print => "—",
+                    },
+                ),
                 Style::default().fg(Color::Yellow),
             ),
         ])),
@@ -1179,7 +1187,11 @@ fn render_popups(f: &mut Frame, app: &App, size: Rect) {
 
     if matches!(app.focus, AppFocus::OutputArgumentInput) {
         let input_text = app.config.output.export_path.as_deref().unwrap_or("");
-        render_popup_input(f, size, input_text, "Enter Output Path");
+        let title = match app.config.output.output {
+            ExportMethodType::Parquet => "Output Path (default: output.parquet)",
+            ExportMethodType::Csv | ExportMethodType::Print => "Enter Output Path",
+        };
+        render_popup_input(f, size, input_text, title);
     }
 
     if matches!(app.focus, AppFocus::IngressOnlyInput) {
@@ -1228,7 +1240,7 @@ fn render_popups(f: &mut Frame, app: &App, size: Rect) {
 
     if matches!(app.focus, AppFocus::PacketGraphInput) {
         let is_true_selected = match &app.config.output.output {
-            ExportMethodType::Csv => app.config.output.packet_graph,
+            ExportMethodType::Csv | ExportMethodType::Parquet => app.config.output.packet_graph,
             _ => false,
         };
 

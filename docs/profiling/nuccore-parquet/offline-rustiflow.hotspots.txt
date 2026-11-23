@@ -1,0 +1,35 @@
+# To display the perf.data header info, please use --header/--header-only options.
+#
+#
+# Total Lost Samples: 0
+#
+# Samples: 729  of event 'cpu_core/cycles/u'
+# Event count (approx.): 2163486050
+#
+# Overhead  Command          Shared Object     Symbol
+# ........  ...............  ................  ..............................................................................................................................................................................................................................................................................................................................................
+#
+    29.45%  tokio-rt-worker  rustiflow         [.] <rustiflow::flow_table::FlowTable<rustiflow::flows::rusti_flow::RustiFlow>>::process_packet_without_expiration_scan::{closure#0}
+    13.34%  rustiflow        rustiflow         [.] <rustiflow::pcap::ShardDispatcher>::dispatch::{closure#0}
+     5.03%  rustiflow        rustiflow         [.] <pcap_parser::pcap::reader::LegacyPcapReader<std::fs::File> as pcap_parser::traits::PcapReaderIterator>::next
+     4.96%  rustiflow        rustiflow         [.] rustiflow::pcap::process_packet::<rustiflow::flows::basic_flow::BasicFlow, pnet_packet::ipv4::Ipv4Packet>::{closure#0}
+     3.35%  rustiflow        rustiflow         [.] <rustiflow::pcap::CaptureReader>::next_packet
+     3.07%  tokio-rt-worker  rustiflow         [.] <rustiflow::flow_key::FlowKey>::canonicalize
+     2.93%  rustiflow        rustiflow         [.] <chrono::naive::date::NaiveDate>::from_num_days_from_ce_opt
+     2.87%  tokio-rt-worker  rustiflow         [.] <rustiflow::flows::features::iat_stats::IATStats as rustiflow::flows::features::util::FlowFeature>::update
+     2.66%  tokio-rt-worker  rustiflow         [.] <rustiflow::flow_table::FlowTable<rustiflow::flows::rusti_flow::RustiFlow>>::apply_packet_to_flow
+     2.62%  rustiflow        rustiflow         [.] <rustiflow::flow_key::FlowKey>::canonicalize
+     2.38%  tokio-rt-worker  rustiflow         [.] <rustiflow::flows::features::payload_stats::PayloadLengthStats as rustiflow::flows::features::util::FlowFeature>::update
+     2.14%  rustiflow        rustiflow         [.] rustiflow::packet_features::extract_packet_features_transport
+     2.11%  tokio-rt-worker  rustiflow         [.] <rustiflow::flows::features::header_stats::HeaderLengthStats as rustiflow::flows::features::util::FlowFeature>::update
+     1.53%  rustiflow        rustiflow         [.] <rustiflow::packet_features::PacketFeatures>::from_ipv6_packet
+     1.43%  rustiflow        rustiflow         [.] <rustiflow::packet_features::PacketFeatures>::from_ipv4_packet
+     1.41%  rustiflow        rustiflow         [.] rustiflow::run_with_config::{closure#0}
+     1.13%  rustiflow        libc.so.6         [.] 0x0000000000176a87
+     1.09%  tokio-rt-worker  [unknown]         [k] 0000000000000000
+     1.06%  tokio-rt-worker  rustiflow         [.] <parquet::column::writer::GenericColumnWriter<parquet::column::writer::encoder::ColumnValueEncoderImpl<parquet::data_type::DoubleType>>>::write_mini_batch
+
+
+#
+# (Tip: See assembly instructions with percentage: perf annotate <symbol>)
+#

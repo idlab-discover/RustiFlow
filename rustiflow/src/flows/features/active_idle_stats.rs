@@ -1,3 +1,4 @@
+use crate::flows::row::Record;
 use crate::{flows::util::FlowExpireCause, packet_features::PacketFeatures};
 
 use super::util::{FeatureStats, FlowFeature};
@@ -48,9 +49,9 @@ impl FlowFeature for ActiveIdleStats {
         }
     }
 
-    fn append_to_csv(&self, output: &mut String) {
-        self.active_stats.append_csv_values(output);
-        self.idle_stats.append_csv_values(output);
+    fn write_fields(&self, output: &mut impl Record) {
+        self.active_stats.write_fields(output);
+        self.idle_stats.write_fields(output);
     }
 
     fn headers() -> String {

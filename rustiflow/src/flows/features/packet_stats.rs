@@ -1,6 +1,7 @@
+use crate::flows::row::Record;
 use crate::{flows::util::FlowExpireCause, packet_features::PacketFeatures};
 
-use super::util::{push_csv_f64, push_csv_int, FeatureStats, FlowFeature};
+use super::util::{FeatureStats, FlowFeature};
 
 #[derive(Clone)]
 pub struct PacketLengthStats {
@@ -108,17 +109,17 @@ impl FlowFeature for PacketLengthStats {
         // No active state to close
     }
 
-    fn append_to_csv(&self, output: &mut String) {
-        push_csv_int(output, self.flow_count());
-        push_csv_f64(output, self.flow_total());
-        push_csv_f64(output, self.flow_mean());
-        push_csv_f64(output, self.flow_max());
-        push_csv_f64(output, self.flow_min());
-        push_csv_f64(output, self.flow_std());
-        push_csv_int(output, self.fwd_packet_len.get_count());
-        push_csv_int(output, self.bwd_packet_len.get_count());
-        self.fwd_packet_len.append_csv_values(output);
-        self.bwd_packet_len.append_csv_values(output);
+    fn write_fields(&self, output: &mut impl Record) {
+        output.field(self.flow_count());
+        output.field(self.flow_total());
+        output.field(self.flow_mean());
+        output.field(self.flow_max());
+        output.field(self.flow_min());
+        output.field(self.flow_std());
+        output.field(self.fwd_packet_len.get_count());
+        output.field(self.bwd_packet_len.get_count());
+        self.fwd_packet_len.write_fields(output);
+        self.bwd_packet_len.write_fields(output);
     }
 
     fn headers() -> String {
