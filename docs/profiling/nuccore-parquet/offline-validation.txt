@@ -1,0 +1,2 @@
+offline.parquet 696953 bytes, 10001 lines including header, normalized SHA-256 8579cf4b0ef1ca97b5cd9203726d426285c7eade599c271085225cc1c878b549
+repeat.parquet 699273 bytes, 10001 lines including header, normalized SHA-256 8579cf4b0ef1ca97b5cd9203726d426285c7eade599c271085225cc1c878b549

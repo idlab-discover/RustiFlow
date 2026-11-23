@@ -1,0 +1,22 @@
+# To display the perf.data header info, please use --header/--header-only options.
+#
+#
+# Total Lost Samples: 0
+#
+# Samples: 729  of event 'cpu_core/cycles/u'
+# Event count (approx.): 2163486050
+#
+# Children      Self  Command          Shared Object     Symbol
+# ........  ........  ...............  ................  ..................................................................................................................................................................................................................................................................................................................................................................................................................................................................
+#
+    30.05%    29.45%  tokio-rt-worker  rustiflow         [.] <rustiflow::flow_table::FlowTable<rustiflow::flows::rusti_flow::RustiFlow>>::process_packet_without_expiration_scan::{closure#0}
+    13.65%    13.34%  rustiflow        rustiflow         [.] <rustiflow::pcap::ShardDispatcher>::dispatch::{closure#0}
+     5.03%     5.03%  rustiflow        rustiflow         [.] <pcap_parser::pcap::reader::LegacyPcapReader<std::fs::File> as pcap_parser::traits::PcapReaderIterator>::next
+     4.96%     4.96%  rustiflow        rustiflow         [.] rustiflow::pcap::process_packet::<rustiflow::flows::basic_flow::BasicFlow, pnet_packet::ipv4::Ipv4Packet>::{closure#0}
+     3.35%     3.35%  rustiflow        rustiflow         [.] <rustiflow::pcap::CaptureReader>::next_packet
+     3.11%     3.07%  tokio-rt-worker  rustiflow         [.] <rustiflow::flow_key::FlowKey>::canonicalize
+
+
+#
+# (Tip: See assembly instructions with percentage: perf annotate <symbol>)
+#

@@ -4,7 +4,7 @@ set -euo pipefail
 out=${1:?usage: realtime.sh OUTPUT_DIRECTORY PCAP}
 pcap=$(realpath "${2:?usage: realtime.sh OUTPUT_DIRECTORY PCAP}")
 mkdir -p "$out"
-bin="$PWD/target/profiling/rustiflow"
+bin=${RUSTIFLOW_PROFILE_BIN:-"$PWD/target/profiling/rustiflow"}
 export RUSTIFLOW_EBPF_DIR=${RUSTIFLOW_EBPF_DIR:-"$PWD/target/bpfel-unknown-none/release"}
 export RUST_LOG=info
 unset RUSTIFLOW_REALTIME_STATS RUSTIFLOW_PROFILE_FLAMEGRAPH
@@ -42,7 +42,7 @@ send() {
 
 start_capture() {
     local prefix=$1
-    ip netns exec "$capture_ns" taskset -c 0-3 "$bin" -f rustiflow -o csv \
+    ip netns exec "$capture_ns" taskset -c 0-3 "$bin" -f rustiflow -o "${RUSTIFLOW_PROFILE_FORMAT:-parquet}" \
         --export-path /dev/null --threads 2 realtime cap0 --ingress-only >"$prefix.capture" 2>&1 &
     capture_pid=$!
     for _ in {1..100}; do

@@ -4,6 +4,13 @@ This file keeps short-lived design choices and execution notes that would make
 `AGENTS.md` too long. Newest entries come first. Older entries are condensed to
 the decisions and results that still describe the current code.
 
+## 2026-11-23 — Parquet candidate profiling
+
+The [matched writer comparison](profiling/nuccore-parquet/README.md) found a
+longer final export on nuccore. Full-feature offline throughput fell 15% against
+the archived CSV binary. Both Parquet readbacks matched the baseline fingerprint,
+and the live veth runs recorded zero drops.
+
 ## 2026-11-23 — nuccore profiling baseline
 
 The [baseline for `67a8109`](profiling/nuccore-67a8109/README.md) preserves
