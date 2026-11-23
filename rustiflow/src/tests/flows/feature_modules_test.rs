@@ -406,6 +406,33 @@ mod tests {
     }
 
     #[test]
+    fn retransmission_stats_count_syn_and_fin_with_data_across_wrap() {
+        let mut stats = RetransmissionStats::new();
+        for (flags, sequence_number, data_length, retransmissions) in [
+            (SYN_FLAG, u32::MAX - 1, 1, 0),
+            (ACK_FLAG, 0, 2, 0),
+            (FIN_FLAG | ACK_FLAG, 2, 2, 0),
+            (ACK_FLAG, 4, 0, 0),
+            (ACK_FLAG, 4, 1, 1),
+            (ACK_FLAG, u32::MAX, 1, 2),
+            (ACK_FLAG, 5, 1, 2),
+        ] {
+            let segment = PacketFeatures {
+                protocol: IpNextHeaderProtocols::Tcp.0,
+                flags,
+                sequence_number,
+                data_length,
+                ..Default::default()
+            };
+            stats.update(&segment, true, 0);
+            assert_eq!(
+                stats.fwd_retransmission_count, retransmissions,
+                "sequence {sequence_number}, length {data_length}, flags {flags}"
+            );
+        }
+    }
+
+    #[test]
     fn retransmission_stats_ignore_adjacent_tcp_segments_but_count_later_overlap() {
         let mut stats = RetransmissionStats::new();
 

@@ -1,5 +1,5 @@
 use crate::flows::row::Record;
-use std::collections::BTreeMap;
+use std::{collections::BTreeMap, ops::Range};
 
 use pnet_packet::ip::IpNextHeaderProtocols;
 
@@ -23,8 +23,10 @@ pub struct RetransmissionStats {
 #[derive(Clone, Default)]
 struct SequenceHistory {
     // Disjoint, non-adjacent half-open ranges in unwrapped sequence space.
-    ranges: BTreeMap<i64, i64>,
-    latest_end: Option<i64>,
+    // The highest range is inline and serves as the unwrap reference.
+    // An empty latest range means this direction has seen no sequence space.
+    latest: Range<i64>,
+    earlier: BTreeMap<i64, i64>,
 }
 
 impl SequenceHistory {
@@ -32,35 +34,67 @@ impl SequenceHistory {
         if length == 0 {
             return false;
         }
+        let length = i64::from(length);
+        if sequence == self.latest.end as u32 {
+            self.latest.end += length;
+            return false;
+        }
+        if self.latest.is_empty() {
+            let start = i64::from(sequence);
+            self.latest = start..start + length;
+            return false;
+        }
+        self.observe_nonadjacent(sequence, length)
+    }
+
+    // Keep the range searches and merging out of the in-order path.
+    #[inline(never)]
+    fn observe_nonadjacent(&mut self, sequence: u32, length: i64) -> bool {
         // Choose the nearest sequence epoch. As with TCP serial comparisons,
         // a jump of half the sequence space or more is ambiguous.
-        let mut start = self.latest_end.map_or(i64::from(sequence), |reference| {
-            reference + i64::from(sequence.wrapping_sub(reference as u32) as i32)
-        });
-        let mut end = start + i64::from(length);
-        self.latest_end = Some(self.latest_end.map_or(end, |latest| latest.max(end)));
-        let overlaps = self
-            .ranges
-            .range(..end)
-            .next_back()
-            .is_some_and(|(_, &seen_end)| seen_end > start);
+        let reference = self.latest.end;
+        let mut start = reference + i64::from(sequence.wrapping_sub(reference as u32) as i32);
+        let mut end = start + length;
+        if start > self.latest.end {
+            let previous = std::mem::replace(&mut self.latest, start..end);
+            self.insert_earlier(previous.start, previous.end);
+            return false;
+        }
+        if start >= self.latest.start {
+            self.latest.end = self.latest.end.max(end);
+            return true;
+        }
 
-        if let Some((&previous_start, &previous_end)) = self.ranges.range(..=start).next_back() {
+        let overlaps = end > self.latest.start
+            || self
+                .earlier
+                .range(..end)
+                .next_back()
+                .is_some_and(|(_, &seen_end)| seen_end > start);
+        if let Some((&previous_start, &previous_end)) = self.earlier.range(..=start).next_back() {
             if previous_end >= start {
-                self.ranges.remove(&previous_start);
+                self.earlier.remove(&previous_start);
                 start = previous_start;
                 end = end.max(previous_end);
             }
         }
-        while let Some((&next_start, &next_end)) = self.ranges.range(start..=end).next() {
-            self.ranges.remove(&next_start);
+        while let Some((&next_start, &next_end)) = self.earlier.range(start..=end).next() {
+            self.earlier.remove(&next_start);
             end = end.max(next_end);
         }
-        self.ranges.insert(start, end);
-        if self.ranges.len() > MAX_SEQUENCE_RANGES {
-            self.ranges.pop_first();
+        if end >= self.latest.start {
+            self.latest = start..self.latest.end.max(end);
+        } else {
+            self.insert_earlier(start, end);
         }
         overlaps
+    }
+
+    fn insert_earlier(&mut self, start: i64, end: i64) {
+        self.earlier.insert(start, end);
+        if self.earlier.len() == MAX_SEQUENCE_RANGES {
+            self.earlier.pop_first();
+        }
     }
 }
 
@@ -163,16 +197,38 @@ mod tests {
     }
 
     #[test]
+    fn out_of_order_segments_fill_and_overlap_ranges_across_wrap() {
+        let mut history = SequenceHistory::default();
+        for (sequence, length, overlaps) in [
+            (u32::MAX - 7, 4, false),
+            (0, 4, false),
+            (4, 4, false),
+            (u32::MAX - 3, 4, false),
+            (u32::MAX - 19, 2, false),
+            (u32::MAX - 18, 1, true),
+            (u32::MAX - 18, 22, true),
+            (8, 1, false),
+            (2, 12, true),
+            (14, 1, false),
+        ] {
+            assert_eq!(history.observe(sequence, length), overlaps, "{sequence}");
+        }
+        assert!(history.earlier.is_empty());
+    }
+
+    #[test]
     fn sparse_sequence_history_stays_bounded_and_merges_adjacent_ranges() {
         let mut history = SequenceHistory::default();
         for index in 0..40_000 {
             assert!(!history.observe(index * 200, 100));
-            assert!(history.ranges.len() <= MAX_SEQUENCE_RANGES);
+            assert!(history.earlier.len() < MAX_SEQUENCE_RANGES);
         }
-        assert_eq!(history.ranges.len(), MAX_SEQUENCE_RANGES);
+        assert_eq!(history.earlier.len() + 1, MAX_SEQUENCE_RANGES);
+        assert!(!history.observe(0, 100));
+        assert!(!history.observe(0, 100));
         assert!(!history.observe(39_998 * 200 + 100, 100));
-        assert_eq!(history.ranges.len(), MAX_SEQUENCE_RANGES - 1);
+        assert_eq!(history.earlier.len() + 1, MAX_SEQUENCE_RANGES - 1);
         assert!(history.observe(39_998 * 200 + 50, 200));
-        assert_eq!(history.ranges.len(), MAX_SEQUENCE_RANGES - 1);
+        assert_eq!(history.earlier.len() + 1, MAX_SEQUENCE_RANGES - 1);
     }
 }
