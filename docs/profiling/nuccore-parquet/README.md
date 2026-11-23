@@ -2,6 +2,8 @@
 
 The single-writer Parquet candidate adds a measurable export bottleneck. Across five matched runs with full RustiFlow features, offline throughput fell 15% and replay throughput fell 13–14%. The previous CSV executable reproduced the earlier baseline on this host. These measurements serve as the starting point for optimizing the branch.
 
+The follow-up benchmarks cover the parallel writer on the same host. [Results and readback](../../engineering-notes.md#2026-11-24--parallel-parquet-export-on-nuccore) · [Same-binary repetitions](parallel-writers.csv)
+
 ## Offline and replay
 
 Measured on 2026-11-23. The candidate is the writer committed in `cf49bfb`, profiled from its working tree over `1040b8d`. The control is the archived executable from `67a8109`, verified against its published SHA-256. Both used the optimized Cargo profiling profile, four workers, CPUs 0–5 and `/dev/null`. Each case had one warmup and five measured repetitions. The deterministic offline pcap contained 2 million packets across 10,000 flows. The IPv4 and IPv6 replays each used 10 million events across 100,000 flows. [Host, toolchains and binary hashes](environment.txt) · [Previous baseline](../nuccore-67a8109/README.md)

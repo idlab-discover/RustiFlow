@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Compare the old and current writers on regular files, including offline shutdown."""
+"""Compare CSV and Parquet through file close, optionally including an archived CSV binary."""
 
 import argparse
 import csv
@@ -10,13 +10,16 @@ from pathlib import Path
 from time import monotonic_ns
 
 
-def measure(binary, fmt, workload, path, pcap):
-    cmd = ["taskset", "-c", "0-5", binary, "-f", "rustiflow", "-o", fmt,
+def measure(binary, fmt, workload, path, pcap, features="rustiflow"):
+    cmd = ["taskset", "-c", "0-5", binary, "-f", features, "-o", fmt,
            "--export-path", path, "--threads", "4"]
     if workload == "offline":
         cmd.extend(["pcap", pcap])
     else:
-        cmd.extend(["replay-bench", "--packets", "1000000", "--flows", "100000", "--sources", "8"])
+        packets = "1000000" if workload == "replay4" else "10000000"
+        cmd.extend(["replay-bench", "--packets", packets, "--flows", "100000", "--sources", "8"])
+        if workload == "replay6-long":
+            cmd.append("--ipv6")
 
     env = dict(os.environ, RUST_LOG="rustiflow::pcap=debug")
     start = monotonic_ns()
@@ -42,27 +45,46 @@ def measure(binary, fmt, workload, path, pcap):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("old_binary", type=Path)
+    parser.add_argument("old_binary", type=Path, nargs="?", help="archived CSV control")
     parser.add_argument("candidate_binary", type=Path)
     parser.add_argument("pcap", type=Path)
     parser.add_argument("directory", type=Path)
+    parser.add_argument("--matrix", action="store_true",
+                        help="include basic features and 10M-event IPv4 and IPv6 replays")
+    parser.add_argument("--runs", type=int, default=5, help="measured runs per writer after warmup")
     args = parser.parse_args()
+    if args.runs < 1:
+        parser.error("--runs must be positive")
     args.directory.mkdir(parents=True, exist_ok=True)
-    writers = [("old-csv", args.old_binary, "csv"),
-               ("current-csv", args.candidate_binary, "csv"),
+    writers = [("current-csv", args.candidate_binary, "csv"),
                ("current-parquet", args.candidate_binary, "parquet")]
-    with (args.directory / "export-heavy.csv").open("w") as file:
+    if args.old_binary:
+        writers.insert(0, ("old-csv", args.old_binary, "csv"))
+    cases = [("offline", "rustiflow"), ("replay4", "rustiflow")]
+    if args.matrix:
+        cases += [("offline", "basic")]
+        cases += [(workload, features) for workload in ("replay4-long", "replay6-long")
+                  for features in ("basic", "rustiflow")]
+    filename = "writer-matrix.csv" if args.matrix else "export-heavy.csv"
+    with (args.directory / filename).open("w") as file:
         results = csv.writer(file, lineterminator="\n")
-        results.writerow(("workload", "writer", "run", "command_s", "offline_tail_ms",
-                          "replay_s", "replay_cpu_ns_per_packet", "bytes"))
-        for workload in ("offline", "replay4"):
-            for run in range(6):
+        headers = ["workload", "writer", "run", "command_s", "offline_tail_ms",
+                   "replay_s", "replay_cpu_ns_per_packet", "bytes"]
+        results.writerow(headers + (["features"] if args.matrix else []))
+        for workload, features in cases:
+            prefix = f"{workload}-{features}" if args.matrix else workload
+            for run in range(args.runs + 1):
                 offset = run % len(writers)
                 for name, binary, fmt in writers[offset:] + writers[:offset]:
-                    path = args.directory / f"{workload}-{name}.{fmt}"
-                    timings = measure(binary, fmt, workload, path, args.pcap)
+                    path = args.directory / f"{prefix}-{name}.{fmt}"
+                    if workload.endswith("-long"):
+                        path = Path(os.devnull)
+                    timings = measure(binary, fmt, workload, path, args.pcap, features)
                     if run:
-                        results.writerow((workload, name, run, *timings, path.stat().st_size))
+                        size = "" if workload.endswith("-long") else path.stat().st_size
+                        results.writerow([workload, name, run, *timings, size]
+                                         + ([features] if args.matrix else []))
+                file.flush()
 
 
 if __name__ == "__main__":

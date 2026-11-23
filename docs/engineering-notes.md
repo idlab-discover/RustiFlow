@@ -4,6 +4,44 @@ This file keeps short-lived design choices and execution notes that would make
 `AGENTS.md` too long. Newest entries come first. Older entries are condensed to
 the decisions and results that still describe the current code.
 
+## 2026-11-24 — Parallel Parquet export on nuccore
+
+Flow-table shards project completed flows directly into native column buffers.
+Each shard submits its first 512 rows for Snappy compression, then doubles the
+group size up to 4,096. A bounded queue lets groups encode concurrently while
+one writer appends them in submission order and finalizes the footer. Text uses
+dictionary encoding, integers and UTC microsecond timestamps use delta encoding,
+and doubles use plain encoding. These small groups retain column-chunk
+statistics and omit page indexes.
+
+The table gives median elapsed milliseconds for eight runs per format after
+warmup, alternating order within the same optimized binary on CPUs 0–5 with
+four flow-table workers. The offline pcap contains 10,000 flows. The replays
+use 100,000 possible flows over eight sources. Offline and short-replay timings include
+closing a regular file. Long replays target `/dev/null` and include all
+encoding and finalization. [Raw repetitions](profiling/nuccore-parquet/parallel-writers.csv) · [Reproduction command](profiling/README.md)
+
+| Features | Workload | CSV ms | Parquet ms |
+| --- | --- | ---: | ---: |
+| rustiflow | Offline, 2M packets | 254.7 | 255.8 |
+| rustiflow | Offline, end of input to exit | 13.2 | 11.0 |
+| rustiflow | IPv4 replay, 1M events to disk | 296.0 | 244.5 |
+| rustiflow | IPv4 replay, 10M events | 1,671.0 | 1,591.5 |
+| rustiflow | IPv6 replay, 10M events | 1,688.5 | 1,613.0 |
+| basic | Offline, 2M packets | 251.4 | 249.5 |
+| basic | Offline, end of input to exit | 4.0 | 3.9 |
+| basic | IPv4 replay, 10M events | 332.5 | 332.5 |
+| basic | IPv6 replay, 10M events | 329.5 | 324.0 |
+
+The full-feature short replay wrote 35.3 MB of Parquet and 106.5 MB of CSV.
+Median replay CPU cost was 1,125 ns/event with Parquet and 1,252 ns/event with
+CSV. A separate instrumented run of each writer produced 99,994 records with
+zero flow clones. Peak process RSS was 369 MiB for Parquet and 352 MiB for CSV.
+The previous single-writer profile recorded 33.1 MB of Parquet and a 562 ms
+replay. The updated offline file decoded to the archived SHA-256
+`8579cf4b0ef1ca97b5cd9203726d426285c7eade599c271085225cc1c878b549` across all
+203 fields and 10,000 sorted records. [Previous writer profile](profiling/nuccore-parquet/README.md)
+
 ## 2026-11-23 — Parquet candidate profiling
 
 The [matched writer comparison](profiling/nuccore-parquet/README.md) found a

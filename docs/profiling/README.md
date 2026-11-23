@@ -85,3 +85,18 @@ repetitions per writer, rotating their order, and writes its measurements to
 python docs/profiling/export_tail.py target/profile-parquet/baseline-rustiflow \
     target/profiling/rustiflow target/profile-baseline/mixed.pcap target/profile-parquet/tail
 ```
+
+To compare CSV and Parquet in the same executable, omit the archived binary.
+The matrix adds basic features for the offline capture and replays 10 million
+IPv4 and IPv6 events to `/dev/null` with each feature set. The offline capture
+and the short, export-heavy IPv4 replay write regular files. An even run count
+gives each format the same number of first and second runs after warmup.
+
+```bash
+python docs/profiling/export_tail.py --matrix --runs 8 target/profiling/rustiflow \
+    target/profile-baseline/mixed.pcap target/parquet-parity/final
+```
+
+The output directory contains the final regular files and all repetitions in
+`writer-matrix.csv`. Use `command_s` for whole-command offline timing and
+`replay_s` for replay timing including file close.
