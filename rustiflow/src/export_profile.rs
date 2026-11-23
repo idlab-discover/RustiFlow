@@ -111,3 +111,12 @@ fn env_flag(name: &str) -> bool {
         Some("1" | "true" | "TRUE" | "yes" | "YES" | "on" | "ON")
     )
 }
+
+/// Parquet byte counts become available after encoding and footer finalization.
+pub fn record_file_bytes(bytes: usize) {
+    if let Some(profile) = export_profile() {
+        profile
+            .serialized_bytes
+            .fetch_add(bytes as u64, Ordering::Relaxed);
+    }
+}

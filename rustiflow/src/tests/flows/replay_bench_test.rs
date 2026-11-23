@@ -32,7 +32,7 @@ mod tests {
         };
         let (tx, mut rx) = mpsc::channel::<RustiFlow>(1024);
 
-        replay_bench(&replay_args, &config, 4, tx, tokio::spawn(async {}))
+        replay_bench(&replay_args, &config, 4, tx, tokio::spawn(async { Ok(()) }))
             .await
             .expect("replay failed");
 

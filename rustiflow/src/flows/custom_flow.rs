@@ -1,3 +1,4 @@
+use crate::flows::row::{fields, Record};
 use std::net::IpAddr;
 
 use crate::packet_features::PacketFeatures;
@@ -65,18 +66,17 @@ impl Flow for CustomFlow {
         self.icmp_stats.close(timestamp_us, cause);
     }
 
-    fn dump(&self) -> String {
-        // Add here the dump of the custom flow.
-        format!(
-            "{},{},{},{},{},{},{}",
-            self.basic_flow.flow_key,
+    fn write_fields(&self, output: &mut impl Record) {
+        fields!(
+            output,
+            self.basic_flow.flow_key.as_str(),
             self.icmp_stats.get_type(),
             self.icmp_stats.get_code(),
             self.icmp_stats.echo_request_count,
             self.icmp_stats.echo_reply_count,
             self.icmp_stats.error_count,
             self.icmp_stats.destination_unreachable_count
-        )
+        );
     }
 
     fn get_features() -> String {
@@ -84,17 +84,16 @@ impl Flow for CustomFlow {
         "flow_id,icmp_type,icmp_code,icmp_echo_request_count,icmp_echo_reply_count,icmp_error_count,icmp_destination_unreachable_count".to_string()
     }
 
-    fn dump_without_contamination(&self) -> String {
-        // Add here the dump of the custom flow without contaminant features.
-        format!(
-            "{},{},{},{},{},{}",
+    fn write_clean_fields(&self, output: &mut impl Record) {
+        fields!(
+            output,
             self.icmp_stats.get_type(),
             self.icmp_stats.get_code(),
             self.icmp_stats.echo_request_count,
             self.icmp_stats.echo_reply_count,
             self.icmp_stats.error_count,
             self.icmp_stats.destination_unreachable_count
-        )
+        );
     }
 
     fn get_features_without_contamination() -> String {

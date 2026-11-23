@@ -1,3 +1,4 @@
+use crate::flows::row::{fields, Record};
 use std::net::IpAddr;
 
 use crate::{
@@ -106,20 +107,11 @@ impl Flow for CicFlow {
         self.window_size_stats.close(timestamp_us, cause);
     }
 
-    fn dump(&self) -> String {
-        format!(
-            "{},{},{},{},{},{},{},{},{},{},\
-            {},{},{},{},{},{},{},{},{},{},\
-            {},{},{},{},{},{},{},{},{},{},\
-            {},{},{},{},{},{},{},{},{},{},\
-            {},{},{},{},{},{},{},{},{},{},\
-            {},{},{},{},{},{},{},{},{},{},\
-            {},{},{},{},{},{},{},{},{},{},\
-            {},{},{},{},{},{},{},{},{},{},\
-            {},{},{},{},{},{},{},{},{},{},\
-            {},{},{},{},{},{},{},{},{},{}",
+    fn write_fields(&self, output: &mut impl Record) {
+        fields!(
+            output,
             // Basic Info
-            self.basic_flow.flow_key,
+            self.basic_flow.flow_key.as_str(),
             self.basic_flow.ip_source,
             self.basic_flow.port_source,
             self.basic_flow.ip_destination,
@@ -267,7 +259,7 @@ impl Flow for CicFlow {
             // Connection Duration
             // Duplicate of duration. Configure active and idle timeouts for specific use case of (very) long runnning flows.
             self.basic_flow.get_flow_duration_usec(),
-        )
+        );
     }
 
     fn get_features() -> String {
@@ -376,17 +368,9 @@ impl Flow for CicFlow {
         .join(",")
     }
 
-    fn dump_without_contamination(&self) -> String {
-        format!(
-            "{},{},{},{},{},{},{},{},{},{},\
-            {},{},{},{},{},{},{},{},{},{},\
-            {},{},{},{},{},{},{},{},{},{},\
-            {},{},{},{},{},{},{},{},{},{},\
-            {},{},{},{},{},{},{},{},{},{},\
-            {},{},{},{},{},{},{},{},{},{},\
-            {},{},{},{},{},{},{},{},{},{},\
-            {},{},{},{},{},{},{},{},{},{},\
-            {},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{}",
+    fn write_clean_fields(&self, output: &mut impl Record) {
+        fields!(
+            output,
             // Basic Info
             iana_port_mapping(self.basic_flow.port_source),
             iana_port_mapping(self.basic_flow.port_destination),
@@ -532,7 +516,7 @@ impl Flow for CicFlow {
             // Connection Duration
             // Duplicate of duration. Configure active and idle timeouts for specific use case of (very) long runnning flows.
             self.basic_flow.get_flow_duration_usec(),
-        )
+        );
     }
 
     fn get_features_without_contamination() -> String {

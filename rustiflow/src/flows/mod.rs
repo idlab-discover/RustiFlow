@@ -5,5 +5,6 @@ pub mod custom_flow;
 pub mod features;
 pub mod flow;
 pub mod nf_flow;
+pub mod row;
 pub mod rusti_flow;
 pub mod util;

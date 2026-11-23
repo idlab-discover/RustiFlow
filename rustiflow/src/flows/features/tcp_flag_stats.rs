@@ -1,6 +1,7 @@
+use crate::flows::row::Record;
 use crate::{flows::util::FlowExpireCause, packet_features::PacketFeatures};
 
-use super::util::{push_csv_display, push_csv_int, FlowFeature};
+use super::util::FlowFeature;
 
 #[derive(Clone)]
 pub struct TcpFlagStats {
@@ -109,32 +110,32 @@ impl FlowFeature for TcpFlagStats {
         // No active state to close
     }
 
-    fn append_to_csv(&self, output: &mut String) {
-        push_csv_int(output, self.fwd_fin_flag_count);
-        push_csv_int(output, self.fwd_syn_flag_count);
-        push_csv_int(output, self.fwd_rst_flag_count);
-        push_csv_int(output, self.fwd_psh_flag_count);
-        push_csv_int(output, self.fwd_ack_flag_count);
-        push_csv_int(output, self.fwd_urg_flag_count);
-        push_csv_int(output, self.fwd_cwr_flag_count);
-        push_csv_int(output, self.fwd_ece_flag_count);
-        push_csv_int(output, self.bwd_fin_flag_count);
-        push_csv_int(output, self.bwd_syn_flag_count);
-        push_csv_int(output, self.bwd_rst_flag_count);
-        push_csv_int(output, self.bwd_psh_flag_count);
-        push_csv_int(output, self.bwd_ack_flag_count);
-        push_csv_int(output, self.bwd_urg_flag_count);
-        push_csv_int(output, self.bwd_cwr_flag_count);
-        push_csv_int(output, self.bwd_ece_flag_count);
-        push_csv_int(output, self.fwd_fin_flag_count + self.bwd_fin_flag_count);
-        push_csv_int(output, self.fwd_syn_flag_count + self.bwd_syn_flag_count);
-        push_csv_int(output, self.fwd_rst_flag_count + self.bwd_rst_flag_count);
-        push_csv_int(output, self.fwd_psh_flag_count + self.bwd_psh_flag_count);
-        push_csv_int(output, self.fwd_ack_flag_count + self.bwd_ack_flag_count);
-        push_csv_int(output, self.fwd_urg_flag_count + self.bwd_urg_flag_count);
-        push_csv_int(output, self.fwd_cwr_flag_count + self.bwd_cwr_flag_count);
-        push_csv_int(output, self.fwd_ece_flag_count + self.bwd_ece_flag_count);
-        push_csv_display(output, self.get_flags());
+    fn write_fields(&self, output: &mut impl Record) {
+        output.field(self.fwd_fin_flag_count);
+        output.field(self.fwd_syn_flag_count);
+        output.field(self.fwd_rst_flag_count);
+        output.field(self.fwd_psh_flag_count);
+        output.field(self.fwd_ack_flag_count);
+        output.field(self.fwd_urg_flag_count);
+        output.field(self.fwd_cwr_flag_count);
+        output.field(self.fwd_ece_flag_count);
+        output.field(self.bwd_fin_flag_count);
+        output.field(self.bwd_syn_flag_count);
+        output.field(self.bwd_rst_flag_count);
+        output.field(self.bwd_psh_flag_count);
+        output.field(self.bwd_ack_flag_count);
+        output.field(self.bwd_urg_flag_count);
+        output.field(self.bwd_cwr_flag_count);
+        output.field(self.bwd_ece_flag_count);
+        output.field(self.fwd_fin_flag_count + self.bwd_fin_flag_count);
+        output.field(self.fwd_syn_flag_count + self.bwd_syn_flag_count);
+        output.field(self.fwd_rst_flag_count + self.bwd_rst_flag_count);
+        output.field(self.fwd_psh_flag_count + self.bwd_psh_flag_count);
+        output.field(self.fwd_ack_flag_count + self.bwd_ack_flag_count);
+        output.field(self.fwd_urg_flag_count + self.bwd_urg_flag_count);
+        output.field(self.fwd_cwr_flag_count + self.bwd_cwr_flag_count);
+        output.field(self.fwd_ece_flag_count + self.bwd_ece_flag_count);
+        output.field(self.get_flags().as_str());
     }
 
     fn headers() -> String {

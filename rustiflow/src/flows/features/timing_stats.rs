@@ -1,6 +1,7 @@
+use crate::flows::row::Record;
 use crate::{flows::util::FlowExpireCause, packet_features::PacketFeatures};
 
-use super::util::{push_csv_f64, FlowFeature};
+use super::util::FlowFeature;
 
 #[derive(Clone)]
 pub struct TimingStats {
@@ -87,13 +88,13 @@ impl FlowFeature for TimingStats {
         // No active state to close
     }
 
-    fn append_to_csv(&self, output: &mut String) {
-        push_csv_f64(output, self.first_timestamp_fwd_ms());
-        push_csv_f64(output, self.first_timestamp_bwd_ms());
-        push_csv_f64(output, self.last_timestamp_fwd_ms());
-        push_csv_f64(output, self.last_timestamp_bwd_ms());
-        push_csv_f64(output, self.get_fwd_duration());
-        push_csv_f64(output, self.get_bwd_duration());
+    fn write_fields(&self, output: &mut impl Record) {
+        output.field(self.first_timestamp_fwd_ms());
+        output.field(self.first_timestamp_bwd_ms());
+        output.field(self.last_timestamp_fwd_ms());
+        output.field(self.last_timestamp_bwd_ms());
+        output.field(self.get_fwd_duration());
+        output.field(self.get_bwd_duration());
     }
 
     fn headers() -> String {

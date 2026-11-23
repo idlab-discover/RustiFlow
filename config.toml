@@ -7,8 +7,8 @@ expiration_check_interval = 60  # How often the flow table is scanned for expire
 threads = 4              # Number of threads to use for processing packets, optional
 
 [output]
-output = "Csv"                       # OutputMethodType can be one of: Print, Csv
-export_path = "output.csv"  # Path for output if method is Csv
-header = true                        # Whether to export the feature header
+output = "Parquet"                   # Parquet (default), Csv, or Print
+export_path = "output.parquet"       # File destination
+header = true                        # Include headers for Csv or Print
 drop_contaminant_features = false    # Whether to drop contaminant features
 

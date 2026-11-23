@@ -1,6 +1,7 @@
+use crate::flows::row::Record;
 use crate::{flows::util::FlowExpireCause, packet_features::PacketFeatures};
 
-use super::util::{push_csv_f64, push_csv_int, safe_per_second_rate, FeatureStats, FlowFeature};
+use super::util::{safe_per_second_rate, FeatureStats, FlowFeature};
 
 const MIN_BULK_PACKETS: u32 = 4;
 const BULK_IDLE_US: i64 = 1_000_000;
@@ -171,17 +172,17 @@ impl FlowFeature for BulkStats {
         self.finalize_current_bulk(false);
     }
 
-    fn append_to_csv(&self, output: &mut String) {
-        push_csv_f64(output, self.fwd_bulk_rate());
-        push_csv_f64(output, self.bwd_bulk_rate());
-        push_csv_int(output, self.fwd_bulk_packets.get_count());
-        push_csv_int(output, self.bwd_bulk_packets.get_count());
-        self.fwd_bulk_packets.append_csv_values(output);
-        self.bwd_bulk_packets.append_csv_values(output);
-        self.fwd_bulk_payload_size.append_csv_values(output);
-        self.bwd_bulk_payload_size.append_csv_values(output);
-        self.fwd_bulk_duration.append_csv_values(output);
-        self.bwd_bulk_duration.append_csv_values(output);
+    fn write_fields(&self, output: &mut impl Record) {
+        output.field(self.fwd_bulk_rate());
+        output.field(self.bwd_bulk_rate());
+        output.field(self.fwd_bulk_packets.get_count());
+        output.field(self.bwd_bulk_packets.get_count());
+        self.fwd_bulk_packets.write_fields(output);
+        self.bwd_bulk_packets.write_fields(output);
+        self.fwd_bulk_payload_size.write_fields(output);
+        self.bwd_bulk_payload_size.write_fields(output);
+        self.fwd_bulk_duration.write_fields(output);
+        self.bwd_bulk_duration.write_fields(output);
     }
 
     fn headers() -> String {

@@ -46,24 +46,19 @@ pub struct Cli {
     #[clap(long, group = "cli_group")]
     pub threads: Option<u8>,
 
-    /// Output method (required if no config file is provided)
-    #[clap(
-        long,
-        short,
-        group = "cli_group",
-        required_unless_present = "config_file"
-    )]
-    pub output: Option<ExportMethodType>,
+    /// Output method (default: parquet)
+    #[clap(long, short, group = "cli_group", default_value = "parquet")]
+    pub output: ExportMethodType,
 
-    /// File path for output (used if method is Csv)
-    #[clap(long, group = "cli_group", required_if_eq("output", "Csv"))]
+    /// Output file path (Parquet defaults to output.parquet)
+    #[clap(long, group = "cli_group", required_if_eq("output", "csv"))]
     pub export_path: Option<String>,
 
-    /// Enable the realtime packet graph when exporting to CSV
-    #[clap(long = "packet-graph", alias = "performance-mode", group = "cli_group", action = clap::ArgAction::SetTrue, required_if_eq("output", "Csv"))]
+    /// Enable the realtime packet graph when exporting to a file
+    #[clap(long = "packet-graph", alias = "performance-mode", group = "cli_group", action = clap::ArgAction::SetTrue)]
     pub packet_graph: bool,
 
-    /// Whether to export the feature header
+    /// Include the header in CSV or console output
     #[clap(long, action = clap::ArgAction::SetTrue, group = "cli_group")]
     pub header: bool,
 
@@ -195,22 +190,23 @@ pub struct ExportConfig {
     pub threads: Option<u8>,
 }
 
-#[derive(Serialize, Deserialize, Args, Debug, Clone)]
+#[derive(Serialize, Deserialize, Args, Debug, Default, Clone)]
+#[serde(default)]
 pub struct OutputConfig {
     /// Output method
-    #[clap(short, long, value_enum)]
+    #[clap(short, long, value_enum, default_value = "parquet")]
     pub output: ExportMethodType,
 
-    /// File path for output (used if method is Csv)
+    /// Output file path (Parquet defaults to output.parquet)
     #[clap(required_if_eq("output", "csv"))]
     pub export_path: Option<String>,
 
-    /// Enable the realtime packet graph when exporting to CSV
-    #[clap(long = "packet-graph", alias = "performance-mode", action = clap::ArgAction::SetTrue, required_if_eq("output", "Csv"))]
+    /// Enable the realtime packet graph when exporting to a file
+    #[clap(long = "packet-graph", alias = "performance-mode", action = clap::ArgAction::SetTrue)]
     #[serde(default, alias = "performance_mode")]
     pub packet_graph: bool,
 
-    /// Whether to export the feature header
+    /// Include the header in CSV or console output
     #[clap(long, action = clap::ArgAction::SetTrue)]
     pub header: bool,
 
@@ -219,8 +215,12 @@ pub struct OutputConfig {
     pub drop_contaminant_features: bool,
 }
 
-#[derive(Serialize, Deserialize, clap::ValueEnum, Clone, Debug)]
+#[derive(Serialize, Deserialize, clap::ValueEnum, Clone, Debug, Default)]
 pub enum ExportMethodType {
+    /// Write a typed Apache Parquet file
+    #[default]
+    Parquet,
+
     /// The output will be printed to the console
     Print,
 
@@ -277,6 +277,7 @@ impl FlowType {
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct ConfigFile {
     pub config: ExportConfig,
+    #[serde(default)]
     pub output: OutputConfig,
 }
 
@@ -291,13 +292,7 @@ impl Default for ConfigFile {
                 early_export: None,
                 threads: None,
             },
-            output: OutputConfig {
-                output: ExportMethodType::Print,
-                export_path: None,
-                header: false,
-                drop_contaminant_features: false,
-                packet_graph: false,
-            },
+            output: OutputConfig::default(),
         }
     }
 }
@@ -389,10 +384,9 @@ mod tests {
         assert_eq!(tui_names, cli_names);
     }
     #[test]
-    fn capture_requires_features_and_output_without_config() {
+    fn capture_requires_features_without_config() {
         for args in [
             vec!["rustiflow", "pcap", "input.pcap"],
-            vec!["rustiflow", "-f", "basic", "pcap", "input.pcap"],
             vec!["rustiflow", "-o", "print", "pcap", "input.pcap"],
         ] {
             assert_eq!(
@@ -401,6 +395,7 @@ mod tests {
             );
         }
         for args in [
+            vec!["rustiflow", "-f", "basic", "pcap", "input.pcap"],
             vec!["rustiflow", "-c", "config.toml", "pcap", "input.pcap"],
             vec![
                 "rustiflow",

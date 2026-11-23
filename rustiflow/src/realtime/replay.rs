@@ -51,7 +51,7 @@ pub async fn replay_bench<T: Flow>(
     config: &ExportConfig,
     num_threads: u8,
     exporter: impl FlowSink<T>,
-    output_task: JoinHandle<()>,
+    output_task: JoinHandle<anyhow::Result<()>>,
 ) -> Result<(), anyhow::Error> {
     let shard_count =
         NonZeroUsize::new(usize::from(num_threads)).context("thread count must be at least 1")?;
@@ -88,8 +88,7 @@ pub async fn replay_bench<T: Flow>(
         },
         &exporter,
     );
-    // The shard encoders hold their own chunk senders; the writer closes once
-    // they finish.
+    // The writer closes after the shards finish exporting.
     drop(exporter);
 
     let mut handle_set = JoinSet::new();
@@ -140,7 +139,7 @@ pub async fn replay_bench<T: Flow>(
             error!("Replay task failed: {:?}", err);
         }
     }
-    output_task.await.context("output writer task failed")?;
+    output_task.await.context("output writer task failed")??;
 
     let wall = wall_start.elapsed();
     let cpu = process_cpu_time()?.saturating_sub(cpu_start);

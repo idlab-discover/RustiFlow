@@ -1,7 +1,8 @@
+use crate::flows::row::Record;
 use crate::{flows::util::FlowExpireCause, packet_features::PacketFeatures};
 use pnet_packet::ip::IpNextHeaderProtocols;
 
-use super::util::{push_csv_int, FlowFeature};
+use super::util::FlowFeature;
 
 #[derive(Clone)]
 pub struct IcmpStats {
@@ -84,13 +85,13 @@ impl FlowFeature for IcmpStats {
         // No active state to close
     }
 
-    fn append_to_csv(&self, output: &mut String) {
-        push_csv_int(output, self.get_type());
-        push_csv_int(output, self.get_code());
-        push_csv_int(output, self.echo_request_count);
-        push_csv_int(output, self.echo_reply_count);
-        push_csv_int(output, self.error_count);
-        push_csv_int(output, self.destination_unreachable_count);
+    fn write_fields(&self, output: &mut impl Record) {
+        output.field(self.get_type());
+        output.field(self.get_code());
+        output.field(self.echo_request_count);
+        output.field(self.echo_reply_count);
+        output.field(self.error_count);
+        output.field(self.destination_unreachable_count);
     }
 
     fn headers() -> String {

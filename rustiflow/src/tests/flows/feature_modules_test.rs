@@ -1,5 +1,6 @@
 #[cfg(test)]
 mod tests {
+    use crate::flows::row::{CsvRow, Record};
     use pnet_packet::ip::IpNextHeaderProtocols;
 
     use crate::{
@@ -15,7 +16,7 @@ mod tests {
                 subflow_stats::SubflowStats,
                 tcp_quality_stats::TcpQualityStats,
                 timing_stats::TimingStats,
-                util::{push_csv_f64, push_csv_int, FeatureStats, FlowFeature},
+                util::{FeatureStats, FlowFeature},
                 window_size_stats::WindowSizeStats,
             },
             util::FlowExpireCause,
@@ -181,7 +182,7 @@ mod tests {
                     "{actual_rate} != {rate}"
                 );
                 let mut csv = String::new();
-                bulk.append_to_csv(&mut csv);
+                bulk.write_fields(&mut CsvRow::new(&mut csv));
                 assert_eq!(csv.trim_start_matches(','), bulk.dump());
                 assert!(bulk
                     .dump()
@@ -682,8 +683,9 @@ mod tests {
 
         for value in values {
             let mut output = String::new();
-            push_csv_f64(&mut output, value);
-            push_csv_f64(&mut output, value);
+            let mut row = CsvRow::new(&mut output);
+            row.field(value);
+            row.field(value);
             assert_eq!(
                 output,
                 format!("{value},{value}"),
@@ -711,8 +713,9 @@ mod tests {
         ];
         for value in values {
             let mut output = String::new();
-            push_csv_int(&mut output, value);
-            push_csv_int(&mut output, value);
+            let mut row = CsvRow::new(&mut output);
+            row.field(value);
+            row.field(value);
             assert_eq!(output, format!("{value},{value}"));
         }
     }

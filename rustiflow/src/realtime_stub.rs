@@ -35,7 +35,7 @@ pub async fn replay_bench<T: Flow>(
     _config: &ExportConfig,
     _num_threads: u8,
     _exporter: impl FlowSink<T>,
-    _output_task: JoinHandle<()>,
+    _output_task: JoinHandle<anyhow::Result<()>>,
 ) -> Result<(), anyhow::Error> {
     Err(anyhow::anyhow!(
         "The replay benchmark is only supported on Linux"

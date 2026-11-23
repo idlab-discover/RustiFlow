@@ -1,3 +1,4 @@
+use crate::flows::row::{fields, Record};
 use std::net::IpAddr;
 
 use pnet_packet::ip::IpNextHeaderProtocols;
@@ -76,9 +77,9 @@ impl Flow for CiddsFlow {
         self.packet_stats.close(timestamp_us, cause);
     }
 
-    fn dump(&self) -> String {
-        format!(
-            "{},{},{},{},{},{},{},{},{},{}",
+    fn write_fields(&self, output: &mut impl Record) {
+        fields!(
+            output,
             self.basic_flow.ip_source,
             self.basic_flow.port_source,
             self.basic_flow.ip_destination,
@@ -88,8 +89,8 @@ impl Flow for CiddsFlow {
             self.basic_flow.get_flow_duration_msec(),
             self.packet_stats.flow_total(),
             self.packet_stats.flow_count(),
-            self.tcp_flag_stats.get_flags(),
-        )
+            self.tcp_flag_stats.get_flags().as_str(),
+        );
     }
 
     fn get_features() -> String {
@@ -108,17 +109,17 @@ impl Flow for CiddsFlow {
         .join(",")
     }
 
-    fn dump_without_contamination(&self) -> String {
-        format!(
-            "{},{},{},{},{},{},{}",
+    fn write_clean_fields(&self, output: &mut impl Record) {
+        fields!(
+            output,
             iana_port_mapping(self.basic_flow.port_source),
             iana_port_mapping(self.basic_flow.port_destination),
             self.format_protocol(self.basic_flow.protocol),
             self.basic_flow.get_flow_duration_msec(),
             self.packet_stats.flow_total(),
             self.packet_stats.flow_count(),
-            self.tcp_flag_stats.get_flags(),
-        )
+            self.tcp_flag_stats.get_flags().as_str(),
+        );
     }
 
     fn get_features_without_contamination() -> String {

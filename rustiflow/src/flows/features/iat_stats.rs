@@ -1,3 +1,4 @@
+use crate::flows::row::Record;
 use crate::{flows::util::FlowExpireCause, packet_features::PacketFeatures};
 
 use super::util::{FeatureStats, FlowFeature};
@@ -65,10 +66,10 @@ impl FlowFeature for IATStats {
         // No active state to close
     }
 
-    fn append_to_csv(&self, output: &mut String) {
-        self.iat.append_csv_values(output);
-        self.fwd_iat.append_csv_values(output);
-        self.bwd_iat.append_csv_values(output);
+    fn write_fields(&self, output: &mut impl Record) {
+        self.iat.write_fields(output);
+        self.fwd_iat.write_fields(output);
+        self.bwd_iat.write_fields(output);
     }
 
     fn headers() -> String {

@@ -8,7 +8,7 @@ use super::util::FlowExpireCause;
 ///
 /// This trait should be implemented by structures that represent
 /// a network flow, providing mechanisms to update the flow state
-/// and to dump its current state into a string format.
+/// and to export its current state as typed fields.
 pub trait Flow: Send + Sync + 'static + Clone {
     /// Constructs a new `Flow`.
     ///
@@ -64,40 +64,21 @@ pub trait Flow: Send + Sync + 'static + Clone {
     /// * `cause` - The reason for closing the flow
     fn close_flow(&mut self, timestamp_us: i64, cause: FlowExpireCause);
 
-    /// Dumps the current state of the flow.
-    ///
-    /// This method returns a string representation of the current state of the flow.
-    ///
-    /// ### Returns
-    ///
-    /// Returns a `String` that represents the current state of the flow.
+    fn write_fields(&self, output: &mut impl super::row::Record);
+    fn write_clean_fields(&self, output: &mut impl super::row::Record);
+
+    #[cfg(test)]
     fn dump(&self) -> String {
-        let mut output = String::new();
-        self.append_to_csv_row(&mut output);
-        output
+        let mut row = String::new();
+        self.write_fields(&mut super::row::CsvRow::new(&mut row));
+        row
     }
 
-    /// Appends the current state of the flow to an existing CSV row buffer.
-    fn append_to_csv_row(&self, output: &mut String) {
-        output.push_str(&self.dump());
-    }
-
-    /// Dumps the current state of the flow without contaminant features.
-    ///
-    /// This method returns a string representation of the current state of the flow without contaminant features.
-    ///
-    /// ### Returns
-    ///
-    /// Returns a `String` that represents the current state of the flow without contaminant features.
+    #[cfg(test)]
     fn dump_without_contamination(&self) -> String {
-        let mut output = String::new();
-        self.append_to_csv_row_without_contamination(&mut output);
-        output
-    }
-
-    /// Appends the contamination-free state of the flow to an existing CSV row buffer.
-    fn append_to_csv_row_without_contamination(&self, output: &mut String) {
-        output.push_str(&self.dump_without_contamination());
+        let mut row = String::new();
+        self.write_clean_fields(&mut super::row::CsvRow::new(&mut row));
+        row
     }
 
     /// Returns the first timestamp of the flow.

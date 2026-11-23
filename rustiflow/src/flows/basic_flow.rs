@@ -1,5 +1,5 @@
+use crate::flows::row::Record;
 use std::net::IpAddr;
-use std::{fmt::Display, fmt::Write as _};
 
 use chrono::{DateTime, Utc};
 use pnet_packet::ip::IpNextHeaderProtocols;
@@ -258,13 +258,6 @@ fn acknowledges(ack: Option<u32>, expected: Option<u32>) -> bool {
         .is_some_and(|(ack, expected)| (ack.wrapping_sub(expected) as i32) >= 0)
 }
 
-fn push_csv_display(output: &mut String, value: impl Display) {
-    if !output.is_empty() {
-        output.push(',');
-    }
-    let _ = write!(output, "{value}");
-}
-
 impl Flow for BasicFlow {
     fn new(
         flow_id: String,
@@ -336,17 +329,17 @@ impl Flow for BasicFlow {
         self.update_tcp_close_style(cause);
     }
 
-    fn append_to_csv_row(&self, output: &mut String) {
-        push_csv_display(output, &self.flow_key);
-        push_csv_display(output, self.ip_source);
-        push_csv_display(output, self.port_source);
-        push_csv_display(output, self.ip_destination);
-        push_csv_display(output, self.port_destination);
-        push_csv_display(output, self.protocol);
-        push_csv_display(output, self.get_first_timestamp());
-        push_csv_display(output, self.get_last_timestamp());
-        push_csv_display(output, self.get_flow_duration_usec());
-        push_csv_display(output, self.flow_expire_cause.as_str());
+    fn write_fields(&self, output: &mut impl Record) {
+        output.field(self.flow_key.as_str());
+        output.field(self.ip_source);
+        output.field(self.port_source);
+        output.field(self.ip_destination);
+        output.field(self.port_destination);
+        output.field(self.protocol);
+        output.field(self.get_first_timestamp());
+        output.field(self.get_last_timestamp());
+        output.field(self.get_flow_duration_usec());
+        output.field(self.flow_expire_cause.as_str());
     }
 
     fn get_features() -> String {
@@ -355,12 +348,12 @@ impl Flow for BasicFlow {
             .to_string()
     }
 
-    fn append_to_csv_row_without_contamination(&self, output: &mut String) {
-        push_csv_display(output, iana_port_mapping(self.port_source));
-        push_csv_display(output, iana_port_mapping(self.port_destination));
-        push_csv_display(output, self.protocol);
-        push_csv_display(output, self.get_flow_duration_usec());
-        push_csv_display(output, self.flow_expire_cause.as_str());
+    fn write_clean_fields(&self, output: &mut impl Record) {
+        output.field(iana_port_mapping(self.port_source));
+        output.field(iana_port_mapping(self.port_destination));
+        output.field(self.protocol);
+        output.field(self.get_flow_duration_usec());
+        output.field(self.flow_expire_cause.as_str());
     }
 
     fn get_features_without_contamination() -> String {

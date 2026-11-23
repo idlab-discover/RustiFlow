@@ -18,7 +18,7 @@ This tool is engineered for robust and efficient feature extraction, particularl
 - **High Throughput:** Utilizes Rust and the [Aya](https://aya-rs.dev/) library for eBPF program compilation and execution, ensuring exceptional performance and resource efficiency.
 - **Versatile Feature Sets:** Offers a variety of pre-defined feature sets (flows) and the flexibility to create custom feature sets tailored to specific requirements. An example of the custom flow is shown [here](https://github.com/idlab-discover/RustiFlow/blob/main/rustiflow/src/flows/custom_flow.rs).
 - **Pcap File Support:** Facilitates packet analysis from classic pcap and pcapng files, compatible with both Linux and Windows generated files. A capture that ends inside a record is read up to that record with a warning; a corrupt record stops the read with an error naming its file offset, after exporting earlier packets. Timestamp fractions must be below 1,000,000 for microsecond pcap or 1,000,000,000 for nanosecond pcap; invalid fractions are rejected, not normalized. Out-of-range pcapng timestamps are also rejected. Sorted offline CSV rows are deterministic across runs and thread counts. Expiration scans use one capture clock shared by all shards, including a final scan at the last readable record's timestamp.
-- **Diverse Output Options:** Features can be outputted to the console, a CSV file, or other formats with minimal effort.
+- **Diverse Output Options:** Offline and realtime captures write typed Apache Parquet files by default. CSV files and console output are also available.
 - **Richer TCP Quality Signals:** The RustiFlow feature set exports duplicate ACK counts, zero-window observations, and TCP close style in addition to the existing lifecycle and retransmission fields.
 - **Endpoint-Aware IP Context:** The RustiFlow feature set exports `ip_version`, endpoint IP scope, and coarse `path_locality` derived from normalized addresses without expanding the eBPF event payload.
 
@@ -127,7 +127,7 @@ On a tap or SPAN/mirror port, set `RUSTIFLOW_REALTIME_ARGS=--promiscuous` in
 `/etc/rustiflow/eth0.env`; see [Promiscuous capture](#promiscuous-capture).
 
 Use `/usr/local/share/rustiflow/...` for a bundle installed into the default
-prefix. Relative CSV export paths in the config are written below
+prefix. Relative export paths in the config are written below
 `/var/lib/rustiflow/eth0/`.
 
 ### Building a release bundle
@@ -162,9 +162,22 @@ cargo xtask dist --target-cpu native   # bundle for this machine only
 
 You can then run the binary with the following commands displayed on the [help menu](#usage-instructions).
 
-When using command-line arguments, both `--features` (`-f`) and `--output`
-(`-o`) are required unless `--config-file` (`-c`) is provided. Missing options
-produce a usage error. Running without arguments still opens the TUI.
+Both capture modes default to Snappy-compressed Parquet. Select a feature set
+with `-f` or load a config with `-c`. Running without arguments opens the TUI.
+
+```bash
+rustiflow -f rustiflow pcap trace.pcap
+rustiflow -f basic --export-path live.parquet realtime eth0
+rustiflow -f basic -o csv --export-path flows.csv --header pcap trace.pcap
+```
+
+With no export path, RustiFlow creates `output.parquet` in the working directory
+and reports an error if it already exists. An explicit file path overwrites its destination.
+Parquet embeds the selected feature names and types, including for empty captures.
+It preserves the feature set's units and contamination-free projection. Timestamp
+fields displayed as UTC dates in CSV use UTC microseconds in Parquet. Stop live
+capture with Ctrl-C to flush open flows and finalize the file. Use `-o print` for
+console output. The `--header` flag applies to CSV and console output.
 
 ### Active and idle measurements
 
@@ -205,8 +218,8 @@ early_export = 25
 expiration_check_interval = 0
 
 [output]
-output = "Csv"
-export_path = "path/to/output.csv"
+output = "Parquet"
+export_path = "path/to/output.parquet"
 header = false
 drop_contaminant_features = true
 ```
@@ -228,7 +241,7 @@ header = true
 drop_contaminant_features = false
 ```
 
-For realtime CSV exports, the live packet graph is now off by default so the
+For realtime file exports, the live packet graph is now off by default so the
 standard CLI path keeps the best throughput-oriented behavior. Enable it only
 when you want the graph:
 
@@ -295,8 +308,7 @@ Make sure that you don't use docker desktop and that you don't have it installed
   ```bash
   docker run --rm --privileged --network host -v /home/user/output:/app rustiflow \
     -f cic \
-    -o csv \
-    --export-path /app/output.csv \
+    --export-path /app/output.parquet \
     realtime enp5s0
   ```
 
@@ -464,21 +476,22 @@ Options:
           The numbers of threads to use for processing packets (optional) (default: realtime uses 12, capped at the number of logical CPUs; pcap uses 5; maximum number of logical CPUs)
 
       -o, --output <OUTPUT>
-              Output method (required if no config file is provided)
+              Output method (default: parquet)
 
               Possible values:
+              - parquet: Write a typed Apache Parquet file
               - print: The output will be printed to the console
               - csv:   The output will be written to a CSV file
 
           --export-path <EXPORT_PATH>
-              File path for output (used if method is Csv)
+              Output file path (Parquet defaults to output.parquet)
 
           --packet-graph
-              Enable the realtime packet graph for CSV exports
+              Enable the realtime packet graph for file exports
               [default: false]
 
           --header
-              Whether to export the feature header
+              Include the header in CSV or console output
 
           --drop-contaminant-features
               Whether to drop contaminant features
@@ -534,7 +547,7 @@ periodic snapshots of long-lived flows before their final export:
 `replay-bench` measures the realtime userspace pipeline without capturing
 traffic or loading eBPF programs, so it needs no root and no traffic generator.
 It generates synthetic eBPF events in memory, then drains them through the same
-per-source batching, dispatch, shard flow tables and CSV export as `realtime`:
+per-source batching, dispatch, shard flow tables and flow exporter as `realtime`:
 
 ```bash
 cargo build --release
