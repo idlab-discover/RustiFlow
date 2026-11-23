@@ -1,3 +1,5 @@
+#[cfg(target_os = "linux")]
+mod batch_keys;
 #[cfg(not(feature = "staged-flow-lookup"))]
 use std::collections::{hash_map::Entry, HashMap};
 #[cfg(feature = "staged-flow-lookup")]
@@ -55,6 +57,8 @@ pub struct FlowTable<T> {
         target_arch = "x86_64"
     ))]
     staged_lookup: bool,
+    #[cfg(target_os = "linux")]
+    canonicalizer: batch_keys::BatchCanonicalizer,
     active_timeout: u64,
     idle_timeout: u64,
     early_export_us: Option<i64>,
@@ -75,6 +79,8 @@ where
         expiration_check_interval: u64,
     ) -> Self {
         Self {
+            #[cfg(target_os = "linux")]
+            canonicalizer: batch_keys::BatchCanonicalizer::from_env(),
             #[cfg(not(feature = "staged-flow-lookup"))]
             flow_map: HashMap::default(),
             #[cfg(feature = "staged-flow-lookup")]
@@ -131,6 +137,29 @@ where
         #[cfg(all(feature = "staged-flow-lookup", target_arch = "x86_64"))]
         if self.staged_lookup {
             self.process_staged_batch(packets).await;
+            return;
+        }
+        if let Some(orientations) = self.canonicalizer.prepare(packets) {
+            let orientations = std::mem::take(orientations);
+            for (packet, &orientation) in packets.iter().zip(&orientations) {
+                self.check_and_export_expired_flows(packet.timestamp_us)
+                    .await;
+                let key = packet.flow_key_value();
+                let key = match orientation {
+                    KeyOrientation::Canonical => key,
+                    KeyOrientation::Reversed => key.reverse(),
+                };
+                let lookup = PacketLookup {
+                    key,
+                    orientation,
+                    #[cfg(feature = "staged-flow-lookup")]
+                    hash: self.hash_builder.hash_one(key),
+                    #[cfg(feature = "staged-flow-lookup")]
+                    bucket_hint: None,
+                };
+                self.apply_lookup(packet, lookup).await;
+            }
+            self.canonicalizer.restore(orientations);
             return;
         }
         for packet in packets {

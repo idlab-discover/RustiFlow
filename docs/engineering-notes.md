@@ -13,9 +13,8 @@ the decisions and results that still describe the current code.
   is opt-in for capture and replay. It used 3.4–3.6% fewer cycles per frame
   in paced live capture. Full-feature replay throughput stayed within 1.4%
   of baseline.
-- The [AVX2 flow-key prototype](profiling/overnight-simd-flow-keys.md) stays
-  on its experiment branch after increasing live CPU cost and slowing Basic
-  replay with SIMD disabled.
+- The [AVX2 flow-key prototype](profiling/overnight-simd-flow-keys.md) is opt-in. It increased live CPU cost and slowed Basic
+  replay with SIMD disabled in the branch benchmarks.
 - [Parquet Float64 statistics](profiling/overnight-simd-parquet-projection.md)
   gained Snappy round-trip regression coverage. The AVX2 implementation is
   available as a local dependency patch for reproducing the measurements.
