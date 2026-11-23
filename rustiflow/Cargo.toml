@@ -32,7 +32,6 @@ num_cpus = "1.14"
 confy = "2.0.0"
 ratatui = { version = "0.30", default-features = false, features = ["crossterm", "layout-cache"] }
 parquet = { version = "60.2", default-features = false, features = ["arrow", "snap"] }
-arrow-array = "60.2"
 arrow-schema = "60.2"
 
 [target.'cfg(target_os = "linux")'.dependencies]
@@ -49,4 +48,5 @@ name = "rustiflow"
 path = "src/main.rs"
 
 [dev-dependencies]
+arrow-array = "60.2"
 tempfile = "3"

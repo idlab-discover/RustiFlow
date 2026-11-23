@@ -731,7 +731,7 @@ where
             active_timeout,
             idle_timeout,
             early_export,
-            exporter.shard_sender(),
+            exporter.shard_output(),
             expiration_check_interval,
         );
 

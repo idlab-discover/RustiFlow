@@ -174,7 +174,7 @@ fn spawn_shard_workers<T: Flow>(
                 flow_table_settings.active_timeout,
                 flow_table_settings.idle_timeout,
                 flow_table_settings.early_export,
-                exporter.shard_sender(),
+                exporter.shard_output(),
                 flow_table_settings.expiration_check_interval,
             );
 

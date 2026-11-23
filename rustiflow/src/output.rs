@@ -27,31 +27,62 @@ const ENCODED_CHUNK_BYTES: usize = 64 * 1024;
 const ENCODED_CHUNK_QUEUE_CAPACITY: usize = 64;
 
 pub enum FlowExporter<T> {
-    Parquet(mpsc::Sender<T>),
+    Parquet(parquet::Exporter<T>),
     Csv {
         clean: bool,
         chunks: mpsc::Sender<String>,
     },
 }
 
+/// One flow table's output. Parquet projects directly from the owned flow
+/// while it is still hot in the table worker's cache.
+pub enum ShardOutput<T> {
+    Channel(mpsc::Sender<T>),
+    Parquet(parquet::Shard<T>),
+}
+
+impl<T> From<mpsc::Sender<T>> for ShardOutput<T> {
+    fn from(sender: mpsc::Sender<T>) -> Self {
+        Self::Channel(sender)
+    }
+}
+
+impl<T: Flow> ShardOutput<T> {
+    pub async fn export(&mut self, flow: T) {
+        match self {
+            Self::Channel(sender) => {
+                if sender.send(flow).await.is_err() {
+                    error!("Failed to send flow: export channel is closed");
+                }
+            }
+            Self::Parquet(shard) => shard.export(&flow).await,
+        }
+    }
+
+    pub async fn flush(&mut self) {
+        if let Self::Parquet(shard) = self {
+            shard.flush().await;
+        }
+    }
+}
+
 /// Destination for the flows that each shard's flow table exports.
 pub trait FlowSink<T>: Send + 'static {
-    /// Returns the sender one shard's flow table exports into.
-    fn shard_sender(&self) -> mpsc::Sender<T>;
+    /// Creates the output used by one shard for its lifetime.
+    fn shard_output(&self) -> ShardOutput<T>;
 }
 
 /// All shards share the channel; used by tests that inspect exported flows.
 impl<T: Flow> FlowSink<T> for mpsc::Sender<T> {
-    fn shard_sender(&self) -> mpsc::Sender<T> {
-        self.clone()
+    fn shard_output(&self) -> ShardOutput<T> {
+        self.clone().into()
     }
 }
 
 impl<T: Flow> FlowSink<T> for FlowExporter<T> {
-    /// Parquet projects owned flows on the writer thread. CSV encodes per shard.
-    fn shard_sender(&self) -> mpsc::Sender<T> {
+    fn shard_output(&self) -> ShardOutput<T> {
         let (clean, chunk_sender) = match self {
-            Self::Parquet(sender) => return sender.clone(),
+            Self::Parquet(exporter) => return ShardOutput::Parquet(exporter.shard()),
             Self::Csv { clean, chunks } => (*clean, chunks.clone()),
         };
         let (flow_sender, mut flow_receiver) = mpsc::channel::<T>(SHARD_FLOW_QUEUE_CAPACITY);
@@ -90,7 +121,7 @@ impl<T: Flow> FlowSink<T> for FlowExporter<T> {
             }
         });
 
-        flow_sender
+        flow_sender.into()
     }
 }
 
@@ -121,10 +152,7 @@ pub fn spawn_output_writer<T: Flow>(
                     "creating output.parquet (set --export-path to choose a destination)",
                 )?,
             };
-            let writer = parquet::Writer::new::<T>(file, &headers, clean)?;
-            let (sender, receiver) = mpsc::channel(SHARD_FLOW_QUEUE_CAPACITY);
-            let task = tokio::task::spawn_blocking(move || writer.run(receiver, clean));
-            return Ok((FlowExporter::Parquet(sender), task));
+            return parquet::spawn::<T>(file, &headers, clean);
         }
         ExportMethodType::Csv => Box::new(open(
             output

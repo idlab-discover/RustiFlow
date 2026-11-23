@@ -204,3 +204,23 @@ fn config_can_omit_output_and_implicit_path_preserves_existing_files() {
     assert!(!cmd.output().unwrap().status.success());
     assert_eq!(fs::read(file).unwrap(), contents);
 }
+
+#[cfg(target_os = "linux")]
+#[test]
+fn parquet_write_errors_reach_the_cli() {
+    let result = Command::new(env!("CARGO_BIN_EXE_rustiflow"))
+        .args([
+            "-f",
+            "rustiflow",
+            "--threads",
+            "2",
+            "--export-path",
+            "/dev/full",
+            "pcap",
+            FIXTURE,
+        ])
+        .output()
+        .unwrap();
+    assert!(!result.status.success());
+    assert!(String::from_utf8_lossy(&result.stderr).contains("No space left on device"));
+}
