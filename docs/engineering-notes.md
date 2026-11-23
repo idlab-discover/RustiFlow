@@ -4,6 +4,12 @@ This file keeps short-lived design choices and execution notes that would make
 `AGENTS.md` too long. Newest entries come first. Older entries are condensed to
 the decisions and results that still describe the current code.
 
+## 2026-11-23 — nuccore profiling baseline
+
+The [baseline for `67a8109`](profiling/nuccore-67a8109/README.md) preserves
+local CPU, allocation, and realtime eBPF measurements for optimization branches.
+
+
 ## 2026-11-06: opt-in promiscuous capture
 
 Branch `feat/promiscuous-capture`.

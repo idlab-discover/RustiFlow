@@ -1,0 +1,33 @@
+# To display the perf.data header info, please use --header/--header-only options.
+#
+#
+# Total Lost Samples: 0
+#
+# Samples: 4K of event 'cpu_core/cycles/u'
+# Event count (approx.): 20175233774
+#
+# Overhead  Command          Shared Object     Symbol
+# ........  ...............  ................  .............................................................................................................................................................................................................................................................................................................................................................................
+#
+    32.22%  tokio-rt-worker  rustiflow         [.] <rustiflow::flow_table::FlowTable<rustiflow::flows::rusti_flow::RustiFlow>>::process_packet_without_expiration_scan::{closure#0}
+    10.61%  tokio-rt-worker  rustiflow         [.] <rustiflow::flows::features::retransmission_stats::RetransmissionStats>::update_direction
+     6.29%  tokio-rt-worker  rustiflow         [.] <rustiflow::flow_table::FlowTable<rustiflow::flows::rusti_flow::RustiFlow>>::apply_packet_to_flow
+     6.11%  tokio-rt-worker  rustiflow         [.] rustiflow::realtime::replay::replay_source::<common::EbpfEventIpv4>::{closure#0}
+     4.79%  tokio-rt-worker  rustiflow         [.] core::num::imp::flt2dec::strategy::grisu::format_shortest_opt
+     4.71%  tokio-rt-worker  rustiflow         [.] <rustiflow::flow_key::FlowKey>::canonicalize
+     3.97%  tokio-rt-worker  rustiflow         [.] <rustiflow::flows::features::payload_stats::PayloadLengthStats as rustiflow::flows::features::util::FlowFeature>::update
+     3.54%  tokio-rt-worker  rustiflow         [.] <rustiflow::flows::features::iat_stats::IATStats as rustiflow::flows::features::util::FlowFeature>::update
+     2.89%  tokio-rt-worker  rustiflow         [.] <rustiflow::flows::features::header_stats::HeaderLengthStats as rustiflow::flows::features::util::FlowFeature>::update
+     2.64%  tokio-rt-worker  rustiflow         [.] rustiflow::realtime::spawn_shard_workers::<rustiflow::flows::rusti_flow::RustiFlow, rustiflow::output::FlowExporter>::{closure#0}::{closure#0}
+     2.11%  tokio-rt-worker  rustiflow         [.] <rustiflow::flows::basic_flow::BasicFlow as rustiflow::flows::flow::Flow>::update_flow
+     1.96%  rustiflow        rustiflow         [.] <rustiflow::realtime::replay::ReplayEvents>::generate
+     1.60%  tokio-rt-worker  libc.so.6         [.] 0x0000000000176319
+     1.51%  rustiflow        rustiflow         [.] <rustiflow::realtime::replay::ReplayEvents>::generate::{closure#1}
+     1.36%  tokio-rt-worker  rustiflow         [.] rustiflow::flows::features::util::push_i64_digits
+     1.04%  tokio-rt-worker  rustiflow         [.] <rustiflow::flows::features::active_idle_stats::ActiveIdleStats as rustiflow::flows::features::util::FlowFeature>::update
+     1.02%  tokio-rt-worker  rustiflow         [.] <rustiflow::flows::features::window_size_stats::WindowSizeStats as rustiflow::flows::features::util::FlowFeature>::update
+
+
+#
+# (Tip: To collect Processor Trace with samples use perf record -e '{intel_pt//,cycles}' ; perf script --call-trace or --insn-trace --xed -F +ipc (remove --xed if no xed))
+#

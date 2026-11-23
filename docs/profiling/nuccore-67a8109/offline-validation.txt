@@ -1,0 +1,4 @@
+offline.csv: 10000 unique UDP flows (5000 per IP version), 200 packets each
+offline.csv: SHA-256 of header plus sorted LF-terminated data lines: 8579cf4b0ef1ca97b5cd9203726d426285c7eade599c271085225cc1c878b549
+offline-repeat.csv: 10000 unique UDP flows (5000 per IP version), 200 packets each
+offline-repeat.csv: SHA-256 of header plus sorted LF-terminated data lines: 8579cf4b0ef1ca97b5cd9203726d426285c7eade599c271085225cc1c878b549

@@ -1,0 +1,45 @@
+# To display the perf.data header info, please use --header/--header-only options.
+#
+#
+# Total Lost Samples: 0
+#
+# Samples: 1K of event 'cpu_core/cycles/u'
+# Event count (approx.): 1102909333
+#
+# Overhead  Command          Shared Object     Symbol
+# ........  ...............  ................  ..............................................................................................................................................................................................................................................................................................................................................
+#
+    10.76%  tokio-rt-worker  rustiflow         [.] rustiflow::realtime::drain_ring_source::{closure#0}
+    10.51%  tokio-rt-worker  rustiflow         [.] <rustiflow::flow_table::FlowTable<rustiflow::flows::rusti_flow::RustiFlow>>::process_packet_without_expiration_scan::{closure#0}
+     7.97%  tokio-rt-worker  rustiflow         [.] rustiflow::realtime::spawn_source_dispatcher::{closure#0}
+     6.37%  tokio-rt-worker  rustiflow         [.] tokio::runtime::task::raw::poll::<tokio::runtime::blocking::task::BlockingTask<<tokio::runtime::scheduler::multi_thread::worker::Launch>::launch::{closure#0}>, tokio::runtime::blocking::schedule::BlockingSchedule>
+     5.13%  tokio-rt-worker  rustiflow         [.] rustiflow::realtime::enqueue_shard_batch::{closure#0}
+     4.17%  tokio-rt-worker  rustiflow         [.] <tokio::runtime::io::registration::Registration>::readiness::{closure#0}
+     2.74%  tokio-rt-worker  rustiflow         [.] tokio::runtime::task::waker::wake_by_val
+     2.54%  tokio-rt-worker  [vdso]            [.] __vdso_clock_gettime
+     2.45%  tokio-rt-worker  rustiflow         [.] <rustiflow::flows::features::iat_stats::IATStats as rustiflow::flows::features::util::FlowFeature>::update
+     2.42%  tokio-rt-worker  rustiflow         [.] rustiflow::realtime::spawn_shard_workers::<rustiflow::flows::rusti_flow::RustiFlow, rustiflow::output::FlowExporter>::{closure#0}::{closure#0}
+     2.30%  tokio-rt-worker  rustiflow         [.] <rustiflow::flow_key::FlowKey>::canonicalize
+     2.15%  tokio-rt-worker  rustiflow         [.] <tokio::sync::batch_semaphore::Semaphore>::add_permits_locked
+     2.04%  tokio-rt-worker  rustiflow         [.] <tokio::runtime::scheduler::multi_thread::worker::Context>::park_internal
+     1.79%  tokio-rt-worker  rustiflow         [.] <rustiflow::flow_table::FlowTable<rustiflow::flows::rusti_flow::RustiFlow>>::apply_packet_to_flow
+     1.58%  tokio-rt-worker  rustiflow         [.] <tokio::sync::task::atomic_waker::AtomicWaker>::register_by_ref
+     1.51%  tokio-rt-worker  rustiflow         [.] <tokio::runtime::scheduler::multi_thread::worker::Core>::maintenance
+     1.46%  tokio-rt-worker  rustiflow         [.] <tokio::runtime::scheduler::multi_thread::worker::Context>::run_task
+     1.29%  tokio-rt-worker  libc.so.6         [.] 0x00000000000a6e8b
+     1.24%  tokio-rt-worker  rustiflow         [.] <tokio::runtime::io::scheduled_io::ScheduledIo>::wake
+     1.17%  tokio-rt-worker  rustiflow         [.] <tokio::sync::mpsc::bounded::Receiver<alloc::vec::Vec<rustiflow::packet_features::PacketFeatures>>>::recv::{closure#0}
+     1.16%  tokio-rt-worker  rustiflow         [.] <tokio::runtime::io::driver::Driver>::turn
+     1.15%  tokio-rt-worker  libc.so.6         [.] 0x00000000000a62e8
+     1.11%  tokio-rt-worker  rustiflow         [.] tokio::runtime::task::raw::poll::<rustiflow::realtime::spawn_shard_workers<rustiflow::flows::rusti_flow::RustiFlow, rustiflow::output::FlowExporter>::{closure#0}::{closure#0}, alloc::sync::Arc<tokio::runtime::scheduler::multi_thread::handle::Handle>>
+     1.11%  tokio-rt-worker  rustiflow         [.] tokio::runtime::task::waker::clone_waker
+     1.11%  tokio-rt-worker  rustiflow         [.] <tokio::sync::batch_semaphore::Acquire as core::future::future::Future>::poll
+     1.10%  tokio-rt-worker  [unknown]         [k] 0000000000000000
+     1.08%  tokio-rt-worker  rustiflow         [.] <tokio::runtime::scheduler::multi_thread::park::Unparker>::unpark
+     1.04%  tokio-rt-worker  rustiflow         [.] <tokio::sync::mpsc::list::Rx<alloc::vec::Vec<rustiflow::packet_features::PacketFeatures>>>::pop
+     1.03%  tokio-rt-worker  rustiflow         [.] <rustiflow::flows::features::payload_stats::PayloadLengthStats as rustiflow::flows::features::util::FlowFeature>::update
+
+
+#
+# (Tip: To trace calls using Processor Trace use perf record -e intel_pt// ... ; perf script --call-trace. Then use perf script --time A-B --insn-trace to look at region of interest.)
+#

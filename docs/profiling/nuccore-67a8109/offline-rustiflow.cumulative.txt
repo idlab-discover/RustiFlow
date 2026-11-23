@@ -1,0 +1,25 @@
+# To display the perf.data header info, please use --header/--header-only options.
+#
+#
+# Total Lost Samples: 0
+#
+# Samples: 639  of event 'cpu_core/cycles/u'
+# Event count (approx.): 2049224724
+#
+# Children      Self  Command          Shared Object     Symbol
+# ........  ........  ...............  ................  ..................................................................................................................................................................................................................................................................................................................................................................................................................................................................
+#
+    30.67%    29.34%  tokio-rt-worker  rustiflow         [.] <rustiflow::flow_table::FlowTable<rustiflow::flows::rusti_flow::RustiFlow>>::process_packet_without_expiration_scan::{closure#0}
+    13.64%    12.93%  rustiflow        rustiflow         [.] <rustiflow::pcap::ShardDispatcher>::dispatch::{closure#0}
+     6.80%     6.11%  rustiflow        rustiflow         [.] <rustiflow::pcap::CaptureReader>::next_packet
+     5.18%     5.18%  rustiflow        rustiflow         [.] <pcap_parser::pcap::reader::LegacyPcapReader<std::fs::File> as pcap_parser::traits::PcapReaderIterator>::next
+     4.09%     4.09%  rustiflow        rustiflow         [.] rustiflow::run_with_config::{closure#0}
+     4.07%     4.07%  tokio-rt-worker  rustiflow         [.] <rustiflow::flows::features::iat_stats::IATStats as rustiflow::flows::features::util::FlowFeature>::update
+     3.71%     3.71%  tokio-rt-worker  rustiflow         [.] <rustiflow::flows::features::payload_stats::PayloadLengthStats as rustiflow::flows::features::util::FlowFeature>::update
+     3.42%     3.25%  tokio-rt-worker  rustiflow         [.] <rustiflow::flow_table::FlowTable<rustiflow::flows::rusti_flow::RustiFlow>>::apply_packet_to_flow
+     3.17%     2.73%  tokio-rt-worker  rustiflow         [.] <rustiflow::flow_key::FlowKey>::canonicalize
+
+
+#
+# (Tip: To show context switches in perf report sample context add --switch-events to perf record.)
+#

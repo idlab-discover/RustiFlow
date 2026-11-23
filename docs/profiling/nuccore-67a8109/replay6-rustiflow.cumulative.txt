@@ -1,0 +1,26 @@
+# To display the perf.data header info, please use --header/--header-only options.
+#
+#
+# Total Lost Samples: 0
+#
+# Samples: 4K of event 'cpu_core/cycles/u'
+# Event count (approx.): 19003432477
+#
+# Children      Self  Command          Shared Object     Symbol
+# ........  ........  ...............  ................  ...............................................................................................................................................................................................................................................................................................................................................................................
+#
+    32.46%    32.44%  tokio-rt-worker  rustiflow         [.] <rustiflow::flow_table::FlowTable<rustiflow::flows::rusti_flow::RustiFlow>>::process_packet_without_expiration_scan::{closure#0}
+    11.23%    11.22%  tokio-rt-worker  rustiflow         [.] <rustiflow::flows::features::retransmission_stats::RetransmissionStats>::update_direction
+     7.24%     7.21%  tokio-rt-worker  rustiflow         [.] rustiflow::realtime::replay::replay_source::<common::EbpfEventIpv6>::{closure#0}
+     6.26%     6.26%  tokio-rt-worker  rustiflow         [.] <rustiflow::flow_table::FlowTable<rustiflow::flows::rusti_flow::RustiFlow>>::apply_packet_to_flow
+     5.38%     5.38%  tokio-rt-worker  rustiflow         [.] core::num::imp::flt2dec::strategy::grisu::format_shortest_opt
+     4.67%     4.67%  tokio-rt-worker  rustiflow         [.] <rustiflow::flow_key::FlowKey>::canonicalize
+     4.09%     4.09%  tokio-rt-worker  rustiflow         [.] <rustiflow::flows::features::payload_stats::PayloadLengthStats as rustiflow::flows::features::util::FlowFeature>::update
+     3.40%     3.40%  tokio-rt-worker  rustiflow         [.] <rustiflow::flows::features::header_stats::HeaderLengthStats as rustiflow::flows::features::util::FlowFeature>::update
+     3.37%     3.37%  tokio-rt-worker  rustiflow         [.] <rustiflow::flows::features::iat_stats::IATStats as rustiflow::flows::features::util::FlowFeature>::update
+     3.04%     3.00%  rustiflow        rustiflow         [.] <rustiflow::realtime::replay::ReplayEvents>::generate
+
+
+#
+# (Tip: If call chains don't work try perf record --call-graph dwarf or --call-graph lbr)
+#
