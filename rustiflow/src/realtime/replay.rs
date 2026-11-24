@@ -16,10 +16,12 @@ use anyhow::Context;
 use common::{EbpfEventIpv4, EbpfEventIpv6};
 use log::error;
 use tokio::task::{JoinHandle, JoinSet};
+use zerocopy::{Immutable, IntoBytes};
 
 use super::{
-    compute_realtime_offset_us, log_source_stats, queue_label, read_clock_us, spawn_shard_workers,
-    FlowTableSettings, PipelineMode, PipelineSettings, RealtimeSourceStats, SourceBatcher,
+    compute_realtime_offset_us, decode_ipv4_event, decode_ipv6_event, log_source_stats,
+    queue_label, read_clock_us, spawn_shard_workers, DecodeEvent, FlowTableSettings, PipelineMode,
+    PipelineSettings, RealtimeSourceStats, SourceBatcher,
 };
 use crate::{
     args::{ExportConfig, ReplayBenchArgs},
@@ -27,7 +29,6 @@ use crate::{
     flow_key::ShardSelector,
     flows::flow::Flow,
     output::FlowSink,
-    packet_features::PacketFeatures,
     profiling::ProfilingSession,
 };
 
@@ -112,7 +113,7 @@ pub async fn replay_bench<T: Flow>(
                     events,
                     batcher,
                     replay_args.drain_burst,
-                    PacketFeatures::from_ebpf_event_ipv4,
+                    decode_ipv4_event,
                     realtime_offset_us,
                 ));
             }
@@ -124,7 +125,7 @@ pub async fn replay_bench<T: Flow>(
                     events,
                     batcher,
                     replay_args.drain_burst,
-                    PacketFeatures::from_ebpf_event_ipv6,
+                    decode_ipv6_event,
                     realtime_offset_us,
                 ));
             }
@@ -172,18 +173,22 @@ pub async fn replay_bench<T: Flow>(
 
 /// Drains one source's events in bursts, flushing partial batches after each
 /// burst as a live source does when its ring runs empty.
-async fn replay_source<E: Send + Sync + 'static>(
+///
+/// Events pass through the live ring decoder as raw bytes, so replay runs the
+/// same size check and decode as live capture.
+async fn replay_source<E: IntoBytes + Immutable + Send + Sync + 'static>(
     events: Vec<E>,
     mut batcher: SourceBatcher,
     drain_burst: NonZeroUsize,
-    decode: fn(&E, i64) -> PacketFeatures,
+    decode: DecodeEvent,
     realtime_offset_us: i64,
 ) {
     for burst in events.chunks(drain_burst.get()) {
         for event in burst {
-            batcher
-                .push_event(|| Some(decode(event, realtime_offset_us)))
+            let decoded = batcher
+                .push_event(|| decode(event.as_bytes(), realtime_offset_us))
                 .await;
+            debug_assert!(decoded, "replay events match the ring record layout");
         }
         batcher.flush().await;
         // A live source waits for ring readiness between drains.

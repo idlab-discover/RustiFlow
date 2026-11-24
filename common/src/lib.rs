@@ -18,7 +18,12 @@ pub const REALTIME_EVENT_RINGBUF_BYTES: u32 = 1024 * 1024 * 64;
 #[repr(C, packed)]
 #[cfg_attr(
     feature = "zerocopy",
-    derive(zerocopy::FromBytes, zerocopy::KnownLayout, zerocopy::Immutable)
+    derive(
+        zerocopy::FromBytes,
+        zerocopy::IntoBytes,
+        zerocopy::KnownLayout,
+        zerocopy::Immutable
+    )
 )]
 #[derive(Copy, Clone)]
 pub struct EbpfEventIpv4 {
@@ -91,7 +96,12 @@ const _: () = assert!(core::mem::size_of::<EbpfEventIpv4>() == 40);
 #[repr(C, packed)]
 #[cfg_attr(
     feature = "zerocopy",
-    derive(zerocopy::FromBytes, zerocopy::KnownLayout, zerocopy::Immutable)
+    derive(
+        zerocopy::FromBytes,
+        zerocopy::IntoBytes,
+        zerocopy::KnownLayout,
+        zerocopy::Immutable
+    )
 )]
 #[derive(Clone, Copy)]
 pub struct EbpfEventIpv6 {
