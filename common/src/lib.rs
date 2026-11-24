@@ -81,8 +81,8 @@ impl EbpfEventIpv4 {
     }
 }
 
-#[cfg(feature = "user")]
-unsafe impl aya::Pod for EbpfEventIpv4 {}
+// The eBPF programs and userspace exchange this record by size alone.
+const _: () = assert!(core::mem::size_of::<EbpfEventIpv4>() == 40);
 
 /// BasicFeaturesIpv6 is a struct collection all ipv6 traffic data.
 ///
@@ -156,8 +156,8 @@ impl EbpfEventIpv6 {
     }
 }
 
-#[cfg(feature = "user")]
-unsafe impl aya::Pod for EbpfEventIpv6 {}
+// The eBPF programs and userspace exchange this record by size alone.
+const _: () = assert!(core::mem::size_of::<EbpfEventIpv6>() == 72);
 
 pub trait NetworkHeader {
     fn source_port(&self) -> u16;

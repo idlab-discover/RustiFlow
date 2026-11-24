@@ -5,11 +5,9 @@ edition = "2021"
 
 [features]
 default = []
-user = [ "aya" ]
 
 [dependencies]
 zerocopy = { workspace = true, features = ["derive"], optional = true }
-aya = { version = "0.16.0", optional = true }
 network-types = { version = "0.2.0", default-features = false }
 
 [lib]
