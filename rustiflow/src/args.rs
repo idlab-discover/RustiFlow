@@ -234,7 +234,7 @@ pub enum FlowType {
     /// A basic flow that stores the basic features of a flow.
     Basic,
 
-    /// Represents the CIC Flow, giving 83 features.
+    /// Represents the CIC Flow, giving 100 features.
     CIC,
 
     /// Represents the CIDDS Flow, giving 10 features.
