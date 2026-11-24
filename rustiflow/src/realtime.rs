@@ -1,3 +1,4 @@
+mod batch_pool;
 mod ebpf_objects;
 mod promiscuous;
 mod replay;
@@ -33,6 +34,7 @@ use aya::{
     Ebpf,
 };
 use aya_log::EbpfLogger;
+use batch_pool::BatchPool;
 use common::{EbpfEventIpv4, EbpfEventIpv6, REALTIME_EVENT_QUEUE_COUNT};
 use ebpf_objects::ebpf_object_path;
 use log::{error, info};
@@ -130,6 +132,7 @@ struct PipelineSettings {
     shard_batch_size: usize,
     shard_queue_capacity: usize,
     source_dispatch_queue_capacity: usize,
+    recycle_shard_batches: bool,
 }
 
 impl PipelineSettings {
@@ -147,6 +150,8 @@ impl PipelineSettings {
                 "RUSTIFLOW_REALTIME_SOURCE_DISPATCH_QUEUE_CAPACITY",
                 DEFAULT_SOURCE_DISPATCH_QUEUE_CAPACITY,
             ),
+            recycle_shard_batches: std::env::var_os("RUSTIFLOW_EXPERIMENT_RECYCLE_SHARD_BATCHES")
+                .is_some_and(|value| value == "1"),
         }
     }
 }
@@ -158,18 +163,28 @@ struct FlowTableSettings {
     expiration_check_interval: u64,
 }
 
+struct ShardBatchSender {
+    sender: Sender<Vec<PacketFeatures>>,
+    batch_pool: Option<Arc<BatchPool>>,
+}
+
 /// Spawns one flow-table worker per shard. Each worker exports its remaining
 /// flows once every sender for its shard is dropped.
 fn spawn_shard_workers<T: Flow>(
     shard_count: NonZeroUsize,
-    shard_queue_capacity: usize,
+    settings: &PipelineSettings,
     flow_table_settings: &FlowTableSettings,
     exporter: &impl FlowSink<T>,
-) -> Vec<Sender<Vec<PacketFeatures>>> {
+) -> Vec<ShardBatchSender> {
     debug!("Creating {} sharded FlowTables...", shard_count);
     let shard_senders = (0..shard_count.get())
         .map(|_| {
-            let (tx, mut rx) = mpsc::channel::<Vec<PacketFeatures>>(shard_queue_capacity);
+            let (sender, mut rx) =
+                mpsc::channel::<Vec<PacketFeatures>>(settings.shard_queue_capacity);
+            let batch_pool = settings
+                .recycle_shard_batches
+                .then(|| Arc::new(BatchPool::new()));
+            let worker_pool = batch_pool.clone();
             let mut flow_table = FlowTable::new(
                 flow_table_settings.active_timeout,
                 flow_table_settings.idle_timeout,
@@ -181,9 +196,12 @@ fn spawn_shard_workers<T: Flow>(
             tokio::spawn(async move {
                 let mut last_timestamp = None;
                 while let Some(packet_batch) = rx.recv().await {
-                    for packet_features in packet_batch {
+                    for packet_features in &packet_batch {
                         last_timestamp = Some(packet_features.timestamp_us);
-                        flow_table.process_packet(&packet_features).await;
+                        flow_table.process_packet(packet_features).await;
+                    }
+                    if let Some(pool) = &worker_pool {
+                        pool.recycle(packet_batch);
                     }
                 }
                 debug!("Shard finished processing packets");
@@ -192,7 +210,7 @@ fn spawn_shard_workers<T: Flow>(
                     flow_table.export_all_flows(timestamp).await;
                 }
             });
-            tx
+            ShardBatchSender { sender, batch_pool }
         })
         .collect();
     debug!("Sharded FlowTables created");
@@ -220,30 +238,44 @@ fn decode_ipv6_event(event: &[u8], realtime_offset_us: i64) -> PacketFeatures {
 struct SourceBatcher {
     shard_selector: ShardSelector,
     shard_batch_size: usize,
-    pending_batches: Vec<Vec<PacketFeatures>>,
+    pending_batches: Vec<PendingShardBatch>,
     dispatch_sender: Sender<ShardDispatchBatch>,
     stats: Option<Arc<RealtimeSourceStats>>,
+}
+
+struct PendingShardBatch {
+    packets: Vec<PacketFeatures>,
+    batch_pool: Option<Arc<BatchPool>>,
 }
 
 impl SourceBatcher {
     /// Creates the batcher and spawns its dispatcher into `handle_set`.
     fn new(
         handle_set: &mut JoinSet<()>,
-        shard_senders: &[Sender<Vec<PacketFeatures>>],
+        shard_senders: &[ShardBatchSender],
         shard_selector: &ShardSelector,
         settings: &PipelineSettings,
         stats: Option<Arc<RealtimeSourceStats>>,
     ) -> Self {
         let dispatch_sender = spawn_source_dispatcher(
             handle_set,
-            shard_senders.to_vec(),
+            shard_senders
+                .iter()
+                .map(|shard| shard.sender.clone())
+                .collect(),
             settings.source_dispatch_queue_capacity,
             stats.clone(),
         );
         Self {
             shard_selector: shard_selector.clone(),
             shard_batch_size: settings.shard_batch_size,
-            pending_batches: create_pending_batches(shard_senders.len(), settings.shard_batch_size),
+            pending_batches: shard_senders
+                .iter()
+                .map(|shard| PendingShardBatch {
+                    packets: Vec::with_capacity(settings.shard_batch_size),
+                    batch_pool: shard.batch_pool.clone(),
+                })
+                .collect(),
             dispatch_sender,
             stats,
         }
@@ -262,8 +294,8 @@ impl SourceBatcher {
         }
 
         let pending_batch = &mut self.pending_batches[shard_index];
-        pending_batch.push(packet_features);
-        if pending_batch.len() >= self.shard_batch_size {
+        pending_batch.packets.push(packet_features);
+        if pending_batch.packets.len() >= self.shard_batch_size {
             enqueue_shard_batch(
                 &self.dispatch_sender,
                 pending_batch,
@@ -281,12 +313,15 @@ impl SourceBatcher {
 
     /// Dispatches every partial batch, as a source does when its ring runs empty.
     async fn flush(&mut self) {
-        enqueue_pending_batches(
-            &self.dispatch_sender,
-            &mut self.pending_batches,
-            self.stats.as_ref(),
-        )
-        .await;
+        for (shard_index, pending_batch) in self.pending_batches.iter_mut().enumerate() {
+            enqueue_shard_batch(
+                &self.dispatch_sender,
+                pending_batch,
+                self.stats.as_ref(),
+                shard_index,
+            )
+            .await;
+        }
     }
 }
 
@@ -483,7 +518,7 @@ where
 
     let shard_senders = spawn_shard_workers(
         shard_count,
-        settings.shard_queue_capacity,
+        &settings,
         &FlowTableSettings {
             active_timeout,
             idle_timeout,
@@ -598,22 +633,6 @@ fn read_per_cpu_counter(
     }
 }
 
-fn create_pending_batches(num_shards: usize, shard_batch_size: usize) -> Vec<Vec<PacketFeatures>> {
-    std::iter::repeat_with(|| Vec::with_capacity(shard_batch_size))
-        .take(num_shards)
-        .collect()
-}
-
-async fn enqueue_pending_batches(
-    dispatch_sender: &Sender<ShardDispatchBatch>,
-    pending_batches: &mut [Vec<PacketFeatures>],
-    stats: Option<&Arc<RealtimeSourceStats>>,
-) {
-    for (shard_index, pending_batch) in pending_batches.iter_mut().enumerate() {
-        enqueue_shard_batch(dispatch_sender, pending_batch, stats, shard_index).await;
-    }
-}
-
 struct ShardDispatchBatch {
     shard_index: usize,
     batch: Vec<PacketFeatures>,
@@ -659,16 +678,20 @@ async fn run_source_dispatcher(
 
 async fn enqueue_shard_batch(
     dispatch_sender: &Sender<ShardDispatchBatch>,
-    pending_batch: &mut Vec<PacketFeatures>,
+    pending_batch: &mut PendingShardBatch,
     stats: Option<&Arc<RealtimeSourceStats>>,
     shard_index: usize,
 ) {
-    if pending_batch.is_empty() {
+    if pending_batch.packets.is_empty() {
         return;
     }
 
-    let next_capacity = pending_batch.capacity().max(1);
-    let batch = std::mem::replace(pending_batch, Vec::with_capacity(next_capacity));
+    let replacement = pending_batch
+        .batch_pool
+        .as_ref()
+        .and_then(|pool| pool.try_take())
+        .unwrap_or_else(|| Vec::with_capacity(pending_batch.packets.capacity()));
+    let batch = std::mem::replace(&mut pending_batch.packets, replacement);
     let send_start = stats.as_ref().map(|_| Instant::now());
     if let Err(e) = dispatch_sender
         .send(ShardDispatchBatch { shard_index, batch })

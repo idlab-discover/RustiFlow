@@ -79,7 +79,7 @@ pub async fn replay_bench<T: Flow>(
     let shard_selector = ShardSelector::new(shard_count);
     let shard_senders = spawn_shard_workers(
         shard_count,
-        settings.shard_queue_capacity,
+        &settings,
         &FlowTableSettings {
             active_timeout: config.active_timeout,
             idle_timeout: config.idle_timeout,

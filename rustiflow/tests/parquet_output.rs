@@ -266,8 +266,21 @@ fn double_columns_preserve_value_bits_and_statistics_across_tails() {
 #[cfg(target_os = "linux")]
 #[test]
 fn replay_drains_multiple_row_groups_and_the_partial_tail() {
+    check_replay_parquet_tail(Command::new(env!("CARGO_BIN_EXE_rustiflow")));
+
+    let mut recycling = Command::new(env!("CARGO_BIN_EXE_rustiflow"));
+    recycling
+        .env("RUSTIFLOW_EXPERIMENT_RECYCLE_SHARD_BATCHES", "1")
+        .env("RUSTIFLOW_REALTIME_SHARD_BATCH_SIZE", "8")
+        .env("RUSTIFLOW_REALTIME_SHARD_QUEUE_CAPACITY", "1")
+        .env("RUSTIFLOW_REALTIME_SOURCE_DISPATCH_QUEUE_CAPACITY", "1");
+    check_replay_parquet_tail(recycling);
+}
+
+#[cfg(target_os = "linux")]
+fn check_replay_parquet_tail(mut command: Command) {
     let dir = tempfile::tempdir().unwrap();
-    let result = Command::new(env!("CARGO_BIN_EXE_rustiflow"))
+    let result = command
         .current_dir(dir.path())
         .args([
             "-f",
@@ -280,6 +293,8 @@ fn replay_drains_multiple_row_groups_and_the_partial_tail() {
             "120000",
             "--flows",
             "10000",
+            "--drain-burst",
+            "257",
         ])
         .output()
         .unwrap();
