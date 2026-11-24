@@ -1,6 +1,6 @@
 use crate::flows::row::Record;
 use crate::{flows::util::FlowExpireCause, packet_features::PacketFeatures};
-use pnet_packet::ip::IpNextHeaderProtocols;
+use common::ip_protocol;
 
 use super::util::FlowFeature;
 
@@ -38,7 +38,7 @@ impl IcmpStats {
 
     fn record_behavior(&mut self, packet: &PacketFeatures) {
         match packet.protocol {
-            protocol if protocol == IpNextHeaderProtocols::Icmp.0 => match packet.icmp_type {
+            protocol if protocol == ip_protocol::ICMP => match packet.icmp_type {
                 Some(8) => self.echo_request_count += 1,
                 Some(0) => self.echo_reply_count += 1,
                 Some(3) => {
@@ -48,7 +48,7 @@ impl IcmpStats {
                 Some(4 | 5 | 11 | 12) => self.error_count += 1,
                 _ => {}
             },
-            protocol if protocol == IpNextHeaderProtocols::Icmpv6.0 => match packet.icmp_type {
+            protocol if protocol == ip_protocol::ICMPV6 => match packet.icmp_type {
                 Some(128) => self.echo_request_count += 1,
                 Some(129) => self.echo_reply_count += 1,
                 Some(1) => {
@@ -65,9 +65,7 @@ impl IcmpStats {
 
 impl FlowFeature for IcmpStats {
     fn update(&mut self, packet: &PacketFeatures, _is_forward: bool, _last_timestamp_us: i64) {
-        if packet.protocol != IpNextHeaderProtocols::Icmp.0
-            && packet.protocol != IpNextHeaderProtocols::Icmpv6.0
-        {
+        if packet.protocol != ip_protocol::ICMP && packet.protocol != ip_protocol::ICMPV6 {
             return;
         }
 

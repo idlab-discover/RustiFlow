@@ -1,7 +1,7 @@
 use crate::flows::row::{fields, Record};
 use std::net::IpAddr;
 
-use pnet_packet::ip::IpNextHeaderProtocols;
+use common::ip_protocol;
 
 use crate::flows::util::iana_port_mapping;
 use crate::packet_features::PacketFeatures;
@@ -24,11 +24,9 @@ pub struct CiddsFlow {
 impl CiddsFlow {
     fn format_protocol(&self, protocol: u8) -> &str {
         match protocol {
-            p if p == IpNextHeaderProtocols::Tcp.0 => "TCP",
-            p if p == IpNextHeaderProtocols::Udp.0 => "UDP",
-            p if p == IpNextHeaderProtocols::Icmp.0 || p == IpNextHeaderProtocols::Icmpv6.0 => {
-                "ICMP"
-            }
+            p if p == ip_protocol::TCP => "TCP",
+            p if p == ip_protocol::UDP => "UDP",
+            p if p == ip_protocol::ICMP || p == ip_protocol::ICMPV6 => "ICMP",
             _ => "OTHER",
         }
     }

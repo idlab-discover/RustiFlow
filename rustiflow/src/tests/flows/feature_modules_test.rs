@@ -1,7 +1,7 @@
 #[cfg(test)]
 mod tests {
     use crate::flows::row::{CsvRow, Record};
-    use pnet_packet::ip::IpNextHeaderProtocols;
+    use common::ip_protocol;
 
     use crate::{
         flows::{
@@ -294,25 +294,25 @@ mod tests {
         let mut stats = IcmpStats::new();
 
         let mut first = packet(1_000_000);
-        first.protocol = IpNextHeaderProtocols::Icmp.0;
+        first.protocol = ip_protocol::ICMP;
         first.icmp_type = Some(8);
         first.icmp_code = Some(0);
         stats.update(&first, true, first.timestamp_us);
 
         let mut second = packet(2_000_000);
-        second.protocol = IpNextHeaderProtocols::Icmp.0;
+        second.protocol = ip_protocol::ICMP;
         second.icmp_type = Some(3);
         second.icmp_code = Some(1);
         stats.update(&second, false, first.timestamp_us);
 
         let mut third = packet(3_000_000);
-        third.protocol = IpNextHeaderProtocols::Icmpv6.0;
+        third.protocol = ip_protocol::ICMPV6;
         third.icmp_type = Some(129);
         third.icmp_code = Some(0);
         stats.update(&third, true, second.timestamp_us);
 
         let mut fourth = packet(4_000_000);
-        fourth.protocol = IpNextHeaderProtocols::Icmpv6.0;
+        fourth.protocol = ip_protocol::ICMPV6;
         fourth.icmp_type = Some(1);
         fourth.icmp_code = Some(4);
         stats.update(&fourth, false, third.timestamp_us);
@@ -331,7 +331,7 @@ mod tests {
         let mut stats = RetransmissionStats::new();
 
         let mut pure_ack = packet(1_000_000);
-        pure_ack.protocol = IpNextHeaderProtocols::Tcp.0;
+        pure_ack.protocol = ip_protocol::TCP;
         pure_ack.flags = ACK_FLAG;
         pure_ack.ack_flag = 1;
         pure_ack.sequence_number = 11;
@@ -339,38 +339,38 @@ mod tests {
         stats.update(&pure_ack, true, pure_ack.timestamp_us);
 
         let mut udp = packet(1_250_000);
-        udp.protocol = IpNextHeaderProtocols::Udp.0;
+        udp.protocol = ip_protocol::UDP;
         udp.sequence_number = 0;
         stats.update(&udp, true, pure_ack.timestamp_us);
         stats.update(&udp, true, pure_ack.timestamp_us);
 
         let mut icmp = packet(1_500_000);
-        icmp.protocol = IpNextHeaderProtocols::Icmp.0;
+        icmp.protocol = ip_protocol::ICMP;
         icmp.sequence_number = 22;
         stats.update(&icmp, true, pure_ack.timestamp_us);
         stats.update(&icmp, true, pure_ack.timestamp_us);
 
         let mut fwd = packet(2_000_000);
-        fwd.protocol = IpNextHeaderProtocols::Tcp.0;
+        fwd.protocol = ip_protocol::TCP;
         fwd.sequence_number = 100;
         fwd.data_length = 100;
         stats.update(&fwd, true, pure_ack.timestamp_us);
 
         let mut partial_fwd = packet(2_100_000);
-        partial_fwd.protocol = IpNextHeaderProtocols::Tcp.0;
+        partial_fwd.protocol = ip_protocol::TCP;
         partial_fwd.sequence_number = 150;
         partial_fwd.data_length = 100;
         stats.update(&partial_fwd, true, fwd.timestamp_us);
 
         let mut bwd = packet(2_500_000);
-        bwd.protocol = IpNextHeaderProtocols::Tcp.0;
+        bwd.protocol = ip_protocol::TCP;
         bwd.flags = SYN_FLAG;
         bwd.syn_flag = 1;
         bwd.sequence_number = 200;
         stats.update(&bwd, false, fwd.timestamp_us);
 
         let mut duplicate_syn = packet(2_600_000);
-        duplicate_syn.protocol = IpNextHeaderProtocols::Tcp.0;
+        duplicate_syn.protocol = ip_protocol::TCP;
         duplicate_syn.flags = SYN_FLAG;
         duplicate_syn.syn_flag = 1;
         duplicate_syn.sequence_number = 200;
@@ -386,7 +386,7 @@ mod tests {
         let mut stats = RetransmissionStats::new();
 
         let mut fin = packet(1_000_000);
-        fin.protocol = IpNextHeaderProtocols::Tcp.0;
+        fin.protocol = ip_protocol::TCP;
         fin.flags = FIN_FLAG | ACK_FLAG;
         fin.fin_flag = 1;
         fin.ack_flag = 1;
@@ -394,7 +394,7 @@ mod tests {
         stats.update(&fin, true, fin.timestamp_us);
 
         let mut duplicate_fin = packet(1_100_000);
-        duplicate_fin.protocol = IpNextHeaderProtocols::Tcp.0;
+        duplicate_fin.protocol = ip_protocol::TCP;
         duplicate_fin.flags = FIN_FLAG | ACK_FLAG;
         duplicate_fin.fin_flag = 1;
         duplicate_fin.ack_flag = 1;
@@ -418,7 +418,7 @@ mod tests {
             (ACK_FLAG, 5, 1, 2),
         ] {
             let segment = PacketFeatures {
-                protocol: IpNextHeaderProtocols::Tcp.0,
+                protocol: ip_protocol::TCP,
                 flags,
                 sequence_number,
                 data_length,
@@ -437,19 +437,19 @@ mod tests {
         let mut stats = RetransmissionStats::new();
 
         let mut first = packet(1_000_000);
-        first.protocol = IpNextHeaderProtocols::Tcp.0;
+        first.protocol = ip_protocol::TCP;
         first.sequence_number = 100;
         first.data_length = 100;
         stats.update(&first, true, first.timestamp_us);
 
         let mut adjacent = packet(1_050_000);
-        adjacent.protocol = IpNextHeaderProtocols::Tcp.0;
+        adjacent.protocol = ip_protocol::TCP;
         adjacent.sequence_number = 200;
         adjacent.data_length = 100;
         stats.update(&adjacent, true, first.timestamp_us);
 
         let mut overlap = packet(1_100_000);
-        overlap.protocol = IpNextHeaderProtocols::Tcp.0;
+        overlap.protocol = ip_protocol::TCP;
         overlap.sequence_number = 150;
         overlap.data_length = 100;
         stats.update(&overlap, true, adjacent.timestamp_us);
@@ -515,7 +515,7 @@ mod tests {
         let mut stats = TcpQualityStats::new();
 
         let mut first_ack = packet(1_000_000);
-        first_ack.protocol = IpNextHeaderProtocols::Tcp.0;
+        first_ack.protocol = ip_protocol::TCP;
         first_ack.flags = ACK_FLAG;
         first_ack.ack_flag = 1;
         first_ack.sequence_number_ack = 500;
@@ -523,7 +523,7 @@ mod tests {
         stats.update(&first_ack, true, first_ack.timestamp_us);
 
         let mut duplicate_ack = packet(1_000_500);
-        duplicate_ack.protocol = IpNextHeaderProtocols::Tcp.0;
+        duplicate_ack.protocol = ip_protocol::TCP;
         duplicate_ack.flags = ACK_FLAG;
         duplicate_ack.ack_flag = 1;
         duplicate_ack.sequence_number_ack = 500;
@@ -531,7 +531,7 @@ mod tests {
         stats.update(&duplicate_ack, true, first_ack.timestamp_us);
 
         let mut changed_window = packet(1_001_000);
-        changed_window.protocol = IpNextHeaderProtocols::Tcp.0;
+        changed_window.protocol = ip_protocol::TCP;
         changed_window.flags = ACK_FLAG;
         changed_window.ack_flag = 1;
         changed_window.sequence_number_ack = 500;
@@ -539,7 +539,7 @@ mod tests {
         stats.update(&changed_window, true, duplicate_ack.timestamp_us);
 
         let mut zero_window = packet(1_001_500);
-        zero_window.protocol = IpNextHeaderProtocols::Tcp.0;
+        zero_window.protocol = ip_protocol::TCP;
         zero_window.flags = ACK_FLAG;
         zero_window.ack_flag = 1;
         zero_window.sequence_number_ack = 800;
@@ -547,7 +547,7 @@ mod tests {
         stats.update(&zero_window, false, changed_window.timestamp_us);
 
         let mut zero_window_repeat = packet(1_002_000);
-        zero_window_repeat.protocol = IpNextHeaderProtocols::Tcp.0;
+        zero_window_repeat.protocol = ip_protocol::TCP;
         zero_window_repeat.flags = ACK_FLAG;
         zero_window_repeat.ack_flag = 1;
         zero_window_repeat.sequence_number_ack = 800;
@@ -555,7 +555,7 @@ mod tests {
         stats.update(&zero_window_repeat, false, zero_window.timestamp_us);
 
         let mut tcp_payload = packet(1_002_500);
-        tcp_payload.protocol = IpNextHeaderProtocols::Tcp.0;
+        tcp_payload.protocol = ip_protocol::TCP;
         tcp_payload.ack_flag = 1;
         tcp_payload.flags = ACK_FLAG;
         tcp_payload.sequence_number_ack = 500;
@@ -564,7 +564,7 @@ mod tests {
         stats.update(&tcp_payload, true, zero_window_repeat.timestamp_us);
 
         let mut udp = packet(1_003_000);
-        udp.protocol = IpNextHeaderProtocols::Udp.0;
+        udp.protocol = ip_protocol::UDP;
         udp.window_size = 0;
         stats.update(&udp, false, tcp_payload.timestamp_us);
 

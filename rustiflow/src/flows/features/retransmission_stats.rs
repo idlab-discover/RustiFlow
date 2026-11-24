@@ -1,7 +1,7 @@
 use crate::flows::row::Record;
 use std::{collections::BTreeMap, ops::Range};
 
-use pnet_packet::ip::IpNextHeaderProtocols;
+use common::ip_protocol;
 
 use crate::{
     flows::util::FlowExpireCause,
@@ -123,7 +123,7 @@ impl RetransmissionStats {
 
 impl FlowFeature for RetransmissionStats {
     fn update(&mut self, packet: &PacketFeatures, is_forward: bool, _last_timestamp_us: i64) {
-        if packet.protocol != IpNextHeaderProtocols::Tcp.0 {
+        if packet.protocol != ip_protocol::TCP {
             // Retransmission stats are TCP-only.
             return;
         }

@@ -1,5 +1,5 @@
 use crate::flows::row::Record;
-use pnet_packet::ip::IpNextHeaderProtocols;
+use common::ip_protocol;
 
 use crate::{
     flows::util::FlowExpireCause,
@@ -37,9 +37,7 @@ impl TcpQualityStats {
     }
 
     fn is_duplicate_ack_candidate(packet: &PacketFeatures) -> bool {
-        packet.protocol == IpNextHeaderProtocols::Tcp.0
-            && packet.flags == ACK_FLAG
-            && packet.data_length == 0
+        packet.protocol == ip_protocol::TCP && packet.flags == ACK_FLAG && packet.data_length == 0
     }
 
     fn update_duplicate_ack_state(
@@ -69,7 +67,7 @@ impl TcpQualityStats {
 
 impl FlowFeature for TcpQualityStats {
     fn update(&mut self, packet: &PacketFeatures, is_forward: bool, _last_timestamp_us: i64) {
-        if packet.protocol != IpNextHeaderProtocols::Tcp.0 {
+        if packet.protocol != ip_protocol::TCP {
             return;
         }
 

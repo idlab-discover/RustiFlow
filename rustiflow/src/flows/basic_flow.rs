@@ -2,7 +2,7 @@ use crate::flows::row::Record;
 use std::net::IpAddr;
 
 use chrono::{DateTime, Utc};
-use pnet_packet::ip::IpNextHeaderProtocols;
+use common::ip_protocol;
 
 use crate::{
     flows::util::{
@@ -92,7 +92,7 @@ pub struct BasicFlow {
 
 impl BasicFlow {
     fn is_tcp(&self) -> bool {
-        self.protocol == IpNextHeaderProtocols::Tcp.0
+        self.protocol == ip_protocol::TCP
     }
 
     fn observe_tcp_handshake(&mut self, packet: &PacketFeatures, forward: bool) {

@@ -1,5 +1,6 @@
 #![no_std]
 
+pub mod ip_protocol;
 pub mod ipv6_extensions;
 
 pub use network_types::{
