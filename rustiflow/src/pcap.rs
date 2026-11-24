@@ -7,16 +7,14 @@ use crate::Flow;
 use crate::{flow_table::FlowTable, packet_features::PacketFeatures};
 use anyhow::{anyhow, bail, Context};
 use chrono::{DateTime, Utc};
+use common::wire::{
+    EthernetHeader, LinuxCookedHeader, VlanTag, ETHER_TYPE_IPV4, ETHER_TYPE_IPV6, ETHER_TYPE_VLAN,
+};
 use log::{debug, error, warn};
 use pcap_parser::traits::PcapReaderIterator;
 use pcap_parser::{create_reader, Block, OptionCode, PcapBlockOwned, PcapError, PcapNGOption};
-use pnet_packet::{
-    ethernet::{EtherType, EtherTypes, EthernetPacket},
-    ipv4::Ipv4Packet,
-    ipv6::Ipv6Packet,
-    Packet,
-};
 use tokio::sync::mpsc;
+use zerocopy::FromBytes;
 
 pub async fn read_pcap_file<T>(
     path: &str,
@@ -564,46 +562,37 @@ fn decode_frame(
     timestamp_us: i64,
     capture_tcp_payload: bool,
 ) -> Option<PacketFeatures> {
-    let Some(ethernet) = EthernetPacket::new(data) else {
+    let Ok((ethernet, ethernet_payload)) = EthernetHeader::ref_from_prefix(data) else {
         error!("Error parsing packet...");
         return None;
     };
-    let (mut ethertype, mut payload) = match ethernet.get_ethertype() {
-        kind @ (EtherTypes::Ipv4 | EtherTypes::Ipv6 | EtherTypes::Vlan) => {
-            (kind, ethernet.payload())
-        }
+    let (mut ether_type, mut payload) = match ethernet.ether_type.get() {
+        kind @ (ETHER_TYPE_IPV4 | ETHER_TYPE_IPV6 | ETHER_TYPE_VLAN) => (kind, ethernet_payload),
         _ => {
-            let Some((header, payload)) = data.split_at_checked(16) else {
+            let Ok((cooked, payload)) = LinuxCookedHeader::ref_from_prefix(data) else {
                 debug!("Packet too short for Linux cooked capture header");
                 return None;
             };
-            (
-                EtherType(u16::from_be_bytes([header[14], header[15]])),
-                payload,
-            )
+            (cooked.protocol.get(), payload)
         }
     };
-    if ethertype == EtherTypes::Vlan {
-        let Some((tag, inner)) = payload.split_at_checked(4) else {
+    if ether_type == ETHER_TYPE_VLAN {
+        let Ok((tag, inner)) = VlanTag::ref_from_prefix(payload) else {
             debug!("VLAN packet too short to contain inner EtherType");
             return None;
         };
-        ethertype = EtherType(u16::from_be_bytes([tag[2], tag[3]]));
+        ether_type = tag.ether_type.get();
         payload = inner;
     }
-    match ethertype {
-        EtherTypes::Ipv4 => PacketFeatures::from_ipv4_packet(
-            &Ipv4Packet::new(payload)?,
-            timestamp_us,
-            capture_tcp_payload,
-        ),
-        EtherTypes::Ipv6 => PacketFeatures::from_ipv6_packet(
-            &Ipv6Packet::new(payload)?,
-            timestamp_us,
-            capture_tcp_payload,
-        ),
+    match ether_type {
+        ETHER_TYPE_IPV4 => {
+            PacketFeatures::from_ipv4_packet(payload, timestamp_us, capture_tcp_payload)
+        }
+        ETHER_TYPE_IPV6 => {
+            PacketFeatures::from_ipv6_packet(payload, timestamp_us, capture_tcp_payload)
+        }
         _ => {
-            debug!("Unsupported EtherType: {ethertype:?}");
+            debug!("Unsupported EtherType: {ether_type:#06x}");
             None
         }
     }

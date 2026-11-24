@@ -2,19 +2,15 @@
 use std::net::Ipv6Addr;
 use std::net::{IpAddr, Ipv4Addr};
 
-use common::ipv6_extensions::Ipv6Extension;
+use common::{
+    ip_protocol,
+    ipv6_extensions::Ipv6Extension,
+    wire::{IcmpHeader, Ipv4Header, Ipv6Header, TcpHeader, UdpHeader},
+};
 #[cfg(target_os = "linux")]
 use common::{EbpfEventIpv4, EbpfEventIpv6};
 use log::debug;
-use pnet_packet::{
-    icmp::IcmpPacket,
-    ip::{IpNextHeaderProtocol, IpNextHeaderProtocols},
-    ipv4::Ipv4Packet,
-    ipv6::Ipv6Packet,
-    tcp::TcpPacket,
-    udp::UdpPacket,
-    Packet,
-};
+use zerocopy::FromBytes;
 
 use crate::flow_key::FlowKey;
 
@@ -115,12 +111,12 @@ impl PacketFeatures {
             window_size: event.window_size,
             sequence_number: event.sequence_number,
             sequence_number_ack: event.sequence_number_ack,
-            icmp_type: if event.protocol == IpNextHeaderProtocols::Icmp.0 {
+            icmp_type: if event.protocol == ip_protocol::ICMP {
                 Some(event.icmp_type)
             } else {
                 None
             },
-            icmp_code: if event.protocol == IpNextHeaderProtocols::Icmp.0 {
+            icmp_code: if event.protocol == ip_protocol::ICMP {
                 Some(event.icmp_code)
             } else {
                 None
@@ -155,12 +151,12 @@ impl PacketFeatures {
             window_size: event.window_size,
             sequence_number: event.sequence_number,
             sequence_number_ack: event.sequence_number_ack,
-            icmp_type: if event.protocol == IpNextHeaderProtocols::Icmpv6.0 {
+            icmp_type: if event.protocol == ip_protocol::ICMPV6 {
                 Some(event.icmp_type)
             } else {
                 None
             },
-            icmp_code: if event.protocol == IpNextHeaderProtocols::Icmpv6.0 {
+            icmp_code: if event.protocol == ip_protocol::ICMPV6 {
                 Some(event.icmp_code)
             } else {
                 None
@@ -171,60 +167,77 @@ impl PacketFeatures {
         }
     }
 
+    /// Decodes an IPv4 packet that starts at `packet`. Bytes past the
+    /// declared total length, such as Ethernet padding, are ignored.
     pub fn from_ipv4_packet(
-        packet: &Ipv4Packet,
+        packet: &[u8],
         timestamp_us: i64,
         capture_tcp_payload: bool,
     ) -> Option<Self> {
-        if packet.get_fragment_offset() > 0 {
+        let (header, _) = Ipv4Header::ref_from_prefix(packet).ok()?;
+        if header.fragment_offset() > 0 {
             return None;
         }
 
-        let length = packet.get_total_length();
-        let transport_length = if capture_tcp_payload && packet.get_flags() & 1 == 0 {
-            usize::from(length).checked_sub(usize::from(packet.get_header_length()) * 4)
+        let header_length = header.header_length();
+        let length = header.total_length.get();
+        let transport_length = if capture_tcp_payload && !header.more_fragments() {
+            usize::from(length).checked_sub(header_length)
         } else {
             None
         };
+        // An IHL below the minimum still leaves the fixed header in front.
+        let payload = packet
+            .get(header_length.max(size_of::<Ipv4Header>())..)
+            .map_or(&[][..], |rest| {
+                &rest[..rest
+                    .len()
+                    .min(usize::from(length).saturating_sub(header_length))]
+            });
         extract_packet_features_transport(
             Self {
-                source_ip: packet.get_source().into(),
-                destination_ip: packet.get_destination().into(),
-                protocol: packet.get_next_level_protocol().0,
+                source_ip: Ipv4Addr::from(header.source).into(),
+                destination_ip: Ipv4Addr::from(header.destination).into(),
+                protocol: header.protocol,
                 timestamp_us,
                 length,
-                ttl: packet.get_ttl(),
+                ttl: header.ttl,
                 ..Self::default()
             },
-            packet.payload(),
+            payload,
             transport_length,
         )
     }
 
+    /// Decodes an IPv6 packet that starts at `packet`. Bytes past the
+    /// declared payload length are ignored.
     pub fn from_ipv6_packet(
-        packet: &Ipv6Packet,
+        packet: &[u8],
         timestamp_us: i64,
         capture_tcp_payload: bool,
     ) -> Option<Self> {
-        let (protocol, payload, fragmented) = skip_ipv6_extension_headers(packet)?;
-        let declared_length = packet.get_payload_length();
+        let (header, rest) = Ipv6Header::ref_from_prefix(packet).ok()?;
+        let declared_length = header.payload_length.get();
+        let ip_payload = &rest[..rest.len().min(usize::from(declared_length))];
+        let (protocol, payload, fragmented) =
+            skip_ipv6_extension_headers(header.next_header, ip_payload)?;
         let transport_length = if capture_tcp_payload && !fragmented {
-            usize::from(declared_length).checked_sub(packet.payload().len() - payload.len())
+            usize::from(declared_length).checked_sub(ip_payload.len() - payload.len())
         } else {
             None
         };
         extract_packet_features_transport(
             Self {
-                source_ip: packet.get_source().into(),
-                destination_ip: packet.get_destination().into(),
-                protocol: protocol.0,
+                source_ip: Ipv6Addr::from(header.source).into(),
+                destination_ip: Ipv6Addr::from(header.destination).into(),
+                protocol,
                 timestamp_us,
                 length: if capture_tcp_payload {
                     declared_length.saturating_add(40)
                 } else {
-                    packet.packet().len() as u16
+                    packet.len() as u16
                 },
-                ttl: packet.get_hop_limit(),
+                ttl: header.hop_limit,
                 ..Self::default()
             },
             payload,
@@ -256,28 +269,23 @@ fn monotonic_ns_to_epoch_us(timestamp_ns: u64, realtime_offset_us: i64) -> i64 {
     realtime_offset_us + (timestamp_ns / 1_000) as i64
 }
 
-fn skip_ipv6_extension_headers<'a>(
-    packet: &'a Ipv6Packet<'a>,
-) -> Option<(IpNextHeaderProtocol, &'a [u8], bool)> {
+fn skip_ipv6_extension_headers(
+    mut next_header: u8,
+    mut payload: &[u8],
+) -> Option<(u8, &[u8], bool)> {
     const MAX_EXTENSION_HEADERS: usize = 8;
-    let mut next_header = packet.get_next_header();
-    let mut payload = packet.payload();
     let mut fragmented = false;
 
     for _ in 0..MAX_EXTENSION_HEADERS {
-        let Some(extension) = Ipv6Extension::from_next_header(next_header.0) else {
+        let Some(extension) = Ipv6Extension::from_next_header(next_header) else {
             return Some((next_header, payload, fragmented));
         };
-        let prefix = payload.get(..4)?.try_into().ok()?;
+        let prefix = *payload.first_chunk::<4>()?;
         let header_len = extension.header_length(prefix)?;
         fragmented |= matches!(extension, Ipv6Extension::Fragment) && prefix[3] & 1 != 0;
 
-        if payload.len() < header_len {
-            return None;
-        }
-
-        next_header = IpNextHeaderProtocol(payload[0]);
-        payload = &payload[header_len..];
+        next_header = prefix[0];
+        payload = payload.get(header_len..)?;
     }
 
     Some((next_header, payload, fragmented))
@@ -288,12 +296,12 @@ fn extract_packet_features_transport(
     packet: &[u8],
     declared_transport_length: Option<usize>,
 ) -> Option<PacketFeatures> {
-    match IpNextHeaderProtocol(features.protocol) {
-        IpNextHeaderProtocols::Tcp => {
-            let tcp = TcpPacket::new(packet)?;
-            features.source_port = tcp.get_source();
-            features.destination_port = tcp.get_destination();
-            features.flags = tcp.get_flags();
+    match features.protocol {
+        ip_protocol::TCP => {
+            let (tcp, _) = TcpHeader::ref_from_prefix(packet).ok()?;
+            features.source_port = tcp.source_port.get();
+            features.destination_port = tcp.destination_port.get();
+            features.flags = tcp.flags;
             features.fin_flag = get_tcp_flag(features.flags, FIN_FLAG);
             features.syn_flag = get_tcp_flag(features.flags, SYN_FLAG);
             features.rst_flag = get_tcp_flag(features.flags, RST_FLAG);
@@ -302,11 +310,13 @@ fn extract_packet_features_transport(
             features.urg_flag = get_tcp_flag(features.flags, URG_FLAG);
             features.cwr_flag = get_tcp_flag(features.flags, CWR_FLAG);
             features.ece_flag = get_tcp_flag(features.flags, ECE_FLAG);
-            features.header_length = tcp.get_data_offset() * 4;
-            features.data_length = tcp.payload().len() as u16;
-            features.window_size = tcp.get_window();
-            features.sequence_number = tcp.get_sequence();
-            features.sequence_number_ack = tcp.get_acknowledgement();
+            features.header_length = tcp.header_length();
+            // A data offset below the minimum still leaves the fixed header in front.
+            let payload_start = usize::from(features.header_length).max(size_of::<TcpHeader>());
+            features.data_length = packet.len().saturating_sub(payload_start) as u16;
+            features.window_size = tcp.window.get();
+            features.sequence_number = tcp.sequence_number.get();
+            features.sequence_number_ack = tcp.acknowledgement_number.get();
             if let Some(end) = declared_transport_length {
                 let start = usize::from(features.header_length);
                 if let Some(length) = end.checked_sub(start).filter(|_| start >= 20) {
@@ -323,19 +333,20 @@ fn extract_packet_features_transport(
                 }
             }
         }
-        IpNextHeaderProtocols::Udp => {
-            let udp = UdpPacket::new(packet)?;
-            features.source_port = udp.get_source();
-            features.destination_port = udp.get_destination();
-            features.data_length = udp.payload().len() as u16;
+        ip_protocol::UDP => {
+            let (udp, payload) = UdpHeader::ref_from_prefix(packet).ok()?;
+            features.source_port = udp.source_port.get();
+            features.destination_port = udp.destination_port.get();
+            features.data_length = payload.len() as u16;
             features.header_length = 8;
         }
-        IpNextHeaderProtocols::Icmp | IpNextHeaderProtocols::Icmpv6 => {
-            let icmp = IcmpPacket::new(packet)?;
-            features.data_length = icmp.payload().len() as u16;
+        ip_protocol::ICMP | ip_protocol::ICMPV6 => {
+            // The message-specific rest of the header counts as data here.
+            let (icmp, payload) = IcmpHeader::ref_from_prefix(packet).ok()?;
+            features.data_length = payload.len() as u16;
             features.header_length = 8;
-            features.icmp_type = Some(icmp.get_icmp_type().0);
-            features.icmp_code = Some(icmp.get_icmp_code().0);
+            features.icmp_type = Some(icmp.icmp_type);
+            features.icmp_code = Some(icmp.code);
         }
         _ => {
             debug!("Unsupported protocol in packet!");

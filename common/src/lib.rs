@@ -2,6 +2,8 @@
 
 pub mod ip_protocol;
 pub mod ipv6_extensions;
+#[cfg(feature = "zerocopy")]
+pub mod wire;
 
 pub use network_types::{
     icmp::{Icmpv4Hdr, Icmpv6Hdr},

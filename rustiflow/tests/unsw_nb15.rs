@@ -1,12 +1,13 @@
 use std::{fs, path::Path, process::Command};
 
-use pnet_packet::{
-    ethernet::{EtherTypes, MutableEthernetPacket},
-    ip::IpNextHeaderProtocols,
-    ipv4::MutableIpv4Packet,
-    tcp::{MutableTcpPacket, TcpFlags},
-    udp::MutableUdpPacket,
+use common::{
+    ip_protocol,
+    wire::{EthernetHeader, Ipv4Header, TcpHeader, UdpHeader, ETHER_TYPE_IPV4},
 };
+use zerocopy::{FromZeros, IntoBytes};
+
+const SYN_FLAG: u8 = 0x02;
+const ACK_FLAG: u8 = 0x10;
 
 struct Capture(Vec<u8>);
 
@@ -19,25 +20,23 @@ impl Capture {
     }
 
     fn packet(&mut self, timestamp_us: u32, reply: bool, protocol: u8, transport: &[u8]) {
-        let mut frame = vec![0; 14 + 20 + transport.len()];
-        let mut ethernet = MutableEthernetPacket::new(&mut frame).unwrap();
-        ethernet.set_ethertype(EtherTypes::Ipv4);
-        let mut ip = MutableIpv4Packet::new(&mut frame[14..]).unwrap();
-        ip.set_version(4);
-        ip.set_header_length(5);
-        ip.set_total_length((20 + transport.len()) as u16);
-        let client = "192.0.2.1".parse().unwrap();
-        let server = "192.0.2.2".parse().unwrap();
+        let mut ethernet = EthernetHeader::new_zeroed();
+        ethernet.ether_type.set(ETHER_TYPE_IPV4);
+        let client = [192, 0, 2, 1];
+        let server = [192, 0, 2, 2];
         let (source, destination, ttl) = if reply {
             (server, client, 252)
         } else {
             (client, server, 62)
         };
-        ip.set_source(source);
-        ip.set_destination(destination);
-        ip.set_ttl(ttl);
-        ip.set_next_level_protocol(pnet_packet::ip::IpNextHeaderProtocol(protocol));
-        ip.set_payload(transport);
+        let mut ip = Ipv4Header::new_zeroed();
+        ip.version_ihl = 0x45;
+        ip.total_length.set((20 + transport.len()) as u16);
+        ip.source = source;
+        ip.destination = destination;
+        ip.ttl = ttl;
+        ip.protocol = protocol;
+        let frame = [ethernet.as_bytes(), ip.as_bytes(), transport].concat();
         for value in [
             timestamp_us / 1_000_000,
             timestamp_us % 1_000_000,
@@ -57,36 +56,29 @@ impl Capture {
         flags: u8,
         body: &[u8],
     ) {
-        let mut transport = vec![0; 20 + body.len()];
-        let mut tcp = MutableTcpPacket::new(&mut transport).unwrap();
-        tcp.set_source(ports.0);
-        tcp.set_destination(ports.1);
-        tcp.set_sequence(seq_ack.0);
-        tcp.set_acknowledgement(seq_ack.1);
-        tcp.set_data_offset(5);
-        tcp.set_flags(flags);
-        tcp.set_window(2048);
-        tcp.set_payload(body);
+        let mut tcp = TcpHeader::new_zeroed();
+        tcp.source_port.set(ports.0);
+        tcp.destination_port.set(ports.1);
+        tcp.sequence_number.set(seq_ack.0);
+        tcp.acknowledgement_number.set(seq_ack.1);
+        tcp.data_offset_reserved = 5 << 4;
+        tcp.flags = flags;
+        tcp.window.set(2048);
+        let transport = [tcp.as_bytes(), body].concat();
         self.packet(
             timestamp_us,
             ports.0 < ports.1,
-            IpNextHeaderProtocols::Tcp.0,
+            ip_protocol::TCP,
             &transport,
         );
     }
 
     fn udp(&mut self, timestamp_us: u32, port: u16) {
-        let mut transport = [0; 8];
-        let mut udp = MutableUdpPacket::new(&mut transport).unwrap();
-        udp.set_source(port);
-        udp.set_destination(53);
-        udp.set_length(8);
-        self.packet(
-            timestamp_us,
-            false,
-            IpNextHeaderProtocols::Udp.0,
-            &transport,
-        );
+        let mut udp = UdpHeader::new_zeroed();
+        udp.source_port.set(port);
+        udp.destination_port.set(53);
+        udp.length.set(8);
+        self.packet(timestamp_us, false, ip_protocol::UDP, udp.as_bytes());
     }
 }
 
@@ -121,7 +113,7 @@ fn export(path: &Path, threads: &str, extra: &[&str]) -> String {
 #[test]
 fn extracts_application_features_and_orders_connections_across_shards() {
     let mut capture = Capture::new();
-    let (syn, ack) = (TcpFlags::SYN, TcpFlags::ACK);
+    let (syn, ack) = (SYN_FLAG, ACK_FLAG);
     let client = (50000, 80);
     let server = (80, 50000);
     capture.tcp(2_000_000, client, (100, 0), syn, b"");
