@@ -2,14 +2,9 @@
 
 pub mod ip_protocol;
 pub mod ipv6_extensions;
-#[cfg(feature = "zerocopy")]
 pub mod wire;
 
-pub use network_types::{
-    icmp::{Icmpv4Hdr, Icmpv6Hdr},
-    tcp::TcpHdr,
-    udp::UdpHdr,
-};
+use wire::{IcmpMessageHeader, TcpHeader, UdpHeader};
 
 pub const REALTIME_EVENT_QUEUE_COUNT: usize = 8;
 pub const REALTIME_EVENT_RINGBUF_BYTES: u32 = 1024 * 1024 * 64;
@@ -19,16 +14,14 @@ pub const REALTIME_EVENT_RINGBUF_BYTES: u32 = 1024 * 1024 * 64;
 /// Addresses are the wire bytes in network order; every other multi-byte
 /// field is in host byte order.
 #[repr(C, packed)]
-#[cfg_attr(
-    feature = "zerocopy",
-    derive(
-        zerocopy::FromBytes,
-        zerocopy::IntoBytes,
-        zerocopy::KnownLayout,
-        zerocopy::Immutable
-    )
+#[derive(
+    Copy,
+    Clone,
+    zerocopy::FromBytes,
+    zerocopy::IntoBytes,
+    zerocopy::KnownLayout,
+    zerocopy::Immutable,
 )]
-#[derive(Copy, Clone)]
 pub struct EbpfEventIpv4 {
     pub timestamp_ns: u64,
     pub ipv4_destination: [u8; 4],
@@ -97,16 +90,14 @@ const _: () = assert!(core::mem::size_of::<EbpfEventIpv4>() == 40);
 /// Addresses are the wire bytes in network order; every other multi-byte
 /// field is in host byte order.
 #[repr(C, packed)]
-#[cfg_attr(
-    feature = "zerocopy",
-    derive(
-        zerocopy::FromBytes,
-        zerocopy::IntoBytes,
-        zerocopy::KnownLayout,
-        zerocopy::Immutable
-    )
+#[derive(
+    Copy,
+    Clone,
+    zerocopy::FromBytes,
+    zerocopy::IntoBytes,
+    zerocopy::KnownLayout,
+    zerocopy::Immutable,
 )]
-#[derive(Clone, Copy)]
 pub struct EbpfEventIpv6 {
     pub timestamp_ns: u64,
     pub ipv6_destination: [u8; 16],
@@ -184,34 +175,27 @@ pub trait NetworkHeader {
     fn icmp_code(&self) -> u8;
 }
 
-impl NetworkHeader for TcpHdr {
+impl NetworkHeader for TcpHeader {
     fn source_port(&self) -> u16 {
-        u16::from_be_bytes(self.source)
+        self.source_port.get()
     }
     fn destination_port(&self) -> u16 {
-        u16::from_be_bytes(self.dest)
+        self.destination_port.get()
     }
     fn window_size(&self) -> u16 {
-        u16::from_be_bytes(self.window)
+        self.window.get()
     }
     fn combined_flags(&self) -> u8 {
-        (self.fin() as u8)
-            | ((self.syn() as u8) << 1)
-            | ((self.rst() as u8) << 2)
-            | ((self.psh() as u8) << 3)
-            | ((self.ack() as u8) << 4)
-            | ((self.urg() as u8) << 5)
-            | ((self.ece() as u8) << 6)
-            | ((self.cwr() as u8) << 7)
+        self.flags
     }
     fn header_length(&self) -> u8 {
-        (self.doff() * 4) as u8
+        TcpHeader::header_length(self)
     }
     fn sequence_number(&self) -> u32 {
-        u32::from_be_bytes(self.seq)
+        self.sequence_number.get()
     }
     fn sequence_number_ack(&self) -> u32 {
-        u32::from_be_bytes(self.ack_seq)
+        self.acknowledgement_number.get()
     }
     fn icmp_type(&self) -> u8 {
         0
@@ -221,12 +205,12 @@ impl NetworkHeader for TcpHdr {
     }
 }
 
-impl NetworkHeader for UdpHdr {
+impl NetworkHeader for UdpHeader {
     fn source_port(&self) -> u16 {
-        self.src_port()
+        self.source_port.get()
     }
     fn destination_port(&self) -> u16 {
-        self.dst_port()
+        self.destination_port.get()
     }
     fn window_size(&self) -> u16 {
         0
@@ -235,7 +219,7 @@ impl NetworkHeader for UdpHdr {
         0
     }
     fn header_length(&self) -> u8 {
-        UdpHdr::LEN as u8
+        core::mem::size_of::<UdpHeader>() as u8
     }
     fn sequence_number(&self) -> u32 {
         0
@@ -252,51 +236,44 @@ impl NetworkHeader for UdpHdr {
 }
 
 /// ICMPv4 and ICMPv6 share the type/code layout this crate reads.
-macro_rules! impl_icmp_network_header {
-    ($header:ty) => {
-        impl NetworkHeader for $header {
-            fn source_port(&self) -> u16 {
-                0
-            }
-            fn destination_port(&self) -> u16 {
-                0
-            }
-            fn window_size(&self) -> u16 {
-                0
-            }
-            fn combined_flags(&self) -> u8 {
-                0
-            }
-            fn header_length(&self) -> u8 {
-                <$header>::LEN as u8
-            }
-            fn sequence_number(&self) -> u32 {
-                0
-            }
-            fn sequence_number_ack(&self) -> u32 {
-                0
-            }
-            fn icmp_type(&self) -> u8 {
-                self.type_
-            }
-            fn icmp_code(&self) -> u8 {
-                self.code
-            }
-        }
-    };
+impl NetworkHeader for IcmpMessageHeader {
+    fn source_port(&self) -> u16 {
+        0
+    }
+    fn destination_port(&self) -> u16 {
+        0
+    }
+    fn window_size(&self) -> u16 {
+        0
+    }
+    fn combined_flags(&self) -> u8 {
+        0
+    }
+    fn header_length(&self) -> u8 {
+        core::mem::size_of::<IcmpMessageHeader>() as u8
+    }
+    fn sequence_number(&self) -> u32 {
+        0
+    }
+    fn sequence_number_ack(&self) -> u32 {
+        0
+    }
+    fn icmp_type(&self) -> u8 {
+        self.header.icmp_type
+    }
+    fn icmp_code(&self) -> u8 {
+        self.header.code
+    }
 }
-
-impl_icmp_network_header!(Icmpv4Hdr);
-impl_icmp_network_header!(Icmpv6Hdr);
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use zerocopy::FromBytes;
 
     /// Reads a header from wire bytes the way `TcContext::load` does.
-    fn load<T>(bytes: &[u8]) -> T {
-        assert_eq!(bytes.len(), core::mem::size_of::<T>());
-        unsafe { core::ptr::read_unaligned(bytes.as_ptr().cast()) }
+    fn load<T: FromBytes>(bytes: &[u8]) -> T {
+        T::read_from_bytes(bytes).unwrap()
     }
 
     fn fields(header: &impl NetworkHeader) -> (u16, u16, u16, u8, u8, u32, u32, u8, u8) {
@@ -315,7 +292,7 @@ mod tests {
 
     #[test]
     fn tcp_header_fields_are_in_host_order() {
-        let tcp: TcpHdr = load(&[
+        let tcp: TcpHeader = load(&[
             0xc3, 0x50, // source port 50000
             0x01, 0xbb, // destination port 443
             0x01, 0x02, 0x03, 0x04, // sequence number
@@ -343,18 +320,15 @@ mod tests {
 
     #[test]
     fn udp_header_fields_are_in_host_order() {
-        let udp: UdpHdr = load(&[0x00, 0x35, 0xd4, 0x31, 0x00, 0x20, 0x00, 0x00]);
+        let udp: UdpHeader = load(&[0x00, 0x35, 0xd4, 0x31, 0x00, 0x20, 0x00, 0x00]);
 
         assert_eq!(fields(&udp), (53, 54321, 0, 0, 8, 0, 0, 0, 0));
     }
 
     #[test]
-    fn icmp_headers_report_type_and_code() {
-        let bytes = [3, 4, 0, 0, 0, 0, 0, 0];
-        let icmpv4: Icmpv4Hdr = load(&bytes);
-        let icmpv6: Icmpv6Hdr = load(&bytes);
+    fn icmp_header_reports_type_and_code() {
+        let icmp: IcmpMessageHeader = load(&[3, 4, 0, 0, 0, 0, 0, 0]);
 
-        assert_eq!(fields(&icmpv4), (0, 0, 0, 0, 8, 0, 0, 3, 4));
-        assert_eq!(fields(&icmpv6), fields(&icmpv4));
+        assert_eq!(fields(&icmp), (0, 0, 0, 0, 8, 0, 0, 3, 4));
     }
 }

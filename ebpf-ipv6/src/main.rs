@@ -8,7 +8,8 @@ mod ipv6;
 mod packet;
 
 use aya_ebpf::{bindings::TC_ACT_PIPE, macros::classifier, programs::TcContext};
-use network_types::eth::{EthHdr, EtherType};
+use common::wire::{EthernetHeader, ETHER_TYPE_IPV6};
+use packet::PacketContext;
 
 const COUNTER_SLOTS: u32 = 1;
 const IPV6_COUNTER_INDEX: u32 = 0;
@@ -16,8 +17,9 @@ const IPV6_COUNTER_INDEX: u32 = 0;
 #[classifier]
 pub fn tc_flow_track(ctx: TcContext) -> i32 {
     if matches!(
-        ctx.load::<EthHdr>(0).map(|header| header.ether_type()),
-        Ok(Ok(EtherType::Ipv6))
+        ctx.load_header::<EthernetHeader>(0)
+            .map(|header| header.ether_type.get()),
+        Ok(ETHER_TYPE_IPV6)
     ) {
         let _ = ipv6::process_packet(&ctx);
     }

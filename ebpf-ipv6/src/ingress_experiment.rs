@@ -16,12 +16,10 @@ use aya_ebpf::{
     programs::{TcContext, XdpContext},
     EbpfContext,
 };
-use core::{
-    mem::{size_of, MaybeUninit},
-    ptr,
-};
-use network_types::eth::{EthHdr, EtherType};
-use packet::{PacketContext, WireHeader};
+use common::wire::{EthernetHeader, ETHER_TYPE_IPV4, ETHER_TYPE_IPV6};
+use core::{mem::size_of, ptr};
+use packet::PacketContext;
+use zerocopy::{FromBytes, IntoBytes};
 
 const COUNTER_SLOTS: u32 = 2;
 const IPV4_COUNTER_INDEX: u32 = 0;
@@ -41,41 +39,42 @@ pub fn xdp_flow_track(ctx: XdpContext) -> u32 {
 
 #[inline(always)]
 fn observe(ctx: &impl PacketContext) -> Result<(), ()> {
-    match ctx.load_header::<EthHdr>(0)?.ether_type() {
-        Ok(EtherType::Ipv4) => ipv4::process_packet(ctx),
-        Ok(EtherType::Ipv6) => ipv6::process_packet(ctx),
+    match ctx.load_header::<EthernetHeader>(0)?.ether_type.get() {
+        ETHER_TYPE_IPV4 => ipv4::process_packet(ctx),
+        ETHER_TYPE_IPV6 => ipv6::process_packet(ctx),
         _ => Ok(()),
     }
 }
 
 impl PacketContext for XdpContext {
     #[inline(always)]
-    fn load_header<T: WireHeader>(&self, offset: usize) -> Result<T, ()> {
+    fn load_header<T: FromBytes + IntoBytes + Copy>(&self, offset: usize) -> Result<T, ()> {
         // Keep the direct read within the verifier's range tracking. Longer
         // extension chains and headers spanning buffers use the copy helper.
         if offset <= 255 {
             let start = self.data() + offset;
             if start + size_of::<T>() <= self.data_end() {
-                // SAFETY: the bounds check covers the whole header, whose fields
-                // accept all bit patterns. Wire headers may be unaligned.
+                // SAFETY: the bounds check covers the whole header, and
+                // `FromBytes` accepts every bit pattern. Wire headers may be
+                // unaligned.
                 return Ok(unsafe { ptr::read_unaligned(start as *const T) });
             }
         }
 
         // After at most eight IPv6 extension headers, this offset fits in u32.
-        let mut header = MaybeUninit::<T>::uninit();
-        // SAFETY: the helper writes size_of::<T>() bytes on success, and WireHeader
-        // accepts all bit patterns.
+        let mut header = T::new_zeroed();
+        let bytes = header.as_mut_bytes();
+        // SAFETY: the helper writes at most `bytes.len()` bytes into `bytes`.
         let result = unsafe {
             bpf_xdp_load_bytes(
                 self.as_ptr().cast(),
                 offset as u32,
-                header.as_mut_ptr().cast(),
-                size_of::<T>() as u32,
+                bytes.as_mut_ptr().cast(),
+                bytes.len() as u32,
             )
         };
         if result == 0 {
-            Ok(unsafe { header.assume_init() })
+            Ok(header)
         } else {
             Err(())
         }

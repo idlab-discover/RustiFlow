@@ -1,23 +1,16 @@
 use aya_ebpf::{helpers::bpf_ktime_get_ns, macros::map, maps::RingBuf};
 use aya_log_ebpf::debug;
 
-use common::EbpfEventIpv4;
-use common::Icmpv4Hdr;
-use common::NetworkHeader;
-use common::TcpHdr;
-use common::UdpHdr;
-use common::REALTIME_EVENT_QUEUE_COUNT;
-use common::REALTIME_EVENT_RINGBUF_BYTES;
-use network_types::{
-    eth::EthHdr,
-    ip::{IpProto, Ipv4Hdr},
+use common::{
+    ip_protocol,
+    wire::{EthernetHeader, IcmpMessageHeader, Ipv4Header, TcpHeader, UdpHeader},
+    EbpfEventIpv4, NetworkHeader, REALTIME_EVENT_QUEUE_COUNT, REALTIME_EVENT_RINGBUF_BYTES,
 };
+use core::mem::size_of;
+use zerocopy::{FromBytes, IntoBytes};
 
 use crate::counters::{increment_counter, DROPPED_PACKETS, MATCHED_PACKETS, SUBMITTED_EVENTS};
-use crate::{
-    packet::{PacketContext, WireHeader},
-    IPV4_COUNTER_INDEX,
-};
+use crate::{packet::PacketContext, IPV4_COUNTER_INDEX};
 
 #[map]
 static EVENTS_IPV4_0: RingBuf = RingBuf::with_byte_size(REALTIME_EVENT_RINGBUF_BYTES, 0);
@@ -44,18 +37,20 @@ static EVENTS_IPV4_6: RingBuf = RingBuf::with_byte_size(REALTIME_EVENT_RINGBUF_B
 static EVENTS_IPV4_7: RingBuf = RingBuf::with_byte_size(REALTIME_EVENT_RINGBUF_BYTES, 0);
 
 pub(crate) fn process_packet(ctx: &impl PacketContext) -> Result<(), ()> {
-    let ipv4hdr = ctx.load_header::<Ipv4Hdr>(EthHdr::LEN)?;
-    if ipv4hdr.frag_offset() != 0 {
+    let ipv4hdr = ctx.load_header::<Ipv4Header>(size_of::<EthernetHeader>())?;
+    if ipv4hdr.fragment_offset() != 0 {
         return Ok(());
     }
-    let ip_header_length = usize::from(ipv4hdr.ihl());
+    let ip_header_length = ipv4hdr.header_length();
     let packet_info = PacketInfo::new(&ipv4hdr, ip_header_length)?;
-    let hdr_offset = EthHdr::LEN + ip_header_length;
+    let hdr_offset = size_of::<EthernetHeader>() + ip_header_length;
 
-    match ipv4hdr.proto() {
-        Ok(IpProto::Tcp) => process_transport_packet::<TcpHdr>(ctx, &packet_info, hdr_offset),
-        Ok(IpProto::Udp) => process_transport_packet::<UdpHdr>(ctx, &packet_info, hdr_offset),
-        Ok(IpProto::Icmp) => process_transport_packet::<Icmpv4Hdr>(ctx, &packet_info, hdr_offset),
+    match ipv4hdr.protocol {
+        ip_protocol::TCP => process_transport_packet::<TcpHeader>(ctx, &packet_info, hdr_offset),
+        ip_protocol::UDP => process_transport_packet::<UdpHeader>(ctx, &packet_info, hdr_offset),
+        ip_protocol::ICMP => {
+            process_transport_packet::<IcmpMessageHeader>(ctx, &packet_info, hdr_offset)
+        }
         _ => Ok(()),
     }
 }
@@ -154,7 +149,7 @@ fn finish_hash32(mut value: u32) -> u32 {
     value ^ (value >> 16)
 }
 
-fn process_transport_packet<T: NetworkHeader + WireHeader>(
+fn process_transport_packet<T: NetworkHeader + FromBytes + IntoBytes + Copy>(
     ctx: &impl PacketContext,
     packet_info: &PacketInfo,
     header_offset: usize,
@@ -178,14 +173,14 @@ struct PacketInfo {
 }
 
 impl PacketInfo {
-    fn new(ipv4hdr: &Ipv4Hdr, network_header_length: usize) -> Result<Self, ()> {
+    fn new(ipv4hdr: &Ipv4Header, network_header_length: usize) -> Result<Self, ()> {
         Ok(Self {
-            ipv4_source: u32::from_ne_bytes(ipv4hdr.src_addr),
-            ipv4_destination: u32::from_ne_bytes(ipv4hdr.dst_addr),
-            total_length: ipv4hdr.tot_len(),
+            ipv4_source: u32::from_ne_bytes(ipv4hdr.source),
+            ipv4_destination: u32::from_ne_bytes(ipv4hdr.destination),
+            total_length: ipv4hdr.total_length.get(),
             network_header_length: network_header_length as u16,
             ttl: ipv4hdr.ttl,
-            protocol: ipv4hdr.proto,
+            protocol: ipv4hdr.protocol,
         })
     }
 

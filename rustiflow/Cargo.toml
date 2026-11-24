@@ -9,7 +9,7 @@ publish = false
 [dependencies]
 clap = { version = "4.5.0", features = ["derive"] }
 serde = { version = "1.0.196", features = ["derive"] }
-common = { path = "../common", features = ["zerocopy"] }
+common = { path = "../common" }
 zerocopy = { workspace = true, features = ["simd"] }
 anyhow = "1"
 log = "0.4"

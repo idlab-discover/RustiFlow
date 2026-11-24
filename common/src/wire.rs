@@ -128,6 +128,15 @@ pub struct IcmpHeader {
     pub checksum: U16,
 }
 
+/// The first eight bytes of an ICMPv4 or ICMPv6 message. The realtime
+/// programs require all eight and count them as transport header.
+#[derive(Clone, Copy, FromBytes, IntoBytes, KnownLayout, Immutable, Unaligned)]
+#[repr(C)]
+pub struct IcmpMessageHeader {
+    pub header: IcmpHeader,
+    pub rest_of_header: [u8; 4],
+}
+
 const _: () = {
     assert!(core::mem::size_of::<EthernetHeader>() == 14);
     assert!(core::mem::size_of::<LinuxCookedHeader>() == 16);
@@ -137,4 +146,5 @@ const _: () = {
     assert!(core::mem::size_of::<TcpHeader>() == 20);
     assert!(core::mem::size_of::<UdpHeader>() == 8);
     assert!(core::mem::size_of::<IcmpHeader>() == 4);
+    assert!(core::mem::size_of::<IcmpMessageHeader>() == 8);
 };

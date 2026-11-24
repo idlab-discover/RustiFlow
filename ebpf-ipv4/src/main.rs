@@ -6,7 +6,8 @@ mod ipv4;
 mod packet;
 
 use aya_ebpf::{bindings::TC_ACT_PIPE, macros::classifier, programs::TcContext};
-use network_types::eth::{EthHdr, EtherType};
+use common::wire::{EthernetHeader, ETHER_TYPE_IPV4};
+use packet::PacketContext;
 
 const COUNTER_SLOTS: u32 = 1;
 const IPV4_COUNTER_INDEX: u32 = 0;
@@ -14,8 +15,9 @@ const IPV4_COUNTER_INDEX: u32 = 0;
 #[classifier]
 pub fn tc_flow_track(ctx: TcContext) -> i32 {
     if matches!(
-        ctx.load::<EthHdr>(0).map(|header| header.ether_type()),
-        Ok(Ok(EtherType::Ipv4))
+        ctx.load_header::<EthernetHeader>(0)
+            .map(|header| header.ether_type.get()),
+        Ok(ETHER_TYPE_IPV4)
     ) {
         let _ = ipv4::process_packet(&ctx);
     }

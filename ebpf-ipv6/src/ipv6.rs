@@ -1,22 +1,17 @@
 use aya_ebpf::{helpers::bpf_ktime_get_ns, macros::map, maps::RingBuf};
 use aya_log_ebpf::debug;
 
-use common::ipv6_extensions::Ipv6Extension;
 use common::{
-    EbpfEventIpv6, Icmpv6Hdr, NetworkHeader, TcpHdr, UdpHdr, REALTIME_EVENT_QUEUE_COUNT,
-    REALTIME_EVENT_RINGBUF_BYTES,
+    ip_protocol,
+    ipv6_extensions::Ipv6Extension,
+    wire::{EthernetHeader, IcmpMessageHeader, Ipv6Header, TcpHeader, UdpHeader},
+    EbpfEventIpv6, NetworkHeader, REALTIME_EVENT_QUEUE_COUNT, REALTIME_EVENT_RINGBUF_BYTES,
 };
-use network_types::{
-    eth::EthHdr,
-    ip::{IpProto, Ipv6Hdr},
-};
-use num_traits::FromPrimitive;
+use core::mem::size_of;
+use zerocopy::{FromBytes, IntoBytes};
 
 use crate::counters::{increment_counter, DROPPED_PACKETS, MATCHED_PACKETS, SUBMITTED_EVENTS};
-use crate::{
-    packet::{PacketContext, WireHeader},
-    IPV6_COUNTER_INDEX,
-};
+use crate::{packet::PacketContext, IPV6_COUNTER_INDEX};
 
 #[map]
 static EVENTS_IPV6_0: RingBuf = RingBuf::with_byte_size(REALTIME_EVENT_RINGBUF_BYTES, 0);
@@ -46,11 +41,11 @@ const MAX_EXT_HEADERS: usize = 8;
 
 fn skip_ipv6_ext_headers(ctx: &impl PacketContext, start_offset: usize) -> Result<(u8, usize), ()> {
     // Load the base IPv6 header
-    let ipv6hdr = ctx.load_header::<Ipv6Hdr>(start_offset)?;
+    let ipv6hdr = ctx.load_header::<Ipv6Header>(start_offset)?;
 
     // Current offset: skip the fixed 40-byte IPv6 header
-    let mut offset = start_offset + Ipv6Hdr::LEN;
-    let mut next_hdr = ipv6hdr.next_hdr;
+    let mut offset = start_offset + size_of::<Ipv6Header>();
+    let mut next_hdr = ipv6hdr.next_header;
 
     // Unrolled loop using a fixed number of iterations
     for _ in 0..MAX_EXT_HEADERS {
@@ -70,23 +65,23 @@ fn skip_ipv6_ext_headers(ctx: &impl PacketContext, start_offset: usize) -> Resul
 
 pub(crate) fn process_packet(ctx: &impl PacketContext) -> Result<(), ()> {
     // 1) Skip over IPv6 extension headers to find the real upper-layer protocol and offset
-    let (final_proto, offset_after_ext) = skip_ipv6_ext_headers(ctx, EthHdr::LEN)?;
+    let (final_proto, offset_after_ext) = skip_ipv6_ext_headers(ctx, size_of::<EthernetHeader>())?;
 
     // 2) Build packet_info for IPv6
-    let ipv6hdr = ctx.load_header::<Ipv6Hdr>(EthHdr::LEN)?;
-    let network_header_length = offset_after_ext - EthHdr::LEN;
+    let ipv6hdr = ctx.load_header::<Ipv6Header>(size_of::<EthernetHeader>())?;
+    let network_header_length = offset_after_ext - size_of::<EthernetHeader>();
     let packet_info = PacketInfo::new(&ipv6hdr, final_proto, network_header_length)?;
 
     // 3) Dispatch on the final protocol
-    match IpProto::from_u8(final_proto) {
-        Some(IpProto::Tcp) => {
-            process_transport_packet::<TcpHdr>(ctx, &packet_info, offset_after_ext)
+    match final_proto {
+        ip_protocol::TCP => {
+            process_transport_packet::<TcpHeader>(ctx, &packet_info, offset_after_ext)
         }
-        Some(IpProto::Udp) => {
-            process_transport_packet::<UdpHdr>(ctx, &packet_info, offset_after_ext)
+        ip_protocol::UDP => {
+            process_transport_packet::<UdpHeader>(ctx, &packet_info, offset_after_ext)
         }
-        Some(IpProto::Ipv6Icmp) => {
-            process_transport_packet::<Icmpv6Hdr>(ctx, &packet_info, offset_after_ext)
+        ip_protocol::ICMPV6 => {
+            process_transport_packet::<IcmpMessageHeader>(ctx, &packet_info, offset_after_ext)
         }
         _ => Ok(()),
     }
@@ -194,7 +189,7 @@ fn finish_hash32(mut value: u32) -> u32 {
     value ^ (value >> 16)
 }
 
-fn process_transport_packet<T: NetworkHeader + WireHeader>(
+fn process_transport_packet<T: NetworkHeader + FromBytes + IntoBytes + Copy>(
     ctx: &impl PacketContext,
     packet_info: &PacketInfo,
     transport_offset: usize,
@@ -218,11 +213,11 @@ struct PacketInfo {
 }
 
 impl PacketInfo {
-    fn new(ipv6hdr: &Ipv6Hdr, protocol: u8, network_header_length: usize) -> Result<Self, ()> {
+    fn new(ipv6hdr: &Ipv6Header, protocol: u8, network_header_length: usize) -> Result<Self, ()> {
         Ok(Self {
-            ipv6_source: u128::from_ne_bytes(ipv6hdr.src_addr),
-            ipv6_destination: u128::from_ne_bytes(ipv6hdr.dst_addr),
-            total_length: Ipv6Hdr::LEN as u16 + ipv6hdr.payload_len(),
+            ipv6_source: u128::from_ne_bytes(ipv6hdr.source),
+            ipv6_destination: u128::from_ne_bytes(ipv6hdr.destination),
+            total_length: size_of::<Ipv6Header>() as u16 + ipv6hdr.payload_length.get(),
             network_header_length: network_header_length as u16,
             ttl: ipv6hdr.hop_limit,
             protocol,
