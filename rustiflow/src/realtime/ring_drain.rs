@@ -29,7 +29,7 @@ impl DrainPolicy {
 
     pub(super) async fn run(
         self,
-        ring: RingBuf<MapData>,
+        ring: AsyncFd<RingBuf<MapData>>,
         batcher: SourceBatcher,
         graph: Option<PacketGraphState>,
         decode: DecodeEvent,
@@ -52,16 +52,12 @@ enum DrainEnd {
 }
 
 async fn drain<const BUDGETED: bool>(
-    ring: RingBuf<MapData>,
+    mut ring: AsyncFd<RingBuf<MapData>>,
     mut batcher: SourceBatcher,
     graph: Option<PacketGraphState>,
     decode: DecodeEvent,
     realtime_offset_us: i64,
 ) {
-    // SAFETY: the ring owns its map fd, which stays open and stable for the
-    // lifetime of the AsyncFd.
-    let mut ring = unsafe { AsyncFd::register(ring) }.unwrap();
-
     loop {
         let mut guard = ring.readable_mut().await.unwrap();
         if let Some(stats) = batcher.stats.as_ref().and_then(|stats| stats.ring.as_ref()) {

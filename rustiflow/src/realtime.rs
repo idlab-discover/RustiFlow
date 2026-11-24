@@ -3,6 +3,7 @@ mod ebpf_objects;
 mod promiscuous;
 mod replay;
 mod ring_drain;
+mod source_reactors;
 
 pub use replay::replay_bench;
 
@@ -41,9 +42,9 @@ use ebpf_objects::ebpf_object_path;
 use log::{error, info};
 use promiscuous::PromiscuousMembership;
 use ring_drain::{DrainPolicy, RingStats};
+use source_reactors::{ReactorCount, RingSource, RingSourcePipeline};
 use tokio::sync::watch;
 use tokio::{
-    io::unix::AsyncFd,
     signal,
     sync::mpsc::{self, Receiver, Sender},
     task::JoinSet,
@@ -381,6 +382,7 @@ pub async fn handle_realtime<T>(
 where
     T: Flow,
 {
+    let reactor_count = ReactorCount::from_env(ingress_only)?;
     let settings = PipelineSettings::from_env();
     let shard_count =
         NonZeroUsize::new(usize::from(num_threads)).context("thread count must be at least 1")?;
@@ -498,32 +500,33 @@ where
                 .into_iter()
                 .map(|(label, ring_buf)| (label, ring_buf, decode_ipv6_event as DecodeEvent)),
         );
-    for (label, ring_buf, decode_event) in sources {
-        let stats = enable_source_stats.then(|| {
-            Arc::new(RealtimeSourceStats {
-                ring: Some(RingStats::new(realtime_offset_us)),
-                ..RealtimeSourceStats::default()
-            })
-        });
-        source_stats.push((label, stats.clone()));
-        let batcher = SourceBatcher::new(
-            &mut handle_set,
-            &shard_senders,
-            &shard_selector,
-            &settings,
-            stats,
-        );
-        handle_set.spawn(drain_policy.run(
-            ring_buf,
-            batcher,
-            packet_graph.clone(),
-            decode_event,
-            realtime_offset_us,
-        ));
+    let sources = sources
+        .map(|(label, ring, decode)| {
+            let stats = enable_source_stats.then(|| {
+                Arc::new(RealtimeSourceStats {
+                    ring: Some(RingStats::new(realtime_offset_us)),
+                    ..RealtimeSourceStats::default()
+                })
+            });
+
+            source_stats.push((label, stats.clone()));
+            RingSource {
+                ring,
+                decode,
+                stats,
+            }
+        })
+        .collect();
+    let mut reactors = RingSourcePipeline {
+        shard_senders,
+        shard_selector,
+        settings,
+        packet_graph,
+        drain_policy,
+        realtime_offset_us,
     }
-    // Only the dispatchers keep the shards' senders, so aborting them on
-    // shutdown lets each shard export its remaining flows.
-    drop(shard_senders);
+    .start(reactor_count, &mut handle_set, sources)
+    .await?;
 
     info!("Waiting for Ctrl-C...");
 
@@ -531,7 +534,10 @@ where
         let _ = launch_packet_tui(packet_rx).await;
     }
 
-    signal::ctrl_c().await?;
+    let capture_result = tokio::select! {
+        signal = signal::ctrl_c() => signal.context("waiting for Ctrl-C"),
+        error = reactors.unexpected_exit() => Err(error),
+    };
 
     // Fetch dropped packets counter from eBPF program before terminating
     info!("Fetching dropped packet counters before exiting...");
@@ -549,6 +555,7 @@ where
 
     // Cancel the tasks reading ebpf events
     handle_set.abort_all();
+    let reactor_result = reactors.shutdown().await;
 
     // Wait for all tasks to finish
     while let Some(res) = handle_set.join_next().await {
@@ -568,6 +575,8 @@ where
         }
     }
 
+    capture_result?;
+    reactor_result?;
     Ok(total_dropped)
 }
 
