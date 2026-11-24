@@ -45,6 +45,14 @@ jobs:
     - name: Build eBPF program ipv6
       run: cargo xtask ebpf-ipv6
 
+    # Opt-in experiments (docs/profiling/experiments.md) are not in default
+    # builds; build and test them here so they cannot break silently.
+    - name: Build experimental eBPF objects
+      working-directory: ebpf-ipv6
+      run: |
+        cargo build --locked --features dual-stack --bin rustiflow-ebpf-dual-stack
+        cargo build --locked --features xdp-experiment --bin rustiflow-ebpf-ingress-experiment
+
     - name: Build userspace program
       run: cargo build --locked --verbose
 
@@ -53,6 +61,9 @@ jobs:
 
     - name: Run Clippy with profiling
       run: cargo clippy --locked -p rustiflow --all-targets --features profiling -- -D warnings
+
+    - name: Run Clippy with experiment features
+      run: cargo clippy --locked -p rustiflow --all-targets --features experiment-deadline-index,staged-flow-lookup -- -D warnings
 
     # Documentation is only published from main; pull requests just build it.
     - name: Fetch gh-pages branch
@@ -68,6 +79,9 @@ jobs:
       
     - name: Run tests
       run: cargo test --locked --verbose
+
+    - name: Run tests with experiment features
+      run: cargo test --locked -p rustiflow --features experiment-deadline-index,staged-flow-lookup
       
     - name: Generate documentation
       run: cargo doc --locked --no-deps

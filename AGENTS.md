@@ -93,6 +93,8 @@ Use the smallest command that gives confidence:
   - `cargo check -p rustiflow`
 - Run Rust tests for the main crate:
   - `cargo test -p rustiflow`
+- Check opt-in experiment code when touching the flow table or expiration (CI runs both):
+  - `cargo test -p rustiflow --features experiment-deadline-index,staged-flow-lookup`
 - Build eBPF programs:
   - `cargo xtask ebpf-ipv4`
   - `cargo xtask ebpf-ipv6`
