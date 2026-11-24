@@ -9,11 +9,7 @@ use super::util::FlowExpireCause;
 use super::{
     basic_flow::BasicFlow,
     features::{
-        active_idle_stats::ActiveIdleStats, bulk_stats::BulkStats, header_stats::HeaderLengthStats,
-        iat_stats::IATStats, icmp_stats::IcmpStats, packet_stats::PacketLengthStats,
-        payload_stats::PayloadLengthStats, retransmission_stats::RetransmissionStats,
-        subflow_stats::SubflowStats, tcp_flag_stats::TcpFlagStats,
-        window_size_stats::WindowSizeStats,
+        iat_stats::IATStats, packet_stats::PacketLengthStats, tcp_flag_stats::TcpFlagStats,
     },
     flow::Flow,
 };
@@ -25,14 +21,6 @@ pub struct NfFlow {
     pub packet_len_stats: PacketLengthStats,
     pub iat_stats: IATStats,
     pub tcp_flags_stats: TcpFlagStats,
-    pub header_len_stats: HeaderLengthStats,
-    pub payload_len_stats: PayloadLengthStats,
-    pub bulk_stats: BulkStats,
-    pub subflow_stats: SubflowStats,
-    pub active_idle_stats: ActiveIdleStats,
-    pub icmp_stats: IcmpStats,
-    pub retransmission_stats: RetransmissionStats,
-    pub window_size_stats: WindowSizeStats,
     pub timing_stats: TimingStats,
 }
 
@@ -74,14 +62,6 @@ impl Flow for NfFlow {
             packet_len_stats: PacketLengthStats::new(),
             iat_stats: IATStats::new(),
             tcp_flags_stats: TcpFlagStats::new(),
-            header_len_stats: HeaderLengthStats::new(),
-            payload_len_stats: PayloadLengthStats::new(),
-            bulk_stats: BulkStats::new(),
-            subflow_stats: SubflowStats::new(),
-            active_idle_stats: ActiveIdleStats::new(timestamp_us),
-            icmp_stats: IcmpStats::new(),
-            retransmission_stats: RetransmissionStats::new(),
-            window_size_stats: WindowSizeStats::new(),
             timing_stats: TimingStats::new(),
         }
     }
@@ -93,18 +73,6 @@ impl Flow for NfFlow {
         self.packet_len_stats.update(packet, fwd, last_timestamp_us);
         self.iat_stats.update(packet, fwd, last_timestamp_us);
         self.tcp_flags_stats.update(packet, fwd, last_timestamp_us);
-        self.header_len_stats.update(packet, fwd, last_timestamp_us);
-        self.payload_len_stats
-            .update(packet, fwd, last_timestamp_us);
-        self.bulk_stats.update(packet, fwd, last_timestamp_us);
-        self.subflow_stats.update(packet, fwd, last_timestamp_us);
-        self.active_idle_stats
-            .update(packet, fwd, last_timestamp_us);
-        self.icmp_stats.update(packet, fwd, last_timestamp_us);
-        self.retransmission_stats
-            .update(packet, fwd, last_timestamp_us);
-        self.window_size_stats
-            .update(packet, fwd, last_timestamp_us);
         self.timing_stats.update(packet, fwd, last_timestamp_us);
 
         is_terminated
@@ -116,14 +84,6 @@ impl Flow for NfFlow {
         self.packet_len_stats.close(timestamp_us, cause);
         self.iat_stats.close(timestamp_us, cause);
         self.tcp_flags_stats.close(timestamp_us, cause);
-        self.header_len_stats.close(timestamp_us, cause);
-        self.payload_len_stats.close(timestamp_us, cause);
-        self.bulk_stats.close(timestamp_us, cause);
-        self.subflow_stats.close(timestamp_us, cause);
-        self.active_idle_stats.close(timestamp_us, cause);
-        self.icmp_stats.close(timestamp_us, cause);
-        self.retransmission_stats.close(timestamp_us, cause);
-        self.window_size_stats.close(timestamp_us, cause);
         self.timing_stats.close(timestamp_us, cause);
     }
 

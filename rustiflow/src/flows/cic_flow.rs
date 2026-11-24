@@ -12,14 +12,34 @@ use crate::{
 use super::{
     basic_flow::BasicFlow,
     features::{
-        active_idle_stats::ActiveIdleStats, bulk_stats::BulkStats, header_stats::HeaderLengthStats,
-        iat_stats::IATStats, icmp_stats::IcmpStats, payload_stats::PayloadLengthStats,
+        active_idle_stats::ActiveIdleStats, bulk_stats::BulkStats, iat_stats::IATStats,
+        icmp_stats::IcmpStats, payload_stats::PayloadLengthStats,
         retransmission_stats::RetransmissionStats, subflow_stats::SubflowStats,
-        tcp_flag_stats::TcpFlagStats, util::FlowFeature, window_size_stats::WindowSizeStats,
+        tcp_flag_stats::TcpFlagStats, util::FlowFeature,
     },
     flow::Flow,
     util::FlowExpireCause,
 };
+
+/// Header and window measurements exported by CIC for one direction.
+#[derive(Clone, Default)]
+struct CicDirection {
+    header_bytes: f64,
+    min_header: u8,
+    initial_window: Option<u16>,
+}
+
+impl CicDirection {
+    fn update(&mut self, packet: &PacketFeatures) {
+        self.header_bytes += f64::from(packet.header_length);
+        self.min_header = if self.initial_window.is_none() {
+            self.initial_window = Some(packet.window_size);
+            packet.header_length
+        } else {
+            self.min_header.min(packet.header_length)
+        };
+    }
+}
 
 /// Represents a Flow as exported by CICFlowMeter.
 #[derive(Clone)]
@@ -27,14 +47,14 @@ pub struct CicFlow {
     pub basic_flow: BasicFlow,
     pub iat_stats: IATStats,
     pub tcp_flags_stats: TcpFlagStats,
-    pub header_len_stats: HeaderLengthStats,
+    forward: CicDirection,
+    backward: CicDirection,
     pub payload_len_stats: PayloadLengthStats,
     pub bulk_stats: BulkStats,
     pub subflow_stats: SubflowStats,
     pub active_idle_stats: ActiveIdleStats,
     pub icmp_stats: IcmpStats,
     pub retransmission_stats: RetransmissionStats,
-    pub window_size_stats: WindowSizeStats,
 }
 
 impl Flow for CicFlow {
@@ -59,14 +79,14 @@ impl Flow for CicFlow {
             ),
             iat_stats: IATStats::new(),
             tcp_flags_stats: TcpFlagStats::new(),
-            header_len_stats: HeaderLengthStats::new(),
+            forward: CicDirection::default(),
+            backward: CicDirection::default(),
             payload_len_stats: PayloadLengthStats::new(),
             bulk_stats: BulkStats::new(),
             subflow_stats: SubflowStats::new(),
             active_idle_stats: ActiveIdleStats::new(timestamp_us),
             icmp_stats: IcmpStats::new(),
             retransmission_stats: RetransmissionStats::new(),
-            window_size_stats: WindowSizeStats::new(),
         }
     }
 
@@ -76,7 +96,12 @@ impl Flow for CicFlow {
 
         self.iat_stats.update(packet, fwd, last_timestamp_us);
         self.tcp_flags_stats.update(packet, fwd, last_timestamp_us);
-        self.header_len_stats.update(packet, fwd, last_timestamp_us);
+        let direction = if fwd {
+            &mut self.forward
+        } else {
+            &mut self.backward
+        };
+        direction.update(packet);
         self.payload_len_stats
             .update(packet, fwd, last_timestamp_us);
         self.bulk_stats.update(packet, fwd, last_timestamp_us);
@@ -85,8 +110,6 @@ impl Flow for CicFlow {
             .update(packet, fwd, last_timestamp_us);
         self.icmp_stats.update(packet, fwd, last_timestamp_us);
         self.retransmission_stats
-            .update(packet, fwd, last_timestamp_us);
-        self.window_size_stats
             .update(packet, fwd, last_timestamp_us);
 
         is_terminated
@@ -97,14 +120,12 @@ impl Flow for CicFlow {
 
         self.iat_stats.close(timestamp_us, cause);
         self.tcp_flags_stats.close(timestamp_us, cause);
-        self.header_len_stats.close(timestamp_us, cause);
         self.payload_len_stats.close(timestamp_us, cause);
         self.bulk_stats.close(timestamp_us, cause);
         self.subflow_stats.close(timestamp_us, cause);
         self.active_idle_stats.close(timestamp_us, cause);
         self.icmp_stats.close(timestamp_us, cause);
         self.retransmission_stats.close(timestamp_us, cause);
-        self.window_size_stats.close(timestamp_us, cause);
     }
 
     fn write_fields(&self, output: &mut impl Record) {
@@ -167,8 +188,8 @@ impl Flow for CicFlow {
             self.tcp_flags_stats.fwd_rst_flag_count,
             self.tcp_flags_stats.bwd_rst_flag_count,
             // Header Length Stats
-            self.header_len_stats.fwd_header_len.get_total(),
-            self.header_len_stats.bwd_header_len.get_total(),
+            self.forward.header_bytes,
+            self.backward.header_bytes,
             // Rate Stats (fwd & bwd packets)
             safe_per_second_rate(
                 self.payload_len_stats.fwd_payload_len.get_count() as f64,
@@ -227,14 +248,14 @@ impl Flow for CicFlow {
                 self.subflow_stats.subflow_count as f64
             ),
             // Window Size Stats
-            self.window_size_stats.fwd_init_window_size,
-            self.window_size_stats.bwd_init_window_size,
+            self.forward.initial_window.unwrap_or(0),
+            self.backward.initial_window.unwrap_or(0),
             // Non Zero Payload Packets
             self.payload_len_stats.fwd_non_zero_payload_packets,
             self.payload_len_stats.bwd_non_zero_payload_packets,
             // Segment Length Stats
-            self.header_len_stats.fwd_header_len.get_min(),
-            self.header_len_stats.bwd_header_len.get_min(),
+            f64::from(self.forward.min_header),
+            f64::from(self.backward.min_header),
             // Active/Idle Stats
             self.active_idle_stats.active_stats.get_mean(),
             self.active_idle_stats.active_stats.get_std(),
@@ -424,8 +445,8 @@ impl Flow for CicFlow {
             self.tcp_flags_stats.fwd_rst_flag_count,
             self.tcp_flags_stats.bwd_rst_flag_count,
             // Header Length Stats
-            self.header_len_stats.fwd_header_len.get_total(),
-            self.header_len_stats.bwd_header_len.get_total(),
+            self.forward.header_bytes,
+            self.backward.header_bytes,
             // Rate Stats (fwd & bwd packets)
             safe_per_second_rate(
                 self.payload_len_stats.fwd_payload_len.get_count() as f64,
@@ -484,14 +505,14 @@ impl Flow for CicFlow {
                 self.subflow_stats.subflow_count as f64
             ),
             // Window Size Stats
-            self.window_size_stats.fwd_init_window_size,
-            self.window_size_stats.bwd_init_window_size,
+            self.forward.initial_window.unwrap_or(0),
+            self.backward.initial_window.unwrap_or(0),
             // Non Zero Payload Packets
             self.payload_len_stats.fwd_non_zero_payload_packets,
             self.payload_len_stats.bwd_non_zero_payload_packets,
             // Segment Length Stats
-            self.header_len_stats.fwd_header_len.get_min(),
-            self.header_len_stats.bwd_header_len.get_min(),
+            f64::from(self.forward.min_header),
+            f64::from(self.backward.min_header),
             // Active/Idle Stats
             self.active_idle_stats.active_stats.get_mean(),
             self.active_idle_stats.active_stats.get_std(),

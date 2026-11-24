@@ -55,6 +55,47 @@ mod tests {
     }
 
     #[test]
+    fn cic_keeps_the_first_window_and_smallest_header_in_each_direction() {
+        use crate::flows::cic_flow::CicFlow;
+
+        let ip = IpAddr::V4(Ipv4Addr::LOCALHOST);
+        let mut flow = CicFlow::new("cic".into(), ip, 1234, ip, 80, 6, 0);
+        for (forward, header_length, window_size) in
+            [(true, 32, 0), (false, 24, 1024), (true, 20, 4096)]
+        {
+            let packet = PacketFeatures {
+                protocol: 6,
+                header_length,
+                window_size,
+                ..Default::default()
+            };
+            flow.update_flow(&packet, forward);
+        }
+        for (headers, row) in [
+            (CicFlow::get_features(), flow.dump()),
+            (
+                CicFlow::get_features_without_contamination(),
+                flow.dump_without_contamination(),
+            ),
+        ] {
+            let fields: std::collections::HashMap<_, _> =
+                headers.split(',').zip(row.split(',')).collect();
+            let names = [
+                "Fwd Header Length",
+                "Bwd Header Length",
+                "FWD Init Win Bytes",
+                "Bwd Init Win Bytes",
+                "Fwd Seg Size Min",
+                "Bwd Seg Size Min",
+            ];
+            assert_eq!(
+                names.map(|name| fields[name]),
+                ["52", "24", "0", "1024", "20", "24"]
+            );
+        }
+    }
+
+    #[test]
     fn bulk_rates_match_in_both_exporters_and_serialization_paths() {
         use crate::flows::{cic_flow::CicFlow, util::FlowExpireCause};
 
