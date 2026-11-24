@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"struct":["CicFlow"]};
+window.SIDEBAR_ITEMS = {"struct":["CicDirection","CicFlow"]};
