@@ -6,23 +6,17 @@ use crate::output::FlowSink;
 use crate::Flow;
 use crate::{flow_table::FlowTable, packet_features::PacketFeatures};
 use anyhow::{anyhow, bail, Context};
-use chrono::DateTime;
+use chrono::{DateTime, Utc};
 use log::{debug, error, warn};
 use pcap_parser::traits::PcapReaderIterator;
 use pcap_parser::{create_reader, Block, OptionCode, PcapBlockOwned, PcapError, PcapNGOption};
 use pnet_packet::{
-    ethernet::{EtherTypes, EthernetPacket},
+    ethernet::{EtherType, EtherTypes, EthernetPacket},
     ipv4::Ipv4Packet,
     ipv6::Ipv6Packet,
     Packet,
 };
 use tokio::sync::mpsc;
-
-// Define constants for Linux cooked capture EtherTypes
-const SLL_IPV4: u16 = 0x0800;
-const SLL_IPV6: u16 = 0x86DD;
-// Define constant for 802.1Q VLAN EtherType
-const ETHERTYPE_VLAN: u16 = 0x8100;
 
 pub async fn read_pcap_file<T>(
     path: &str,
@@ -86,145 +80,8 @@ where
             next_check_time_us = Some(timestamp_us.saturating_add(check_interval_us));
         }
 
-        if let Some(ethernet) = EthernetPacket::new(packet.data) {
-            match ethernet.get_ethertype() {
-                EtherTypes::Ipv4 => {
-                    if let Some(packet) = Ipv4Packet::new(ethernet.payload()) {
-                        process_packet::<T, Ipv4Packet>(
-                            &packet,
-                            timestamp_us,
-                            &mut dispatcher,
-                            PacketFeatures::from_ipv4_packet,
-                        )
-                        .await;
-                    }
-                }
-                EtherTypes::Ipv6 => {
-                    if let Some(packet) = Ipv6Packet::new(ethernet.payload()) {
-                        process_packet::<T, Ipv6Packet>(
-                            &packet,
-                            timestamp_us,
-                            &mut dispatcher,
-                            PacketFeatures::from_ipv6_packet,
-                        )
-                        .await;
-                    }
-                }
-                EtherTypes::Vlan => {
-                    // Handle 802.1Q VLAN tagged packets
-                    // VLAN header is 4 bytes: 2 bytes for VLAN tag and 2 bytes for inner EtherType
-                    if ethernet.payload().len() >= 4 {
-                        let inner_ethertype =
-                            u16::from_be_bytes([ethernet.payload()[2], ethernet.payload()[3]]);
-
-                        match inner_ethertype {
-                            SLL_IPV4 => {
-                                if let Some(packet) = Ipv4Packet::new(&ethernet.payload()[4..]) {
-                                    process_packet::<T, Ipv4Packet>(
-                                        &packet,
-                                        timestamp_us,
-                                        &mut dispatcher,
-                                        PacketFeatures::from_ipv4_packet,
-                                    )
-                                    .await;
-                                }
-                            }
-                            SLL_IPV6 => {
-                                if let Some(packet) = Ipv6Packet::new(&ethernet.payload()[4..]) {
-                                    process_packet::<T, Ipv6Packet>(
-                                        &packet,
-                                        timestamp_us,
-                                        &mut dispatcher,
-                                        PacketFeatures::from_ipv6_packet,
-                                    )
-                                    .await;
-                                }
-                            }
-                            _ => debug!(
-                                "Unsupported inner EtherType in VLAN packet: 0x{:04x}",
-                                inner_ethertype
-                            ),
-                        }
-                    } else {
-                        debug!("VLAN packet too short to contain inner EtherType");
-                    }
-                }
-                _ => {
-                    // Check if it is a Linux cooked capture
-                    if packet.data.len() < 16 {
-                        debug!("Packet too short for Linux cooked capture header");
-                        continue;
-                    }
-
-                    let ethertype = u16::from_be_bytes([packet.data[14], packet.data[15]]);
-                    match ethertype {
-                        SLL_IPV4 => {
-                            if let Some(packet) = Ipv4Packet::new(&packet.data[16..]) {
-                                process_packet::<T, Ipv4Packet>(
-                                    &packet,
-                                    timestamp_us,
-                                    &mut dispatcher,
-                                    PacketFeatures::from_ipv4_packet,
-                                )
-                                .await;
-                            }
-                        }
-                        SLL_IPV6 => {
-                            if let Some(packet) = Ipv6Packet::new(&packet.data[16..]) {
-                                process_packet::<T, Ipv6Packet>(
-                                    &packet,
-                                    timestamp_us,
-                                    &mut dispatcher,
-                                    PacketFeatures::from_ipv6_packet,
-                                )
-                                .await;
-                            }
-                        }
-                        ETHERTYPE_VLAN => {
-                            // Handle VLAN in Linux cooked capture
-                            if packet.data.len() >= 20 {
-                                // 16 bytes SLL header + 4 bytes VLAN header
-                                let inner_ethertype =
-                                    u16::from_be_bytes([packet.data[18], packet.data[19]]);
-
-                                match inner_ethertype {
-                                    SLL_IPV4 => {
-                                        if let Some(packet) = Ipv4Packet::new(&packet.data[20..]) {
-                                            process_packet::<T, Ipv4Packet>(
-                                                &packet,
-                                                timestamp_us,
-                                                &mut dispatcher,
-                                                PacketFeatures::from_ipv4_packet,
-                                            )
-                                            .await;
-                                        }
-                                    }
-                                    SLL_IPV6 => {
-                                        if let Some(packet) = Ipv6Packet::new(&packet.data[20..]) {
-                                            process_packet::<T, Ipv6Packet>(
-                                                &packet,
-                                                timestamp_us,
-                                                &mut dispatcher,
-                                                PacketFeatures::from_ipv6_packet,
-                                            )
-                                            .await;
-                                        }
-                                    }
-                                    _ => debug!(
-                                        "Unsupported inner EtherType in VLAN packet: 0x{:04x}",
-                                        inner_ethertype
-                                    ),
-                                }
-                            } else {
-                                debug!("VLAN packet in Linux cooked capture too short");
-                            }
-                        }
-                        _ => debug!("Failed to parse packet as IPv4 or IPv6..."),
-                    }
-                }
-            }
-        } else {
-            error!("Error parsing packet...");
+        if let Some(features) = decode_frame(packet.data, timestamp_us) {
+            dispatcher.dispatch(features).await;
         }
     }
     if let Some(timestamp_us) = last_timestamp_us {
@@ -376,9 +233,6 @@ impl CaptureReader {
                 }
                 Err(e) => bail!("corrupt record at offset {offset}: {e}"),
             };
-            if DateTime::from_timestamp(ts_sec, (ts_usec * 1000) as u32).is_none() {
-                bail!("corrupt record at offset {offset}: timestamp out of range");
-            }
             let buffer = self.blocks.data();
             assert_eq!(buffer.as_ptr() as usize, buffer_start);
             return Ok(Some(CapturedPacket {
@@ -546,6 +400,13 @@ impl PcapNgInterface {
             .with_context(|| {
                 format!("corrupt packet at offset {offset}: timestamp out of range")
             })?;
+        // Classic pcap seconds fit in u32. Only pcapng offsets and timestamp
+        // units can place a packet outside the exporter's UTC date range.
+        if !(DateTime::<Utc>::MIN_UTC.timestamp()..=DateTime::<Utc>::MAX_UTC.timestamp())
+            .contains(&seconds)
+        {
+            bail!("corrupt record at offset {offset}: timestamp out of range");
+        }
         let fraction = u128::from(units % self.units_per_second);
         let micros = fraction * 1_000_000 / u128::from(self.units_per_second);
         // `fraction` is below `units_per_second`, so `micros` is below 10^6.
@@ -696,18 +557,47 @@ impl ShardDispatcher {
     }
 }
 
-/// Extracts packet features and routes them to the appropriate shard.
-async fn process_packet<T, P>(
-    packet: &P,
-    timestamp_us: i64,
-    dispatcher: &mut ShardDispatcher,
-    extractor: fn(&P, i64) -> Option<PacketFeatures>,
-) where
-    T: Flow,
-    P: Packet,
-{
-    if let Some(packet_features) = extractor(packet, timestamp_us) {
-        dispatcher.dispatch(packet_features).await;
+/// Locate the network header once, then decode Ethernet and Linux cooked
+/// frames through the same IP parser, including single-tag VLAN captures.
+fn decode_frame(data: &[u8], timestamp_us: i64) -> Option<PacketFeatures> {
+    let Some(ethernet) = EthernetPacket::new(data) else {
+        error!("Error parsing packet...");
+        return None;
+    };
+    let (mut ethertype, mut payload) = match ethernet.get_ethertype() {
+        kind @ (EtherTypes::Ipv4 | EtherTypes::Ipv6 | EtherTypes::Vlan) => {
+            (kind, ethernet.payload())
+        }
+        _ => {
+            let Some((header, payload)) = data.split_at_checked(16) else {
+                debug!("Packet too short for Linux cooked capture header");
+                return None;
+            };
+            (
+                EtherType(u16::from_be_bytes([header[14], header[15]])),
+                payload,
+            )
+        }
+    };
+    if ethertype == EtherTypes::Vlan {
+        let Some((tag, inner)) = payload.split_at_checked(4) else {
+            debug!("VLAN packet too short to contain inner EtherType");
+            return None;
+        };
+        ethertype = EtherType(u16::from_be_bytes([tag[2], tag[3]]));
+        payload = inner;
+    }
+    match ethertype {
+        EtherTypes::Ipv4 => {
+            PacketFeatures::from_ipv4_packet(&Ipv4Packet::new(payload)?, timestamp_us)
+        }
+        EtherTypes::Ipv6 => {
+            PacketFeatures::from_ipv6_packet(&Ipv6Packet::new(payload)?, timestamp_us)
+        }
+        _ => {
+            debug!("Unsupported EtherType: {ethertype:?}");
+            None
+        }
     }
 }
 
