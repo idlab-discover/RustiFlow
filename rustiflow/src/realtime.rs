@@ -2,6 +2,7 @@ mod batch_pool;
 mod ebpf_objects;
 mod promiscuous;
 mod replay;
+mod ring_drain;
 
 pub use replay::replay_bench;
 
@@ -39,6 +40,7 @@ use common::{EbpfEventIpv4, EbpfEventIpv6, REALTIME_EVENT_QUEUE_COUNT};
 use ebpf_objects::ebpf_object_path;
 use log::{error, info};
 use promiscuous::PromiscuousMembership;
+use ring_drain::{DrainPolicy, RingStats};
 use tokio::sync::watch;
 use tokio::{
     io::unix::AsyncFd,
@@ -50,6 +52,7 @@ use tokio::{
 
 #[derive(Default)]
 struct RealtimeSourceStats {
+    ring: Option<RingStats>,
     events: AtomicU64,
     decode_and_shard_ns: AtomicU64,
     dispatch_enqueue_ns: AtomicU64,
@@ -128,6 +131,9 @@ fn elapsed_ns(start: Instant) -> u64 {
 }
 
 fn log_source_stats(label: &str, stats: &RealtimeSourceStats) {
+    if let Some(ring) = &stats.ring {
+        ring.log(label);
+    }
     let events = stats.events.load(Ordering::Relaxed);
     let decode_and_shard_ns = stats.decode_and_shard_ns.load(Ordering::Relaxed);
     let dispatch_enqueue_ns = stats.dispatch_enqueue_ns.load(Ordering::Relaxed);
@@ -357,48 +363,6 @@ impl SourceBatcher {
     }
 }
 
-/// Drains one ring buffer for as long as the task runs.
-async fn drain_ring_source(
-    ring_buf: RingBuf<MapData>,
-    mut batcher: SourceBatcher,
-    packet_graph: Option<PacketGraphState>,
-    decode_event: DecodeEvent,
-    realtime_offset_us: i64,
-) {
-    // Wrap the RingBuf in AsyncFd to poll it with tokio.
-    // SAFETY: the ring buffer owns its map file descriptor and reports that
-    // same descriptor from `as_raw_fd` until it is dropped with the `AsyncFd`.
-    let mut async_ring_buf = unsafe { AsyncFd::register(ring_buf) }.unwrap();
-
-    loop {
-        // Wait for data to be available in the ring buffer
-        let mut guard = async_ring_buf.readable_mut().await.unwrap();
-
-        let ring_buf = guard.get_inner_mut();
-        let mut drained_events = 0;
-        while let Some(event) = ring_buf.next() {
-            drained_events += 1;
-            if drained_events == PACKET_GRAPH_RECORD_BATCH {
-                if let Some(packet_graph) = &packet_graph {
-                    packet_graph.record_packets(drained_events);
-                }
-                drained_events = 0;
-            }
-            batcher
-                .push_event(|| decode_event(&event, realtime_offset_us))
-                .await;
-        }
-
-        if let Some(packet_graph) = &packet_graph {
-            packet_graph.record_packets(drained_events);
-        }
-        batcher.flush().await;
-
-        // Clear the readiness state for the next iteration
-        guard.clear_ready();
-    }
-}
-
 /// Starts the realtime processing of packets on the given interface.
 /// The function will return the number of packets dropped by the eBPF program.
 #[allow(clippy::too_many_arguments)]
@@ -524,6 +488,7 @@ where
     );
 
     // Spawn a drain task and a dispatcher per event source
+    let drain_policy = DrainPolicy::from_env();
     let mut source_stats = Vec::new();
     let sources = event_sources_v4
         .into_iter()
@@ -534,7 +499,12 @@ where
                 .map(|(label, ring_buf)| (label, ring_buf, decode_ipv6_event as DecodeEvent)),
         );
     for (label, ring_buf, decode_event) in sources {
-        let stats = enable_source_stats.then(|| Arc::new(RealtimeSourceStats::default()));
+        let stats = enable_source_stats.then(|| {
+            Arc::new(RealtimeSourceStats {
+                ring: Some(RingStats::new(realtime_offset_us)),
+                ..RealtimeSourceStats::default()
+            })
+        });
         source_stats.push((label, stats.clone()));
         let batcher = SourceBatcher::new(
             &mut handle_set,
@@ -543,7 +513,7 @@ where
             &settings,
             stats,
         );
-        handle_set.spawn(drain_ring_source(
+        handle_set.spawn(drain_policy.run(
             ring_buf,
             batcher,
             packet_graph.clone(),
@@ -646,6 +616,10 @@ async fn run_source_dispatcher(
     stats: Option<&Arc<RealtimeSourceStats>>,
 ) {
     while let Some(ShardDispatchBatch { shard_index, batch }) = dispatch_receiver.recv().await {
+        let handoff = stats
+            .and_then(|stats| stats.ring.as_ref())
+            .zip(batch.first())
+            .map(|(ring, first)| (ring, batch.len(), first.timestamp_us));
         let send_start = stats.as_ref().map(|_| Instant::now());
         if let Err(e) = shard_senders[shard_index].send(batch).await {
             if let Some(stats) = stats {
@@ -655,6 +629,8 @@ async fn run_source_dispatcher(
                 "Failed to send packet batch to shard {}: {}",
                 shard_index, e
             );
+        } else if let Some((ring, records, first_timestamp_us)) = handoff {
+            ring.record_handoff(records, first_timestamp_us);
         }
         if let (Some(stats), Some(send_start)) = (stats, send_start) {
             stats.add_shard_send_wait_ns(elapsed_ns(send_start));
