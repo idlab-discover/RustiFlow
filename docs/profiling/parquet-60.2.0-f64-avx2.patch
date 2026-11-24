@@ -1,0 +1,89 @@
+--- a/src/column/writer/min_max.rs
++++ b/src/column/writer/min_max.rs
+@@ -154 +154,85 @@
+-float_min_max!(min_max_f64, f64, i64, u64, LANES_64);
++float_min_max!(scalar_min_max_f64, f64, i64, u64, LANES_64);
++
++pub(crate) fn min_max_f64(values: &[f64]) -> Option<(f64, f64, u64)> {
++    #[cfg(target_arch = "x86_64")]
++    if values.len() >= 32 && std::arch::is_x86_feature_detected!("avx2") {
++        // SAFETY: the runtime check verified AVX2 support.
++        return unsafe { avx2_min_max_f64(values) };
++    }
++    scalar_min_max_f64(values)
++}
++
++#[cfg(target_arch = "x86_64")]
++#[target_feature(enable = "avx2")]
++fn avx2_min_max_f64(values: &[f64]) -> Option<(f64, f64, u64)> {
++    use std::arch::x86_64::{
++        _mm256_and_si256, _mm256_blendv_epi8, _mm256_cmpgt_epi64, _mm256_loadu_si256,
++        _mm256_set1_epi64x, _mm256_setzero_si256, _mm256_storeu_si256, _mm256_sub_epi64,
++        _mm256_xor_si256,
++    };
++
++    let zero = _mm256_setzero_si256();
++    let magnitude = _mm256_set1_epi64x(i64::MAX);
++    let infinity = _mm256_set1_epi64x(f64::INFINITY.to_bits() as i64);
++    let low = _mm256_set1_epi64x(i64::MIN);
++    let high = _mm256_set1_epi64x(i64::MAX);
++    let mut mins = high;
++    let mut maxs = low;
++    let mut nans = zero;
++
++    let (vectors, tail) = values.as_chunks::<4>();
++    for vector in vectors {
++        // SAFETY: each chunk contains exactly 32 initialized bytes. The
++        // unaligned load requires no extra alignment.
++        let bits = unsafe { _mm256_loadu_si256(vector.as_ptr().cast()) };
++        let nan = _mm256_cmpgt_epi64(_mm256_and_si256(bits, magnitude), infinity);
++        nans = _mm256_sub_epi64(nans, nan);
++
++        // Flipping the magnitude of negatives maps IEEE total order to signed
++        // integer order, including the distinction between -0.0 and +0.0.
++        let negative = _mm256_cmpgt_epi64(zero, bits);
++        let key = _mm256_xor_si256(bits, _mm256_and_si256(negative, magnitude));
++        let min_key = _mm256_blendv_epi8(key, high, nan);
++        let max_key = _mm256_blendv_epi8(key, low, nan);
++        mins = _mm256_blendv_epi8(mins, min_key, _mm256_cmpgt_epi64(mins, min_key));
++        maxs = _mm256_blendv_epi8(maxs, max_key, _mm256_cmpgt_epi64(max_key, maxs));
++    }
++
++    let mut min_lanes = [0i64; 4];
++    let mut max_lanes = [0i64; 4];
++    let mut nan_lanes = [0u64; 4];
++    // SAFETY: each array has space for one full unaligned store.
++    unsafe {
++        _mm256_storeu_si256(min_lanes.as_mut_ptr().cast(), mins);
++        _mm256_storeu_si256(max_lanes.as_mut_ptr().cast(), maxs);
++        _mm256_storeu_si256(nan_lanes.as_mut_ptr().cast(), nans);
++    }
++
++    // The total-order key mapping is its own inverse. Keep the reduction in
++    // integer space so the accumulator identities sort outside every number.
++    let order_key = |bits: i64| bits ^ ((bits >> 63) & i64::MAX);
++    let mut min = min_lanes.into_iter().min().unwrap();
++    let mut max = max_lanes.into_iter().max().unwrap();
++    let mut nan_count: u64 = nan_lanes.into_iter().sum();
++    for &value in tail {
++        if value.is_nan() {
++            nan_count += 1;
++        } else {
++            let key = order_key(value.to_bits() as i64);
++            min = min.min(key);
++            max = max.max(key);
++        }
++    }
++
++    // Preserve the existing caller's all-NaN path, which also determines
++    // the extrema of the input NaN payloads.
++    if nan_count == values.len() as u64 {
++        None
++    } else {
++        Some((
++            f64::from_bits(order_key(min) as u64),
++            f64::from_bits(order_key(max) as u64),
++            nan_count,
++        ))
++    }
++}

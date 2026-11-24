@@ -2,12 +2,23 @@ use std::{
     fs::{self, File},
     path::Path,
     process::Command,
+    sync::Arc,
 };
 
 use arrow_array::{Array, Float64Array, Int64Array, StringArray, TimestampMicrosecondArray};
 use arrow_schema::DataType;
 use chrono::DateTime;
-use parquet::arrow::arrow_reader::ParquetRecordBatchReaderBuilder;
+use parquet::{
+    arrow::arrow_reader::ParquetRecordBatchReaderBuilder,
+    basic::Compression,
+    data_type::DoubleType,
+    file::{
+        properties::{EnabledStatistics, WriterProperties},
+        statistics::Statistics,
+        writer::SerializedFileWriter,
+    },
+    schema::parser::parse_message_type,
+};
 
 const FIXTURE: &str = concat!(
     env!("CARGO_MANIFEST_DIR"),
@@ -145,6 +156,111 @@ fn empty_capture_has_a_readable_schema_and_no_rows() {
     assert_eq!(reader.schema().fields().len(), 10);
     assert_eq!(reader.metadata().file_metadata().num_rows(), 0);
     assert_eq!(reader.build().unwrap().count(), 0);
+}
+
+#[test]
+fn double_columns_preserve_value_bits_and_statistics_across_tails() {
+    let file = tempfile::NamedTempFile::new().unwrap();
+    let schema = Arc::new(parse_message_type("message flow { REQUIRED DOUBLE value; }").unwrap());
+    let properties = Arc::new(
+        WriterProperties::builder()
+            .set_compression(Compression::SNAPPY)
+            .set_dictionary_enabled(false)
+            .set_statistics_enabled(EnabledStatistics::Chunk)
+            .set_offset_index_disabled(true)
+            .build(),
+    );
+    let mut writer = SerializedFileWriter::new(file.reopen().unwrap(), schema, properties).unwrap();
+    let nans = [
+        f64::from_bits(0xfff8_0000_0000_0002),
+        f64::from_bits(0x7ff0_0000_0000_0001),
+        f64::from_bits(0x7ff8_0000_0000_0003),
+    ];
+    let patterns: [&[f64]; 4] = [
+        &nans,
+        &[0.0, -0.0, nans[0]],
+        &[nans[1], f64::from_bits(1), -f64::from_bits(1)],
+        &[0.25, -17.5, nans[2], f64::MIN, f64::MAX],
+    ];
+    let mut groups = Vec::new();
+    for len in [
+        1, 2, 3, 4, 31, 32, 33, 34, 35, 36, 511, 512, 513, 1023, 1024, 1025, 4095, 4096, 4097,
+    ] {
+        for pattern in patterns {
+            groups.push(
+                pattern
+                    .iter()
+                    .copied()
+                    .cycle()
+                    .take(len)
+                    .collect::<Vec<_>>(),
+            );
+        }
+        // The final full vector or scalar tail holds the only non-NaN values.
+        let mut tail = vec![nans[0]; len];
+        tail[len - 1] = f64::INFINITY;
+        if len > 1 {
+            tail[len - 2] = f64::NEG_INFINITY;
+        }
+        groups.push(tail);
+    }
+    for values in &groups {
+        let mut group = writer.next_row_group().unwrap();
+        let mut column = group.next_column().unwrap().unwrap();
+        column
+            .typed::<DoubleType>()
+            .write_batch(values, None, None)
+            .unwrap();
+        column.close().unwrap();
+        group.close().unwrap();
+    }
+    writer.close().unwrap();
+
+    let reader = ParquetRecordBatchReaderBuilder::try_new(file.reopen().unwrap()).unwrap();
+    assert_eq!(reader.metadata().num_row_groups(), groups.len());
+    for (group, values) in reader.metadata().row_groups().iter().zip(&groups) {
+        let column = group.column(0);
+        assert_eq!(column.compression(), Compression::SNAPPY);
+        let Some(Statistics::Double(stats)) = column.statistics() else {
+            panic!("missing Double column statistics");
+        };
+        let nan_count = values.iter().filter(|v| v.is_nan()).count();
+        let extrema = values
+            .iter()
+            .copied()
+            .filter(|v| nan_count == values.len() || !v.is_nan());
+        assert_eq!(stats.nan_count_opt(), Some(nan_count as u64));
+        assert_eq!(
+            (
+                stats.min_opt().map(|v| v.to_bits()),
+                stats.max_opt().map(|v| v.to_bits())
+            ),
+            (
+                extrema.clone().min_by(f64::total_cmp).map(f64::to_bits),
+                extrema.max_by(f64::total_cmp).map(f64::to_bits)
+            ),
+            "statistics for a {}-row group",
+            values.len()
+        );
+    }
+    let mut decoded = Vec::new();
+    for batch in reader.build().unwrap() {
+        let batch = batch.unwrap();
+        let values = batch
+            .column(0)
+            .as_any()
+            .downcast_ref::<Float64Array>()
+            .unwrap();
+        decoded.extend(values.values().iter().map(|v| v.to_bits()));
+    }
+    assert_eq!(
+        decoded,
+        groups
+            .into_iter()
+            .flatten()
+            .map(f64::to_bits)
+            .collect::<Vec<_>>()
+    );
 }
 
 #[cfg(target_os = "linux")]
