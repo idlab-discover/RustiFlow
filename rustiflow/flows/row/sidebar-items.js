@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"constant":["EXACT_INTEGER_F64_LIMIT"],"enum":["Value"],"fn":["append_float","push_i64_digits"],"macro":[["fields",1],["integer_values",1]],"struct":["CsvRow"],"trait":["Record"]};

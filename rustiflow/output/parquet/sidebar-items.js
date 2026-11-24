@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"constant":["FIRST_GROUP_ROWS","MAX_GROUP_ROWS"],"enum":["Column"],"fn":["spawn","write_groups"],"struct":["BatchRow","EncodedGroup","Encoder","Exporter","Layout","Shard","TextColumn"],"type":["GroupJob"]};

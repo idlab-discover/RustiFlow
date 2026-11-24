@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"constant":["EXPERIMENT_ENV"],"enum":["ExperimentHook","Ingress"],"fn":["attach_tc","attach_xdp","load_object","read_per_cpu_counter","spawn_ebpf_logger","take_sources","tc_attach_type_label"],"struct":["Capture","RealtimeEbpfCounters"],"type":["Sources"]};

@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"enum":["FlowUpdate"],"struct":["FlowEntry","FlowTable"]};
+window.SIDEBAR_ITEMS = {"enum":["FlowUpdate"],"mod":["batch_keys"],"struct":["FlowEntry","FlowTable","PacketLookup"]};
