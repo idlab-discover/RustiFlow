@@ -591,9 +591,14 @@ On x86-64 Linux, build with `--features staged-flow-lookup` and set
 live capture. The [benchmark report](docs/profiling/overnight-flow-table-prefetch.md)
 records the throughput gain at high flow counts and the CPU cost in live capture.
 
-Set `RUSTIFLOW_EXPERIMENT_RECYCLE_SHARD_BATCHES=1` to try reusing batch buffers
-in `replay-bench` or `realtime`. Each shard can retain up to 32 empty buffers.
-The [profiling report](docs/profiling/overnight-batch-buffer-reuse.md) records
+Live capture and Basic replay reuse shard batch buffers by default. Each shard
+can retain up to 32 empty buffers. Set `RUSTIFLOW_EXPERIMENT_RECYCLE_SHARD_BATCHES=0`
+to disable recycling, or set it to `1` to enable it for other replay feature sets.
+On x86-64 with AVX2, Basic replay also batches flow-key comparisons by default.
+Set `RUSTIFLOW_EXPERIMENT_SIMD_FLOW_KEYS=0` to select scalar comparisons, or
+`1` to request AVX2 on other replay or capture workloads. CPUs without AVX2
+use scalar comparisons. Staged lookup takes precedence when enabled.
+The [buffer recycling report](docs/profiling/overnight-batch-buffer-reuse.md) records
 the CPU savings and memory cost measured on nuccore.
 
 ## Logging in both development or using the binary

@@ -45,6 +45,9 @@ async fn measure<T: Flow>(flows: u32, batches: usize) {
         println!("HIT_BENCH_READY");
         assert_ne!(io::stdin().read_line(&mut String::new()).unwrap(), 0);
     }
+    let mut canonicalizer = crate::flow_table::BatchCanonicalizer::new(
+        std::env::var_os("RUSTIFLOW_EXPERIMENT_SIMD_FLOW_KEYS").is_some_and(|value| value != "0"),
+    );
     let start = Instant::now();
     for _ in 0..batches {
         for packet_slot in &mut batch {
@@ -54,7 +57,7 @@ async fn measure<T: Flow>(flows: u32, batches: usize) {
             timestamp_us += 1;
             *packet_slot = packet((rng % u64::from(flows)) as u32, timestamp_us);
         }
-        table.process_batch(&batch).await;
+        table.process_batch(&batch, &mut canonicalizer).await;
     }
     println!(
         "HIT_BENCH_DONE flows={flows} packets={timestamp_us} seconds={:.6}",

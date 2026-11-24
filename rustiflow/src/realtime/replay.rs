@@ -19,7 +19,7 @@ use tokio::task::{JoinHandle, JoinSet};
 
 use super::{
     compute_realtime_offset_us, log_source_stats, queue_label, read_clock_us, spawn_shard_workers,
-    FlowTableSettings, PipelineSettings, RealtimeSourceStats, SourceBatcher,
+    FlowTableSettings, PipelineMode, PipelineSettings, RealtimeSourceStats, SourceBatcher,
 };
 use crate::{
     args::{ExportConfig, ReplayBenchArgs},
@@ -74,7 +74,7 @@ pub async fn replay_bench<T: Flow>(
     let cpu_start = process_cpu_time()?;
     let wall_start = Instant::now();
 
-    let settings = PipelineSettings::from_env();
+    let settings = PipelineSettings::from_env(PipelineMode::Replay(config.features));
     let enable_source_stats = std::env::var_os("RUSTIFLOW_REALTIME_STATS").is_some();
     let shard_selector = ShardSelector::new(shard_count);
     let shard_senders = spawn_shard_workers(

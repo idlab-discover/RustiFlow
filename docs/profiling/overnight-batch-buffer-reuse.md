@@ -1,6 +1,6 @@
 # Experiment 4 · Shard batch buffer reuse on nuccore
 
-Retained as an opt-in prototype. At paced live rates the candidate used
+Integrated main enables recycling for live capture and Basic replay. At paced live rates the candidate used
 3.4–3.6% fewer cycles per frame than baseline. Full-feature replay
 throughput stayed within 1.4% of baseline.
 
@@ -20,7 +20,7 @@ private pool. Sources take a spare from their destination shard or
 allocate at the existing dispatch boundary. The worker returns an empty
 vector after processing its batch. Both directions use `try_lock`.
 An empty, contended or poisoned pool falls back to allocation, and a
-full pool releases excess vectors. Recycling is opt-in with
+full pool releases excess vectors. The original experiment enabled recycling with
 `RUSTIFLOW_EXPERIMENT_RECYCLE_SHARD_BATCHES=1` for capture and replay.
 
 ## Replay

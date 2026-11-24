@@ -4,7 +4,7 @@ Available on Linux with AVX2 through
 `RUSTIFLOW_EXPERIMENT_SIMD_FLOW_KEYS=1`. The Basic replay gains depended
 on long bursts. Full-feature replay gains stayed within run-to-run spread,
 live CPU costs rose, and the candidate's scalar path regressed in Basic
-replay. The SIMD path stays off by default. When both experiments are enabled, staged flow lookup takes precedence.
+replay. Integrated main enables SIMD by default for Basic replay on AVX2 CPUs. When both experiments are enabled, staged flow lookup takes precedence.
 
 Base commit `2fbecc3d8c796841d19b6db8edbfba0c7de42e60`. Recent work added a
 single canonical map lookup, independent seeded foldhash instances for

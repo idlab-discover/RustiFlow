@@ -17,12 +17,15 @@ use std::sync::{
 };
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
+use crate::args::FlowType;
 use crate::debug;
 use crate::flow_tui::launch_packet_tui;
 use crate::output::FlowSink;
 use crate::realtime_mode::{PacketGraphMode, PromiscuousMode};
 use crate::{
-    flow_key::ShardSelector, flow_table::FlowTable, flows::flow::Flow,
+    flow_key::ShardSelector,
+    flow_table::{BatchCanonicalizer, FlowTable},
+    flows::flow::Flow,
     packet_features::PacketFeatures,
 };
 use anyhow::Context;
@@ -140,16 +143,24 @@ const DEFAULT_SHARD_BATCH_SIZE: usize = 128;
 const DEFAULT_SHARD_QUEUE_CAPACITY: usize = 512;
 const DEFAULT_SOURCE_DISPATCH_QUEUE_CAPACITY: usize = 1024;
 
+enum PipelineMode {
+    Capture,
+    Replay(FlowType),
+}
+
 /// Queue and batch sizes of the userspace stages behind the event rings.
 struct PipelineSettings {
     shard_batch_size: usize,
     shard_queue_capacity: usize,
     source_dispatch_queue_capacity: usize,
     recycle_shard_batches: bool,
+    simd_keys: bool,
 }
 
 impl PipelineSettings {
-    fn from_env() -> Self {
+    fn from_env(mode: PipelineMode) -> Self {
+        let basic_replay = matches!(mode, PipelineMode::Replay(FlowType::Basic));
+        let recycle = basic_replay || matches!(mode, PipelineMode::Capture);
         Self {
             shard_batch_size: read_env_usize(
                 "RUSTIFLOW_REALTIME_SHARD_BATCH_SIZE",
@@ -164,7 +175,9 @@ impl PipelineSettings {
                 DEFAULT_SOURCE_DISPATCH_QUEUE_CAPACITY,
             ),
             recycle_shard_batches: std::env::var_os("RUSTIFLOW_EXPERIMENT_RECYCLE_SHARD_BATCHES")
-                .is_some_and(|value| value == "1"),
+                .map_or(recycle, |value| value == "1"),
+            simd_keys: std::env::var_os("RUSTIFLOW_EXPERIMENT_SIMD_FLOW_KEYS")
+                .map_or(basic_replay, |value| value != "0"),
         }
     }
 }
@@ -198,6 +211,7 @@ fn spawn_shard_workers<T: Flow>(
                 .recycle_shard_batches
                 .then(|| Arc::new(BatchPool::new()));
             let worker_pool = batch_pool.clone();
+            let mut canonicalizer = BatchCanonicalizer::new(settings.simd_keys);
             let mut flow_table = FlowTable::new(
                 flow_table_settings.active_timeout,
                 flow_table_settings.idle_timeout,
@@ -209,7 +223,9 @@ fn spawn_shard_workers<T: Flow>(
             tokio::spawn(async move {
                 let mut last_timestamp = None;
                 while let Some(packet_batch) = rx.recv().await {
-                    flow_table.process_batch(&packet_batch).await;
+                    flow_table
+                        .process_batch(&packet_batch, &mut canonicalizer)
+                        .await;
                     if let Some(packet) = packet_batch.last() {
                         last_timestamp = Some(packet.timestamp_us);
                     }
@@ -357,7 +373,7 @@ where
     T: Flow,
 {
     let reactor_count = ReactorCount::from_env(ingress_only)?;
-    let settings = PipelineSettings::from_env();
+    let settings = PipelineSettings::from_env(PipelineMode::Capture);
     let shard_count =
         NonZeroUsize::new(usize::from(num_threads)).context("thread count must be at least 1")?;
     let shard_selector = ShardSelector::new(shard_count);

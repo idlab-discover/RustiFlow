@@ -4,16 +4,34 @@ This file keeps short-lived design choices and execution notes that would make
 `AGENTS.md` too long. Newest entries come first. Older entries are condensed to
 the decisions and results that still describe the current code.
 
+## 2026-11-24 — Defaults after integrating the overnight experiments
+
+On nuccore, default release builds before and after changing the workload
+defaults used the same inputs and CPU affinity. Against `cc0dd0e`, median
+Basic replay rose from 28.08 to 35.21 Mpps for IPv4 and 28.17 to 34.31 Mpps
+for IPv6 with AVX2 flow keys and recycled shard buffers. Full RustiFlow IPv4
+replay measured 7.27 and 7.22 Mpps. Each case used six alternating pairs
+after warmup, 10 million events, 100,000 flows, eight sources, four workers
+on CPUs 0–5, and Parquet to `/dev/null`. Timings cover replay through writer
+close. Decoded Basic output matched for IPv4 and IPv6 after normalizing the
+replay clock origin.
+
+At 650 kpps, enabling buffer recycling by default for live capture reduced
+median capture userspace cycles per frame from 3,971 to 3,431 in four
+alternating pairs. Each split-TC ingress run submitted two million mixed
+IPv4/IPv6 UDP packets with zero drops. Counters cover the sender interval.
+The TCP retransmission fast path was already active.
+
 ## 2026-11-24 — Overnight performance experiments on nuccore
 
 - [TCP sequence tracking](profiling/overnight-retransmission-fast-path.md)
   keeps the highest sequence range inline. Median full-feature TCP/UDP
   replay throughput improved 15.2–15.6% in the branch benchmarks.
 - [Shard batch buffer recycling](profiling/overnight-batch-buffer-reuse.md)
-  is opt-in for capture and replay. It used 3.4–3.6% fewer cycles per frame
+  is enabled by default for live capture and Basic replay. It used 3.4–3.6% fewer cycles per frame
   in paced live capture. Full-feature replay throughput stayed within 1.4%
   of baseline.
-- The [AVX2 flow-key prototype](profiling/overnight-simd-flow-keys.md) is opt-in. It increased live CPU cost and slowed Basic
+- The [AVX2 flow-key prototype](profiling/overnight-simd-flow-keys.md) is enabled by default for Basic replay on AVX2 CPUs. It increased live CPU cost and slowed Basic
   replay with SIMD disabled in the branch benchmarks.
 - [Parquet Float64 statistics](profiling/overnight-simd-parquet-projection.md)
   gained Snappy round-trip regression coverage. The AVX2 implementation is

@@ -1,5 +1,7 @@
 #[cfg(target_os = "linux")]
 mod batch_keys;
+#[cfg(target_os = "linux")]
+pub(crate) use batch_keys::BatchCanonicalizer;
 #[cfg(not(feature = "staged-flow-lookup"))]
 use std::collections::{hash_map::Entry, HashMap};
 #[cfg(feature = "staged-flow-lookup")]
@@ -63,8 +65,6 @@ pub struct FlowTable<T> {
         target_arch = "x86_64"
     ))]
     staged_lookup: bool,
-    #[cfg(target_os = "linux")]
-    canonicalizer: batch_keys::BatchCanonicalizer,
     #[cfg(feature = "experiment-deadline-index")]
     deadlines: DeadlineIndex,
     active_timeout: u64,
@@ -87,8 +87,6 @@ where
         expiration_check_interval: u64,
     ) -> Self {
         Self {
-            #[cfg(target_os = "linux")]
-            canonicalizer: batch_keys::BatchCanonicalizer::from_env(),
             #[cfg(not(feature = "staged-flow-lookup"))]
             flow_map: HashMap::default(),
             #[cfg(feature = "staged-flow-lookup")]
@@ -143,15 +141,18 @@ where
 
     /// Processes one already ordered realtime shard batch.
     #[cfg(target_os = "linux")]
-    pub(crate) async fn process_batch(&mut self, packets: &[PacketFeatures]) {
+    pub(crate) async fn process_batch(
+        &mut self,
+        packets: &[PacketFeatures],
+        canonicalizer: &mut BatchCanonicalizer,
+    ) {
         #[cfg(all(feature = "staged-flow-lookup", target_arch = "x86_64"))]
         if self.staged_lookup {
             self.process_staged_batch(packets).await;
             return;
         }
-        if let Some(orientations) = self.canonicalizer.prepare(packets) {
-            let orientations = std::mem::take(orientations);
-            for (packet, &orientation) in packets.iter().zip(&orientations) {
+        if let Some(orientations) = canonicalizer.prepare(packets) {
+            for (packet, &orientation) in packets.iter().zip(orientations) {
                 self.check_and_export_expired_flows(packet.timestamp_us)
                     .await;
                 let key = packet.flow_key_value();
@@ -169,7 +170,6 @@ where
                 };
                 self.apply_lookup(packet, lookup).await;
             }
-            self.canonicalizer.restore(orientations);
             return;
         }
         for packet in packets {
