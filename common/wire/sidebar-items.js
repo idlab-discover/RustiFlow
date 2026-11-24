@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"constant":["ETHER_TYPE_IPV4","ETHER_TYPE_IPV6","ETHER_TYPE_VLAN"],"struct":["EthernetHeader","IcmpHeader","IcmpMessageHeader","Ipv4Header","Ipv6Header","LinuxCookedHeader","TcpHeader","UdpHeader","VlanTag"]};

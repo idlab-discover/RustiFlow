@@ -51,8 +51,8 @@
 <a href=#51 id=51 data-nosnippet>51</a>        <span class="kw">let </span>realtime_offset_us = <span class="number">1_000_000</span>;
 <a href=#52 id=52 data-nosnippet>52</a>        <span class="kw">let </span>event = EbpfEventIpv4::new(
 <a href=#53 id=53 data-nosnippet>53</a>            (spec.timestamp_us - realtime_offset_us) <span class="kw">as </span>u64 * <span class="number">1_000</span>,
-<a href=#54 id=54 data-nosnippet>54</a>            u32::from(spec.destination_ip).to_be(),
-<a href=#55 id=55 data-nosnippet>55</a>            u32::from(spec.source_ip).to_be(),
+<a href=#54 id=54 data-nosnippet>54</a>            spec.destination_ip.octets(),
+<a href=#55 id=55 data-nosnippet>55</a>            spec.source_ip.octets(),
 <a href=#56 id=56 data-nosnippet>56</a>            spec.destination_port,
 <a href=#57 id=57 data-nosnippet>57</a>            spec.source_port,
 <a href=#58 id=58 data-nosnippet>58</a>            spec.data_length,
@@ -88,8 +88,8 @@
 <a href=#88 id=88 data-nosnippet>88</a>        <span class="kw">let </span>realtime_offset_us = <span class="number">1_000_000</span>;
 <a href=#89 id=89 data-nosnippet>89</a>        <span class="kw">let </span>event = EbpfEventIpv6::new(
 <a href=#90 id=90 data-nosnippet>90</a>            (spec.timestamp_us - realtime_offset_us) <span class="kw">as </span>u64 * <span class="number">1_000</span>,
-<a href=#91 id=91 data-nosnippet>91</a>            u128::from(spec.destination_ip).to_be(),
-<a href=#92 id=92 data-nosnippet>92</a>            u128::from(spec.source_ip).to_be(),
+<a href=#91 id=91 data-nosnippet>91</a>            spec.destination_ip.octets(),
+<a href=#92 id=92 data-nosnippet>92</a>            spec.source_ip.octets(),
 <a href=#93 id=93 data-nosnippet>93</a>            spec.destination_port,
 <a href=#94 id=94 data-nosnippet>94</a>            spec.source_port,
 <a href=#95 id=95 data-nosnippet>95</a>            spec.data_length,

@@ -82,8 +82,8 @@
 <a href=#82 id=82 data-nosnippet>82</a>                };
 <a href=#83 id=83 data-nosnippet>83</a>                <span class="kw">let </span>event = EbpfEventIpv4::new(
 <a href=#84 id=84 data-nosnippet>84</a>                    timestamp_ns,
-<a href=#85 id=85 data-nosnippet>85</a>                    u32::from(destination).to_be(),
-<a href=#86 id=86 data-nosnippet>86</a>                    u32::from(source).to_be(),
+<a href=#85 id=85 data-nosnippet>85</a>                    destination.octets(),
+<a href=#86 id=86 data-nosnippet>86</a>                    source.octets(),
 <a href=#87 id=87 data-nosnippet>87</a>                    destination_port,
 <a href=#88 id=88 data-nosnippet>88</a>                    source_port,
 <a href=#89 id=89 data-nosnippet>89</a>                    segment.data_length,
@@ -109,8 +109,8 @@
 <a href=#109 id=109 data-nosnippet>109</a>                };
 <a href=#110 id=110 data-nosnippet>110</a>                <span class="kw">let </span>event = EbpfEventIpv6::new(
 <a href=#111 id=111 data-nosnippet>111</a>                    timestamp_ns,
-<a href=#112 id=112 data-nosnippet>112</a>                    u128::from(destination).to_be(),
-<a href=#113 id=113 data-nosnippet>113</a>                    u128::from(source).to_be(),
+<a href=#112 id=112 data-nosnippet>112</a>                    destination.octets(),
+<a href=#113 id=113 data-nosnippet>113</a>                    source.octets(),
 <a href=#114 id=114 data-nosnippet>114</a>                    destination_port,
 <a href=#115 id=115 data-nosnippet>115</a>                    source_port,
 <a href=#116 id=116 data-nosnippet>116</a>                    segment.data_length,

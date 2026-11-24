@@ -2,7 +2,7 @@
 <a href=#2 id=2 data-nosnippet>2</a><span class="kw">use </span>std::net::IpAddr;
 <a href=#3 id=3 data-nosnippet>3</a>
 <a href=#4 id=4 data-nosnippet>4</a><span class="kw">use </span>chrono::{DateTime, Utc};
-<a href=#5 id=5 data-nosnippet>5</a><span class="kw">use </span>pnet_packet::ip::IpNextHeaderProtocols;
+<a href=#5 id=5 data-nosnippet>5</a><span class="kw">use </span>common::ip_protocol;
 <a href=#6 id=6 data-nosnippet>6</a>
 <a href=#7 id=7 data-nosnippet>7</a><span class="kw">use crate</span>::{
 <a href=#8 id=8 data-nosnippet>8</a>    flows::util::{
@@ -92,8 +92,8 @@
 <a href=#92 id=92 data-nosnippet>92</a>
 <a href=#93 id=93 data-nosnippet>93</a><span class="kw">impl </span>BasicFlow {
 <a href=#94 id=94 data-nosnippet>94</a>    <span class="kw">fn </span>is_tcp(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
-<a href=#95 id=95 data-nosnippet>95</a>        <span class="self">self</span>.protocol == IpNextHeaderProtocols::Tcp.<span class="number">0
-<a href=#96 id=96 data-nosnippet>96</a>    </span>}
+<a href=#95 id=95 data-nosnippet>95</a>        <span class="self">self</span>.protocol == ip_protocol::TCP
+<a href=#96 id=96 data-nosnippet>96</a>    }
 <a href=#97 id=97 data-nosnippet>97</a>
 <a href=#98 id=98 data-nosnippet>98</a>    <span class="kw">fn </span>observe_tcp_handshake(<span class="kw-2">&amp;mut </span><span class="self">self</span>, packet: <span class="kw-2">&amp;</span>PacketFeatures, forward: bool) {
 <a href=#99 id=99 data-nosnippet>99</a>        <span class="kw">if </span>!<span class="self">self</span>.is_tcp() || <span class="self">self</span>.tcp_handshake_completed {
