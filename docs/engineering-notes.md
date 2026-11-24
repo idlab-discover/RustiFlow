@@ -4,6 +4,69 @@ This file keeps short-lived design choices and execution notes that would make
 `AGENTS.md` too long. Newest entries come first. Older entries are condensed to
 the decisions and results that still describe the current code.
 
+## 2026-11-24 — Default-path CPU and cache profile on nuccore
+
+Against `2c877ef`, CIC now keeps each direction's header byte total, minimum
+header length and first window. NFStream drops eight feature families absent
+from both projections, including TCP sequence-range tracking. In the baseline
+CIC replay profile, header and window updates took 6.9% of userspace cycle
+samples. In NFStream, header, window and payload updates alone took 12.0%.
+
+The offline reader now dispatches a decoded frame from one async call site.
+Classic pcap's unsigned 32-bit seconds already fit the exporter's UTC range.
+Pcapng checks that range after applying its interface offset. Calendar date
+construction accounted for 4.3% of the baseline CIC offline cycle samples.
+Shard selection now maps the seeded 64-bit hash into the shard range with
+a widening multiply, and the optimizer can inline biflow canonicalization.
+
+The table reports median million packets per second on an Intel Core Ultra 7
+255H with normal host affinity, default worker counts (5 offline, 12 replay),
+default build features, Parquet to `/dev/null`, one warmup per binary and four
+alternating measured pairs. Offline measures the whole CLI on a warm
+2-million-frame mixed IPv4/IPv6 UDP pcap with 10,000 bidirectional flows.
+IPv4 replay measures processing through writer close after generating 10
+million TCP/UDP events over 100,000 possible flows and eight sources. In the
+raw CSV, `ms` covers the whole process and replay `mpps` comes from the CLI.
+
+| Features | Offline before | Offline after | IPv4 replay before | IPv4 replay after |
+| --- | ---: | ---: | ---: | ---: |
+| Basic | 7.92 | 9.10 | 42.50 | 42.49 |
+| CIC | 7.48 | 8.72 | 13.60 | 17.29 |
+| NFStream | 7.45 | 8.83 | 11.66 | 25.43 |
+| RustiFlow | 7.18 | 8.18 | 11.04 | 11.14 |
+
+On CPUs 0–5, six alternating pairs gave 14–17% higher offline throughput.
+Full IPv4 and IPv6 replay gained about 3.5%. Basic replay varied by run.
+Its IPv4 median went from 23.62 to 22.14 Mpps, and its IPv6 median went from
+20.90 to 21.76 Mpps. [Individual repetitions](profiling/nuccore-default-path.csv)
+
+Three separate `perf stat` pairs on CPUs 0–5 include event generation and
+writer close. Median NFStream IPv4 replay fell from 1,580 to 995 user cycles
+per input event, 30.05 to 14.78 hardware cache misses per event and 796 to
+582 MiB peak process RSS. CIC fell from 1,437 to 1,223 cycles and 27.20 to
+22.93 cache misses per event. In four live CIC pairs on a local veth, median
+capture-process user cycles per frame went from 3,424 to 3,293. Each run
+submitted 2 million frames at 650 kpps with zero eBPF drops, with capture
+on CPUs 0–3 and the sender on CPU 4.
+
+To repeat the throughput measurements, build each revision with
+`cargo build --release --locked -p rustiflow`. Generate the offline input
+with `python docs/profiling/generate_pcap.py mixed.pcap`. Run
+`rustiflow -f FEATURES --export-path /dev/null pcap mixed.pcap` or
+`rustiflow -f FEATURES --export-path /dev/null replay-bench`, alternating
+binaries. The six-core measurements prefix the same commands with
+`taskset -c 0-5`. The local run directory `target/pass-2c877ef/` includes
+the saved binaries, profiling commands, perf reports and veth counters.
+
+A separate experiment skipped the Welford update when a sample equaled its
+running mean. With four workers, median full-feature replay time grew 0.9%
+for IPv4 and 1.2% for IPv6. A single-worker variable-length TCP pcap gained
+0.9%. The shared accumulator retains its straight-line update.
+
+Decoded Parquet headers and sorted rows matched in all 40 comparisons across
+the four feature sets and both projections, including one-second early
+snapshots, the mixed pcap, TCP, VLAN, Linux cooked and two-interface pcapng.
+
 ## 2026-11-24 — Defaults after integrating the overnight experiments
 
 On nuccore, default release builds before and after changing the workload
