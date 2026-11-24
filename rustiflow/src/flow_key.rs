@@ -48,6 +48,7 @@ impl FlowKey {
 
     /// Returns the canonical biflow key together with the orientation `self`
     /// had relative to it. A key whose endpoints are equal is canonical.
+    #[inline]
     pub fn canonicalize(self) -> (Self, KeyOrientation) {
         if self.source <= self.destination {
             (self, KeyOrientation::Canonical)
@@ -104,6 +105,8 @@ impl ShardSelector {
     /// Returns the shard for `biflow_key`, in `0..shard_count`. Callers must pass
     /// the canonical key so both directions of a flow land on the same shard.
     pub fn shard_index(&self, biflow_key: &FlowKey) -> usize {
-        (self.hash_builder.hash_one(biflow_key) % self.shard_count.get() as u64) as usize
+        // Scale a uniform 64-bit hash into the shard range without division.
+        let hash = self.hash_builder.hash_one(biflow_key);
+        ((u128::from(hash) * self.shard_count.get() as u128) >> 64) as usize
     }
 }
