@@ -13,6 +13,8 @@ use crate::{
 
 use super::{flow::Flow, util::FlowExpireCause};
 
+const MICROS_PER_SECOND: i64 = 1_000_000;
+
 #[derive(Clone, PartialEq, Debug)]
 pub(crate) enum FlowState {
     Established,
@@ -374,18 +376,39 @@ impl Flow for BasicFlow {
             return (true, self.flow_expire_cause);
         }
 
-        if (timestamp_us.saturating_sub(self.first_timestamp_us).max(0) / 1_000_000) as u64
+        if (timestamp_us.saturating_sub(self.first_timestamp_us).max(0) / MICROS_PER_SECOND) as u64
             > active_timeout
         {
             return (true, FlowExpireCause::ActiveTimeout);
         }
 
-        if (timestamp_us.saturating_sub(self.last_timestamp_us).max(0) / 1_000_000) as u64
+        if (timestamp_us.saturating_sub(self.last_timestamp_us).max(0) / MICROS_PER_SECOND) as u64
             > idle_timeout
         {
             return (true, FlowExpireCause::IdleTimeout);
         }
 
         (false, FlowExpireCause::None)
+    }
+
+    #[cfg(feature = "experiment-deadline-index")]
+    fn expiration_deadline_us(&self, active_timeout: u64, idle_timeout: u64) -> Option<i64> {
+        // `is_expired` uses whole seconds and a strict comparison. A delay
+        // larger than i64::MAX is unreachable even with saturating elapsed time.
+        fn deadline(timestamp_us: i64, timeout: u64) -> Option<i64> {
+            let delay_us = i64::try_from(timeout)
+                .ok()?
+                .checked_add(1)?
+                .checked_mul(MICROS_PER_SECOND)?;
+            timestamp_us.checked_add(delay_us)
+        }
+
+        match (
+            deadline(self.first_timestamp_us, active_timeout),
+            deadline(self.last_timestamp_us, idle_timeout),
+        ) {
+            (Some(active), Some(idle)) => Some(active.min(idle)),
+            (only, None) | (None, only) => only,
+        }
     }
 }

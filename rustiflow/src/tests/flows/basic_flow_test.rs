@@ -61,6 +61,34 @@ mod tests {
         );
     }
 
+    #[cfg(feature = "experiment-deadline-index")]
+    #[test]
+    fn expiry_deadline_matches_saturating_elapsed_time() {
+        let mut flow = BasicFlow::new(
+            "extreme-time".to_string(),
+            "10.0.0.1".parse().unwrap(),
+            40_000,
+            "10.0.0.2".parse().unwrap(),
+            443,
+            6,
+            i64::MIN,
+        );
+        flow.last_timestamp_us = i64::MAX - 999_999;
+
+        let deadline = i64::MIN + 1_000_000;
+        assert_eq!(flow.expiration_deadline_us(0, 0), Some(deadline));
+        assert!(!flow.is_expired(deadline - 1, 0, 0).0);
+        assert_eq!(
+            flow.is_expired(deadline, 0, 0),
+            (true, FlowExpireCause::ActiveTimeout)
+        );
+
+        let unreachable = (i64::MAX / 1_000_000) as u64;
+        assert_eq!(flow.expiration_deadline_us(unreachable, 0), None);
+        assert!(!flow.is_expired(i64::MAX, unreachable, 0).0);
+        assert_eq!(flow.expiration_deadline_us(u64::MAX, u64::MAX), None);
+    }
+
     #[test]
     fn close_flow_records_expiration_cause() {
         let ip_source = IpAddr::V4(Ipv4Addr::new(192, 168, 1, 10));

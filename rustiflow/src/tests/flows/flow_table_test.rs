@@ -326,6 +326,77 @@ mod tests {
         assert!(rx.try_recv().is_err());
     }
 
+    #[tokio::test]
+    async fn sweep_rechecks_refreshed_flows_at_exact_deadlines() {
+        let (tx, mut rx) = mpsc::channel::<BasicFlow>(8);
+        let mut table = FlowTable::new(5, 2, None, tx, 60);
+
+        // Refresh one flow shortly before its initial idle deadline. A
+        // reordered packet and sweep must preserve the last observed time.
+        for timestamp_us in [250_000, 3_150_000] {
+            table
+                .process_packet_without_expiration_scan(&build_packet(timestamp_us))
+                .await;
+        }
+        table.export_expired_flows(3_250_000).await;
+        table
+            .process_packet_without_expiration_scan(&build_packet(2_000_000))
+            .await;
+        table.export_expired_flows(2_500_000).await;
+        table.export_expired_flows(6_149_999).await;
+        assert!(rx.try_recv().is_err());
+
+        table.export_expired_flows(6_150_000).await;
+        let expired = rx.try_recv().unwrap();
+        assert_eq!(
+            (expired.last_timestamp_us, expired.flow_expire_cause),
+            (3_150_000, FlowExpireCause::IdleTimeout)
+        );
+
+        // A quiet replacement is eligible for both timeouts after a jump.
+        table
+            .process_packet_without_expiration_scan(&build_packet(6_150_000))
+            .await;
+        table.export_expired_flows(25_000_000).await;
+        assert_eq!(
+            rx.try_recv().unwrap().flow_expire_cause,
+            FlowExpireCause::ActiveTimeout
+        );
+        table.export_all_flows(25_000_000).await;
+        assert!(rx.try_recv().is_err());
+    }
+
+    #[tokio::test]
+    async fn termination_and_replacement_allow_key_reuse_across_sweeps() {
+        let (tx, mut rx) = mpsc::channel::<BasicFlow>(8);
+        let mut table = FlowTable::new(60, 1, None, tx, 60);
+        table.process_packet(&build_packet(250_000)).await;
+        table
+            .process_packet(&PacketFeatures {
+                rst_flag: 1,
+                ..build_packet(1_000_000)
+            })
+            .await;
+        table.process_packet(&build_packet(1_250_000)).await;
+        table.export_expired_flows(2_250_000).await;
+        table.process_packet(&build_packet(3_250_000)).await;
+        table.export_expired_flows(3_250_000).await;
+        table.export_expired_flows(5_250_000).await;
+        table.export_all_flows(5_250_000).await;
+
+        let exports: Vec<_> = std::iter::from_fn(|| rx.try_recv().ok())
+            .map(|flow| (flow.first_timestamp_us, flow.flow_expire_cause))
+            .collect();
+        assert_eq!(
+            exports,
+            [
+                (250_000, FlowExpireCause::TcpReset),
+                (1_250_000, FlowExpireCause::IdleTimeout),
+                (3_250_000, FlowExpireCause::IdleTimeout),
+            ]
+        );
+    }
+
     fn early_export_every(seconds: u64) -> Option<NonZeroU64> {
         NonZeroU64::new(seconds)
     }

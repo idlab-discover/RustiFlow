@@ -114,4 +114,10 @@ impl Flow for CustomFlow {
         self.basic_flow
             .is_expired(timestamp_us, active_timeout, idle_timeout)
     }
+
+    #[cfg(feature = "experiment-deadline-index")]
+    fn expiration_deadline_us(&self, active_timeout: u64, idle_timeout: u64) -> Option<i64> {
+        self.basic_flow
+            .expiration_deadline_us(active_timeout, idle_timeout)
+    }
 }

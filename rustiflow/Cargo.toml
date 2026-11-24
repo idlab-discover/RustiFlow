@@ -44,6 +44,7 @@ pprof = { version = "0.15.0", features = ["flamegraph"], optional = true }
 staged-flow-lookup = ["dep:hashbrown"]
 # Builds in the pprof sampler behind RUSTIFLOW_PROFILE_FLAMEGRAPH (Linux only).
 profiling = ["dep:pprof"]
+experiment-deadline-index = []
 
 [[bin]]
 name = "rustiflow"

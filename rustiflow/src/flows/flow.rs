@@ -127,4 +127,10 @@ pub trait Flow: Send + Sync + 'static + Clone {
         active_timeout: u64,
         idle_timeout: u64,
     ) -> (bool, FlowExpireCause);
+
+    /// Earliest timestamp at which a currently live flow could time out, or
+    /// `None` if no representable timestamp can reach a timeout. Packet updates
+    /// can only move this bound later. Use `is_expired` to decide the cause.
+    #[cfg(feature = "experiment-deadline-index")]
+    fn expiration_deadline_us(&self, active_timeout: u64, idle_timeout: u64) -> Option<i64>;
 }

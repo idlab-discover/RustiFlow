@@ -18,12 +18,16 @@ use crate::{
 use hashbrown::HashTable;
 use log::debug;
 
+#[cfg(feature = "experiment-deadline-index")]
+mod deadline_index;
 #[cfg(all(
     feature = "staged-flow-lookup",
     target_os = "linux",
     target_arch = "x86_64"
 ))]
 mod staged_lookup;
+#[cfg(feature = "experiment-deadline-index")]
+use deadline_index::{DeadlineBucket, DeadlineIndex};
 
 enum FlowUpdate<T> {
     Active,
@@ -42,6 +46,8 @@ struct FlowEntry<T> {
     /// Next early-export boundary, at first packet + k * interval. Unused when
     /// early export is disabled.
     next_early_export_us: i64,
+    #[cfg(feature = "experiment-deadline-index")]
+    deadline_bucket: Option<DeadlineBucket>,
 }
 
 pub struct FlowTable<T> {
@@ -59,6 +65,8 @@ pub struct FlowTable<T> {
     staged_lookup: bool,
     #[cfg(target_os = "linux")]
     canonicalizer: batch_keys::BatchCanonicalizer,
+    #[cfg(feature = "experiment-deadline-index")]
+    deadlines: DeadlineIndex,
     active_timeout: u64,
     idle_timeout: u64,
     early_export_us: Option<i64>,
@@ -94,6 +102,8 @@ where
             ))]
             staged_lookup: std::env::var_os("RUSTIFLOW_EXPERIMENT_STAGED_FLOW_LOOKUP")
                 .is_some_and(|value| value == "1"),
+            #[cfg(feature = "experiment-deadline-index")]
+            deadlines: DeadlineIndex::default(),
             active_timeout,
             idle_timeout,
             early_export_us: early_export.map(|seconds| (seconds.get() * 1_000_000) as i64),
@@ -206,12 +216,14 @@ where
                 );
 
                 if is_expired {
-                    #[cfg(not(feature = "staged-flow-lookup"))]
-                    let mut expired_flow = occupied.remove().flow;
                     #[cfg(feature = "staged-flow-lookup")]
-                    let mut expired_flow = occupied.remove().0.flow;
-                    expired_flow.close_flow(packet.timestamp_us, cause);
-                    self.output.export(expired_flow).await;
+                    let mut expired = occupied.remove().0;
+                    #[cfg(not(feature = "staged-flow-lookup"))]
+                    let mut expired = occupied.remove();
+                    #[cfg(feature = "experiment-deadline-index")]
+                    self.deadlines.remove(&biflow_key, expired.deadline_bucket);
+                    expired.flow.close_flow(packet.timestamp_us, cause);
+                    self.output.export(expired.flow).await;
                     self.create_and_insert_flow(packet, lookup).await;
                     return;
                 }
@@ -223,11 +235,14 @@ where
                         self.output.export(snapshot).await;
                     }
                     FlowUpdate::Terminated => {
-                        #[cfg(not(feature = "staged-flow-lookup"))]
-                        let terminated_flow = occupied.remove().flow;
                         #[cfg(feature = "staged-flow-lookup")]
-                        let terminated_flow = occupied.remove().0.flow;
-                        self.output.export(terminated_flow).await;
+                        let terminated = occupied.remove().0;
+                        #[cfg(not(feature = "staged-flow-lookup"))]
+                        let terminated = occupied.remove();
+                        #[cfg(feature = "experiment-deadline-index")]
+                        self.deadlines
+                            .remove(&biflow_key, terminated.deadline_bucket);
+                        self.output.export(terminated.flow).await;
                     }
                 }
             }
@@ -272,6 +287,8 @@ where
             flow: new_flow,
             forward_orientation,
             next_early_export_us: packet.timestamp_us + self.early_export_us.unwrap_or(0),
+            #[cfg(feature = "experiment-deadline-index")]
+            deadline_bucket: None,
         };
         let snapshot = match Self::apply_packet_to_flow(
             &mut entry,
@@ -287,6 +304,14 @@ where
             }
         };
 
+        #[cfg(feature = "experiment-deadline-index")]
+        {
+            entry.deadline_bucket = entry
+                .flow
+                .expiration_deadline_us(self.active_timeout, self.idle_timeout)
+                .map(DeadlineBucket::containing);
+            self.deadlines.insert(biflow_key, entry.deadline_bucket);
+        }
         // The authoritative lookup found a miss or removed the expired entry.
         #[cfg(not(feature = "staged-flow-lookup"))]
         self.flow_map.insert(biflow_key, entry);
@@ -345,7 +370,7 @@ where
         export_order.sort_by_key(|&(first_timestamp_us, _)| first_timestamp_us);
 
         for (_, key) in export_order {
-            if let Some(FlowEntry { mut flow, .. }) = self.remove(&key) {
+            if let Some(mut flow) = self.remove_flow(&key) {
                 flow.close_flow(timestamp_us, FlowExpireCause::ExporterShutdown);
                 self.output.export(flow).await;
             }
@@ -370,9 +395,26 @@ where
 
     /// Export all expired flows.
     pub async fn export_expired_flows(&mut self, timestamp_us: i64) {
-        // Export all expired flows
-        let expired_flows: Vec<_> = self
-            .entries()
+        let expired_flows = self.expired_flows(timestamp_us);
+        debug!("Exporting {} expired flows", expired_flows.len());
+        for (key, cause) in expired_flows {
+            if let Some(mut flow) = self.remove_flow(&key) {
+                flow.close_flow(timestamp_us, cause);
+                self.output.export(flow).await;
+            }
+        }
+    }
+
+    fn remove_flow(&mut self, key: &FlowKey) -> Option<T> {
+        let entry = self.remove(key)?;
+        #[cfg(feature = "experiment-deadline-index")]
+        self.deadlines.remove(key, entry.deadline_bucket);
+        Some(entry.flow)
+    }
+
+    #[cfg(not(feature = "experiment-deadline-index"))]
+    fn expired_flows(&mut self, timestamp_us: i64) -> Vec<(FlowKey, FlowExpireCause)> {
+        self.entries()
             .filter_map(|(key, entry)| {
                 let (is_expired, cause) =
                     entry
@@ -384,15 +426,50 @@ where
                     None
                 }
             })
+            .collect()
+    }
+
+    #[cfg(feature = "experiment-deadline-index")]
+    fn expired_flows(&mut self, timestamp_us: i64) -> Vec<(FlowKey, FlowExpireCause)> {
+        let mut reschedule = Vec::new();
+        let expired = self
+            .deadlines
+            .due(timestamp_us)
+            .filter_map(|key| {
+                #[cfg(feature = "staged-flow-lookup")]
+                let entry = self
+                    .flow_map
+                    .find_mut(self.hash_builder.hash_one(key), |entry| entry.key == key);
+                #[cfg(not(feature = "staged-flow-lookup"))]
+                let entry = self.flow_map.get_mut(&key);
+                let entry = entry.expect("a scheduled deadline belongs to a tracked flow");
+                let (is_expired, cause) =
+                    entry
+                        .flow
+                        .is_expired(timestamp_us, self.active_timeout, self.idle_timeout);
+                if is_expired {
+                    return Some((key, cause));
+                }
+
+                // Packet updates can only push the deadline later. Refresh it
+                // here so occupied packet updates never touch the index.
+                let next_bucket = entry
+                    .flow
+                    .expiration_deadline_us(self.active_timeout, self.idle_timeout)
+                    .map(DeadlineBucket::containing);
+                if next_bucket != entry.deadline_bucket {
+                    reschedule.push((key, entry.deadline_bucket, next_bucket));
+                    entry.deadline_bucket = next_bucket;
+                }
+                None
+            })
             .collect();
 
-        debug!("Exporting {} expired flows", expired_flows.len());
-        for (key, cause) in expired_flows {
-            if let Some(FlowEntry { mut flow, .. }) = self.remove(&key) {
-                flow.close_flow(timestamp_us, cause);
-                self.output.export(flow).await;
-            }
+        for (key, old_bucket, new_bucket) in reschedule {
+            self.deadlines.remove(&key, old_bucket);
+            self.deadlines.insert(key, new_bucket);
         }
+        expired
     }
 
     fn entries(&self) -> impl Iterator<Item = (FlowKey, &FlowEntry<T>)> {
