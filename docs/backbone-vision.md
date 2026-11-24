@@ -1,123 +1,44 @@
-# Backbone Vision
+# Backbone vision
 
-This document captures the long-term deployment vision for RustiFlow.
+The long-term goal is realtime flow reconstruction and feature extraction at
+backbone rates of 100, 200, and 400 Gbit/s. Raw throughput is not enough on its
+own. RustiFlow should also keep CPU cost low relative to captured traffic, keep
+memory predictable under bursts, report overload and drops clearly, and keep
+flow semantics trustworthy under load. With those properties, deployment on
+production networks for dataset collection becomes a realistic proposal.
 
-It is not a performance checklist. Use [`docs/performance-roadmap.md`](/home/strgenix/postdoc/projects/rustiflow/docs/performance-roadmap.md)
-for execution details and optimization work.
+## Deployment path
 
-## Goal
+1. Validate locally at 10 Gbit/s, then 25 and if possible 40 Gbit/s.
+   RustiFlow reached 10 Gbit/s in earlier work by the master's student who
+   wrote the original implementation. The current work rebuilds that
+   confidence on today's code.
+2. Use that evidence to deploy on the team's slice of the datacenter network.
+3. Use datacenter results to discuss deployment on university infrastructure.
+4. If RustiFlow proves efficient and trustworthy there, approach national ISPs.
 
-The long-term objective is realtime flow reconstruction and feature extraction
-at backbone-scale rates:
+Local validation exposes ingestion bottlenecks early, allows repeatable
+adversarial tests, and establishes CPU, memory, and drop baselines before
+asking operators for access.
 
-- `100 Gbit/s`
-- `200 Gbit/s`
-- `400 Gbit/s`
+## Technical implication
 
-The target is not only raw throughput. RustiFlow should also remain
-operationally attractive:
+The current tc/eBPF ring-buffer path is good for proving semantics and reaching
+moderate-to-high rates. It should not be assumed to be the final architecture
+for 100 Gbit/s and above. That may need stronger parallel ingestion, tighter
+batching and memory movement, core and NUMA locality, careful flow sharding,
+and possibly a different transport if measurements show the ring design
+saturates. [Packet-size research](backbone-packet-size-research.md) relates
+measured packet rates to backbone traffic profiles.
 
-- low CPU usage relative to captured throughput
-- predictable memory usage under burst
-- clearly reported overload and drop behavior
-- flow and feature semantics that remain trustworthy under realtime load
+## What operators will ask
 
-If RustiFlow can reach those properties, it becomes realistic to propose
-deployment on production networks for high-quality dataset collection.
-
-## Near-Term Deployment Path
-
-The immediate deployment ambition is smaller and more concrete:
-
-1. Validate RustiFlow locally at `10 Gbit/s`.
-2. Push local validation to `25 Gbit/s` and, if possible, `40 Gbit/s`.
-3. Use that evidence to justify deployment on the team's slice of the
-   datacenter network.
-4. Use datacenter results to support discussions about broader deployment on
-   university infrastructure.
-5. If RustiFlow proves both efficient and trustworthy there, pursue discussions
-   with national ISPs.
-
-This staged path is intentional. It keeps the project grounded in measured
-evidence instead of premature scaling claims.
-
-## Why Local `10/25/40G` Matters
-
-Local high-throughput validation is valuable even though it is not identical to
-backbone deployment:
-
-- it exposes realtime ingestion bottlenecks early
-- it provides repeatable adversarial tests under direct control
-- it establishes CPU, memory, and drop-rate baselines before asking operators
-  for access to sensitive infrastructure
-- it makes later deployment discussions concrete rather than speculative
-
-For RustiFlow, local validation at `10/25/40G` is the proving ground for both
-correctness and operational maturity.
-
-## Historical Context
-
-RustiFlow has already been validated at `10 Gbit/s` in the past during earlier
-project work with the master's student who produced the original
-implementation.
-
-That matters for two reasons:
-
-- this project is not starting from zero on the throughput question
-- the current work is a continuation and hardening effort, not a brand-new
-  performance ambition
-
-The present goal is to rebuild that confidence on the current codebase, then
-extend it beyond the earlier `10 Gbit/s` proof point.
-
-## Technical Implication
-
-The current Linux realtime path is useful for proving semantics, finding
-bottlenecks, and achieving moderate-to-high throughput. It should not be
-assumed to be the final architecture for `100 Gbit/s+`.
-
-Backbone-scale realtime capture will likely require:
-
-- stronger parallel event ingestion
-- tighter control over memory movement and batching
-- better core and NUMA locality
-- careful flow ownership and sharding design
-- possibly a transport path beyond the current ring-buffer-based design if
-  measurement shows the present architecture will not scale far enough
-
-This does not reduce the value of the current work. On the contrary, the
-current measurement-driven improvements are how RustiFlow can evolve toward a
-credible high-rate architecture without sacrificing flow correctness.
-
-## What Operators Will Care About
-
-Whether the audience is a datacenter team, a university backbone team, or a
-national ISP, the same practical questions will matter:
-
-- What sustained throughput can RustiFlow handle?
-- What packet or event drop rate does it show under realistic and bursty load?
-- How many CPU cores does it need per throughput tier?
-- How much memory does it require?
+- What sustained throughput does it handle, and at what drop rate under
+  realistic and bursty load?
+- How many cores and how much memory does each throughput tier need?
 - Does overload fail visibly and predictably?
-- Are the reconstructed flows and extracted features trustworthy enough for
-  dataset generation and network analysis?
+- Are the flows and features trustworthy enough for datasets and analysis?
 
-RustiFlow should aim to answer those questions with measured data, not only
-with architecture claims.
-
-## Success Definition
-
-For this vision, success is not "RustiFlow once hit a very large number in a
-lab."
-
-Success is:
-
-- repeatable throughput results
-- low and well-characterized resource usage
-- clear overload behavior
-- stable export semantics
-- operator confidence that the tool is safe and useful to deploy
-
-That is the standard required for RustiFlow to move from local experiments to
-datacenter use, then to university backbone use, and eventually to ISP-facing
-conversations.
+Success means repeatable throughput results, well-characterized resource use,
+clear overload behavior, stable export semantics, and operator confidence. A
+single large lab number does not meet that bar.

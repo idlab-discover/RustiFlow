@@ -73,27 +73,16 @@ Raw timings, perf data, profiles, sender logs, and the scripts are in
 
 ## 2026-11-24 — Default-path CPU and cache profile on nuccore
 
-Against `2c877ef`, CIC now keeps each direction's header byte total, minimum
-header length and first window. NFStream drops eight feature families absent
-from both projections, including TCP sequence-range tracking. In the baseline
-CIC replay profile, header and window updates took 6.9% of userspace cycle
-samples. In NFStream, header, window and payload updates alone took 12.0%.
+Against `2c877ef`, CIC keeps only each direction's header byte total, minimum
+header length and first window, and NFStream drops eight feature families
+absent from both of its projections, including TCP sequence-range tracking.
+The offline reader dispatches decoded frames from one async call site and
+skips calendar conversion for classic pcap's unsigned 32-bit seconds. Shard
+selection maps the seeded hash with a widening multiply.
 
-The offline reader now dispatches a decoded frame from one async call site.
-Classic pcap's unsigned 32-bit seconds already fit the exporter's UTC range.
-Pcapng checks that range after applying its interface offset. Calendar date
-construction accounted for 4.3% of the baseline CIC offline cycle samples.
-Shard selection now maps the seeded 64-bit hash into the shard range with
-a widening multiply, and the optimizer can inline biflow canonicalization.
-
-The table reports median million packets per second on an Intel Core Ultra 7
-255H with normal host affinity, default worker counts (5 offline, 12 replay),
-default build features, Parquet to `/dev/null`, one warmup per binary and four
-alternating measured pairs. Offline measures the whole CLI on a warm
-2-million-frame mixed IPv4/IPv6 UDP pcap with 10,000 bidirectional flows.
-IPv4 replay measures processing through writer close after generating 10
-million TCP/UDP events over 100,000 possible flows and eight sources. In the
-raw CSV, `ms` covers the whole process and replay `mpps` comes from the CLI.
+Median Mpps on an Intel Core Ultra 7 255H, default workers and features,
+Parquet to `/dev/null`, four alternating pairs after warmup.
+[Individual repetitions](profiling/nuccore-default-path.csv)
 
 | Features | Offline before | Offline after | IPv4 replay before | IPv4 replay after |
 | --- | ---: | ---: | ---: | ---: |
@@ -102,834 +91,228 @@ raw CSV, `ms` covers the whole process and replay `mpps` comes from the CLI.
 | NFStream | 7.45 | 8.83 | 11.66 | 25.43 |
 | RustiFlow | 7.18 | 8.18 | 11.04 | 11.14 |
 
-On CPUs 0–5, six alternating pairs gave 14–17% higher offline throughput.
-Full IPv4 and IPv6 replay gained about 3.5%. Basic replay varied by run.
-Its IPv4 median went from 23.62 to 22.14 Mpps, and its IPv6 median went from
-20.90 to 21.76 Mpps. [Individual repetitions](profiling/nuccore-default-path.csv)
+NFStream IPv4 replay fell from 1,580 to 995 user cycles and from 30.05 to
+14.78 cache misses per event, and peak RSS fell from 796 to 582 MiB. Live CIC
+capture at 650 kpps went from 3,424 to 3,293 cycles per frame with zero drops.
+Skipping the Welford update for samples equal to the mean was slower and was
+not kept. Decoded Parquet output matched in all 40 comparisons.
 
-Three separate `perf stat` pairs on CPUs 0–5 include event generation and
-writer close. Median NFStream IPv4 replay fell from 1,580 to 995 user cycles
-per input event, 30.05 to 14.78 hardware cache misses per event and 796 to
-582 MiB peak process RSS. CIC fell from 1,437 to 1,223 cycles and 27.20 to
-22.93 cache misses per event. In four live CIC pairs on a local veth, median
-capture-process user cycles per frame went from 3,424 to 3,293. Each run
-submitted 2 million frames at 650 kpps with zero eBPF drops, with capture
-on CPUs 0–3 and the sender on CPU 4.
+To repeat: build each revision with `cargo build --release --locked -p rustiflow`,
+generate input with `python docs/profiling/generate_pcap.py mixed.pcap`, and
+alternate `rustiflow -f FEATURES --export-path /dev/null pcap mixed.pcap` or
+`... replay-bench` between binaries, optionally under `taskset -c 0-5`.
 
-To repeat the throughput measurements, build each revision with
-`cargo build --release --locked -p rustiflow`. Generate the offline input
-with `python docs/profiling/generate_pcap.py mixed.pcap`. Run
-`rustiflow -f FEATURES --export-path /dev/null pcap mixed.pcap` or
-`rustiflow -f FEATURES --export-path /dev/null replay-bench`, alternating
-binaries. The six-core measurements prefix the same commands with
-`taskset -c 0-5`. The local run directory `target/pass-2c877ef/` includes
-the saved binaries, profiling commands, perf reports and veth counters.
+## 2026-11-24 — Overnight experiments and resulting defaults
 
-A separate experiment skipped the Welford update when a sample equaled its
-running mean. With four workers, median full-feature replay time grew 0.9%
-for IPv4 and 1.2% for IPv6. A single-worker variable-length TCP pcap gained
-0.9%. The shared accumulator retains its straight-line update.
+Ten experiments are summarized in [profiling/experiments.md](profiling/experiments.md).
+The TCP sequence fast path is unconditional. Shard batch recycling is on by
+default for live capture and Basic replay, and AVX2 flow keys for Basic replay.
+Against `cc0dd0e`, these defaults raised median Basic replay from 28.08 to
+35.21 Mpps (IPv4) and 28.17 to 34.31 Mpps (IPv6). Recycling lowered live
+capture cost from 3,971 to 3,431 cycles per frame at 650 kpps.
 
-Decoded Parquet headers and sorted rows matched in all 40 comparisons across
-the four feature sets and both projections, including one-second early
-snapshots, the mixed pcap, TCP, VLAN, Linux cooked and two-interface pcapng.
+## 2026-11-24 — Parallel Parquet export
 
-## 2026-11-24 — Defaults after integrating the overnight experiments
+Parquet is the default output. Flow-table shards project completed flows into
+native column buffers. Each shard submits its first 512 rows for Snappy
+compression, then doubles the group size up to 4,096. Groups encode
+concurrently while one writer appends them in submission order and writes the
+footer. Text uses dictionary encoding, integers and UTC microsecond
+timestamps use delta encoding, and doubles use plain encoding. Small groups
+keep column-chunk statistics and omit page indexes.
 
-On nuccore, default release builds before and after changing the workload
-defaults used the same inputs and CPU affinity. Against `cc0dd0e`, median
-Basic replay rose from 28.08 to 35.21 Mpps for IPv4 and 28.17 to 34.31 Mpps
-for IPv6 with AVX2 flow keys and recycled shard buffers. Full RustiFlow IPv4
-replay measured 7.27 and 7.22 Mpps. Each case used six alternating pairs
-after warmup, 10 million events, 100,000 flows, eight sources, four workers
-on CPUs 0–5, and Parquet to `/dev/null`. Timings cover replay through writer
-close. Decoded Basic output matched for IPv4 and IPv6 after normalizing the
-replay clock origin.
-
-At 650 kpps, enabling buffer recycling by default for live capture reduced
-median capture userspace cycles per frame from 3,971 to 3,431 in four
-alternating pairs. Each split-TC ingress run submitted two million mixed
-IPv4/IPv6 UDP packets with zero drops. Counters cover the sender interval.
-The TCP retransmission fast path was already active.
-
-## 2026-11-24 — Overnight performance experiments on nuccore
-
-- [TCP sequence tracking](profiling/overnight-retransmission-fast-path.md)
-  keeps the highest sequence range inline. Median full-feature TCP/UDP
-  replay throughput improved 15.2–15.6% in the branch benchmarks.
-- [Shard batch buffer recycling](profiling/overnight-batch-buffer-reuse.md)
-  is enabled by default for live capture and Basic replay. It used 3.4–3.6% fewer cycles per frame
-  in paced live capture. Full-feature replay throughput stayed within 1.4%
-  of baseline.
-- The [AVX2 flow-key prototype](profiling/overnight-simd-flow-keys.md) is enabled by default for Basic replay on AVX2 CPUs. It increased live CPU cost and slowed Basic
-  replay with SIMD disabled in the branch benchmarks.
-- [Parquet Float64 statistics](profiling/overnight-simd-parquet-projection.md)
-  gained Snappy round-trip regression coverage. The AVX2 implementation is
-  available as a local dependency patch for reproducing the measurements.
-
-## 2026-11-24 — Parallel Parquet export on nuccore
-
-Flow-table shards project completed flows directly into native column buffers.
-Each shard submits its first 512 rows for Snappy compression, then doubles the
-group size up to 4,096. A bounded queue lets groups encode concurrently while
-one writer appends them in submission order and finalizes the footer. Text uses
-dictionary encoding, integers and UTC microsecond timestamps use delta encoding,
-and doubles use plain encoding. These small groups retain column-chunk
-statistics and omit page indexes.
-
-The table gives median elapsed milliseconds for eight runs per format after
-warmup, alternating order within the same optimized binary on CPUs 0–5 with
-four flow-table workers. The offline pcap contains 10,000 flows. The replays
-use 100,000 possible flows over eight sources. Offline and short-replay timings include
-closing a regular file. Long replays target `/dev/null` and include all
-encoding and finalization. [Raw repetitions](profiling/nuccore-parquet/parallel-writers.csv) · [Reproduction command](profiling/README.md)
+Median milliseconds over eight runs per format, same binary, four workers on
+CPUs 0–5. [Raw repetitions](profiling/nuccore-parallel-parquet.csv)
 
 | Features | Workload | CSV ms | Parquet ms |
 | --- | --- | ---: | ---: |
 | rustiflow | Offline, 2M packets | 254.7 | 255.8 |
-| rustiflow | Offline, end of input to exit | 13.2 | 11.0 |
 | rustiflow | IPv4 replay, 1M events to disk | 296.0 | 244.5 |
 | rustiflow | IPv4 replay, 10M events | 1,671.0 | 1,591.5 |
-| rustiflow | IPv6 replay, 10M events | 1,688.5 | 1,613.0 |
 | basic | Offline, 2M packets | 251.4 | 249.5 |
-| basic | Offline, end of input to exit | 4.0 | 3.9 |
 | basic | IPv4 replay, 10M events | 332.5 | 332.5 |
-| basic | IPv6 replay, 10M events | 329.5 | 324.0 |
 
-The full-feature short replay wrote 35.3 MB of Parquet and 106.5 MB of CSV.
-Median replay CPU cost was 1,125 ns/event with Parquet and 1,252 ns/event with
-CSV. A separate instrumented run of each writer produced 99,994 records with
-zero flow clones. Peak process RSS was 369 MiB for Parquet and 352 MiB for CSV.
-The previous single-writer profile recorded 33.1 MB of Parquet and a 562 ms
-replay. The updated offline file decoded to the archived SHA-256
-`8579cf4b0ef1ca97b5cd9203726d426285c7eade599c271085225cc1c878b549` across all
-203 fields and 10,000 sorted records. [Previous writer profile](profiling/nuccore-parquet/README.md)
-
-## 2026-11-23 — Parquet candidate profiling
-
-The [matched writer comparison](profiling/nuccore-parquet/README.md) found a
-longer final export on nuccore. Full-feature offline throughput fell 15% against
-the archived CSV binary. Both Parquet readbacks matched the baseline fingerprint,
-and the live veth runs recorded zero drops.
-
-## 2026-11-23 — nuccore profiling baseline
-
-The [baseline for `67a8109`](profiling/nuccore-67a8109/README.md) preserves
-local CPU, allocation, and realtime eBPF measurements for optimization branches.
-
+The short replay wrote 35.3 MB of Parquet against 106.5 MB of CSV. The
+offline file decoded to the archived fingerprint across all 203 fields. An
+earlier single-writer Parquet candidate had been 15% slower offline than CSV.
 
 ## 2026-11-06: opt-in promiscuous capture
 
-Branch `feat/promiscuous-capture`.
+`realtime --promiscuous` joins a `PACKET_MR_PROMISC` membership on an
+`AF_PACKET` socket with protocol 0, which receives no packets. The kernel
+reference-counts the membership and drops it on close, including SIGKILL, so
+the interface returns to its previous state. The membership is joined before
+the classifiers attach and released after they detach
+(`rustiflow/src/realtime/promiscuous.rs`). The older approach, setting
+`IFF_PROMISC` with `SIOCSIFFLAGS`, never cleared the flag and was not revived.
 
-- tc only sees frames the NIC passes up. On a tap or SPAN port a physical NIC
-  drops most traffic in its MAC filter, so `realtime --promiscuous` joins a
-  `PACKET_MR_PROMISC` membership on an `AF_PACKET` socket with protocol 0,
-  which receives no packets. The kernel reference-counts the membership and
-  drops it on close, including on SIGKILL. The 2024
-  `bug/possible-promiscuous-fix` branch set `IFF_PROMISC` with `SIOCSIFFLAGS`,
-  never cleared it, panicked on error and was always on. It was not revived.
-- The membership is joined before the classifiers attach and released after
-  they detach (`rustiflow/src/realtime/promiscuous.rs`).
-- Opening the socket needs `CAP_NET_RAW`, not `CAP_NET_ADMIN`. With only the
-  unit's former `CAP_BPF CAP_NET_ADMIN CAP_PERFMON`, `socket()` fails with
-  `EPERM`; with the unit's former `RestrictAddressFamilies` it fails with
-  `EAFNOSUPPORT`. The unit now grants `CAP_NET_RAW` and `AF_PACKET`. This was
-  checked with `setpriv --bounding-set` and a `systemd-run` unit that copies
-  the unit's sandbox.
-- Config files store only `[config]` and `[output]`, so the flag comes from
-  the command line, the TUI or `RUSTIFLOW_REALTIME_ARGS`.
-
-`promiscuity` on `rustiflow-t0` (veth harness):
-
-| Run | Before | During | After |
-| --- | --- | --- | --- |
-| no flag, SIGINT | 0 | 0 | 0 |
-| `--promiscuous`, SIGINT | 0 | 1 | 0 |
-| `--promiscuous`, SIGKILL | 0 | 1 | 0 |
-| `--promiscuous`, operator `promisc on`, SIGINT | 1 | 2 | 1 |
-| `--promiscuous` under the unit's sandbox, `systemctl stop` | 0 | 1 | 0 |
-
-No tc filters remained after the SIGINT and unit runs. After SIGKILL the
-netlink-attached filters stay on the interface, as they did before this change,
-and were removed by hand. An unknown interface reports `No such device`, and a
-run without root reports `EPERM` with the `CAP_NET_RAW` hint; neither panics.
-
-With `--promiscuous`, three pings from `rustiflow-peer` to `10.203.0.1` with a
-bogus permanent neighbour MAC got no reply because the host stack dropped them.
-`ingress-ipv4` still matched all three, and the flow was exported. The NIC
-hardware filter cannot be reproduced on veth, so the effect of the flag on a
-physical NIC still needs a check on a real tap or SPAN port.
+The option needs `CAP_NET_RAW` and `AF_PACKET`, which the systemd unit now
+grants. On the veth harness, `promiscuity` rose by one during capture and
+returned to its prior value after SIGINT, SIGKILL, `systemctl stop`, and with
+an operator's `promisc on`. After SIGKILL the netlink tc filters stay attached
+and must be removed by hand, as before. The effect on a physical NIC's MAC
+filter still needs a check on a real tap or SPAN port.
 
 ## 2026-11-06: lean, CPU-targeted release build
 
-Branch `build/lean-release`.
+The release profile uses fat LTO, one codegen unit and stripped symbols. The
+`profiling` profile inherits it but keeps symbols and line tables. `pprof` is
+behind the optional `profiling` feature, and `pnet` became `pnet_packet`.
+`cargo xtask dist --target-cpu` defaults to `x86-64-v3`, recorded in MANIFEST,
+and `install.sh` refuses CPUs below it. Unwinding stays enabled so panics still
+detach tc classifiers.
 
-- The workspace release profile now uses fat LTO, one codegen unit and stripped
-  symbols. A `profiling` profile inherits it but keeps symbols and line tables
-  for pprof and `perf`. Without them a stripped release build would produce
-  unreadable flamegraphs.
-- `pprof` stays behind the optional `profiling` feature; a default release build
-  has no `pprof` in its dependency graph. `pnet` became `pnet_packet`, which
-  removes `pnet_datalink`, `pnet_transport`, `pnet_sys` and `ipnetwork`.
-- `cargo xtask dist --target-cpu` (default `x86-64-v3`) sets the CPU the binary
-  requires. The CPU is recorded as `target_cpu` in MANIFEST, and `install.sh`
-  refuses a live install on a CPU without that x86-64 level. It does not check
-  `--destdir` staging, which runs on a build host. Unwinding stays enabled, so
-  panics still run `Drop`, which detaches the tc classifiers.
-
-`replay-bench`, Ryzen 9 5950X, 100k flows, three runs each, Mpps (min-max):
-
-| Build | `rustiflow` t=1 | `rustiflow` t=8 | `basic` t=1 |
-| --- | --- | --- | --- |
-| previous release profile | 2.38-2.39 | 10.27-10.55 | 7.16-7.67 |
-| fat LTO, cgu 1, stripped | 2.39-2.41 | 10.25-10.39 | 7.21-7.35 |
-| + `x86-64-v3` | 2.44-2.45 | 10.63-10.73 | 7.32-7.39 |
-| + `native` (znver3) | 2.46-2.47 | 10.51-10.73 | 7.03-7.19 |
-
-LTO's throughput effect is within noise. With stripping, the binary shrinks from
-8.2 MB to 4.5 MB. `x86-64-v3` gives a small but consistent 2-3% on the full
-feature set. `native` does not beat `x86-64-v3`, so the portable level is the
-default. The pipeline is memory-bound at this cardinality, and code generation
-is not its limit. A v3 bundle captured TCP, ICMP and ICMPv6 flows on the veth
-harness and left no tc filters behind.
-
-## 2026-11-06: integrate capture reader fixes into main
-
-Merged `fix/offline-robustness` and `fix/offline-determinism` into local `main`,
-including their `feat/pure-rust-pcap` prerequisite. Conflict resolution keeps
-reader-side timestamp validation before advancing the shared offline clock,
-and preserves both sets of regression tests and documentation.
-
-The combined tree passes formatting, Clippy with all targets, and all 108
-main-crate tests. Its release exports match the previously validated sorted
-CSVs for all nine fixtures and both large synthetic capture formats, at one
-and eight threads. Release CLI checks also retain exit code 2 for missing
-options and offset-bearing diagnostics for corrupt timestamps.
+LTO's throughput effect was within noise, and stripping shrank the binary from
+8.2 to 4.5 MB. `x86-64-v3` gave a consistent 2–3% on the full feature set, and
+`native` did not beat it.
 
 ## 2026-11-06: deterministic offline expiration and observed idle periods
 
-Branch `fix/offline-determinism`, based directly on `850c5c7`, separate from
-`fix/offline-robustness`. The user chose to exclude trailing silence from idle
-statistics and require sorted offline exports to match across thread counts.
+The user chose to exclude trailing silence from idle statistics and to require
+sorted offline exports to match across thread counts.
 
-`ActiveIdleStats::close` now finalizes only the observed active period. Idle
-samples come exclusively from packet-to-packet gaps above five seconds within
-a flow. `BasicFlow` already ignores the close timestamp for duration and end
-time; other reusable features either ignore it or finalize packet-derived
-state. The shared idle rule changes realtime exports too. Realtime's scan and
-shutdown scheduling are unchanged. The user authorized passwordless-sudo
-validation on the existing veth setup.
+- Idle samples come only from packet-to-packet gaps above five seconds.
+  `ActiveIdleStats::close` finalizes only the observed active period. This
+  applies to realtime exports too.
+- Offline capture sends ordered expiration messages to every shard on the
+  capture-record clock, flushing pending batches first. EOF and corrupt-record
+  termination run a final scan at the last readable timestamp, then export
+  survivors with Exporter Shutdown. Unsupported frames also advance the clock.
+- Sorting is still needed because concurrent export order varies.
 
-Offline capture sends ordered expiration messages to every shard using the
-capture record clock. Pending packet batches flush before each scan. Workers
-still check the target flow's timeout when processing each packet, but no
-longer schedule independent scans. EOF and corrupt-record termination perform
-a final scan at the last readable record's timestamp, then export survivors
-with Exporter Shutdown. Unsupported frames also advance the capture clock.
-Random hash seeds remain in both modes; they no longer select offline scan
-times. Sorting is still needed because concurrent export order can vary.
-Out-of-order records retain file order, including the common scan ordering.
-
-Validation on Linux:
-
-- `cargo fmt`, `cargo clippy -p rustiflow --all-targets`, and all 105 main-crate
-  tests pass. The sweep-time regression failed before the fix. Another test
-  covers repeated one/eight-shard extraction with out-of-order records.
-- All nine checked-in captures produce unchanged sorted CSVs versus `850c5c7`.
-- The synthetic workload contains 1,675,048 packets across 100,000 original
-  biflows, with 50 to 400,000 us gaps and 130 s gaps for a subset. It exports
-  109,585 rows in both classic pcap and pcapng. Baseline versus fix changes
-  exactly 94,540 values in each of `idle_min`, `idle_max`, `idle_mean`, and
-  `idle_total`, plus 495 `flow_expire_cause` values. No other columns or flow
-  counts change. Both formats have identical counts.
-- For each of those 11 captures, two fixed runs at one thread and two at eight
-  threads produce identical sorted CSV rows.
-
-Performance gate: no observed regression above 5%. Release builds, warm-cache
-classic pcap input, RustiFlow feature set, CSV with headers, defaults for
-expiration, seven measured runs per side after warmup. Baseline and fix
-alternate order. Every timed run successfully writes all 109,585 rows.
-
-| Threads | Baseline median, range | Fixed median, range | Median runtime change |
-| --- | --- | --- | --- |
-| 1 | 0.983 s, 0.968 to 0.987 s | 0.950 s, 0.942 to 0.960 s | -3.43% |
-| 8 | 0.283 s, 0.263 to 0.311 s | 0.267 s, 0.262 to 0.314 s | -5.69% |
-
-Eight-thread ranges overlap, so this is not evidence of a repeatable speedup.
-The host had 32 logical CPUs and load averages 2.29/1.46/1.52 before timing.
-Separate `/proc` sampling of the fixed eight-thread run found the capture
-reader thread used 0.27 CPU seconds in 0.308 elapsed seconds, while reading
-359,715,878 bytes. The serial input/dispatch path limits further scaling on
-this warm-cache workload. Total process CPU was 1.44 user + 0.18 system seconds.
-Kernel permissions blocked perf events; no system settings were changed.
-
-Realtime validation used the existing eBPF objects and legacy netlink attach
-on `rustiflow-t0`, ingress only, with IPv4 and IPv6 UDP from `rustiflow-peer`.
-Three packets create a short active period and an observed 6.1-second gap;
-a later packet on another flow triggers expiration with an 8-second idle
-timeout. The baseline records about 15.56 seconds of idle time including
-trailing silence. Fixed runs at 1-second and 5-second sweep intervals record
-only the measured 6.1-second gap: idle min/max/mean/total equal IAT max, idle
-std is zero, packet count is three, and the cause is Idle Timeout. All six
-IP-family/run combinations pass. Every eBPF source reports zero dropped
-events, and the classifiers detach on shutdown. No container, linker, eBPF
-source, or system settings were changed. Logs and the runnable test are
-`realtime-*.log`, `realtime-results.json`, and `realtime_check.py` in the
-artifact directory below.
-
-Reproduction artifacts, binaries, scripts, raw comparisons, and timing samples
-are in `/tmp/rustiflow-found-bugs/`. `gen_big.py` is a copy of the supplied
-session generator with a 130-second gap after packet index 2 for every tenth
-flow. `compare.py` checks all columns and sorted determinism; `bench.py` times
-the full command and checks exit status, diagnostics, and row count.
-
-## 2026-11-06: reject corrupt capture timestamps
-
-Classic pcap fractional timestamps must be less than one second in the file's
-precision. Reject invalid fractions before nanosecond truncation rather than
-normalizing them into seconds. The reader reports the record offset and exports
-earlier packets. Both formats also reject timestamps outside Chrono's supported
-range before dispatch, preserving the existing pcapng offset-overflow error.
-Valid capture timestamps and exported values are unchanged.
+On a 1.68M-packet synthetic capture, only the four idle statistics and 495
+expiration causes changed, and sorted rows matched at one and eight threads.
+Runtime did not regress. A live veth run confirmed that the fixed idle
+statistics match the observed 6.1-second gap for both IP families.
 
 ## 2026-11-06: pure-Rust capture-file reader
 
-Branch `feat/pure-rust-pcap`. The offline reader in `rustiflow/src/pcap.rs`
-uses `pcap-parser` instead of the `pcap` crate, so RustiFlow no longer links
-libpcap. The link-layer guessing (Ethernet, 802.1Q, Linux cooked capture) is
-unchanged; the file's linktype is still not read.
+The offline reader uses `pcap-parser` 0.17 instead of linking libpcap. It was
+chosen over `pcap-file` for its stable release, single reader for both
+formats, and clean `Eof`/`UnexpectedEof` distinction. Link layers are still
+guessed per packet. Two `pcap-parser` defects are worked around locally, and
+draft upstream reports are in [pcap-parser-issues.md](pcap-parser-issues.md).
 
-Crate choice:
+The reader reproduces libpcap's default microsecond behavior: finer timestamps
+are truncated, frames are cut to the snapshot length (0 or above 262,144 means
+262,144), pcapng uses the first interface's snapshot length, `if_tsoffset` is
+added, and Simple Packet Blocks are stamped at the interface offset.
 
-| | `pcap-parser` 0.17.0 | `pcap-file` |
-| --- | --- | --- |
-| Release state | stable, July 2025, rusticata project | 2.0.0 from February 2023; 3.0.0 still at rc.3 |
-| Formats | pcap and pcapng behind one probing reader | separate pcap and pcapng readers |
-| Large files | streams through a fixed circular buffer; blocks borrow it | streams through an internal buffer |
-| pcapng timestamps | raw `ts_high`/`ts_low`; scaling left to the caller | decoded to `Duration` |
-| MSRV, license | 1.65, MIT or Apache-2.0 | 1.93 (3.0 rc), MIT |
+Error policy:
 
-`pcap-parser` won on release state, a single reader for both formats, and a
-clean distinction between end of file (`Eof`) and a record cut short
-(`UnexpectedEof`). Scaling timestamps ourselves is also what lets the reader
-match libpcap's truncation exactly. Two `pcap-parser` defects are worked around
-in our code and are worth reporting upstream:
+- A record cut short by end of file ends the read with a warning and the
+  offset. Flows are exported.
+- An unframeable record, an obsolete Packet Block, an invalid fractional
+  timestamp, or a timestamp outside the exporter's UTC range ends the read with
+  an error naming the offset, after exporting earlier packets.
+- Pcapng files whose interfaces have different linktypes are accepted, unlike
+  libpcap.
 
-- `build_ts_resolution` rejects every binary `if_tsresol`, because it compares
-  the raw byte, flag bit 0x80 included, against 63.
-- `if_tsoffset` is always decoded as little-endian, also in big-endian sections.
-
-The reader reproduces what libpcap's `pcap_next_ex` returned at its default
-microsecond precision: nanosecond and finer timestamps are truncated, frames are
-cut to the snapshot length (0 or above 262,144 means 262,144), pcapng uses the
-first interface's snapshot length, `if_tsoffset` is added, and a Simple Packet
-Block is stamped at the interface offset.
-
-Error policy. Before, `while let Ok(..)` ended quietly on any read error:
-
-- A record cut off by the end of the file ends the read with a warning that
-  gives its offset. This is the usual shape of a capture whose writer was
-  killed, so the flows are exported as before.
-- A record that cannot be framed (a classic pcap capture length above 262,144,
-  a malformed pcapng block, an unknown interface ID, an invalid
-  `if_tsresol`) or an obsolete pcapng Packet Block ends the read with an error
-  that gives its offset. Packets before it are dispatched and their flows
-  exported first; the CLI logs the error.
-- Deliberate divergence: libpcap refuses pcapng files whose interfaces have
-  different linktypes. The reader accepts them, since link layers are guessed
-  per packet anyway.
-
-Validation, against a libpcap build of `c04b3b5`:
-
-- Fixtures from `scripts/generate_pcap_fixtures.py`: the committed variants and
-  uncommitted edge cases (snapshot shorter than frames, corrupt capture length
-  mid-file, big-endian pcapng with binary `if_tsresol`, `if_tsoffset` and an SPB,
-  two pcapng sections, truncated pcapng, header-only and non-capture files). With
-  `-f rustiflow --threads 1`, every CSV is byte-identical to the baseline; only
-  the new warnings and errors differ.
-- A synthetic capture of 1.68M packets and 100k TCP/UDP biflows, written as pcap
-  and as nanosecond pcapng: identical row sets at one thread.
-- Multi-thread outputs cannot be compared, even after sorting: two baseline runs
-  with `--threads 8` differ in about 149k Idle Timeout rows. Shard assignment
-  uses a per-process random hash seed, and idle sweeps run on each shard's packet
-  clock, so idle-expiry timing varies between runs. This predates the change.
-- Throughput, median of 7 alternating runs on the synthetic capture: at one
-  thread +1.6% wall (pcap) and +2.3% (pcapng) with equal or lower CPU time; at
-  the default 5 threads 12% and 7% faster.
+Single-thread CSVs for all fixtures were byte-identical to the libpcap build.
+Throughput was within 2.3% at one thread and 7–12% faster at five.
 
 ## 2026-10-22: adversarial flow and parser fixes
 
-Resolved the eight synthetic-event findings documented in
-[the adversarial findings record](handoff-realtime-adversarial.md). TCP sequence
-arithmetic wraps explicitly, expiration rejects negative elapsed time, and
-handshake/close observations survive cross-direction reordering. A first SYN-ACK
-identifies the forward endpoint as its destination. Normal three-segment closes
-now use `four_way_fin`; genuine simultaneous FIN exchanges remain distinct.
+Eight synthetic-event findings were fixed, and all now have active
+deterministic tests in `realtime_adversarial_test.rs`. The resulting semantics
+are documented in the README under TCP flow lifecycle and out-of-order packet
+timing. The user chose these policies:
 
-The user selected these policies:
+- Preserve late post-close packets as a separate flow. There are no tombstones.
+- Use bounded streaming timing: duration uses timestamp bounds, and late
+  packets add zero IAT samples against a nondecreasing reference.
+- Bound retransmission history to 1,024 merged ranges per direction in an
+  ordered map, accepting misses against evicted ranges.
+- A first SYN-ACK identifies its destination as the forward endpoint.
 
-- Preserve late post-close packets in a separate flow.
-- Keep bounded streaming timing, with timestamp bounds for duration and zero IAT
-  samples for late packets against a nondecreasing reference.
-- Bound retransmission history, accepting missed retransmissions into evicted
-  ranges. The implementation retains 1,024 merged ranges per direction in an
-  ordered map and handles sequence rollover.
+eBPF fragment handling and IPv6 AH/ESP parsing were aligned with offline
+parsing through the shared `common::ipv6_extensions`. Neither path reassembles
+fragments. The full findings record is in Git history at `2cd5df81`
+(`docs/handoff-realtime-adversarial.md`).
 
-The tests that encoded suppression or incorrect close classification were
-corrected. The machine-dependent performance assertion was replaced with
-bounded-history and overlap tests. All adversarial cases are active.
+## 2026-10-20: aya 0.14 and realtime byte order
 
-Also aligned eBPF fragment handling and IPv6 AH/ESP parsing with offline capture.
-IPv6 extension interpretation is shared through `common`. Workspace tests,
-all-feature Clippy, and both eBPF builds pass. Live veth validation is still
-outstanding: this session had no `rustiflow-t0` and no passwordless sudo.
+Moved to aya 0.14, aya-log 0.3, aya-ebpf 0.2 and network-types 0.2, with
+bpf-linker 0.12.0. `common` takes aya from crates.io, so one version is
+locked.
 
-## 2026-10-20: aya 0.14 and network-types 0.2; realtime byte order
-
-Moved to aya 0.14, aya-log 0.3, aya-ebpf 0.2, aya-log-ebpf 0.2 and
-network-types 0.2, with bpf-linker 0.12.0 in CI and the images. `common` now
-takes aya from crates.io instead of unpinned git, so one aya version is locked.
-aya 0.14 also fixes ring buffer consumer ordering in userspace.
-
-network-types 0.2 stores multi-byte header fields as wire-order byte arrays,
-which exposed a realtime bug present since `c645b70` (2024-03): the eBPF
-programs passed TCP/UDP ports, TCP window and sequence/ack numbers to userspace
-in network byte order, and the userspace decoder used them as host order, so
-realtime ports read byte-swapped on little-endian hosts. IPv6 addresses were
-also reversed (`from_be_bytes` in eBPF, then `to_be` again in userspace). The
-offline/realtime parity tests and the replay build events in userspace with the
-intended convention, so they did not cover the eBPF side. `EbpfEventIpv4/6`
-now document the contract: addresses in wire order in memory, everything else
-host order. `common` tests decode wire bytes through the same `NetworkHeader`
-accessors the eBPF programs use.
-
-Other changes that came with the bump:
-
-- `Ipv4Hdr::ihl()` now returns bytes, not 32-bit words.
-- Protocol, EtherType and IPv6 extension `next_hdr` are read as integers and
-  converted with checked accessors instead of loading enums from packet bytes.
-- aya-log 0.3 no longer spawns a reader; `spawn_ebpf_logger` drives it.
-
-Realtime ports, window, sequence numbers and IPv6 addresses in datasets
-exported before this change are not trustworthy. Not yet validated with a live
-realtime run on the veth harness.
+network-types 0.2 exposed a realtime bug present since `c645b70` (2024-03).
+Ports, TCP window, and sequence and ack numbers reached userspace in network
+byte order but were decoded as host order, and IPv6 addresses were reversed.
+`EbpfEventIpv4/6` now document the contract: addresses are in wire order and
+all other fields in host order. **Realtime ports, windows, sequence numbers and
+IPv6 addresses in datasets exported before this change are not trustworthy.**
 
 ## 2026-10-20: realtime userspace replay benchmark
 
-`rustiflow ... replay-bench` (README, "Replay benchmark") generates synthetic
-eBPF events in memory and drains them through the realtime userspace pipeline:
-per-source batching, dispatcher, shard flow tables, per-shard encoders and the
-writer. To keep it on the same code as live capture, `realtime.rs` now shares
-`PipelineSettings`, `spawn_shard_workers` and `SourceBatcher` between the ring
-drain tasks and the replay; the IPv4 and IPv6 drain loops became one
-`drain_ring_source`. The subcommand sits in a CLI-only `CliCommand` wrapper, so
-the TUI and config files keep the capture-only `Commands`.
-
-What it does not model: ring-buffer reads and wakeups, the eBPF programs and
-the kernel receive path; uneven queue fanout (sources are evenly balanced);
-handshakes, teardown and flow churn (flows never terminate). The final export
-of all open flows is inside the measured interval.
-
-First observations, Ryzen 9 5950X, no CPU pinning, 30M IPv4 events over 100k
-flows, 1400-byte payloads, 8 sources, CSV to `/dev/null`. Run-to-run variation
-was about +-3% on repeated 10M-event runs.
-
-| `--threads` | `basic` Mpps | `basic` CPU ns/pkt | `rustiflow` Mpps | `rustiflow` CPU ns/pkt |
-| --- | --- | --- | --- | --- |
-| 1 | 8.8 | 208 | 2.9 | 440 |
-| 2 | 17.4 | 181 | 5.3 | 450 |
-| 4 | 35.9 | 172 | 8.4 | 538 |
-| 8 | 69.6 | 195 | 12.3 | 712 |
-| 12 | 62.3 | 227 | 15.7 | 853 |
-| 16 | 61.8 | 228 | 17.2 | 1031 |
-
-- `basic` scales almost linearly to 8 shards and then flattens. With 8
-  sources, the source and dispatcher stages are a candidate limit; not yet
-  verified.
-- `rustiflow` scales sublinearly and its CPU per packet more than doubles from 1
-  to 16 shards. With 100k flows of about 1.6 KB each, flow state alone is about
-  160 MB, so cache and memory contention are candidates, as are SMT sharing
-  (16 shards plus source, dispatcher and encoder tasks on 16 physical cores)
-  and the two CCDs. Pinning and `perf` sampling should come before conclusions.
-- CPU ns/packet is whole-process CPU, including tokio scheduling and idle
-  spinning, so it is an upper bound on the pipeline's own work.
+`replay-bench` drives synthetic eBPF events through the same per-source
+batching, dispatch, shard flow tables and exporter as `realtime`. It does not
+model ring reads and wakeups, the eBPF programs, the kernel receive path,
+uneven queue fanout, or flow churn. The subcommand lives in a CLI-only
+`CliCommand`, so the TUI and config files keep the capture-only `Commands`.
 
 ## 2026-10-20: early export on a fixed per-flow schedule
 
-Branch `perf/hot-path-40g`, commits `f426f95` and `8a556aa`.
+Early export used to emit a raw clone on every packet once a flow passed the
+threshold. It now uses a fixed per-flow schedule. Each `FlowEntry` stores its
+next boundary (first packet + k·N, in microseconds). The first packet at or
+after a boundary exports one finalized snapshot with cause `None`. Expiration
+sweeps never trigger snapshots. `N` is a `NonZeroU64` smaller than the active
+timeout. **Datasets produced with early export before this change contain
+roughly one cumulative row per packet.** Per-interval delta rows in the
+NetFlow/IPFIX style were not implemented. They would need a separate mode.
 
-Previous behavior: on every packet, the flow table compared the flow age,
-truncated to whole seconds, with `> N` and exported a clone when it passed.
-Nothing recorded earlier exports, so once a flow passed the threshold every
-packet produced another row. `N=2` first fired at 3 s, and `0` exported on
-every packet after the first second. One UDP flow of 1,000 packets, 10 ms
-apart, gave 1 row without early export, 701 rows with `--early-export 2` and 901
-with `--early-export 0`. Snapshots were raw clones, so open bulks, the current
-active period and the TCP close style were not finalized.
+## 2026-10-20: userspace hot-path pass
 
-Current behavior:
+Kept: integer formatting for integral `f64` CSV fields, mandatory
+`append_to_csv` on every `FlowFeature`, one canonical-key lookup per packet,
+seeded foldhash for the flow map and shard selector (random per process and
+instance), shutdown exports sorted by `(timestamp, key)`, per-shard CSV
+encoders, and offline packets batched 128 per shard send. Together these
+roughly halved offline CPU time. Zero `--threads` is rejected at startup.
 
-- Each `FlowEntry` stores its next boundary, first packet + k * N, compared in
-  microseconds. The first packet at or after a boundary exports one snapshot.
-  Boundaries that pass without packets are skipped.
-- Only packets trigger snapshots. Expiration sweeps never do, so a quiet flow
-  gets no snapshots until it expires.
-- A snapshot is a clone closed with `close_flow(packet timestamp, None)`. Bulks,
-  the active period and the close style are complete, and the live flow is
-  unaffected. Snapshots keep cause `None`; final rows always carry a real cause.
-- The interval is a `NonZeroU64`, so CLI and config-file input reject `0`. In
-  the TUI, `0` still means disabled. Startup rejects `N >= active_timeout`.
-- The same flow now gives 5 rows with `--early-export 2`: snapshots at 2, 4, 6
-  and 8 s, then the final row.
-- Offline and realtime share `FlowTable`. A parity test checks that equivalent
-  packet sequences produce identical snapshot rows.
+Measured and rejected: a synchronous `FlowTable` core to shrink the per-packet
+future (no cycle change).
 
-Consequences:
+## 2026-10-15: bulk timing
 
-- Datasets produced with early export before this change contain repeated
-  cumulative rows, roughly one per packet once a flow passed the threshold.
-- All March export measurements with `--early-export 5` were dominated by those
-  repeats: 0.5-3M rows per 10 s for about 10 long flows. Their per-row costs
-  remain useful; their row volumes do not describe the current code. Expect
-  about flows * duration / N snapshot rows now.
+Bulk state uses integer microseconds. The idle threshold is exactly 1,000,000
+µs, and a new bulk starts only when the gap is greater. Durations export as
+fractional milliseconds. Rates are packet bytes per second, and identical
+timestamps yield the zero-denominator fallback of zero. The four-packet
+minimum and direction-switch rules are unchanged. The AuthStorm dataset was
+regenerated with this fix under
+`feature-revisions/bulk-us-20261015-default/release/`. No non-bulk feature
+changed across 1,019,250 flows.
 
-Not done: per-interval (delta) rows in the NetFlow/IPFIX style. They would need
-a per-family statistics reset that keeps TCP and lifecycle state, so they belong
-in a separate, explicit mode. No realtime harness run was made for this change.
+## 2026-04 to 2026-03: realtime ingestion design (condensed)
 
-Validation: `cargo test -p rustiflow` (74 tests) and
-`cargo clippy -p rustiflow --all-targets`, plus the 1,000-packet pcap above
-through the CLI.
+Earlier run logs, the April veth throughput matrix, and the October
+measurement plan are in Git history at `2cd5df81`. The following still
+describes the current code.
 
-## 2026-10-20: userspace hot-path pass toward 40G
-
-Branch `perf/hot-path-40g`. Userspace only: no eBPF change, and no live
-realtime run (no root on the development host). Realtime still needs
-validation on the `rustiflow-t0` harness with the 2026-10-18 measurement plan.
-
-Harnesses, all on a Ryzen 9 5950X with outputs compared as sorted row sets:
-
-- Offline: a deterministic synthetic pcap with 2.97M packets and 150k TCP/UDP
-  biflows (handshake, data, FIN or RST teardown), run with `perf stat -r 5`.
-  This path is bounded by the pcap reader, so it hides shard-side gains.
-- In-memory FlowTable replay: 4M packets over 200k concurrent flows, one shard,
-  no reader and no channels. This gives ns/packet for the flow-table path.
-- Row encoding: one RustiFlow flow encoded 200k times.
-
-| Change | Measurement | Before | After |
-| --- | --- | --- | --- |
-| Integral `f64` CSV fields use the integer formatter | rustiflow dump time | 1204 ms | 1077 ms |
-| `append_to_csv` required for every `FlowFeature` | rustiflow dump time | 1077 ms | 883 ms |
-| One canonical-key lookup per packet; no clone on termination | replay, basic | 184 ns/pkt | 175 ns/pkt |
-| Seeded foldhash for the flow map and `ShardSelector` | replay, basic / rustiflow | 175 / ~404 ns/pkt | 142 / 357 ns/pkt |
-| Sort shutdown exports by `(timestamp, key)` | shutdown with 200k flows, rustiflow | 595 ms | ~124 ms |
-| Per-shard CSV encoder tasks feed the writer | offline wall, rustiflow | 1.13 s | 0.74 s |
-| Offline packets batched per shard (128 per send) | offline CPU, basic / rustiflow | 2.32 / 3.72 s | 1.13 / 2.54 s |
-| Direct digit writer for integral fields | encode one RustiFlow row | 4.57 us | 2.98 us |
-
-The packet-graph change removes a per-event tokio Mutex, sort and watch send.
-It is opt-in and was not measured.
-
-Notes:
-
-- Basic shutdown export went from 42 ms to 55 ms with the key sort, since
-  120-byte flows were cheap to sort directly. This was accepted.
-- The writer is no longer the export ceiling. Rows from one shard keep their
-  order; rows from different shards interleave, as before.
-- Zero `--threads` is rejected at startup. It used to assert on the first packet.
-- The foldhash seeds are random per process and per instance. A remote sender
-  cannot precompute collisions, and the shard choice does not correlate with
-  bucket choice inside each shard's map.
-
-Measured and rejected:
-
-- Making the FlowTable core synchronous to shrink the per-packet future from
-  9.9 KB to 368 B: no cycle or instruction change.
-- `lto = "fat"` with `codegen-units = 1`: instructions changed by 1-3% and wall
-  time stayed within noise. Not worth about 40 s of extra build time.
-
-Open candidates, with the evidence for each:
-
-- Fractional floats are about 44% of row encoding. A faster shortest-digit
-  algorithm would also need Display-identical output.
-- The expiration scan iterates every flow each interval. A timer wheel or an
-  incremental scan would bound the per-shard stall when tables are large.
-- The eBPF programs bump `MATCHED_PACKETS` on every packet, but it always equals
-  submitted plus dropped, so it could be derived in userspace. Verify the saving
-  with `bpf_stats_enabled`.
-- A RustiFlow flow is 1,576 bytes, so with large tables the remaining per-packet
-  cost is mostly cache misses on flow state.
-
-## 2026-10-18: proposed packet-rate and CPU-cost measurement plan
-
-Status: planned, not executed. Use the trusted `rustiflow-t0` / `rustiflow-peer`
-veth setup to measure software cost and scaling. Physical 40G wire throughput
-remains unvalidated. Keep the April results as historical observations; their
-headroom loss does not by itself locate the bottleneck in eBPF.
-
-Report sustained clean Mpps, CPU allocation, and component ns/packet. Distinguish
-CPU time per packet from reciprocal throughput, which is elapsed time per packet
-across all concurrent workers. Derive any equivalent bitrate from an explicit
-packet-size distribution and framing convention.
-
-For illustration, with Ethernet frame sizes including FCS, add 20 bytes per
-frame for preamble/SFD and inter-frame gap. Required Mpps is
-`line_Gbit_s * 1000 / (8 * (mean_frame_bytes + 20))`.
-
-| Line-rate target | 1400-byte frames | 400-byte mean frames | 64-byte frames |
-| --- | --- | --- | --- |
-| 25 Gbit/s | 2.20 Mpps | 7.44 Mpps | 37.20 Mpps |
-| 40 Gbit/s | 3.52 Mpps | 11.90 Mpps | 59.52 Mpps |
-| 100 Gbit/s | 8.80 Mpps | 29.76 Mpps | 148.81 Mpps |
-
-The 400-byte mean is illustrative, not a defined IMIX distribution. Generator
-payload lengths in B1/B4 are not automatically Ethernet frame lengths. At
-4 Mpps, 40 Gbit/s corresponds to 1250 wire bytes per packet under this convention,
-or a 1230-byte mean frame. This is a capacity equivalence, not a wire-rate result.
-
-### 1. Establish packetization and CPU placement
-
-- Save the current host and peer RPS/XPS masks, queue counts, offload settings,
-  MTU, CPU topology, affinity, and kernel/build versions before changing setup.
-- Use bounded `perf` sampling across the existing CPU groups to locate tc/BPF
-  and receive processing under B1 and B4 load. Treat RPS placement as a hypothesis
-  until samples confirm the executing CPUs. Linux documents RPS as steering
-  receive processing through CPU backlog queues in its
-  [network scaling guide](https://www.kernel.org/doc/html/latest/networking/scaling.html).
-- Restrict host RX RPS to dedicated receive-processing CPUs. Keep generator,
-  receive processing, RustiFlow userspace, and control/receiver budgets explicit.
-  Inspect peer steering and both traffic directions too. Verify placement again
-  after changing masks; process affinity alone does not establish BPF placement.
-- Record physical cores and SMT siblings. Avoid accidental sharing between roles.
-  Restore settings after experiments. Update the maintained matrix only after
-  validating the replacement CPU partition.
-- Disable aggregation/segmentation offloads for the packet-rate baseline where
-  supported, and verify actual observed packet sizes and counts. The April jumbo
-  MTU and enlarged GSO/GRO limits make application bitrate an unreliable proxy
-  for classifier invocations. Keep bulk-offload runs as a separate scenario.
-
-### 2. Measure classifier cost
-
-- Start with B1 and B4, for both `basic` and `rustiflow`. Temporarily enable
-  `kernel.bpf_stats_enabled=1`, record program IDs and attachment order, and take
-  before/after `bpftool prog show` snapshots over the same steady-state interval.
-  Restore the previous sysctl value afterward.
-- Compute `delta(run_time_ns) / delta(run_cnt)` for each program. Label this
-  ns/invocation. Reconcile invocation counts with capture-side packets, including
-  packets that visit both IPv4 and IPv6 classifiers. Sum relevant runtime deltas
-  and divide by observed packets to obtain combined BPF ns/packet.
-- Record instrumentation state and repeat throughput measurements with runtime
-  statistics disabled. Runtime accounting is an instrumented average, not an
-  exact measurement of the entire datapath cost.
-- Independently use `bpftool prog run ... data_in ... repeat N` for crafted TCP
-  and UDP packets over IPv4 and IPv6, including IPv6 extension-header cases.
-  Provide valid classifier context and maps, verify expected emitted events,
-  and keep a consumer draining all relevant rings. Check reservation failures;
-  a running consumer alone does not prove the successful-submit path dominated.
-  Separate full-ring results from successful-event results. Test-run timing is
-  a microbenchmark with cache and scheduling effects, not an ingress ceiling.
-  See the kernel's [BPF program execution documentation](https://kernel.org/doc/html/next/bpf/bpf_prog_run.html)
-  and [bpftool command reference](https://github.com/torvalds/linux/blob/master/tools/bpf/bpftool/Documentation/bpftool-prog.rst).
-- At a fixed achieved packet rate below saturation, compare CPU cycles with and
-  without attachment using `perf stat -e cycles -C <receive CPUs>`. Normalize the
-  cycle difference by observed packets over matched intervals. Include any other
-  CPUs where profiling finds added datapath work, and report run-to-run variation.
-
-### 3. Measure userspace separately
-
-- Process a large, known-count pcap in offline mode with controlled flow mix,
-  churn, output mode, and storage/cache state. Report accepted packets/s, CPU
-  time, and shard distribution. This measures the offline pipeline, including
-  parsing and I/O; it does not establish the realtime consumer ceiling.
-- Use `RUSTIFLOW_REALTIME_STATS` to attribute realtime decode, enqueue, and shard
-  send waits. Its elapsed-time counters include waits and do not measure all
-  shard processing. Do not sum overlapping stage timings into CPU ns/packet.
-- For a generator-independent realtime userspace ceiling, use `replay-bench`
-  (added 2026-10-20). It replays synthetic events through the
-  consumer/dispatcher/shard/export path; ring reads, eBPF and the kernel receive
-  path are excluded. Label realtime harness timings as observations at the
-  offered rate.
-
-### 4. Run the scaling sweep
-
-- Sweep `--threads 2,4,8,16` with a fixed, sufficient receive CPU budget first.
-  Then vary receive CPU allocation with userspace held fixed. Finally test paired
-  allocations that fit the host. Record total CPU budgets, queue/ring counts,
-  actual affinity, and worker utilization; a thread count is not a core count.
-- Use enough independent flows to exercise all shards and queues. Keep packet
-  shape, flow count/churn, output mode, and duration fixed within each sweep.
-  Include B3/B4 alongside B1, and test realistic churn separately.
-- Find the highest sustained clean rate with bounded offered-rate steps. Require
-  reconciled sender/receiver/capture counts, zero unexpected kernel/ring/userspace
-  losses, and no growing backlog. Zero internal drops alone is insufficient.
-- Warm up, repeat each point at least three times, and retain raw counters,
-  exact commands, durations, and variability. Mark generator-limited points as
-  lower bounds on capacity. Compare throughput with statistics enabled and
-  disabled to expose measurement overhead.
-- Report observed scaling and saturation before extrapolating. Any projection
-  beyond measured cores must state its assumptions, packet mix, and shared
-  bottlenecks. Per-core rate multiplied by cores is conditional, not a guarantee.
-
-After these baselines, measure one change at a time: merged IPv4/IPv6 programs,
-counter consolidation, ring wakeup batching, per-CPU rings, removal of the extra
-userspace hop, and an expiry timer wheel. The single-lookup, hasher and
-per-shard export changes landed on 2026-10-20 without a realtime run, so the
-first harness baseline already includes them; compare against the April matrix
-only with that caveat.
-Use component cost and clean Mpps to judge each change against its baseline.
-
-Native XDP performance, hardware RSS, hardware timestamps, and NIC-related NUMA
-placement need physical hardware validation. Veth XDP can support correctness
-checks; do not present its performance as representative of a NIC. If hardware
-becomes available, a suitable dual-port NIC with a compatible DAC provides a
-single-host physical path. A mirror/SPAN feed can add realistic flow mix and
-churn evidence, with mirror loss accounted for separately.
-
-## 2026-10-15: bulk timing and AuthStorm regeneration
-
-- Bulk state now retains integer microseconds. The idle threshold is exactly
-  1,000,000 microseconds, with a new bulk only when the gap is greater.
-- Exported duration statistics remain milliseconds, now fractional. Rates use
-  packet bytes per second through `safe_per_second_rate`. Identical timestamps
-  yield the existing zero-denominator fallback of zero; a positive bulk count
-  and zero duration identify an undefined rate rather than no bulk.
-- Packet-byte accounting, the four-packet minimum and direction-switch rules
-  are unchanged. RustiFlow and CIC share the correction in ordinary and
-  contamination-free exports.
-- Regression tests fail against the original source and pass after the fix.
-  Coverage includes both directions, sub-millisecond and identical timestamps,
-  accumulated bulks, exact idle boundaries, direction switches, close, CSV
-  serialization and IPv4/IPv6 offline versus eBPF-event feature conversion.
-- Timing audit found no further instance of this rate-unit defect. IAT,
-  active/idle and directional timing already subtract integer microseconds
-  before exporting fractional milliseconds. Other per-second rates consume
-  microsecond durations. NF/CIDDS whole-millisecond fields remain their
-  existing schema choices; this change does not redefine them.
-- AuthStorm regeneration scripts stage a new directory, hash accepted inputs,
-  preserve legacy annotations in sidecars, compare flow multisets, and build
-  the existing fixed train/test split. The final run preserves the original
-  five-thread default. A one-thread exploratory run changed shard-expiration
-  statistics and was excluded from the final revision.
-- Final staged CSV comparison: 1,172 scenarios, 1,019,250 flows, 18,906,131
-  extracted packets; no non-bulk feature or bulk-membership changes and no
-  nonfinite rates or zero-duration bulks. The crosswalk assigns 1,019,204 unique matches; 46 rows in
-  23 duplicate-identity groups remain explicitly ambiguous. All duplicate rows
-  are identical across their native fields, so row-order assignment would invent
-  correspondence.
-- The final Parquet release is in the AuthStorm dataset at
-  `feature-revisions/bulk-us-20261015-default/release/`. Packaging verification
-  passes for train 858,081 and test 161,169 rows; nine family replay comparisons
-  pass. All 69,520 legacy annotation rows are linked into metadata. The 463
-  parser-excluded frames match documented intentional-corruption exceptions.
-  Original dataset artifacts remain intact.
-- Validation on Linux: `cargo fmt --all -- --check`,
-  `cargo check -p rustiflow --locked`, `cargo test -p rustiflow --locked`
-  with 66 tests, and `cargo clippy -p rustiflow --all-targets --locked -- -D warnings`.
-  No live eBPF attachment test was performed; event conversion is covered
-  deterministically and no capture/attach code changed.
-
-## 2026-04-04 and 2026-04-05: local throughput matrix
-
-- The trusted software-path harness is `rustiflow-t0` / `rustiflow-peer` /
-  `rustiflow-p0` (see `AGENTS.md`). Its persistent service is tuned for bulk
-  throughput rather than realism: 8x8 multiqueue veth matching
-  `REALTIME_EVENT_QUEUE_COUNT`, 9000 MTU, `txqueuelen 10000`, widened GSO/GRO
-  limits and RPS/XPS spread across CPUs. Application bitrate on it is therefore
-  not a proxy for packet rate (see the 2026-10-18 plan).
-- A separate multiqueue `pktgen` harness was tried and dropped: its own control
-  path flattened around 19.7-22.9 Gbit/s whatever the target. True 40G
-  validation is a physical-hardware question.
-- 2026-04-04, 24-port `iperf3` fanout: 1400-byte UDP reached 24.72 Gbit/s with
-  RustiFlow against a 24.96 Gbit/s control, with 0 internal drops for IPv4 and
-  IPv6. 512- and 256-byte UDP were generator-limited before RustiFlow dropped.
-  900 s soaks and a short-lived-flow churn soak stayed drop-free.
-- 2026-04-05, the maintained matrix in `docs/realtime-throughput-matrix.md`
-  (CPUs 0-7 sender, 8-23 RustiFlow, 24-31 receiver; artifacts in
-  `target/realtime-matrix/20260405-190241/`). Every capture run had 0 internal
-  drops; values are Gbit/s with headroom loss against control:
-
-| Scenario | Control | `basic` | `rustiflow` |
-| --- | --- | --- | --- |
-| B1 1400-byte UDP, P8, 30 s | 22.2 | 13.9 (-37.4%) | 11.1 (-50.0%) |
-| B2 1400-byte UDP near ceiling | 16.7 | 13.4 (-19.8%) | 11.1 (-33.5%) |
-| B3 512-byte UDP | 7.27 | 5.21 (-28.3%) | 4.20 (-42.2%) |
-| B4 256-byte UDP | 3.68 | 2.11 (-42.7%) | 2.68 (-27.2%) |
-| B5 mixed UDP + TCP | 114.37 | 110.94 (-3.0%) | 114.24 (-0.1%) |
-| B6 200 short TCP runs (mean) | 94.48 | 94.25 (-0.24%) | 93.78 (-0.74%) |
-| B7 900 s 1400-byte UDP soak | 18.8 | 13.7 (-27.1%) | 12.6 (-33.0%) |
-
-B8 (`tcpreplay` of a tiny fixture) is only a parser smoke test. These results
-predate the 2026-10-20 userspace changes and do not locate the bottleneck; the
-2026-10-18 plan is the next measurement.
-
-## 2026-03: realtime ingestion and export design (condensed)
-
-Detailed March run logs are in git history before this commit. What still holds:
-
-Ingestion semantics:
-
-- Realtime events carry kernel monotonic timestamps and the same
-  packet/header/payload length semantics as offline parsing. Timing, IAT,
-  active/idle and bulk logic compare integer microseconds and export
-  milliseconds.
-- Flow lookup and sharding use typed `FlowKey` values; the string flow id is
-  only built when a flow is created.
-- Offline parsing drops non-first IPv4 and IPv6 fragments, and short
-  unsupported frames must not panic the reader.
-- `FlowTable` must not overwrite `TcpReset` with `TcpTermination`, and a flow
-  terminated by its first packet is exported once.
-- Feature decisions from this period, all still current: TCP-only
-  retransmission stats in sequence space, ICMP type/code plus echo and error
-  counts, handshake and reset lifecycle flags, duplicate ACK and zero-window
-  counts, `tcp_close_style` owned by `BasicFlow`, and IP version, scope and
-  path-locality columns derived from the shared `IpAddr`. `FeatureStats` keeps
-  running variance and derives population std on demand.
-- Parity tests feed equivalent offline and realtime packets (IPv4 and IPv6)
-  through `PacketFeatures` constructors and `FlowTable`, and compare exports.
-  Realtime tuning must not change timestamps, lengths, biflow ownership,
-  expiration causes or exported rows.
-
-Realtime ingestion shape, chosen from measurements on the local harness:
-
-- Each IP family emits into 8 ring buffers of 64 MB
-  (`REALTIME_EVENT_QUEUE_COUNT`, `REALTIME_EVENT_RINGBUF_BYTES`). The queue is
-  chosen in eBPF from a canonical biflow tuple with `hash_combine` over `mix_u32`, so
-  both directions land on one queue. The single-ring design was the measured
-  bottleneck; 4 queues cut overload drops sharply, 8 removed them on the
-  overloaded `-P 8` shape, and the stronger hash fixed visible queue skew.
-- Each queue has its own drain task, which batches packets per shard and hands
-  them to a per-source dispatcher, so draining never awaits shard-channel sends.
-- Programs attach through legacy netlink tc, since `aya`'s automatic TCX attach
-  reported success but never ran on the local kernel and veth setup. The
-  per-CPU `matched_packets`, `submitted_events` and `dropped_packets` counters
-  made that visible. `DROPPED_PACKETS` is the authoritative overload signal; the
-  eBPF ring-reservation failure log is `debug!` to avoid log floods.
-- Realtime defaults to 12 worker threads, capped at the logical CPU count; pcap
-  keeps 5. On 8 x 1.25G 1400-byte UDP, 11 or more threads gave 0 drops at
-  about 10 Gbit/s where 4-10 threads did not. Thread count and export volume
-  dominated; shard batch size and queue depth were second order and stay
-  tunable through `RUSTIFLOW_REALTIME_SHARD_BATCH_SIZE`,
+- Realtime events carry kernel monotonic timestamps and the same length
+  semantics as offline parsing. Timing logic compares integer microseconds
+  and exports milliseconds.
+- Flow lookup and sharding use typed `FlowKey` values. The string flow id is
+  built only when a flow is created.
+- Each IP family emits into 8 ring buffers of 64 MB. The queue is chosen in
+  eBPF from a canonical biflow hash, so both directions share a queue. A
+  single ring was the measured bottleneck, and 8 removed overload drops on the
+  local harness.
+- Each queue has its own drain task that batches per shard and hands off to a
+  per-source dispatcher, so draining never awaits shard sends.
+- Programs attach through legacy netlink tc, because `aya`'s automatic TCX
+  attach reported success but never ran on the local kernel and veth. The
+  per-CPU `DROPPED_PACKETS` counter is the authoritative overload signal.
+- Realtime defaults to 12 workers, capped at the logical CPU count, and pcap
+  to 5. Thread count and export volume dominated. Batch size and queue depth
+  are second order and stay tunable through `RUSTIFLOW_REALTIME_SHARD_BATCH_SIZE`,
   `RUSTIFLOW_REALTIME_SHARD_QUEUE_CAPACITY` and
   `RUSTIFLOW_REALTIME_SOURCE_DISPATCH_QUEUE_CAPACITY`.
-- A per-CPU perf-event transport was considered as the next escalation and has
-  not been needed so far.
-
-Export path:
-
-- Measured with `--early-export 5`, which at the time meant a row per packet
-  (see the 2026-10-20 entry). Per row, serialization dominated: about 7-10 us
-  for a `rustiflow` row, about 1 us for buffered writes, and about 0.2 us for
-  the snapshot clone. Clone cost was never the bottleneck.
-- Kept: one reused row buffer per writer and append-style CSV emission for
-  features, which 2026-10-20 made mandatory for every `FlowFeature` and moved
-  into per-shard encoders.
-- Rejected after measurement: a broad leaf `format!` rewrite, a direct-to-writer
-  row prototype, and a typed `Snapshot`/`Owned` export split. None gave a
-  reliable win.
-
-Profiling hooks: `RUSTIFLOW_REALTIME_STATS=1` (per-source drain and dispatch
-timing), `RUSTIFLOW_PROFILE_RESOURCE_SUMMARY=1`,
-`RUSTIFLOW_PROFILE_FLAMEGRAPH=<file.svg>` with `RUSTIFLOW_PROFILE_FREQUENCY_HZ`
-(needs a build with `--features profiling`, which pulls in pprof), and `RUSTIFLOW_PROFILE_EXPORT_BREAKDOWN=1` (clone, encode and write time).
-`scripts/realtime_container_stress.sh` runs the containerized harness baseline.
+- In April, 1400-byte UDP reached 24.7 Gbit/s on the veth harness with zero
+  internal drops. True 40G validation needs physical hardware.
+- `FlowTable` must not overwrite `TcpReset` with `TcpTermination`, and a flow
+  terminated by its first packet is exported once.
+- Parity tests feed equivalent offline and realtime packets through
+  `PacketFeatures` and `FlowTable` and compare exports.

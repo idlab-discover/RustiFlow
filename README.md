@@ -1,120 +1,236 @@
 ![banner](figures/banner.jpg)
 
-# A Network Traffic Feature Extraction Tool
+# RustiFlow: network flow feature extraction
 
-## <img src="figures/RustiFlow_nobg.png" width="60px"/> Overview
-
-This tool is engineered for robust and efficient feature extraction, particularly for applications such as network intrusion detection systems, among others. Leveraging Rust language and eBPF, it excels in processing high volumes of network traffic with remarkable speed and throughput. (When your traffic is already captured, don't worry! It also has a build in pcap reader which is also amazingly fast.) With various pre-defined feature sets and the ability to create custom feature sets, RustiFlow offers a versatile solution for network security applications.
+RustiFlow reconstructs bidirectional network flows and extracts per-flow
+features for intrusion detection research and dataset generation. It reads
+pcap and pcapng files offline. On Linux it can also capture live traffic
+through eBPF classifiers built with [Aya](https://aya-rs.dev/). Both modes feed
+the same flow table, so their flow semantics match.
 
 <a href="https://github.com/idlab-discover/RustiFlow/actions">![Badge displaying GitHub Actions Workflow Status](https://img.shields.io/github/actions/workflow/status/idlab-discover/RustiFlow/rust.yml?logo=github)</a>
 <a href="https://idlab-discover.github.io/RustiFlow"> ![Badge linking to the project documentation website](https://img.shields.io/website?url=https%3A%2F%2Fidlab-discover.github.io%2FRustiFlow&label=Documentation)</a> <a href="https://github.com/idlab-discover/RustiFlow/blob/main/LICENSE"> ![GitHub license](https://img.shields.io/github/license/idlab-discover/RustiFlow) </a>
-
 ![Ubuntu 24](https://img.shields.io/badge/Tested%20on%20ubuntu-purple?logo=ubuntu)
 
 ![Animated image showing network flows](figures/flows.gif)
 
-## <img src="figures/RustiFlow_nobg.png" width="60px"/> Key Features
+## Quick start
 
-- **High Throughput:** Utilizes Rust and the [Aya](https://aya-rs.dev/) library for eBPF program compilation and execution, ensuring exceptional performance and resource efficiency.
-- **Versatile Feature Sets:** Offers a variety of pre-defined feature sets (flows) and the flexibility to create custom feature sets tailored to specific requirements. An example of the custom flow is shown [here](https://github.com/idlab-discover/RustiFlow/blob/main/rustiflow/src/flows/custom_flow.rs).
-- **Pcap File Support:** Facilitates packet analysis from classic pcap and pcapng files, compatible with both Linux and Windows generated files. A capture that ends inside a record is read up to that record with a warning; a corrupt record stops the read with an error naming its file offset, after exporting earlier packets. Timestamp fractions must be below 1,000,000 for microsecond pcap or 1,000,000,000 for nanosecond pcap; invalid fractions are rejected, not normalized. Out-of-range pcapng timestamps are also rejected. Sorted offline CSV rows are deterministic across runs and thread counts. Expiration scans use one capture clock shared by all shards, including a final scan at the last readable record's timestamp.
-- **Diverse Output Options:** Offline and realtime captures write typed Apache Parquet files by default. CSV files and console output are also available.
-- **Richer TCP Quality Signals:** The RustiFlow feature set exports duplicate ACK counts, zero-window observations, and TCP close style in addition to the existing lifecycle and retransmission fields.
-- **Endpoint-Aware IP Context:** The RustiFlow feature set exports `ip_version`, endpoint IP scope, and coarse `path_locality` derived from normalized addresses without expanding the eBPF event payload.
+```bash
+rustiflow -f rustiflow pcap trace.pcap                            # writes output.parquet
+rustiflow -f basic -o csv --header --export-path flows.csv pcap trace.pcap
+sudo rustiflow -f cic --export-path live.parquet realtime eth0    # Ctrl-C flushes and finalizes
+rustiflow -c config.toml pcap trace.pcap                          # settings from a config file
+rustiflow                                                         # interactive TUI
+```
 
 ## Feature sets
 
-See the [wiki](https://github.com/idlab-discover/RustiFlow/wiki) for the different feature sets available.
+Select a set with `-f`. See the [wiki](https://github.com/idlab-discover/RustiFlow/wiki)
+for the individual features.
 
-Bulk durations are exported in milliseconds, including fractional milliseconds.
-Bulk rates are packet bytes per second, measured using integer microsecond timestamps.
-A bulk needs at least four nonzero-length packets; an idle gap greater than exactly
-one second ends it. Packet-byte accounting and direction-switch rules are unchanged.
-A bulk with identical timestamps has an undefined rate exported as zero, following
-the shared rate convention. Positive bulk count with zero total duration identifies
-that fallback; it must not be interpreted as measured zero throughput.
+| Set | Columns | Notes |
+| --- | ---: | --- |
+| `basic` | 10 | Flow key, timestamps, duration, and expiration cause |
+| `cic` | 100 | CICFlowMeter-style |
+| `cidds` | 10 | CIDDS-style |
+| `nfstream` | 71 | NFStream-inspired |
+| `rustiflow` | 203 | Everything, including TCP quality signals (duplicate ACKs, zero windows, close style), retransmissions, and IP version, scope, and path locality |
+| `custom` | — | Your own; start from [`custom_flow.rs`](rustiflow/src/flows/custom_flow.rs) |
 
-## Supported Packet/Header Coverage
+`--drop-contaminant-features` removes raw identifiers such as exact IPs and
+ports, so a model cannot learn shortcuts from them.
 
-RustiFlow currently extracts flows from the following protocol/header combinations:
+## Output
+
+| `-o` | Result |
+| --- | --- |
+| `parquet` (default) | Typed, Snappy-compressed Apache Parquet. Without `--export-path` it writes `output.parquet` and refuses to overwrite an existing one. An explicit path is overwritten. |
+| `csv` | CSV file at `--export-path`. Add `--header` for a header row. |
+| `print` | Console output. `--header` applies. |
+
+Parquet embeds the feature names and types, even for empty captures. Fields
+shown as UTC dates in CSV are UTC microsecond timestamps in Parquet. Sorted
+offline exports are deterministic across runs and thread counts.
+
+## Command-line reference
+
+`rustiflow --help` and `rustiflow <command> --help` give the full text.
+
+| Option | Default | Meaning |
+| --- | --- | --- |
+| `-f, --features` | required without `-c` | Feature set |
+| `-c, --config-file` | | Load settings from a TOML file |
+| `--active-timeout` | 3600 s | Maximum flow lifetime |
+| `--idle-timeout` | 120 s | Maximum gap without packets |
+| `--early-export N` | off | Cumulative snapshot every N s per flow; see [Early export](#early-export) |
+| `--expiration-check-interval` | 60 s | How often the flow table is swept |
+| `--threads` | realtime 12, pcap 5 | Flow-table workers, capped at the logical CPU count |
+| `-o, --output` | `parquet` | `parquet`, `csv`, or `print` |
+| `--export-path` | `output.parquet` | Output file |
+| `--header` | off | Header row for CSV and console output |
+| `--drop-contaminant-features` | off | Omit raw identifiers |
+| `--packet-graph` | off | Live packet graph during realtime file exports |
+
+Commands:
+
+- `pcap <path>` reads a classic pcap or pcapng file.
+- `realtime <interface> [--ingress-only] [--promiscuous]` captures live traffic.
+- `replay-bench` benchmarks the realtime userspace pipeline; see [Replay benchmark](#replay-benchmark).
+
+## Flow semantics
+
+### Packet coverage
 
 | Layer | Offline pcap | Realtime eBPF |
 | --- | --- | --- |
 | Link | Ethernet, Linux cooked capture, 802.1Q VLAN | Ethernet |
-| Network | IPv4, IPv6 | IPv4, IPv6 |
-| IPv6 extras | Extension headers supported before transport parsing | Extension headers supported before transport parsing |
+| Network | IPv4, IPv6 with extension headers | IPv4, IPv6 with extension headers |
 | Transport | TCP, UDP, ICMP, ICMPv6 | TCP, UDP, ICMP, ICMPv6 |
 
-Notes:
+Both modes skip non-initial IPv4 and IPv6 fragments, which lack a transport
+header. Initial fragments are used, and nothing is reassembled. IPv6 ESP is
+skipped because its payload is encrypted. Timestamp and packet-length sources
+can differ slightly between offline and realtime input.
 
-- Realtime support is Linux-only.
-- Offline and realtime aim to expose the same flow semantics, but timestamp and packet-length sources can differ slightly.
-- Realtime VLAN parsing is not implemented yet.
+### Capture files
 
-## <img src="figures/RustiFlow_nobg.png" width="60px"/> Architecture
+RustiFlow reads files with a pure-Rust reader and reproduces libpcap's default
+microsecond behavior. A file that ends inside a record is read up to that
+record, with a warning. A corrupt record, an invalid timestamp fraction, or an
+out-of-range timestamp stops the read with an error naming the file offset.
+Earlier packets are still exported.
 
-### Realtime processing
+### TCP lifecycle
+
+- A flow first seen as a SYN-ACK takes that packet's destination as the
+  forward endpoint. Otherwise the first packet's source is forward.
+- Handshake and FIN acknowledgments tolerate reordering, using wrapping TCP
+  sequence arithmetic.
+- `four_way_fin` includes three-segment closes (FIN, FIN|ACK, ACK).
+  `simultaneous_fin` requires both FINs to carry ACKs that do not cover the
+  peer's FIN.
+- Packets that arrive after a flow was exported start a new flow, so observed
+  packet counts are preserved. This includes retransmitted FINs.
+- Retransmission counters keep at most 1,024 merged sequence ranges per
+  direction and evict the lowest first. Retransmissions that overlap only
+  evicted history can be missed. This is not full stream reassembly.
+
+### Timing
+
+- Durations use the earliest and latest observed timestamps.
+- IATs follow processing order against a nondecreasing reference. A late packet
+  adds a zero interval. Chronological order is not reconstructed.
+- Idle periods are gaps above five seconds between packets of the same flow.
+  Trailing silence before expiration or shutdown is not counted.
+- Bulks need at least four nonzero-length packets, and a gap of more than one
+  second ends one. Durations are fractional milliseconds and rates are bytes
+  per second. A bulk with identical timestamps exports a rate of zero, which
+  shows up as a positive bulk count with zero duration.
+- These rules apply to both offline and realtime input.
+
+### Early export
+
+`--early-export N` emits cumulative snapshots of long-lived flows before their
+final row:
+
+- Snapshots follow a fixed per-flow schedule: first packet + N, + 2N, and so
+  on. The first packet at or after a boundary triggers one snapshot. A quiet
+  flow gets none until it expires.
+- Each snapshot is closed like a final row but has `flow_expire_cause` `None`.
+  The flow stays open, and its final row repeats everything.
+- `N` must be at least 1 and smaller than `--active-timeout`.
+
+## Realtime capture
+
+Realtime capture is Linux-only and needs root or `CAP_BPF`, `CAP_NET_ADMIN` and
+`CAP_PERFMON`. It attaches tc classifiers for ingress and, unless
+`--ingress-only` is given, egress. It detaches them on exit.
 
 ![RustiFlow Architecture Realtime](figures/realtime.png)
 
-### Offline PCAP processing
+### Promiscuous capture
 
-![RustiFlow Architecture Offline](figures/offline.png)
+A physical NIC drops unicast frames addressed to other MAC addresses. On a tap,
+SPAN/mirror port, or backbone link, pass `--promiscuous`. RustiFlow joins a
+promiscuous membership on a packet socket rather than setting the interface's
+`PROMISC` flag. The kernel releases the membership when RustiFlow exits, even
+on a crash, and a `promisc on` set by an operator stays in place. This needs
+`CAP_NET_RAW` and the `AF_PACKET` socket family. Config files do not store the
+flag, so pass it on the command line or in `RUSTIFLOW_REALTIME_ARGS`.
 
-## <img src="figures/RustiFlow_nobg.png" width="60px"/> Installing a release:
+### Tuning and experiments
 
-Every release consumer (the installer, the Debian package and both container
-images) installs the same release bundle,
-`rustiflow-<version>-x86_64-linux.tar.gz`. It holds the `rustiflow` binary, the
-two eBPF objects that realtime capture loads, a systemd template unit, example
-configuration, an `install.sh`, a `MANIFEST` recording how it was built, and
-`SHA256SUMS`. Releases target x86_64 Linux with glibc 2.36 or newer (Debian
-bookworm, Ubuntu 24.04 and later) and need nothing beyond glibc at runtime.
-They are built for x86-64-v3 CPUs (AVX2, BMI2, FMA, MOVBE: Intel Haswell, AMD
-Zen and newer); `MANIFEST` records the CPU as `target_cpu`, and the installer
-refuses a host CPU that cannot run it.
+| Variable | Effect |
+| --- | --- |
+| `RUSTIFLOW_EBPF_DIR` | Directory holding the eBPF objects |
+| `RUSTIFLOW_REALTIME_SHARD_BATCH_SIZE`, `RUSTIFLOW_REALTIME_SHARD_QUEUE_CAPACITY`, `RUSTIFLOW_REALTIME_SOURCE_DISPATCH_QUEUE_CAPACITY` | Pipeline batch and queue sizes |
+| `RUSTIFLOW_REALTIME_STATS=1` | Per-source drain and dispatch timing |
+| `RUSTIFLOW_EXPERIMENT_*` | Opt-in experiments (XDP ingress, single tc classifier, staged lookup, and others) and switches for on-by-default optimizations |
 
-### Installing the bundle
+[docs/profiling/experiments.md](docs/profiling/experiments.md) lists every
+experiment switch, its default, and its measured effect.
+
+## Configuration file and TUI
+
+```toml
+[config]
+features = "Nfstream"
+active_timeout = 3600
+idle_timeout = 120
+early_export = 10               # optional
+expiration_check_interval = 60
+threads = 8                     # optional
+
+[output]
+output = "Parquet"              # Parquet, Csv, or Print
+export_path = "flows.parquet"
+header = false
+drop_contaminant_features = true
+packet_graph = false
+```
+
+Running `rustiflow` without arguments opens a TUI that edits and saves these
+files. Use the saved file with `rustiflow -c <file> pcap ...` or
+`rustiflow -c <file> realtime <interface>`.
+
+![The tui interface](figures/tui_rustiflow.GIF)
+
+## Installing a release
+
+Every release channel installs the same bundle,
+`rustiflow-<version>-x86_64-linux.tar.gz`. It contains the binary, both eBPF
+objects, a systemd template unit, example configuration, `install.sh`, a build
+`MANIFEST`, and `SHA256SUMS`. Bundles need x86_64 Linux with glibc 2.36 or
+newer (Debian bookworm, Ubuntu 24.04 and later) and an x86-64-v3 CPU (Intel
+Haswell, AMD Zen, or newer).
 
 ```bash
 tar -xzf rustiflow-<version>-x86_64-linux.tar.gz
 sudo sh rustiflow-<version>-x86_64-linux/install.sh            # into /usr/local
 sudo sh rustiflow-<version>-x86_64-linux/install.sh --prefix /opt/rustiflow
+cd /usr/local && sha256sum -c share/rustiflow/INSTALLED.sha256  # verify later
 ```
 
-The installer verifies the bundle checksums, installs `bin/rustiflow`, the eBPF
-objects in `lib/rustiflow/`, examples in `share/rustiflow/` and
-`lib/systemd/system/rustiflow@.service` under the prefix, and never writes to
-`/etc`, so reinstalling keeps your configuration. Check an installation later
-with:
-
-```bash
-cd /usr/local && sha256sum -c share/rustiflow/INSTALLED.sha256
-```
-
-The binary finds its eBPF objects in `<prefix>/lib/rustiflow/` next to its own
-`<prefix>/bin/`, so keep that layout or point `RUSTIFLOW_EBPF_DIR` at the
-directory holding `rustiflow-ebpf-ipv4` and `rustiflow-ebpf-ipv6`.
+The installer checks the bundle and refuses an unsupported CPU. It never writes
+to `/etc`. The binary looks for its eBPF objects in `<prefix>/lib/rustiflow/`,
+or in `RUSTIFLOW_EBPF_DIR`.
 
 ### Debian package
 
-`debian/` packages a bundle without rebuilding it, installing into `/usr`:
+`debian/` repackages a bundle into `/usr` without rebuilding. The bundle
+version must match `debian/changelog`, and the bundle must be built on
+bookworm.
 
 ```bash
 RUSTIFLOW_BUNDLE=/path/to/rustiflow-<version>-x86_64-linux.tar.gz dpkg-buildpackage -b -uc -us
 sudo apt install ../rustiflow_<version>-1_amd64.deb
 ```
 
-`RUSTIFLOW_BUNDLE` defaults to `target/dist/`. The bundle version must match
-`debian/changelog`. Use a bundle built on bookworm (see below): one built on a
-newer host needs a newer glibc than Debian provides.
+### systemd service
 
-### Running realtime capture as a service
-
-`rustiflow@<interface>.service` runs realtime capture on one interface with
-only the `CAP_BPF`, `CAP_NET_ADMIN`, `CAP_NET_RAW` and `CAP_PERFMON`
-capabilities (`CAP_NET_RAW` is used only by `--promiscuous`). It is installed
-but never enabled:
+`rustiflow@<interface>.service` captures on one interface with only the
+capabilities it needs. It is installed but not enabled:
 
 ```bash
 sudo install -D -m 0644 /usr/share/rustiflow/config.toml.example /etc/rustiflow/eth0.toml
@@ -123,17 +239,29 @@ sudo systemctl daemon-reload
 sudo systemctl enable --now rustiflow@eth0.service
 ```
 
-On a tap or SPAN/mirror port, set `RUSTIFLOW_REALTIME_ARGS=--promiscuous` in
-`/etc/rustiflow/eth0.env`; see [Promiscuous capture](#promiscuous-capture).
+Set extra realtime flags, such as `--promiscuous`, with
+`RUSTIFLOW_REALTIME_ARGS` in the `.env` file. Relative export paths resolve
+under `/var/lib/rustiflow/<interface>/`. For a `/usr/local` install, use
+`/usr/local/share/rustiflow/...`.
 
-Use `/usr/local/share/rustiflow/...` for a bundle installed into the default
-prefix. Relative export paths in the config are written below
-`/var/lib/rustiflow/eth0/`.
+### Container
+
+Docker Desktop is not supported, because its `--network host` attaches to a VM
+rather than the host.
+
+```bash
+docker build -t rustiflow .                     # Ubuntu 24.04 runtime
+docker build --target slim -t rustiflow:slim .  # Debian bookworm-slim runtime
+docker build --build-context bundle=target/dist -t rustiflow .  # from an existing bundle
+
+docker run --rm -v "$PWD:/app" rustiflow -f basic -o print pcap /app/trace.pcap
+docker run --rm --privileged --network host -v "$PWD:/app" rustiflow \
+  -f cic --export-path /app/live.parquet realtime enp5s0
+```
 
 ### Building a release bundle
 
-The canonical bundle is built in the Dockerfile's bookworm `dist` stage, so the
-binary runs on every supported distribution:
+The canonical bundle comes from the Dockerfile's bookworm stage:
 
 ```bash
 docker build --target bundle \
@@ -143,492 +271,78 @@ docker build --target bundle \
 ```
 
 `cargo xtask dist` builds the same layout on the current host into
-`target/dist/`, and `cargo xtask install [--prefix DIR]` installs that staged
-bundle without rebuilding. A host build only runs on systems with the same or
-newer glibc as the build host.
+`target/dist/`. The result runs only on hosts with the same or newer glibc.
+`cargo xtask install [--prefix DIR]` installs it. `--target-cpu` (default
+`x86-64-v3`) sets the CPU the binary requires. `native` tunes for the build
+host, and a lower level such as `x86-64-v2` suits older CPUs. In the container
+build, pass `--build-arg RUSTIFLOW_TARGET_CPU=<cpu>`.
 
-The release profile uses fat LTO, one codegen unit and stripped symbols, and
-leaves out the `profiling` feature. `--target-cpu` (default `x86-64-v3`) sets
-the CPU the binary is tuned for and requires. `native` tunes for the build
-host, and `MANIFEST` then names its model, for example `znver3`. Use a lower
-level such as `x86-64-v2` for older CPUs. In the container build, pass it as
-`--build-arg RUSTIFLOW_TARGET_CPU=<cpu>`.
+## Development
 
-```bash
-cargo xtask dist --target-cpu native   # bundle for this machine only
-```
+### Prerequisites
 
-### Using commands:
+- Rust via [rustup](https://rustup.rs). `rust-toolchain.toml` pins the
+  userspace toolchain. The eBPF crates use nightly with `rust-src`:
+  `rustup toolchain install nightly --component rust-src`.
+- `bpf-linker` 0.12.0. Use the upstream prebuilt binary, because building it
+  with `cargo install` needs a matching system LLVM:
 
-You can then run the binary with the following commands displayed on the [help menu](#usage-instructions).
-
-Both capture modes default to Snappy-compressed Parquet. Select a feature set
-with `-f` or load a config with `-c`. Running without arguments opens the TUI.
-
-```bash
-rustiflow -f rustiflow pcap trace.pcap
-rustiflow -f basic --export-path live.parquet realtime eth0
-rustiflow -f basic -o csv --export-path flows.csv --header pcap trace.pcap
-```
-
-With no export path, RustiFlow creates `output.parquet` in the working directory
-and reports an error if it already exists. An explicit file path overwrites its destination.
-Parquet embeds the selected feature names and types, including for empty captures.
-It preserves the feature set's units and contamination-free projection. Timestamp
-fields displayed as UTC dates in CSV use UTC microseconds in Parquet. Stop live
-capture with Ctrl-C to flush open flows and finalize the file. Use `-o print` for
-console output. The `--header` flag applies to CSV and console output.
-
-### Active and idle measurements
-
-Idle statistics count gaps longer than five seconds that end with another
-packet in the same flow. Trailing silence at expiration or shutdown does not
-count as an observed idle period. Active periods, flow duration, and end time
-remain based on packet timestamps. This rule applies to offline and realtime
-exports.
-
-### Using the tui interface:
-
-If you want a more graphical interface, you can use the tui interface by just running `rustiflow` without any arguments. This will open a field where you can enter a configuration file you want to edit or you can choose to start new. After that, the following interface will show up:
-
-![The tui interface](figures/tui_rustiflow.GIF)
-
-> **NOTE:** When using the save button, you will be prompted for a filename. You can reuse this file with following command:
-
-```bash
-rustiflow --config-file <filename> realtime <interface> [--ingress-only] [--promiscuous]
-```
-
-```bash
-rustiflow -c <filename> pcap <path to pcap file>
-```
-
-> After saving the configuration file, you can safely reset without changing the configuration file.
-
-### Using the configuration file:
-
-This is an example of a configuration file that you can use to run the tool with the `--config-file` option.
-
-```toml
-[config]
-features = "CIDDS"
-active_timeout = 522
-idle_timeout = 885855
-early_export = 25
-expiration_check_interval = 0
-
-[output]
-output = "Parquet"
-export_path = "path/to/output.parquet"
-header = false
-drop_contaminant_features = true
-```
-
-Example 2:
-
-```toml
-[config]
-features = "Nfstream"
-active_timeout = 3600
-idle_timeout = 120
-early_export = 10
-expiration_check_interval = 60
-threads = 8
-
-[output]
-output = "Print"
-header = true
-drop_contaminant_features = false
-```
-
-For realtime file exports, the live packet graph is now off by default so the
-standard CLI path keeps the best throughput-oriented behavior. Enable it only
-when you want the graph:
-
-```toml
-[output]
-packet_graph = true
-```
-
-or with:
-
-```bash
-rustiflow ... -o csv --export-path out.csv --packet-graph realtime <interface>
-```
-
-### Promiscuous capture
-
-Realtime capture sees only the frames the network card passes up to the
-kernel. A physical card drops unicast frames addressed to other MAC addresses,
-so on a tap, a SPAN/mirror port or a backbone link most of the traffic never
-reaches RustiFlow. Pass `--promiscuous` there:
-
-```bash
-rustiflow ... realtime --promiscuous <interface>
-```
-
-A host that only captures its own traffic does not need it.
-
-RustiFlow does not set the interface's `PROMISC` flag. It joins a promiscuous
-membership on a packet socket that receives no packets, and the kernel counts
-memberships (`promiscuity` in `ip -d link show <interface>`). The kernel drops
-the membership when the socket closes, also when RustiFlow crashes or is
-killed, so the interface returns to its previous state. A `promisc on` set by
-an operator or another tool stays in place.
-
-The option needs `CAP_NET_RAW` and the `AF_PACKET` socket family, in addition
-to what realtime capture already needs. Configuration files store only the
-`[config]` and `[output]` sections, so pass the flag on the command line or
-through `RUSTIFLOW_REALTIME_ARGS` for the systemd unit.
-
-### Experimental XDP ingress capture
-
-The passive XDP prototype is available with `RUSTIFLOW_EXPERIMENT_INGRESS=xdp-driver`
-or `RUSTIFLOW_EXPERIMENT_INGRESS=xdp-skb` and `realtime <interface> --ingress-only`.
-It uses a separately built eBPF object that always returns `XDP_PASS`. Realtime
-uses tc by default. The build, attachment requirements, and veth measurements
-are in the [XDP experiment](docs/profiling/overnight-xdp-capture-prototype.md).
-
-## <img src="figures/RustiFlow_nobg.png" width="60px"/> Using the Container:
-
-Make sure that you don't use docker desktop and that you don't have it installed on your machine. If you have this setup, it will not work as intended as the `--network host` will not link the container to the host network, but to the network of a VM that docker desktop uses.
-
-- **Build the Container**:
   ```bash
-  docker build -t rustiflow .                     # Ubuntu 24.04 runtime
-  docker build --target slim -t rustiflow:slim .  # Debian bookworm-slim runtime
-  ```
-  Both images build the release bundle from source and install it. To install
-  an existing bundle instead, pass the directory holding its tarball:
-  `docker build --build-context bundle=target/dist -t rustiflow .`
-- **Run the Container**:
-  ```bash
-  docker run --rm --network host -v /path/on/host:/app rustiflow [ARGS]
-  ```
-  Run it with the `--privileged` flag if you want to capture traffic in real-time.
-- **Example**:
-  ```bash
-  docker run --rm --network host -v /home/user/pcap:/app rustiflow \
-    -f basic \
-    -o print \
-    pcap /app/pcap.pcap
-  ```
-  ```bash
-  docker run --rm --privileged --network host -v /home/user/output:/app rustiflow \
-    -f cic \
-    --export-path /app/output.parquet \
-    realtime enp5s0
+  curl -fL https://github.com/aya-rs/bpf-linker/releases/download/v0.12.0/bpf-linker-x86_64-unknown-linux-musl.tar.zst \
+    | tar --zstd -xf - -C "$HOME/.cargo/bin"
   ```
 
-Notes:
+  Other platforms: see the [upstream releases](https://github.com/aya-rs/bpf-linker/releases/tag/v0.12.0).
 
-- The current CLI uses flags such as `-f basic` and `-o csv`; the older
-  positional examples are no longer correct.
-- Realtime capture in a container still depends on Linux host support for eBPF
-  and `tc`, so `--privileged --network host` remains the practical baseline for
-  local testing.
-
-## <img src="figures/RustiFlow_nobg.png" width="60px"/> Installation Guide for development
-
-### Prerequisites:
-
-- **Rust Installation**:
-  ```bash
-  curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
-  ```
-- **Nightly Rust Toolchain**:
-  ```bash
-  rustup install stable
-  rustup toolchain install nightly --component rust-src
-  ```
-
-### bpf Linker Installation:
-
-Use the upstream prebuilt binary. Building current `bpf-linker` releases with
-`cargo install` requires a matching system LLVM installation; Rust's
-`llvm-tools-preview` component alone is not sufficient.
-
-- **For Linux x86_64**:
-  ```bash
-  sudo apt install zstd # Debian/Ubuntu; use your distribution's package manager elsewhere
-  curl -fL --retry 3 https://github.com/aya-rs/bpf-linker/releases/download/v0.12.0/bpf-linker-x86_64-unknown-linux-musl.tar.zst -o /tmp/bpf-linker.tar.zst
-  mkdir -p "$HOME/.cargo/bin"
-  tar --zstd -xf /tmp/bpf-linker.tar.zst -C "$HOME/.cargo/bin"
-  rm /tmp/bpf-linker.tar.zst
-  bpf-linker --version
-  ```
-- **For macOS/Linux (Other Architectures)**: choose the matching archive from
-  the [upstream releases](https://github.com/aya-rs/bpf-linker/releases/tag/v0.12.0),
-  or follow the [upstream installation guide](https://github.com/aya-rs/bpf-linker#installation).
-- **Ubuntu 20.04 LTS Specific**:
-  ```bash
-  sudo apt install linux-tools-5.8.0-63-generic
-  export PATH=/usr/lib/linux-tools/5.8.0-63-generic:$PATH
-  ```
-
-## <img src="figures/RustiFlow_nobg.png" width="60px"/> Building the Project
-
-`cargo xtask` enforces the committed lockfiles for the helper and every build it
-launches. If a manifest change requires a lockfile update, update and commit the
-affected lockfile explicitly before rebuilding. Direct Cargo commands need
-`--locked` for the same enforcement.
-
-- **eBPF Programs**:
-  ```bash
-  cargo xtask ebpf-ipv4
-  cargo xtask ebpf-ipv6
-  ```
-- **User Space Programs**:
-  ```bash
-  cargo build
-  ```
-- **With flamegraph profiling** (Linux only, pulls in pprof; enables
-  `RUSTIFLOW_PROFILE_FLAMEGRAPH=<file.svg>`). The `profiling` profile is the
-  release profile with symbols and line tables kept, so it also suits `perf`;
-  the binary is `target/profiling/rustiflow`:
-  ```bash
-  cargo build --profile profiling --features profiling
-  ```
-
-## Fragmented and encrypted packets
-
-Offline and realtime capture skip non-initial IPv4 and IPv6 fragments because
-those fragments do not contain the original transport header. Initial fragments
-remain eligible for extraction; RustiFlow does not reassemble fragmented packets.
-IPv6 AH uses its four-byte length units. IPv6 ESP is skipped because its encrypted
-payload cannot be parsed as a transport header.
-
-## TCP flow lifecycle
-
-A flow first observed as SYN-ACK uses that packet's destination as the forward
-endpoint. Other flows use the first observed packet's source. Handshake and FIN
-acknowledgments tolerate reordered observations using TCP sequence arithmetic.
-The `four_way_fin` close style includes a three-segment FIN, FIN|ACK, ACK close;
-`simultaneous_fin` requires both FIN packets to carry ACKs that do not acknowledge
-the peer's FIN. Packets observed after a completed flow was exported start a new
-flow, including retransmitted FINs. This preserves observed packet counts.
-
-Retransmission counters retain at most 1,024 merged TCP sequence ranges per
-direction. The lowest sequence ranges are evicted first; retransmissions that
-overlap only evicted history may be missed. Sequence numbers are unwrapped across
-32-bit rollover, assuming observations are less than half the sequence space
-apart. These counters do not perform full TCP stream reassembly.
-
-## Out-of-order packet timing
-
-Flow and directional durations use the earliest and latest observed packet
-timestamps. IAT statistics follow processing order with a nondecreasing timestamp
-reference: late packets contribute a zero interval and do not move that reference
-backwards. Active/idle periods also advance monotonically; completed periods are
-not reconstructed. Bulk durations retain the timestamp bounds of their current
-bulk. These bounded streaming statistics do not reconstruct chronological IATs.
-The same rules apply to offline and realtime input.
-
-## Running the Project in dev mode
+### Build, run, test
 
 ```bash
-cargo xtask run -- [OPTIONS] <COMMAND>
-```
-
-## <img src="figures/RustiFlow_nobg.png" width="60px"/> Usage Instructions
-
-### Command Help:
-
-```bash
-rustiflow help
-```
-
-```bash
-Usage: rustiflow [OPTIONS] <COMMAND>
-
-Commands:
-  realtime      Real-time feature extraction
-  pcap          Feature extraction from a pcap file
-  replay-bench  Benchmark the realtime userspace pipeline with synthetic eBPF events (no capture, no root needed). Prints throughput and CPU time per packet
-  help          Print this message or the help of the given subcommand(s)
-
-Options:
-  -c, --config-file <CONFIG_FILE>
-          Configuration file path
-
-  -f, --features <FEATURES>
-          The feature set to use (required if no config file is provided)
-
-          Possible values:
-          - basic:     A basic flow that stores the basic features of a flow
-          - cic:       Represents the CIC Flow, giving 90 features
-          - cidds:     Represents the CIDDS Flow, giving 10 features
-          - nfstream:  Represents a nfstream inspired flow, giving 71 features
-          - rustiflow: Represents the Rusti Flow, giving 203 features
-          - custom:    Represents a flow that you can implement yourself
-
-      --active-timeout <ACTIVE_TIMEOUT>
-          The maximum time a flow is allowed to last in seconds (optional)
-
-          [default: 3600]
-
-      --idle-timeout <IDLE_TIMEOUT>
-          The maximum time with no packets for a flow in seconds (optional)
-
-          [default: 120]
-
-      --early-export <EARLY_EXPORT>
-          Export a cumulative snapshot of each open flow every N seconds after its first packet (optional; must be at least 1 and smaller than the active timeout). Snapshots are triggered by packets and have flow_expire_cause None
-
-      --expiration-check-interval <EXPIRATION_CHECK_INTERVAL>
-          Interval (in seconds) for checking and expiring flows in the flowtable. This represents how often the flowtable should be scanned to remove inactive flows
-
-          [default: 60]
-
-      --threads <THREADS>
-          The numbers of threads to use for processing packets (optional) (default: realtime uses 12, capped at the number of logical CPUs; pcap uses 5; maximum number of logical CPUs)
-
-      -o, --output <OUTPUT>
-              Output method (default: parquet)
-
-              Possible values:
-              - parquet: Write a typed Apache Parquet file
-              - print: The output will be printed to the console
-              - csv:   The output will be written to a CSV file
-
-          --export-path <EXPORT_PATH>
-              Output file path (Parquet defaults to output.parquet)
-
-          --packet-graph
-              Enable the realtime packet graph for file exports
-              [default: false]
-
-          --header
-              Include the header in CSV or console output
-
-          --drop-contaminant-features
-              Whether to drop contaminant features
-
-      -h, --help
-              Print help (see a summary with '-h')
-
-      -V, --version
-              Print version
-
-```
-
-```bash
-rustiflow realtime --help
-```
-
-```bash
-Real-time feature extraction
-
-Usage: rustiflow realtime [OPTIONS] <INTERFACE>
-
-Arguments:
-  <INTERFACE>  The network interface to capture packets from
-
-Options:
-      --ingress-only  Whether to capture only ingress packets
-      --promiscuous   Hold the interface in promiscuous mode while capturing, for taps, SPAN/mirror ports and backbone links (needs CAP_NET_RAW)
-  -h, --help          Print help
-```
-
-### Early export
-
-`--early-export N` (or `early_export = N` in the configuration file) emits
-periodic snapshots of long-lived flows before their final export:
-
-- Snapshots fall on a fixed per-flow schedule: first packet + N, + 2N, ...
-  The first packet at or after a boundary exports one snapshot, so a flow
-  produces about `duration / N` snapshots rather than one per packet.
-  Boundaries that pass without packets are skipped, and a flow that goes quiet
-  gets no further snapshots until it expires.
-- Each snapshot is cumulative: it covers the flow from its first packet up to
-  and including the triggering packet, with the same columns as a final row.
-- Snapshots are closed like a final export (open bulks and the current active
-  period are counted, TCP close style reflects the FINs seen so far) but keep
-  `flow_expire_cause` `None`. Final rows always carry a real expiration cause.
-- The flow itself stays open; its final row repeats everything in the
-  snapshots.
-- `N` must be at least `1` and smaller than `--active-timeout`. Omit the flag to
-  disable early export.
-
-### Replay benchmark
-
-`replay-bench` measures the realtime userspace pipeline without capturing
-traffic or loading eBPF programs, so it needs no root and no traffic generator.
-It generates synthetic eBPF events in memory, then drains them through the same
-per-source batching, dispatch, shard flow tables and flow exporter as `realtime`:
-
-```bash
-cargo build --release
-./target/release/rustiflow -f rustiflow -o csv --export-path /dev/null --threads 12 \
-  replay-bench --packets 50000000 --flows 100000
-```
-
-It prints one result line on stderr:
-
-```text
-Replay: packets=50000000 threads=12 wall_s=3.251 mpps=15.378 cpu_s=43.531 cpu_ns_per_packet=870.6 cpus_busy=13.39
-```
-
-- `mpps` is events per second of wall time, from the first replayed event until
-  the output writer closes. It includes the final export of every open flow, so
-  use far more packets than flows.
-- `cpu_ns_per_packet` is the CPU time of the whole process (all tokio workers)
-  over the same interval, divided by the packet count. Event generation is
-  excluded.
-- Events are spread uniformly at random over `--flows` flows. Even flows are
-  TCP with in-order data segments in both directions, odd flows are UDP, and
-  no flow terminates. All events of a flow go to one of `--sources` sources,
-  which are evenly balanced, unlike real eBPF queue selection.
-- `--virtual-pps` spaces event timestamps, which sets the virtual time seen by
-  timeouts, expiration checks and `--early-export`.
-- The feature set, `--threads`, timeouts, early export, output options and the
-  `RUSTIFLOW_REALTIME_*` and `RUSTIFLOW_PROFILE_*` environment variables apply
-  as for `realtime`. Events take 40 (IPv4) or 72 (IPv6) bytes of memory
-  each.
-
-On x86-64 Linux, build with `--features staged-flow-lookup` and set
-`RUSTIFLOW_EXPERIMENT_STAGED_FLOW_LOOKUP=1` to prefetch flows in replay or
-live capture. The [benchmark report](docs/profiling/overnight-flow-table-prefetch.md)
-records the throughput gain at high flow counts and the CPU cost in live capture.
-
-Live capture and Basic replay reuse shard batch buffers by default. Each shard
-can retain up to 32 empty buffers. Set `RUSTIFLOW_EXPERIMENT_RECYCLE_SHARD_BATCHES=0`
-to disable recycling, or set it to `1` to enable it for other replay feature sets.
-On x86-64 with AVX2, Basic replay also batches flow-key comparisons by default.
-Set `RUSTIFLOW_EXPERIMENT_SIMD_FLOW_KEYS=0` to select scalar comparisons, or
-`1` to request AVX2 on other replay or capture workloads. CPUs without AVX2
-use scalar comparisons. Staged lookup takes precedence when enabled.
-The [buffer recycling report](docs/profiling/overnight-batch-buffer-reuse.md) records
-the CPU savings and memory cost measured on nuccore.
-
-## Logging in both development or using the binary
-
-### Development
-
-```bash
-RUST_LOG=info cargo xtask run --
-```
-
-Run the focused Rust test suite with:
-
-```bash
+cargo xtask ebpf-ipv4 && cargo xtask ebpf-ipv6   # eBPF objects
+cargo build                                       # userspace
+cargo xtask run -- [OPTIONS] <COMMAND>            # build everything and run
 cargo test -p rustiflow
 ```
 
-If you also have the sibling `concap` repository and a reachable Kubernetes cluster,
-you can run a tiny ConCap-backed smoke check and then reprocess the downloaded pcap
-with your current local RustiFlow checkout:
+`cargo xtask` enforces the committed lockfiles. Pass `--locked` to direct Cargo
+commands for the same guarantee. Set `RUST_LOG=info` or `RUST_LOG=debug` for
+logs.
+
+![RustiFlow Architecture Offline](figures/offline.png)
+
+### Replay benchmark
+
+`replay-bench` measures the realtime userspace pipeline without root, traffic,
+or eBPF. It drains synthetic eBPF events through the same per-source
+batching, dispatch, shard flow tables, and exporter as `realtime`:
 
 ```bash
-./scripts/concap_smoke.sh ../concap nmap-tcp-syn-version.yaml
+cargo build --release
+./target/release/rustiflow -f rustiflow --export-path /dev/null replay-bench --packets 50000000 --flows 100000
+# Replay: packets=50000000 threads=12 wall_s=3.251 mpps=15.378 cpu_s=43.531 cpu_ns_per_packet=870.6 cpus_busy=13.39
 ```
 
-### Binary
+- `mpps` covers the first replayed event through writer close, including the
+  final export of all open flows, so use far more packets than flows.
+- `cpu_ns_per_packet` is whole-process CPU time over that interval. Event
+  generation is excluded.
+- Events are spread uniformly over `--flows` flows. Even flows are TCP and odd
+  flows UDP. No flow terminates. Each flow maps to one of `--sources` evenly
+  balanced sources.
+- Other options: `--drain-burst`, `--payload-bytes`, `--virtual-pps` (sets the
+  virtual time seen by timeouts and early export), and `--ipv6`.
+- All global options and `RUSTIFLOW_REALTIME_*`, `RUSTIFLOW_EXPERIMENT_*`, and
+  `RUSTIFLOW_PROFILE_*` variables apply as in `realtime`.
 
-```bash
-sudo RUST_LOG=info rustiflow
-```
+### Profiling
 
-**Note:** For specific logging levels, adjust `RUST_LOG` to `error` for error messages, and `debug` for debug messages. If you don't want any additional logs, just remove `RUST_LOG=info`.
+`cargo build --profile profiling --features profiling` keeps symbols for `perf`
+and enables `RUSTIFLOW_PROFILE_FLAMEGRAPH=<file.svg>`. Other hooks are
+`RUSTIFLOW_PROFILE_RESOURCE_SUMMARY=1` and
+`RUSTIFLOW_PROFILE_EXPORT_BREAKDOWN=1`. The [profiling guide](docs/profiling/README.md)
+covers the workloads and scripts, and the
+[engineering notes](docs/engineering-notes.md) record design decisions and
+measurements.
 
----
+With the sibling `concap` repository and a Kubernetes cluster,
+`./scripts/concap_smoke.sh ../concap nmap-tcp-syn-version.yaml` runs a small
+end-to-end capture and reprocesses it with the local checkout.

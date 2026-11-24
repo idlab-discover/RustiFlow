@@ -1,19 +1,13 @@
-# RustiFlow profiling baselines
+# RustiFlow profiling
 
-[Nuccore baseline for `67a8109`](nuccore-67a8109/README.md) records the initial comparison point for optimization branches.
+Scripts and workloads for measuring RustiFlow's CPU, allocation, and live
+capture costs. [Experiments](experiments.md) summarizes the ten 2026-11
+optimization experiments and their opt-in switches. Dated results are in the
+[engineering notes](../engineering-notes.md).
 
-The [Parquet candidate profile](nuccore-parquet/README.md) repeats those workloads,
-adds a fresh run of the archived CSV binary, and measures the time spent
-finishing regular-file exports.
+## Baseline workflow
 
-[Experiment 7](overnight-single-tc-classifier.md) compares two ingress classifiers
-with a single dual-stack classifier using the same netlink veth harness.
-Passive driver and generic XDP were compared with tc on veth.
-[Experiment 10](overnight-xdp-capture-prototype.md)
-
-## Reproduce on nuccore
-
-Run from the repository root. Keep timings on CPUs 0–5, which are the six P-cores on this host. Use the same Rust toolchains, packet counts, flow counts, worker counts, and output destination for before/after comparisons. The scripts are Bash and take an output directory and a pcap path.
+Run from the repository root. Pin timings to one set of physical cores (on nuccore, CPUs 0–5 are its six P-cores). Use the same Rust toolchains, packet counts, flow counts, worker counts, and output destination for before/after comparisons. The scripts are Bash and take an output directory and a pcap path.
 
 ```bash
 cargo xtask ebpf-ipv4 --release
@@ -38,7 +32,7 @@ The deterministic pcap defaults to 2 million Ethernet packets, spread evenly ove
 
 The userspace script runs one warmup and five measured repetitions per case. It records CPU call stacks separately with `perf record` using DWARF and the symbol-preserving Cargo profile. Samples use `sudo` on this host because unprivileged recording failed at `perf_event_paranoid=2`; userspace hardware counting worked without it. It is normal for the whole-command times and counters for replay to include event generation while the built-in replay summary excludes it. Use the same denominator and measurement interval when comparing changes.
 
-Keep profiles, build objects, generated pcaps, and heap traces under `target/`. Commit compact counter results and text reports alongside the baseline. For each prospective optimization, establish the expected metric and run the baseline and candidate under the same host conditions. Check exact output on a deterministic fixture and report throughput, CPU cost, capture loss, and run-to-run spread where applicable.
+Keep profiles, build objects, generated pcaps, and heap traces under `target/`. Record conclusions in the engineering notes, and commit only the compact CSVs those notes cite. For each prospective optimization, establish the expected metric and run the baseline and candidate under the same host conditions. Check exact output on a deterministic fixture and report throughput, CPU cost, capture loss, and run-to-run spread where applicable.
 
 ## Additional profiles and compact records
 
