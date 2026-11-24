@@ -16,9 +16,14 @@ are wire-order byte arrays.
 
 A differential run of 2M generated and mutated frames, plus every fixture
 export, matched the pnet decoder exactly. Decode cost is unchanged (~55
-ns/frame). BPF instruction counts moved by less than 1%. One pre-existing
-difference remains: offline ICMP counts 4 header bytes and realtime counts 8,
-so `data_length` differs by 4 between the modes.
+ns/frame). BPF instruction counts moved by less than 1%.
+
+Offline ICMP and ICMPv6 parsing then moved to the 8-byte header realtime
+already used. Both modes reported `header_length` 8, but offline counted the
+second header word as data, so its payload and byte features were 4 bytes per
+packet higher. Offline also drops ICMP messages shorter than 8 bytes, as
+realtime does. **Offline ICMP payload features exported before this change
+are 4 bytes per packet too high.**
 
 ## 2026-11-24. UNSW-NB15 exporter
 

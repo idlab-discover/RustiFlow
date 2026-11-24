@@ -5,7 +5,7 @@ use std::net::{IpAddr, Ipv4Addr};
 use common::{
     ip_protocol,
     ipv6_extensions::Ipv6Extension,
-    wire::{IcmpHeader, Ipv4Header, Ipv6Header, TcpHeader, UdpHeader},
+    wire::{IcmpMessageHeader, Ipv4Header, Ipv6Header, TcpHeader, UdpHeader},
 };
 #[cfg(target_os = "linux")]
 use common::{EbpfEventIpv4, EbpfEventIpv6};
@@ -341,12 +341,13 @@ fn extract_packet_features_transport(
             features.header_length = 8;
         }
         ip_protocol::ICMP | ip_protocol::ICMPV6 => {
-            // The message-specific rest of the header counts as data here.
-            let (icmp, payload) = IcmpHeader::ref_from_prefix(packet).ok()?;
+            // Like the realtime programs, require and count the full 8-byte
+            // header, including its message-specific second word.
+            let (icmp, payload) = IcmpMessageHeader::ref_from_prefix(packet).ok()?;
             features.data_length = payload.len() as u16;
-            features.header_length = 8;
-            features.icmp_type = Some(icmp.icmp_type);
-            features.icmp_code = Some(icmp.code);
+            features.header_length = size_of::<IcmpMessageHeader>() as u8;
+            features.icmp_type = Some(icmp.header.icmp_type);
+            features.icmp_code = Some(icmp.header.code);
         }
         _ => {
             debug!("Unsupported protocol in packet!");

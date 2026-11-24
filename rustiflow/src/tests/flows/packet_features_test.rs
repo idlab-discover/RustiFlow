@@ -279,6 +279,72 @@ mod tests {
 
     #[cfg(target_os = "linux")]
     #[test]
+    fn icmp_echo_packets_and_ebpf_events_produce_matching_features() {
+        // Echo request: type, code, checksum, identifier, sequence, 4 data bytes.
+        let icmp = |icmp_type: u8| [icmp_type, 0, 0, 0, 0x12, 0x34, 0, 1, b'p', b'i', b'n', b'g'];
+        let realtime_offset_us = 1_000_000;
+        let timestamp_ns = 500_000_000;
+
+        let bytes = build_ipv4_packet(ip_protocol::ICMP, 0, &icmp(8));
+        let parsed_packet = PacketFeatures::from_ipv4_packet(&bytes, 1_500_000, false).unwrap();
+        let event = EbpfEventIpv4::new(
+            timestamp_ns,
+            [192, 0, 2, 2],
+            [192, 0, 2, 1],
+            0,
+            0,
+            4,
+            32,
+            0,
+            0,
+            ip_protocol::ICMP,
+            8,
+            0,
+            0,
+            8,
+            0,
+            64,
+        );
+        let realtime_packet = PacketFeatures::from_ebpf_event_ipv4(&event, realtime_offset_us);
+        assert_packet_features_match(&parsed_packet, &realtime_packet, 1_500_000);
+        assert_eq!(
+            (parsed_packet.header_length, parsed_packet.data_length),
+            (8, 4)
+        );
+
+        let bytes = build_ipv6_packet(ip_protocol::ICMPV6, &icmp(128));
+        let parsed_packet = PacketFeatures::from_ipv6_packet(&bytes, 1_500_000, false).unwrap();
+        let event = EbpfEventIpv6::new(
+            timestamp_ns,
+            Ipv6Addr::new(0x2001, 0xdb8, 0, 0, 0, 0, 0, 2).octets(),
+            Ipv6Addr::new(0x2001, 0xdb8, 0, 0, 0, 0, 0, 1).octets(),
+            0,
+            0,
+            4,
+            52,
+            0,
+            0,
+            ip_protocol::ICMPV6,
+            8,
+            0,
+            0,
+            128,
+            0,
+            64,
+        );
+        let realtime_packet = PacketFeatures::from_ebpf_event_ipv6(&event, realtime_offset_us);
+        assert_packet_features_match(&parsed_packet, &realtime_packet, 1_500_000);
+    }
+
+    #[test]
+    fn truncated_icmp_header_is_rejected() {
+        let bytes = build_ipv4_packet(ip_protocol::ICMP, 0, &[8, 0, 0, 0, 0, 0, 0]);
+
+        assert!(PacketFeatures::from_ipv4_packet(&bytes, 1, false).is_none());
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
     fn ipv6_udp_packet_and_ebpf_event_produce_matching_features() {
         let payload = b"flow";
         let mut udp = vec![0_u8; 8 + payload.len()];
