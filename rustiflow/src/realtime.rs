@@ -44,6 +44,8 @@ use tokio::{
     time::MissedTickBehavior,
 };
 
+use zerocopy::FromBytes;
+
 #[derive(Default)]
 struct RealtimeSourceStats {
     ring: Option<RingStats>,
@@ -247,18 +249,22 @@ fn spawn_shard_workers<T: Flow>(
 }
 
 /// Decodes one raw ring-buffer record into packet features.
-type DecodeEvent = fn(&[u8], i64) -> PacketFeatures;
+type DecodeEvent = fn(&[u8], i64) -> Option<PacketFeatures>;
 
-fn decode_ipv4_event(event: &[u8], realtime_offset_us: i64) -> PacketFeatures {
-    // SAFETY: the IPv4 programs only submit `EbpfEventIpv4` records to their rings.
-    let event: EbpfEventIpv4 = unsafe { std::ptr::read(event.as_ptr() as *const _) };
-    PacketFeatures::from_ebpf_event_ipv4(&event, realtime_offset_us)
+fn decode_ipv4_event(bytes: &[u8], realtime_offset_us: i64) -> Option<PacketFeatures> {
+    let event = EbpfEventIpv4::ref_from_bytes(bytes).ok()?;
+    Some(PacketFeatures::from_ebpf_event_ipv4(
+        event,
+        realtime_offset_us,
+    ))
 }
 
-fn decode_ipv6_event(event: &[u8], realtime_offset_us: i64) -> PacketFeatures {
-    // SAFETY: the IPv6 programs only submit `EbpfEventIpv6` records to their rings.
-    let event: EbpfEventIpv6 = unsafe { std::ptr::read(event.as_ptr() as *const _) };
-    PacketFeatures::from_ebpf_event_ipv6(&event, realtime_offset_us)
+fn decode_ipv6_event(bytes: &[u8], realtime_offset_us: i64) -> Option<PacketFeatures> {
+    let event = EbpfEventIpv6::ref_from_bytes(bytes).ok()?;
+    Some(PacketFeatures::from_ebpf_event_ipv6(
+        event,
+        realtime_offset_us,
+    ))
 }
 
 /// One event source's userspace stage: pick a shard per packet, batch per
@@ -312,9 +318,11 @@ impl SourceBatcher {
 
     /// Decodes one event and queues it for its shard, dispatching the shard's
     /// batch once it is full.
-    async fn push_event(&mut self, decode: impl FnOnce() -> PacketFeatures) {
+    async fn push_event(&mut self, decode: impl FnOnce() -> Option<PacketFeatures>) -> bool {
         let event_start = self.stats.is_some().then(Instant::now);
-        let packet_features = decode();
+        let Some(packet_features) = decode() else {
+            return false;
+        };
         let shard_index = self
             .shard_selector
             .shard_index(&packet_features.biflow_key_value());
@@ -338,6 +346,7 @@ impl SourceBatcher {
             stats.increment_events();
             stats.add_total_event_ns(elapsed_ns(event_start));
         }
+        true
     }
 
     /// Dispatches every partial batch, as a source does when its ring runs empty.
@@ -676,5 +685,27 @@ fn bump_memlock_rlimit() {
     let ret = unsafe { libc::setrlimit(libc::RLIMIT_MEMLOCK, &rlim) };
     if ret != 0 {
         debug!("remove limit on locked memory failed, ret is: {}", ret);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn ring_decoders_require_exactly_one_packed_record() {
+        // The producer's IPv4 and IPv6 ABIs use 40 and 72 bytes respectively.
+        for (decode, size) in [
+            (decode_ipv4_event as DecodeEvent, 40),
+            (decode_ipv6_event as DecodeEvent, 72),
+        ] {
+            let mut storage = [0u8; 74];
+            let bytes = &mut storage[1..];
+            bytes[..8].copy_from_slice(&12_345_u64.to_ne_bytes());
+            assert_eq!(decode(&bytes[..size], 100).unwrap().timestamp_us, 112);
+            assert!(decode(&[], 100).is_none());
+            assert!(decode(&bytes[..size - 1], 100).is_none());
+            assert!(decode(&bytes[..size + 1], 100).is_none());
+        }
     }
 }

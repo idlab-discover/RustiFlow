@@ -14,12 +14,9 @@ pub(super) fn orientations(packets: &[PacketFeatures], output: &mut [KeyOrientat
         if let (Some((first_src, first_dst)), Some((second_src, second_dst))) =
             (addresses(first), addresses(second))
         {
-            // SAFETY: these initialized bytes fill the vector, one address
-            // per 128-bit lane, and every bit pattern is valid for __m256i.
-            let src =
-                unsafe { std::mem::transmute::<[[u8; 16]; 2], __m256i>([first_src, second_src]) };
-            let dst =
-                unsafe { std::mem::transmute::<[[u8; 16]; 2], __m256i>([first_dst, second_dst]) };
+            // Each address occupies one 128-bit lane.
+            let src: __m256i = zerocopy::transmute!([first_src, second_src]);
+            let dst: __m256i = zerocopy::transmute!([first_dst, second_dst]);
 
             let differences = !_mm256_movemask_epi8(_mm256_cmpeq_epi8(src, dst)) as u32;
             let src_greater =

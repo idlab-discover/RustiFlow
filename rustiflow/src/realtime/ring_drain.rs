@@ -58,6 +58,7 @@ async fn drain<const BUDGETED: bool>(
     decode: DecodeEvent,
     realtime_offset_us: i64,
 ) {
+    let mut warned_invalid_size = false;
     loop {
         let mut guard = ring.readable_mut().await.unwrap();
         if let Some(stats) = batcher.stats.as_ref().and_then(|stats| stats.ring.as_ref()) {
@@ -68,6 +69,7 @@ async fn drain<const BUDGETED: bool>(
             let deadline = BUDGETED.then(|| Instant::now() + TIME_BUDGET);
             let ring = guard.get_inner_mut();
             let mut records = 0;
+            let mut packets = 0;
             let end = loop {
                 let Some(event) = ring.next() else {
                     break DrainEnd::Empty;
@@ -77,15 +79,24 @@ async fn drain<const BUDGETED: bool>(
                 if let Some(stats) = &batcher.stats {
                     stats.sample_ring_age(&event);
                 }
-                batcher
+                if batcher
                     .push_event(|| decode(&event, realtime_offset_us))
-                    .await;
-                records += 1;
-                if records % PACKET_GRAPH_RECORD_BATCH == 0 {
-                    if let Some(graph) = &graph {
-                        graph.record_packets(PACKET_GRAPH_RECORD_BATCH);
+                    .await
+                {
+                    packets += 1;
+                    if packets % PACKET_GRAPH_RECORD_BATCH == 0 {
+                        if let Some(graph) = &graph {
+                            graph.record_packets(PACKET_GRAPH_RECORD_BATCH);
+                        }
                     }
+                } else if !warned_invalid_size {
+                    log::warn!(
+                        "Skipping incorrectly sized realtime ring records (first size: {} bytes)",
+                        event.len()
+                    );
+                    warned_invalid_size = true;
                 }
+                records += 1;
                 if BUDGETED {
                     if records == RECORD_BUDGET {
                         break DrainEnd::RecordBudget;
@@ -99,7 +110,7 @@ async fn drain<const BUDGETED: bool>(
             };
 
             if let Some(graph) = &graph {
-                graph.record_packets(records % PACKET_GRAPH_RECORD_BATCH);
+                graph.record_packets(packets % PACKET_GRAPH_RECORD_BATCH);
             }
             batcher.flush().await;
             if let Some(stats) = batcher.stats.as_ref().and_then(|stats| stats.ring.as_ref()) {

@@ -182,7 +182,7 @@ async fn replay_source<E: Send + Sync + 'static>(
     for burst in events.chunks(drain_burst.get()) {
         for event in burst {
             batcher
-                .push_event(|| decode(event, realtime_offset_us))
+                .push_event(|| Some(decode(event, realtime_offset_us)))
                 .await;
         }
         batcher.flush().await;

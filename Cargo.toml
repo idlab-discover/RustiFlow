@@ -2,6 +2,9 @@
 members = ["rustiflow", "common", "xtask"]
 resolver = "2"
 
+[workspace.dependencies]
+zerocopy = { version = "0.8.63", default-features = false }
+
 # Lean release binary: whole-program optimization and no symbol tables. CPU
 # tuning is chosen per build (`cargo xtask dist --target-cpu`), not here.
 [profile.release]

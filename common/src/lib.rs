@@ -16,6 +16,10 @@ pub const REALTIME_EVENT_RINGBUF_BYTES: u32 = 1024 * 1024 * 64;
 /// Addresses keep the wire byte order in memory (`u32::from_ne_bytes` of the
 /// address bytes); every other multi-byte field is in host byte order.
 #[repr(C, packed)]
+#[cfg_attr(
+    feature = "zerocopy",
+    derive(zerocopy::FromBytes, zerocopy::KnownLayout, zerocopy::Immutable)
+)]
 #[derive(Copy, Clone)]
 pub struct EbpfEventIpv4 {
     pub timestamp_ns: u64,
@@ -85,6 +89,10 @@ unsafe impl aya::Pod for EbpfEventIpv4 {}
 /// Addresses keep the wire byte order in memory (`u128::from_ne_bytes` of the
 /// address bytes); every other multi-byte field is in host byte order.
 #[repr(C, packed)]
+#[cfg_attr(
+    feature = "zerocopy",
+    derive(zerocopy::FromBytes, zerocopy::KnownLayout, zerocopy::Immutable)
+)]
 #[derive(Clone, Copy)]
 pub struct EbpfEventIpv6 {
     pub timestamp_ns: u64,

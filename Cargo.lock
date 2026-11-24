@@ -440,6 +440,7 @@ version = "0.1.0"
 dependencies = [
  "aya",
  "network-types",
+ "zerocopy",
 ]
 
 [[package]]
@@ -1721,6 +1722,7 @@ dependencies = [
  "serde",
  "tempfile",
  "tokio",
+ "zerocopy",
 ]
 
 [[package]]
