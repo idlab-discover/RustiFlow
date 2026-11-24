@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"constant":["ENCODED_CHUNK_BYTES","ENCODED_CHUNK_QUEUE_CAPACITY","ENCODER_FLOW_BATCH","SHARD_FLOW_QUEUE_CAPACITY"],"enum":["FlowExporter","ShardOutput"],"fn":["project","spawn_output_writer"],"mod":["parquet"],"trait":["FlowSink"]};
+window.SIDEBAR_ITEMS = {"constant":["ENCODED_CHUNK_BYTES","ENCODED_CHUNK_QUEUE_CAPACITY","ENCODER_FLOW_BATCH","SHARD_FLOW_QUEUE_CAPACITY"],"enum":["FlowExporter","ShardOutput"],"fn":["project","spawn_output_writer","spawn_writer"],"mod":["connection_order","parquet"],"trait":["FlowSink"]};

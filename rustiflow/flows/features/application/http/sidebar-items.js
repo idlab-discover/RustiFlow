@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"constant":["MAX_PENDING_REQUESTS"],"enum":["Body","RequestKind"],"fn":["parse_framing","parse_request","parse_response"],"struct":["HttpDirection","HttpStats","MessageFraming"]};

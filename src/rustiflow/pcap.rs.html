@@ -80,7 +80,7 @@
 <a href=#80 id=80 data-nosnippet>80</a>            next_check_time_us = <span class="prelude-val">Some</span>(timestamp_us.saturating_add(check_interval_us));
 <a href=#81 id=81 data-nosnippet>81</a>        }
 <a href=#82 id=82 data-nosnippet>82</a>
-<a href=#83 id=83 data-nosnippet>83</a>        <span class="kw">if let </span><span class="prelude-val">Some</span>(features) = decode_frame(packet.data, timestamp_us) {
+<a href=#83 id=83 data-nosnippet>83</a>        <span class="kw">if let </span><span class="prelude-val">Some</span>(features) = decode_frame(packet.data, timestamp_us, T::CAPTURE_TCP_PAYLOAD) {
 <a href=#84 id=84 data-nosnippet>84</a>            dispatcher.dispatch(features).<span class="kw">await</span>;
 <a href=#85 id=85 data-nosnippet>85</a>        }
 <a href=#86 id=86 data-nosnippet>86</a>    }
@@ -559,95 +559,106 @@
 <a href=#559 id=559 data-nosnippet>559</a>
 <a href=#560 id=560 data-nosnippet>560</a><span class="doccomment">/// Locate the network header once, then decode Ethernet and Linux cooked
 <a href=#561 id=561 data-nosnippet>561</a>/// frames through the same IP parser, including single-tag VLAN captures.
-<a href=#562 id=562 data-nosnippet>562</a></span><span class="kw">fn </span>decode_frame(data: <span class="kw-2">&amp;</span>[u8], timestamp_us: i64) -&gt; <span class="prelude-ty">Option</span>&lt;PacketFeatures&gt; {
-<a href=#563 id=563 data-nosnippet>563</a>    <span class="kw">let </span><span class="prelude-val">Some</span>(ethernet) = EthernetPacket::new(data) <span class="kw">else </span>{
-<a href=#564 id=564 data-nosnippet>564</a>        <span class="macro">error!</span>(<span class="string">"Error parsing packet..."</span>);
-<a href=#565 id=565 data-nosnippet>565</a>        <span class="kw">return </span><span class="prelude-val">None</span>;
-<a href=#566 id=566 data-nosnippet>566</a>    };
-<a href=#567 id=567 data-nosnippet>567</a>    <span class="kw">let </span>(<span class="kw-2">mut </span>ethertype, <span class="kw-2">mut </span>payload) = <span class="kw">match </span>ethernet.get_ethertype() {
-<a href=#568 id=568 data-nosnippet>568</a>        kind @ (EtherTypes::Ipv4 | EtherTypes::Ipv6 | EtherTypes::Vlan) =&gt; {
-<a href=#569 id=569 data-nosnippet>569</a>            (kind, ethernet.payload())
-<a href=#570 id=570 data-nosnippet>570</a>        }
-<a href=#571 id=571 data-nosnippet>571</a>        <span class="kw">_ </span>=&gt; {
-<a href=#572 id=572 data-nosnippet>572</a>            <span class="kw">let </span><span class="prelude-val">Some</span>((header, payload)) = data.split_at_checked(<span class="number">16</span>) <span class="kw">else </span>{
-<a href=#573 id=573 data-nosnippet>573</a>                <span class="macro">debug!</span>(<span class="string">"Packet too short for Linux cooked capture header"</span>);
-<a href=#574 id=574 data-nosnippet>574</a>                <span class="kw">return </span><span class="prelude-val">None</span>;
-<a href=#575 id=575 data-nosnippet>575</a>            };
-<a href=#576 id=576 data-nosnippet>576</a>            (
-<a href=#577 id=577 data-nosnippet>577</a>                EtherType(u16::from_be_bytes([header[<span class="number">14</span>], header[<span class="number">15</span>]])),
-<a href=#578 id=578 data-nosnippet>578</a>                payload,
-<a href=#579 id=579 data-nosnippet>579</a>            )
-<a href=#580 id=580 data-nosnippet>580</a>        }
-<a href=#581 id=581 data-nosnippet>581</a>    };
-<a href=#582 id=582 data-nosnippet>582</a>    <span class="kw">if </span>ethertype == EtherTypes::Vlan {
-<a href=#583 id=583 data-nosnippet>583</a>        <span class="kw">let </span><span class="prelude-val">Some</span>((tag, inner)) = payload.split_at_checked(<span class="number">4</span>) <span class="kw">else </span>{
-<a href=#584 id=584 data-nosnippet>584</a>            <span class="macro">debug!</span>(<span class="string">"VLAN packet too short to contain inner EtherType"</span>);
-<a href=#585 id=585 data-nosnippet>585</a>            <span class="kw">return </span><span class="prelude-val">None</span>;
-<a href=#586 id=586 data-nosnippet>586</a>        };
-<a href=#587 id=587 data-nosnippet>587</a>        ethertype = EtherType(u16::from_be_bytes([tag[<span class="number">2</span>], tag[<span class="number">3</span>]]));
-<a href=#588 id=588 data-nosnippet>588</a>        payload = inner;
-<a href=#589 id=589 data-nosnippet>589</a>    }
-<a href=#590 id=590 data-nosnippet>590</a>    <span class="kw">match </span>ethertype {
-<a href=#591 id=591 data-nosnippet>591</a>        EtherTypes::Ipv4 =&gt; {
-<a href=#592 id=592 data-nosnippet>592</a>            PacketFeatures::from_ipv4_packet(<span class="kw-2">&amp;</span>Ipv4Packet::new(payload)<span class="question-mark">?</span>, timestamp_us)
-<a href=#593 id=593 data-nosnippet>593</a>        }
-<a href=#594 id=594 data-nosnippet>594</a>        EtherTypes::Ipv6 =&gt; {
-<a href=#595 id=595 data-nosnippet>595</a>            PacketFeatures::from_ipv6_packet(<span class="kw-2">&amp;</span>Ipv6Packet::new(payload)<span class="question-mark">?</span>, timestamp_us)
-<a href=#596 id=596 data-nosnippet>596</a>        }
-<a href=#597 id=597 data-nosnippet>597</a>        <span class="kw">_ </span>=&gt; {
-<a href=#598 id=598 data-nosnippet>598</a>            <span class="macro">debug!</span>(<span class="string">"Unsupported EtherType: {ethertype:?}"</span>);
-<a href=#599 id=599 data-nosnippet>599</a>            <span class="prelude-val">None
-<a href=#600 id=600 data-nosnippet>600</a>        </span>}
-<a href=#601 id=601 data-nosnippet>601</a>    }
-<a href=#602 id=602 data-nosnippet>602</a>}
-<a href=#603 id=603 data-nosnippet>603</a>
-<a href=#604 id=604 data-nosnippet>604</a><span class="doccomment">/// Creates shard channels to FlowTables and spawns processing tasks for each shard.
-<a href=#605 id=605 data-nosnippet>605</a></span><span class="kw">fn </span>create_shard_senders&lt;T&gt;(
-<a href=#606 id=606 data-nosnippet>606</a>    num_shards: u8,
-<a href=#607 id=607 data-nosnippet>607</a>    exporter: <span class="kw">impl </span>FlowSink&lt;T&gt;,
-<a href=#608 id=608 data-nosnippet>608</a>    active_timeout: u64,
-<a href=#609 id=609 data-nosnippet>609</a>    idle_timeout: u64,
-<a href=#610 id=610 data-nosnippet>610</a>    early_export: <span class="prelude-ty">Option</span>&lt;NonZeroU64&gt;,
-<a href=#611 id=611 data-nosnippet>611</a>    expiration_check_interval: u64,
-<a href=#612 id=612 data-nosnippet>612</a>) -&gt; Vec&lt;mpsc::Sender&lt;ShardMessage&gt;&gt;
-<a href=#613 id=613 data-nosnippet>613</a><span class="kw">where
-<a href=#614 id=614 data-nosnippet>614</a>    </span>T: Flow,
-<a href=#615 id=615 data-nosnippet>615</a>{
-<a href=#616 id=616 data-nosnippet>616</a>    <span class="macro">debug!</span>(<span class="string">"Creating {} sharded FlowTables..."</span>, num_shards);
-<a href=#617 id=617 data-nosnippet>617</a>    <span class="kw">let </span><span class="kw-2">mut </span>shard_senders = Vec::with_capacity(num_shards <span class="kw">as </span>usize);
-<a href=#618 id=618 data-nosnippet>618</a>    <span class="kw">for _ in </span><span class="number">0</span>..num_shards {
-<a href=#619 id=619 data-nosnippet>619</a>        <span class="kw">let </span>(tx, <span class="kw-2">mut </span>rx) = mpsc::channel::&lt;ShardMessage&gt;(SHARD_QUEUE_CAPACITY);
-<a href=#620 id=620 data-nosnippet>620</a>        <span class="kw">let </span><span class="kw-2">mut </span>flow_table = FlowTable::new(
-<a href=#621 id=621 data-nosnippet>621</a>            active_timeout,
-<a href=#622 id=622 data-nosnippet>622</a>            idle_timeout,
-<a href=#623 id=623 data-nosnippet>623</a>            early_export,
-<a href=#624 id=624 data-nosnippet>624</a>            exporter.shard_output(),
-<a href=#625 id=625 data-nosnippet>625</a>            expiration_check_interval,
-<a href=#626 id=626 data-nosnippet>626</a>        );
-<a href=#627 id=627 data-nosnippet>627</a>
-<a href=#628 id=628 data-nosnippet>628</a>        tokio::spawn(<span class="kw">async move </span>{
-<a href=#629 id=629 data-nosnippet>629</a>            <span class="kw">while let </span><span class="prelude-val">Some</span>(message) = rx.recv().<span class="kw">await </span>{
-<a href=#630 id=630 data-nosnippet>630</a>                <span class="kw">match </span>message {
-<a href=#631 id=631 data-nosnippet>631</a>                    ShardMessage::Packets(packets) =&gt; {
-<a href=#632 id=632 data-nosnippet>632</a>                        <span class="kw">for </span>packet <span class="kw">in </span>packets {
-<a href=#633 id=633 data-nosnippet>633</a>                            flow_table
-<a href=#634 id=634 data-nosnippet>634</a>                                .process_packet_without_expiration_scan(<span class="kw-2">&amp;</span>packet)
-<a href=#635 id=635 data-nosnippet>635</a>                                .<span class="kw">await</span>;
-<a href=#636 id=636 data-nosnippet>636</a>                        }
-<a href=#637 id=637 data-nosnippet>637</a>                    }
-<a href=#638 id=638 data-nosnippet>638</a>                    ShardMessage::Expire(timestamp_us) =&gt; {
-<a href=#639 id=639 data-nosnippet>639</a>                        flow_table.export_expired_flows(timestamp_us).<span class="kw">await</span>;
-<a href=#640 id=640 data-nosnippet>640</a>                    }
-<a href=#641 id=641 data-nosnippet>641</a>                    ShardMessage::Finish(timestamp_us) =&gt; {
-<a href=#642 id=642 data-nosnippet>642</a>                        flow_table.export_all_flows(timestamp_us).<span class="kw">await</span>;
-<a href=#643 id=643 data-nosnippet>643</a>                    }
-<a href=#644 id=644 data-nosnippet>644</a>                }
-<a href=#645 id=645 data-nosnippet>645</a>            }
-<a href=#646 id=646 data-nosnippet>646</a>        });
-<a href=#647 id=647 data-nosnippet>647</a>        shard_senders.push(tx);
-<a href=#648 id=648 data-nosnippet>648</a>    }
-<a href=#649 id=649 data-nosnippet>649</a>    <span class="macro">debug!</span>(<span class="string">"Sharded FlowTables created"</span>);
-<a href=#650 id=650 data-nosnippet>650</a>
-<a href=#651 id=651 data-nosnippet>651</a>    shard_senders
-<a href=#652 id=652 data-nosnippet>652</a>}
+<a href=#562 id=562 data-nosnippet>562</a></span><span class="kw">fn </span>decode_frame(
+<a href=#563 id=563 data-nosnippet>563</a>    data: <span class="kw-2">&amp;</span>[u8],
+<a href=#564 id=564 data-nosnippet>564</a>    timestamp_us: i64,
+<a href=#565 id=565 data-nosnippet>565</a>    capture_tcp_payload: bool,
+<a href=#566 id=566 data-nosnippet>566</a>) -&gt; <span class="prelude-ty">Option</span>&lt;PacketFeatures&gt; {
+<a href=#567 id=567 data-nosnippet>567</a>    <span class="kw">let </span><span class="prelude-val">Some</span>(ethernet) = EthernetPacket::new(data) <span class="kw">else </span>{
+<a href=#568 id=568 data-nosnippet>568</a>        <span class="macro">error!</span>(<span class="string">"Error parsing packet..."</span>);
+<a href=#569 id=569 data-nosnippet>569</a>        <span class="kw">return </span><span class="prelude-val">None</span>;
+<a href=#570 id=570 data-nosnippet>570</a>    };
+<a href=#571 id=571 data-nosnippet>571</a>    <span class="kw">let </span>(<span class="kw-2">mut </span>ethertype, <span class="kw-2">mut </span>payload) = <span class="kw">match </span>ethernet.get_ethertype() {
+<a href=#572 id=572 data-nosnippet>572</a>        kind @ (EtherTypes::Ipv4 | EtherTypes::Ipv6 | EtherTypes::Vlan) =&gt; {
+<a href=#573 id=573 data-nosnippet>573</a>            (kind, ethernet.payload())
+<a href=#574 id=574 data-nosnippet>574</a>        }
+<a href=#575 id=575 data-nosnippet>575</a>        <span class="kw">_ </span>=&gt; {
+<a href=#576 id=576 data-nosnippet>576</a>            <span class="kw">let </span><span class="prelude-val">Some</span>((header, payload)) = data.split_at_checked(<span class="number">16</span>) <span class="kw">else </span>{
+<a href=#577 id=577 data-nosnippet>577</a>                <span class="macro">debug!</span>(<span class="string">"Packet too short for Linux cooked capture header"</span>);
+<a href=#578 id=578 data-nosnippet>578</a>                <span class="kw">return </span><span class="prelude-val">None</span>;
+<a href=#579 id=579 data-nosnippet>579</a>            };
+<a href=#580 id=580 data-nosnippet>580</a>            (
+<a href=#581 id=581 data-nosnippet>581</a>                EtherType(u16::from_be_bytes([header[<span class="number">14</span>], header[<span class="number">15</span>]])),
+<a href=#582 id=582 data-nosnippet>582</a>                payload,
+<a href=#583 id=583 data-nosnippet>583</a>            )
+<a href=#584 id=584 data-nosnippet>584</a>        }
+<a href=#585 id=585 data-nosnippet>585</a>    };
+<a href=#586 id=586 data-nosnippet>586</a>    <span class="kw">if </span>ethertype == EtherTypes::Vlan {
+<a href=#587 id=587 data-nosnippet>587</a>        <span class="kw">let </span><span class="prelude-val">Some</span>((tag, inner)) = payload.split_at_checked(<span class="number">4</span>) <span class="kw">else </span>{
+<a href=#588 id=588 data-nosnippet>588</a>            <span class="macro">debug!</span>(<span class="string">"VLAN packet too short to contain inner EtherType"</span>);
+<a href=#589 id=589 data-nosnippet>589</a>            <span class="kw">return </span><span class="prelude-val">None</span>;
+<a href=#590 id=590 data-nosnippet>590</a>        };
+<a href=#591 id=591 data-nosnippet>591</a>        ethertype = EtherType(u16::from_be_bytes([tag[<span class="number">2</span>], tag[<span class="number">3</span>]]));
+<a href=#592 id=592 data-nosnippet>592</a>        payload = inner;
+<a href=#593 id=593 data-nosnippet>593</a>    }
+<a href=#594 id=594 data-nosnippet>594</a>    <span class="kw">match </span>ethertype {
+<a href=#595 id=595 data-nosnippet>595</a>        EtherTypes::Ipv4 =&gt; PacketFeatures::from_ipv4_packet(
+<a href=#596 id=596 data-nosnippet>596</a>            <span class="kw-2">&amp;</span>Ipv4Packet::new(payload)<span class="question-mark">?</span>,
+<a href=#597 id=597 data-nosnippet>597</a>            timestamp_us,
+<a href=#598 id=598 data-nosnippet>598</a>            capture_tcp_payload,
+<a href=#599 id=599 data-nosnippet>599</a>        ),
+<a href=#600 id=600 data-nosnippet>600</a>        EtherTypes::Ipv6 =&gt; PacketFeatures::from_ipv6_packet(
+<a href=#601 id=601 data-nosnippet>601</a>            <span class="kw-2">&amp;</span>Ipv6Packet::new(payload)<span class="question-mark">?</span>,
+<a href=#602 id=602 data-nosnippet>602</a>            timestamp_us,
+<a href=#603 id=603 data-nosnippet>603</a>            capture_tcp_payload,
+<a href=#604 id=604 data-nosnippet>604</a>        ),
+<a href=#605 id=605 data-nosnippet>605</a>        <span class="kw">_ </span>=&gt; {
+<a href=#606 id=606 data-nosnippet>606</a>            <span class="macro">debug!</span>(<span class="string">"Unsupported EtherType: {ethertype:?}"</span>);
+<a href=#607 id=607 data-nosnippet>607</a>            <span class="prelude-val">None
+<a href=#608 id=608 data-nosnippet>608</a>        </span>}
+<a href=#609 id=609 data-nosnippet>609</a>    }
+<a href=#610 id=610 data-nosnippet>610</a>}
+<a href=#611 id=611 data-nosnippet>611</a>
+<a href=#612 id=612 data-nosnippet>612</a><span class="doccomment">/// Creates shard channels to FlowTables and spawns processing tasks for each shard.
+<a href=#613 id=613 data-nosnippet>613</a></span><span class="kw">fn </span>create_shard_senders&lt;T&gt;(
+<a href=#614 id=614 data-nosnippet>614</a>    num_shards: u8,
+<a href=#615 id=615 data-nosnippet>615</a>    exporter: <span class="kw">impl </span>FlowSink&lt;T&gt;,
+<a href=#616 id=616 data-nosnippet>616</a>    active_timeout: u64,
+<a href=#617 id=617 data-nosnippet>617</a>    idle_timeout: u64,
+<a href=#618 id=618 data-nosnippet>618</a>    early_export: <span class="prelude-ty">Option</span>&lt;NonZeroU64&gt;,
+<a href=#619 id=619 data-nosnippet>619</a>    expiration_check_interval: u64,
+<a href=#620 id=620 data-nosnippet>620</a>) -&gt; Vec&lt;mpsc::Sender&lt;ShardMessage&gt;&gt;
+<a href=#621 id=621 data-nosnippet>621</a><span class="kw">where
+<a href=#622 id=622 data-nosnippet>622</a>    </span>T: Flow,
+<a href=#623 id=623 data-nosnippet>623</a>{
+<a href=#624 id=624 data-nosnippet>624</a>    <span class="macro">debug!</span>(<span class="string">"Creating {} sharded FlowTables..."</span>, num_shards);
+<a href=#625 id=625 data-nosnippet>625</a>    <span class="kw">let </span><span class="kw-2">mut </span>shard_senders = Vec::with_capacity(num_shards <span class="kw">as </span>usize);
+<a href=#626 id=626 data-nosnippet>626</a>    <span class="kw">for </span>shard <span class="kw">in </span><span class="number">0</span>..num_shards {
+<a href=#627 id=627 data-nosnippet>627</a>        <span class="kw">let </span>(tx, <span class="kw-2">mut </span>rx) = mpsc::channel::&lt;ShardMessage&gt;(SHARD_QUEUE_CAPACITY);
+<a href=#628 id=628 data-nosnippet>628</a>        <span class="kw">let </span><span class="kw-2">mut </span>flow_table = FlowTable::new(
+<a href=#629 id=629 data-nosnippet>629</a>            active_timeout,
+<a href=#630 id=630 data-nosnippet>630</a>            idle_timeout,
+<a href=#631 id=631 data-nosnippet>631</a>            early_export,
+<a href=#632 id=632 data-nosnippet>632</a>            exporter.pcap_shard_output(usize::from(shard)),
+<a href=#633 id=633 data-nosnippet>633</a>            expiration_check_interval,
+<a href=#634 id=634 data-nosnippet>634</a>        );
+<a href=#635 id=635 data-nosnippet>635</a>
+<a href=#636 id=636 data-nosnippet>636</a>        tokio::spawn(<span class="kw">async move </span>{
+<a href=#637 id=637 data-nosnippet>637</a>            <span class="kw">while let </span><span class="prelude-val">Some</span>(message) = rx.recv().<span class="kw">await </span>{
+<a href=#638 id=638 data-nosnippet>638</a>                <span class="kw">match </span>message {
+<a href=#639 id=639 data-nosnippet>639</a>                    ShardMessage::Packets(packets) =&gt; {
+<a href=#640 id=640 data-nosnippet>640</a>                        <span class="kw">for </span>packet <span class="kw">in </span>packets {
+<a href=#641 id=641 data-nosnippet>641</a>                            flow_table
+<a href=#642 id=642 data-nosnippet>642</a>                                .process_packet_without_expiration_scan(<span class="kw-2">&amp;</span>packet)
+<a href=#643 id=643 data-nosnippet>643</a>                                .<span class="kw">await</span>;
+<a href=#644 id=644 data-nosnippet>644</a>                        }
+<a href=#645 id=645 data-nosnippet>645</a>                    }
+<a href=#646 id=646 data-nosnippet>646</a>                    ShardMessage::Expire(timestamp_us) =&gt; {
+<a href=#647 id=647 data-nosnippet>647</a>                        flow_table.export_expired_flows(timestamp_us).<span class="kw">await</span>;
+<a href=#648 id=648 data-nosnippet>648</a>                        <span class="kw">if </span>T::USES_CONNECTION_HISTORY {
+<a href=#649 id=649 data-nosnippet>649</a>                            flow_table.publish_offline_watermark(timestamp_us).<span class="kw">await</span>;
+<a href=#650 id=650 data-nosnippet>650</a>                        }
+<a href=#651 id=651 data-nosnippet>651</a>                    }
+<a href=#652 id=652 data-nosnippet>652</a>                    ShardMessage::Finish(timestamp_us) =&gt; {
+<a href=#653 id=653 data-nosnippet>653</a>                        flow_table.export_all_flows(timestamp_us).<span class="kw">await</span>;
+<a href=#654 id=654 data-nosnippet>654</a>                    }
+<a href=#655 id=655 data-nosnippet>655</a>                }
+<a href=#656 id=656 data-nosnippet>656</a>            }
+<a href=#657 id=657 data-nosnippet>657</a>        });
+<a href=#658 id=658 data-nosnippet>658</a>        shard_senders.push(tx);
+<a href=#659 id=659 data-nosnippet>659</a>    }
+<a href=#660 id=660 data-nosnippet>660</a>    <span class="macro">debug!</span>(<span class="string">"Sharded FlowTables created"</span>);
+<a href=#661 id=661 data-nosnippet>661</a>
+<a href=#662 id=662 data-nosnippet>662</a>    shard_senders
+<a href=#663 id=663 data-nosnippet>663</a>}
 </code></pre></div></section></main></body></html>

@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"constant":["WINDOW_SIZE"],"struct":["Connection","ConnectionCounts","ConnectionHistory"]};
