@@ -357,8 +357,8 @@ fn encode_ipv4(
     };
     EbpfEventIpv4::new(
         packet.timestamp_ns,
-        u32::from(destination).to_be(),
-        u32::from(source).to_be(),
+        destination.octets(),
+        source.octets(),
         transport.destination_port,
         transport.source_port,
         payload_bytes,
@@ -389,8 +389,8 @@ fn encode_ipv6(
     };
     EbpfEventIpv6::new(
         packet.timestamp_ns,
-        u128::from(destination).to_be(),
-        u128::from(source).to_be(),
+        destination.octets(),
+        source.octets(),
         transport.destination_port,
         transport.source_port,
         payload_bytes,

@@ -198,8 +198,8 @@ impl PacketInfo {
 
         EbpfEventIpv4::new(
             unsafe { bpf_ktime_get_ns() },
-            self.ipv4_destination,
-            self.ipv4_source,
+            self.ipv4_destination.to_ne_bytes(),
+            self.ipv4_source.to_ne_bytes(),
             header.destination_port(),
             header.source_port(),
             data_length,

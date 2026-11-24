@@ -248,8 +248,8 @@ mod tests {
         let realtime_offset_us = 1_000_000;
         let event = EbpfEventIpv4::new(
             (1_234_567 - realtime_offset_us) as u64 * 1_000,
-            u32::from(Ipv4Addr::new(192, 0, 2, 2)).to_be(),
-            u32::from(Ipv4Addr::new(192, 0, 2, 1)).to_be(),
+            Ipv4Addr::new(192, 0, 2, 2).octets(),
+            Ipv4Addr::new(192, 0, 2, 1).octets(),
             443,
             12345,
             payload.len() as u16,
@@ -307,8 +307,8 @@ mod tests {
         let realtime_offset_us = 2_000_000;
         let event = EbpfEventIpv6::new(
             (2_345_678 - realtime_offset_us) as u64 * 1_000,
-            u128::from(Ipv6Addr::new(0x2001, 0xdb8, 0, 0, 0, 0, 0, 2)).to_be(),
-            u128::from(Ipv6Addr::new(0x2001, 0xdb8, 0, 0, 0, 0, 0, 1)).to_be(),
+            Ipv6Addr::new(0x2001, 0xdb8, 0, 0, 0, 0, 0, 2).octets(),
+            Ipv6Addr::new(0x2001, 0xdb8, 0, 0, 0, 0, 0, 1).octets(),
             53,
             5353,
             payload.len() as u16,

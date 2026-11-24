@@ -13,8 +13,8 @@ pub const REALTIME_EVENT_RINGBUF_BYTES: u32 = 1024 * 1024 * 64;
 
 /// BasicFeaturesIpv4 is a struct collection all ipv4 traffic data.
 ///
-/// Addresses keep the wire byte order in memory (`u32::from_ne_bytes` of the
-/// address bytes); every other multi-byte field is in host byte order.
+/// Addresses are the wire bytes in network order; every other multi-byte
+/// field is in host byte order.
 #[repr(C, packed)]
 #[cfg_attr(
     feature = "zerocopy",
@@ -28,8 +28,8 @@ pub const REALTIME_EVENT_RINGBUF_BYTES: u32 = 1024 * 1024 * 64;
 #[derive(Copy, Clone)]
 pub struct EbpfEventIpv4 {
     pub timestamp_ns: u64,
-    pub ipv4_destination: u32,
-    pub ipv4_source: u32,
+    pub ipv4_destination: [u8; 4],
+    pub ipv4_source: [u8; 4],
     pub port_destination: u16,
     pub port_source: u16,
     pub data_length: u16,
@@ -49,8 +49,8 @@ impl EbpfEventIpv4 {
     #[allow(clippy::too_many_arguments)]
     pub fn new(
         timestamp_ns: u64,
-        ipv4_destination: u32,
-        ipv4_source: u32,
+        ipv4_destination: [u8; 4],
+        ipv4_source: [u8; 4],
         port_destination: u16,
         port_source: u16,
         data_length: u16,
@@ -91,8 +91,8 @@ const _: () = assert!(core::mem::size_of::<EbpfEventIpv4>() == 40);
 
 /// BasicFeaturesIpv6 is a struct collection all ipv6 traffic data.
 ///
-/// Addresses keep the wire byte order in memory (`u128::from_ne_bytes` of the
-/// address bytes); every other multi-byte field is in host byte order.
+/// Addresses are the wire bytes in network order; every other multi-byte
+/// field is in host byte order.
 #[repr(C, packed)]
 #[cfg_attr(
     feature = "zerocopy",
@@ -106,8 +106,8 @@ const _: () = assert!(core::mem::size_of::<EbpfEventIpv4>() == 40);
 #[derive(Clone, Copy)]
 pub struct EbpfEventIpv6 {
     pub timestamp_ns: u64,
-    pub ipv6_destination: u128,
-    pub ipv6_source: u128,
+    pub ipv6_destination: [u8; 16],
+    pub ipv6_source: [u8; 16],
     pub port_destination: u16,
     pub port_source: u16,
     pub data_length: u16,
@@ -128,8 +128,8 @@ impl EbpfEventIpv6 {
     #[allow(clippy::too_many_arguments)]
     pub fn new(
         timestamp_ns: u64,
-        ipv6_destination: u128,
-        ipv6_source: u128,
+        ipv6_destination: [u8; 16],
+        ipv6_source: [u8; 16],
         port_destination: u16,
         port_source: u16,
         data_length: u16,

@@ -51,8 +51,8 @@ mod tests {
         let realtime_offset_us = 1_000_000;
         let event = EbpfEventIpv4::new(
             (spec.timestamp_us - realtime_offset_us) as u64 * 1_000,
-            u32::from(spec.destination_ip).to_be(),
-            u32::from(spec.source_ip).to_be(),
+            spec.destination_ip.octets(),
+            spec.source_ip.octets(),
             spec.destination_port,
             spec.source_port,
             spec.data_length,
@@ -88,8 +88,8 @@ mod tests {
         let realtime_offset_us = 1_000_000;
         let event = EbpfEventIpv6::new(
             (spec.timestamp_us - realtime_offset_us) as u64 * 1_000,
-            u128::from(spec.destination_ip).to_be(),
-            u128::from(spec.source_ip).to_be(),
+            spec.destination_ip.octets(),
+            spec.source_ip.octets(),
             spec.destination_port,
             spec.source_port,
             spec.data_length,

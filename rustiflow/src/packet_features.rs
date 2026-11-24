@@ -95,8 +95,8 @@ impl PacketFeatures {
     // Constructor to create PacketFeatures from EbpfEventIpv4
     pub fn from_ebpf_event_ipv4(event: &EbpfEventIpv4, realtime_offset_us: i64) -> Self {
         PacketFeatures {
-            source_ip: IpAddr::V4(Ipv4Addr::from(event.ipv4_source.to_be())),
-            destination_ip: IpAddr::V4(Ipv4Addr::from(event.ipv4_destination.to_be())),
+            source_ip: IpAddr::V4(Ipv4Addr::from(event.ipv4_source)),
+            destination_ip: IpAddr::V4(Ipv4Addr::from(event.ipv4_destination)),
             source_port: event.port_source,
             destination_port: event.port_destination,
             protocol: event.protocol,
@@ -135,8 +135,8 @@ impl PacketFeatures {
     // Constructor to create PacketFeatures from EbpfEventIpv6
     pub fn from_ebpf_event_ipv6(event: &EbpfEventIpv6, realtime_offset_us: i64) -> Self {
         PacketFeatures {
-            source_ip: IpAddr::V6(Ipv6Addr::from(event.ipv6_source.to_be())),
-            destination_ip: IpAddr::V6(Ipv6Addr::from(event.ipv6_destination.to_be())),
+            source_ip: IpAddr::V6(Ipv6Addr::from(event.ipv6_source)),
+            destination_ip: IpAddr::V6(Ipv6Addr::from(event.ipv6_destination)),
             source_port: event.port_source,
             destination_port: event.port_destination,
             protocol: event.protocol,

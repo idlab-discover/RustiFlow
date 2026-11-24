@@ -238,8 +238,8 @@ impl PacketInfo {
 
         EbpfEventIpv6::new(
             unsafe { bpf_ktime_get_ns() },
-            self.ipv6_destination,
-            self.ipv6_source,
+            self.ipv6_destination.to_ne_bytes(),
+            self.ipv6_source.to_ne_bytes(),
             header.destination_port(),
             header.source_port(),
             data_length,

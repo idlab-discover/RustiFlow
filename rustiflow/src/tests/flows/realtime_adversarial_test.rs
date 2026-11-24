@@ -82,8 +82,8 @@ mod tests {
                 };
                 let event = EbpfEventIpv4::new(
                     timestamp_ns,
-                    u32::from(destination).to_be(),
-                    u32::from(source).to_be(),
+                    destination.octets(),
+                    source.octets(),
                     destination_port,
                     source_port,
                     segment.data_length,
@@ -109,8 +109,8 @@ mod tests {
                 };
                 let event = EbpfEventIpv6::new(
                     timestamp_ns,
-                    u128::from(destination).to_be(),
-                    u128::from(source).to_be(),
+                    destination.octets(),
+                    source.octets(),
                     destination_port,
                     source_port,
                     segment.data_length,
