@@ -1,7 +1,4 @@
-use aya_ebpf::{
-    bindings::TC_ACT_PIPE, helpers::bpf_ktime_get_ns, macros::map, maps::RingBuf,
-    programs::TcContext,
-};
+use aya_ebpf::{helpers::bpf_ktime_get_ns, macros::map, maps::RingBuf};
 use aya_log_ebpf::debug;
 
 use common::EbpfEventIpv4;
@@ -17,7 +14,10 @@ use network_types::{
 };
 
 use crate::counters::{increment_counter, DROPPED_PACKETS, MATCHED_PACKETS, SUBMITTED_EVENTS};
-use crate::IPV4_COUNTER_INDEX;
+use crate::{
+    packet::{PacketContext, WireHeader},
+    IPV4_COUNTER_INDEX,
+};
 
 #[map]
 static EVENTS_IPV4_0: RingBuf = RingBuf::with_byte_size(REALTIME_EVENT_RINGBUF_BYTES, 0);
@@ -43,10 +43,10 @@ static EVENTS_IPV4_6: RingBuf = RingBuf::with_byte_size(REALTIME_EVENT_RINGBUF_B
 #[map]
 static EVENTS_IPV4_7: RingBuf = RingBuf::with_byte_size(REALTIME_EVENT_RINGBUF_BYTES, 0);
 
-pub(crate) fn process_packet(ctx: &TcContext) -> Result<i32, ()> {
-    let ipv4hdr = ctx.load::<Ipv4Hdr>(EthHdr::LEN).map_err(|_| ())?;
+pub(crate) fn process_packet(ctx: &impl PacketContext) -> Result<(), ()> {
+    let ipv4hdr = ctx.load_header::<Ipv4Hdr>(EthHdr::LEN)?;
     if ipv4hdr.frag_offset() != 0 {
-        return Ok(TC_ACT_PIPE);
+        return Ok(());
     }
     let ip_header_length = usize::from(ipv4hdr.ihl());
     let packet_info = PacketInfo::new(&ipv4hdr, ip_header_length)?;
@@ -56,12 +56,12 @@ pub(crate) fn process_packet(ctx: &TcContext) -> Result<i32, ()> {
         Ok(IpProto::Tcp) => process_transport_packet::<TcpHdr>(ctx, &packet_info, hdr_offset),
         Ok(IpProto::Udp) => process_transport_packet::<UdpHdr>(ctx, &packet_info, hdr_offset),
         Ok(IpProto::Icmp) => process_transport_packet::<Icmpv4Hdr>(ctx, &packet_info, hdr_offset),
-        _ => Ok(TC_ACT_PIPE),
+        _ => Ok(()),
     }
 }
 
 #[inline(always)]
-fn submit_ipv4_event(ctx: &TcContext, event: EbpfEventIpv4, queue_index: u32) {
+fn submit_ipv4_event(ctx: &impl PacketContext, event: EbpfEventIpv4, queue_index: u32) {
     let reserved = match queue_index {
         0 => reserve_ipv4_event(&EVENTS_IPV4_0, event),
         1 => reserve_ipv4_event(&EVENTS_IPV4_1, event),
@@ -154,18 +154,18 @@ fn finish_hash32(mut value: u32) -> u32 {
     value ^ (value >> 16)
 }
 
-fn process_transport_packet<T: NetworkHeader>(
-    ctx: &TcContext,
+fn process_transport_packet<T: NetworkHeader + WireHeader>(
+    ctx: &impl PacketContext,
     packet_info: &PacketInfo,
     header_offset: usize,
-) -> Result<i32, ()> {
-    let hdr = ctx.load::<T>(header_offset).map_err(|_| ())?;
+) -> Result<(), ()> {
+    let hdr = ctx.load_header::<T>(header_offset)?;
     let packet_log = packet_info.to_packet_log(&hdr);
     let queue_index = queue_index_ipv4(packet_info, &hdr);
 
     submit_ipv4_event(ctx, packet_log, queue_index);
 
-    Ok(TC_ACT_PIPE)
+    Ok(())
 }
 
 struct PacketInfo {

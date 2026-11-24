@@ -281,6 +281,14 @@ to what realtime capture already needs. Configuration files store only the
 `[config]` and `[output]` sections, so pass the flag on the command line or
 through `RUSTIFLOW_REALTIME_ARGS` for the systemd unit.
 
+### Experimental XDP ingress capture
+
+The passive XDP prototype is available with `RUSTIFLOW_EXPERIMENT_INGRESS=xdp-driver`
+or `RUSTIFLOW_EXPERIMENT_INGRESS=xdp-skb` and `realtime <interface> --ingress-only`.
+It uses a separately built eBPF object that always returns `XDP_PASS`. Realtime
+uses tc by default. The build, attachment requirements, and veth measurements
+are in the [XDP experiment](docs/profiling/overnight-xdp-capture-prototype.md).
+
 ## <img src="figures/RustiFlow_nobg.png" width="60px"/> Using the Container:
 
 Make sure that you don't use docker desktop and that you don't have it installed on your machine. If you have this setup, it will not work as intended as the `--network host` will not link the container to the host network, but to the network of a VM that docker desktop uses.

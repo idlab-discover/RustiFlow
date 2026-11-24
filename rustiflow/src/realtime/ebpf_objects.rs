@@ -8,6 +8,8 @@ use std::path::{Path, PathBuf};
 
 use anyhow::bail;
 
+pub(super) const INGRESS_EXPERIMENT_OBJECT: &str = "rustiflow-ebpf-ingress-experiment";
+
 /// Overrides every other location. When set, only this directory is searched,
 /// so a typo fails loudly instead of silently loading a different build.
 pub const EBPF_DIR_ENV: &str = "RUSTIFLOW_EBPF_DIR";
@@ -47,10 +49,19 @@ pub fn ebpf_object_path(program_name: &str) -> Result<PathBuf, anyhow::Error> {
              and set {EBPF_DIR_ENV} to its directory."
         );
     }
+    let build = if program_name == INGRESS_EXPERIMENT_OBJECT {
+        "cd ebpf-ipv6 && cargo build --locked --release --features xdp-experiment \
+         --bin rustiflow-ebpf-ingress-experiment"
+            .to_owned()
+    } else {
+        format!(
+            "cargo xtask {}",
+            program_name.trim_start_matches("rustiflow-")
+        )
+    };
     bail!(
         "eBPF object {program_name} not found. Searched:\n{searched}\n\
-         Install a release bundle, set {EBPF_DIR_ENV}, or build it with `cargo xtask {}`.",
-        program_name.trim_start_matches("rustiflow-")
+         Set {EBPF_DIR_ENV} to an object directory, or build it with `{build}`."
     )
 }
 

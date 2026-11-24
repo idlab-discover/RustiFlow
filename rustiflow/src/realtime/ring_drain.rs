@@ -74,6 +74,9 @@ async fn drain<const BUDGETED: bool>(
                 };
                 // Drop the ring item before a possible yield. push_event
                 // decodes synchronously before awaiting the queue.
+                if let Some(stats) = &batcher.stats {
+                    stats.sample_ring_age(&event);
+                }
                 batcher
                     .push_event(|| decode(&event, realtime_offset_us))
                     .await;

@@ -5,6 +5,7 @@ edition = "2021"
 
 [features]
 dual-stack = []
+xdp-experiment = []
 
 [dependencies]
 aya-ebpf = "0.3.0"
@@ -21,6 +22,11 @@ path = "src/main.rs"
 name = "rustiflow-ebpf-dual-stack"
 path = "src/dual_stack.rs"
 required-features = ["dual-stack"]
+
+[[bin]]
+name = "rustiflow-ebpf-ingress-experiment"
+path = "src/ingress_experiment.rs"
+required-features = ["xdp-experiment"]
 
 [profile.dev]
 opt-level = 3

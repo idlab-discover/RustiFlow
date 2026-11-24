@@ -8,6 +8,8 @@ finishing regular-file exports.
 
 [Experiment 7](overnight-single-tc-classifier.md) compares two ingress classifiers
 with a single dual-stack classifier using the same netlink veth harness.
+Passive driver and generic XDP were compared with tc on veth.
+[Experiment 10](overnight-xdp-capture-prototype.md)
 
 ## Reproduce on nuccore
 

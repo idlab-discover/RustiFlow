@@ -1,3 +1,4 @@
+mod attachments;
 mod batch_pool;
 mod ebpf_objects;
 mod promiscuous;
@@ -8,7 +9,6 @@ mod source_reactors;
 pub use replay::replay_bench;
 
 use std::collections::VecDeque;
-use std::ffi::CString;
 use std::io;
 use std::num::{NonZeroU64, NonZeroUsize};
 use std::sync::{
@@ -26,19 +26,9 @@ use crate::{
     packet_features::PacketFeatures,
 };
 use anyhow::Context;
-use aya::{
-    maps::{MapData, PerCpuArray, RingBuf},
-    programs::{
-        tc,
-        tc::{NlOptions, TcAttach},
-        SchedClassifier, TcAttachType,
-    },
-    Ebpf,
-};
-use aya_log::EbpfLogger;
+use attachments::Capture;
 use batch_pool::BatchPool;
-use common::{EbpfEventIpv4, EbpfEventIpv6, REALTIME_EVENT_QUEUE_COUNT};
-use ebpf_objects::ebpf_object_path;
+use common::{EbpfEventIpv4, EbpfEventIpv6};
 use log::{error, info};
 use promiscuous::PromiscuousMembership;
 use ring_drain::{DrainPolicy, RingStats};
@@ -55,50 +45,12 @@ use tokio::{
 struct RealtimeSourceStats {
     ring: Option<RingStats>,
     events: AtomicU64,
+    ring_age_us_log2: [AtomicU64; 32],
     decode_and_shard_ns: AtomicU64,
     dispatch_enqueue_ns: AtomicU64,
     shard_send_wait_ns: AtomicU64,
     total_event_ns: AtomicU64,
     send_errors: AtomicU64,
-}
-
-struct RealtimeEbpfCounters {
-    labels: &'static [&'static str],
-    dropped_packets: PerCpuArray<MapData, u64>,
-    matched_packets: PerCpuArray<MapData, u64>,
-    submitted_events: PerCpuArray<MapData, u64>,
-}
-
-impl RealtimeEbpfCounters {
-    fn take(bpf: &mut Ebpf, labels: &'static [&'static str]) -> anyhow::Result<Self> {
-        let mut take_counter = |name| {
-            PerCpuArray::try_from(
-                bpf.take_map(name)
-                    .with_context(|| format!("missing eBPF counter map {name}"))?,
-            )
-            .with_context(|| format!("invalid eBPF counter map {name}"))
-        };
-        Ok(Self {
-            labels,
-            dropped_packets: take_counter("DROPPED_PACKETS")?,
-            matched_packets: take_counter("MATCHED_PACKETS")?,
-            submitted_events: take_counter("SUBMITTED_EVENTS")?,
-        })
-    }
-
-    fn log_totals(&self) -> u64 {
-        let mut total_dropped = 0;
-        for (index, &label) in (0..).zip(self.labels) {
-            let dropped = read_per_cpu_counter(&self.dropped_packets, index, label, "dropped");
-            let matched = read_per_cpu_counter(&self.matched_packets, index, label, "matched");
-            let submitted = read_per_cpu_counter(&self.submitted_events, index, label, "submitted");
-            total_dropped += dropped;
-            info!(
-                "eBPF counters {label}: matched_packets={matched}, submitted_events={submitted}, dropped_packets={dropped}"
-            );
-        }
-        total_dropped
-    }
 }
 
 impl RealtimeSourceStats {
@@ -116,6 +68,21 @@ impl RealtimeSourceStats {
 
     fn add_total_event_ns(&self, value: u64) {
         self.total_event_ns.fetch_add(value, Ordering::Relaxed);
+    }
+
+    fn sample_ring_age(&self, event: &[u8]) {
+        if !self.events.load(Ordering::Relaxed).is_multiple_of(64) {
+            return;
+        }
+        // Both event ABIs start with a native-endian CLOCK_MONOTONIC timestamp.
+        let Some(timestamp) = event.first_chunk::<8>() else {
+            return;
+        };
+        if let Ok(now_us) = read_clock_us(libc::CLOCK_MONOTONIC) {
+            let age_us = (now_us as u64).saturating_sub(u64::from_ne_bytes(*timestamp) / 1_000);
+            let bucket = age_us.max(1).ilog2().min(31) as usize;
+            self.ring_age_us_log2[bucket].fetch_add(1, Ordering::Relaxed);
+        }
     }
 
     fn increment_events(&self) {
@@ -160,6 +127,13 @@ fn log_source_stats(label: &str, stats: &RealtimeSourceStats) {
         shard_send_wait_ns as f64 / events as f64 / 1_000.0,
         send_errors,
     );
+    let ring_age = stats
+        .ring_age_us_log2
+        .each_ref()
+        .map(|bucket| bucket.load(Ordering::Relaxed));
+    if ring_age.iter().any(|&count| count != 0) {
+        info!("Realtime source {label}: ring_age_us_log2={ring_age:?}");
+    }
 }
 
 const DEFAULT_SHARD_BATCH_SIZE: usize = 128;
@@ -404,64 +378,8 @@ where
         PromiscuousMode::Disabled => None,
     };
 
-    let single_tc = std::env::var_os("RUSTIFLOW_EXPERIMENT_SINGLE_TC").is_some();
-    anyhow::ensure!(
-        !single_tc || ingress_only,
-        "single TC experiment requires --ingress-only"
-    );
-    let (mut ingress, mut ingress_ipv6) = if single_tc {
-        (
-            load_classifier("dual-stack", "dual-stack", interface, TcAttachType::Ingress)?,
-            None,
-        )
-    } else {
-        let ipv4 = load_classifier("ipv4", "IPv4", interface, TcAttachType::Ingress)?;
-        let ipv6 = load_classifier("ipv6", "IPv6", interface, TcAttachType::Ingress)?;
-        (ipv4, Some(ipv6))
-    };
-
-    let events_ingress_ipv4 = take_ring_buf_maps(&mut ingress, "EVENTS_IPV4")?;
-    let (events_ingress_ipv6, mut ebpf_counters) = if let Some(ipv6) = &mut ingress_ipv6 {
-        let counters = vec![
-            RealtimeEbpfCounters::take(&mut ingress, &["ingress-ipv4"])?,
-            RealtimeEbpfCounters::take(ipv6, &["ingress-ipv6"])?,
-        ];
-        (take_ring_buf_maps(ipv6, "EVENTS_IPV6")?, counters)
-    } else {
-        let events = take_ring_buf_maps(&mut ingress, "EVENTS_IPV6")?;
-        // The experimental object indexes the shared maps by family: v4=0, v6=1.
-        let counters = RealtimeEbpfCounters::take(&mut ingress, &["ingress-ipv4", "ingress-ipv6"])?;
-        (events, vec![counters])
-    };
-
-    let ingress_sources_v4 = labeled_ringbuf_sources("ingress-ipv4", events_ingress_ipv4);
-    let ingress_sources_v6 = labeled_ringbuf_sources("ingress-ipv6", events_ingress_ipv6);
-    let event_sources_v4;
-    let event_sources_v6;
-    // Dropping an `Ebpf` detaches its classifiers, so the egress programs must
-    // outlive the block that loads them, like the ingress ones above.
-    let _egress_programs;
-    if ingress_only {
-        _egress_programs = None;
-        event_sources_v4 = ingress_sources_v4;
-        event_sources_v6 = ingress_sources_v6;
-    } else {
-        let mut ipv4 = load_classifier("ipv4", "IPv4", interface, TcAttachType::Egress)?;
-        let mut ipv6 = load_classifier("ipv6", "IPv6", interface, TcAttachType::Egress)?;
-        event_sources_v4 =
-            labeled_ringbuf_sources("egress-ipv4", take_ring_buf_maps(&mut ipv4, "EVENTS_IPV4")?)
-                .into_iter()
-                .chain(ingress_sources_v4)
-                .collect();
-        event_sources_v6 =
-            labeled_ringbuf_sources("egress-ipv6", take_ring_buf_maps(&mut ipv6, "EVENTS_IPV6")?)
-                .into_iter()
-                .chain(ingress_sources_v6)
-                .collect();
-        ebpf_counters.insert(0, RealtimeEbpfCounters::take(&mut ipv4, &["egress-ipv4"])?);
-        ebpf_counters.insert(2, RealtimeEbpfCounters::take(&mut ipv6, &["egress-ipv6"])?);
-        _egress_programs = Some([ipv4, ipv6]);
-    }
+    let mut capture = Capture::attach(interface, ingress_only)?;
+    let (event_sources_v4, event_sources_v6) = capture.take_sources();
 
     let enable_source_stats = std::env::var_os("RUSTIFLOW_REALTIME_STATS").is_some();
     let mut handle_set = JoinSet::new();
@@ -541,10 +459,7 @@ where
 
     // Fetch dropped packets counter from eBPF program before terminating
     info!("Fetching dropped packet counters before exiting...");
-    let total_dropped = ebpf_counters
-        .iter()
-        .map(RealtimeEbpfCounters::log_totals)
-        .sum();
+    let total_dropped = capture.log_totals();
 
     info!("Total dropped packets before exit: {}", total_dropped);
     for (label, stats) in &source_stats {
@@ -578,24 +493,6 @@ where
     capture_result?;
     reactor_result?;
     Ok(total_dropped)
-}
-
-fn read_per_cpu_counter(
-    counter_array: &PerCpuArray<MapData, u64>,
-    index: u32,
-    label: &str,
-    counter_name: &str,
-) -> u64 {
-    match counter_array.get(&index, 0) {
-        Ok(values) => values.iter().sum(),
-        Err(e) => {
-            error!(
-                "Failed to read {} counter for {}: {:?}",
-                counter_name, label, e
-            );
-            0
-        }
-    }
 }
 
 struct ShardDispatchBatch {
@@ -736,67 +633,8 @@ fn compute_realtime_offset_us() -> Result<i64, anyhow::Error> {
     Ok(realtime_us - monotonic_us)
 }
 
-fn labeled_ringbuf_sources(
-    label_prefix: &'static str,
-    ring_bufs: Vec<RingBuf<MapData>>,
-) -> Vec<(String, RingBuf<MapData>)> {
-    ring_bufs
-        .into_iter()
-        .enumerate()
-        .map(|(index, ring_buf)| (queue_label(label_prefix, index), ring_buf))
-        .collect()
-}
-
-fn queue_label(label_prefix: &'static str, index: usize) -> String {
+fn queue_label(label_prefix: &str, index: usize) -> String {
     format!("{label_prefix}-q{index}")
-}
-
-fn take_ring_buf_maps(
-    bpf: &mut Ebpf,
-    base_name: &str,
-) -> Result<Vec<RingBuf<MapData>>, anyhow::Error> {
-    let mut ring_bufs = Vec::with_capacity(REALTIME_EVENT_QUEUE_COUNT);
-
-    for index in 0..REALTIME_EVENT_QUEUE_COUNT {
-        let map_name = format!("{}_{}", base_name, index);
-        let ring_buf = RingBuf::try_from(
-            bpf.take_map(&map_name)
-                .with_context(|| format!("missing ring buffer map {}", map_name))?,
-        )?;
-        ring_bufs.push(ring_buf);
-    }
-
-    Ok(ring_bufs)
-}
-
-/// Forwards `aya-log` records from the eBPF program to the userspace logger.
-fn spawn_ebpf_logger(bpf: &mut Ebpf) {
-    let logger = match EbpfLogger::init(bpf) {
-        Ok(logger) => logger,
-        Err(e) => {
-            debug!("eBPF logger unavailable: {e}");
-            return;
-        }
-    };
-    // SAFETY: the logger owns its ring buffer map file descriptor and reports
-    // that same descriptor from `as_raw_fd` until it is dropped with the `AsyncFd`.
-    let mut logger = match unsafe { AsyncFd::register(logger) } {
-        Ok(logger) => logger,
-        Err(e) => {
-            error!("Failed to poll the eBPF logger: {e}");
-            return;
-        }
-    };
-
-    tokio::spawn(async move {
-        loop {
-            let Ok(mut guard) = logger.readable_mut().await else {
-                return;
-            };
-            guard.get_inner_mut().flush();
-            guard.clear_ready();
-        }
-    });
 }
 
 fn read_clock_us(clock_id: libc::clockid_t) -> Result<i64, anyhow::Error> {
@@ -823,62 +661,4 @@ fn bump_memlock_rlimit() {
     if ret != 0 {
         debug!("remove limit on locked memory failed, ret is: {}", ret);
     }
-}
-
-fn tc_attach_type_label(tc_attach_type: TcAttachType) -> &'static str {
-    match tc_attach_type {
-        TcAttachType::Ingress => "ingress",
-        TcAttachType::Egress => "egress",
-    }
-}
-
-fn load_classifier(
-    object: &str,
-    family: &str,
-    interface: &str,
-    attach_type: TcAttachType,
-) -> anyhow::Result<Ebpf> {
-    let binary_path = ebpf_object_path(&format!("rustiflow-ebpf-{object}"))?;
-    let attach_label = tc_attach_type_label(attach_type);
-    info!(
-        "Loading {family} eBPF binary {} for {attach_label} on {interface}",
-        binary_path.display()
-    );
-    let mut bpf = Ebpf::load_file(&binary_path).with_context(|| {
-        format!(
-            "Failed to load eBPF {family} binary from {}",
-            binary_path.display()
-        )
-    })?;
-
-    let interface_name = CString::new(interface)
-        .with_context(|| format!("interface name {interface:?} contains a NUL byte"))?;
-
-    spawn_ebpf_logger(&mut bpf);
-    match tc::qdisc_add_clsact(&interface_name) {
-        Ok(()) => info!("Ensured clsact qdisc on {interface}"),
-        Err(e) => debug!("qdisc_add_clsact({interface}): {e:?}"),
-    }
-
-    let program: &mut SchedClassifier = bpf
-        .program_mut("tc_flow_track")
-        .context("missing tc_flow_track classifier")?
-        .try_into()?;
-    program
-        .load()
-        .with_context(|| format!("Failed to load {family} tc classifier"))?;
-    program
-        .attach(
-            &interface_name,
-            TcAttach::Netlink {
-                parent: attach_type.into(),
-                options: NlOptions::default(),
-            },
-        )
-        .with_context(|| {
-            format!("Failed to attach {family} tc classifier to {attach_label} on {interface}")
-        })?;
-    info!("Attached {family} tc classifier to {attach_label} on {interface}");
-
-    Ok(bpf)
 }

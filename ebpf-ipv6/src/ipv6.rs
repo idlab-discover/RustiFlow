@@ -1,7 +1,4 @@
-use aya_ebpf::{
-    bindings::TC_ACT_PIPE, helpers::bpf_ktime_get_ns, macros::map, maps::RingBuf,
-    programs::TcContext,
-};
+use aya_ebpf::{helpers::bpf_ktime_get_ns, macros::map, maps::RingBuf};
 use aya_log_ebpf::debug;
 
 use common::ipv6_extensions::Ipv6Extension;
@@ -16,7 +13,10 @@ use network_types::{
 use num_traits::FromPrimitive;
 
 use crate::counters::{increment_counter, DROPPED_PACKETS, MATCHED_PACKETS, SUBMITTED_EVENTS};
-use crate::IPV6_COUNTER_INDEX;
+use crate::{
+    packet::{PacketContext, WireHeader},
+    IPV6_COUNTER_INDEX,
+};
 
 #[map]
 static EVENTS_IPV6_0: RingBuf = RingBuf::with_byte_size(REALTIME_EVENT_RINGBUF_BYTES, 0);
@@ -44,9 +44,9 @@ static EVENTS_IPV6_7: RingBuf = RingBuf::with_byte_size(REALTIME_EVENT_RINGBUF_B
 
 const MAX_EXT_HEADERS: usize = 8;
 
-fn skip_ipv6_ext_headers(ctx: &TcContext, start_offset: usize) -> Result<(u8, usize), ()> {
+fn skip_ipv6_ext_headers(ctx: &impl PacketContext, start_offset: usize) -> Result<(u8, usize), ()> {
     // Load the base IPv6 header
-    let ipv6hdr = ctx.load::<Ipv6Hdr>(start_offset).map_err(|_| ())?;
+    let ipv6hdr = ctx.load_header::<Ipv6Hdr>(start_offset)?;
 
     // Current offset: skip the fixed 40-byte IPv6 header
     let mut offset = start_offset + Ipv6Hdr::LEN;
@@ -57,10 +57,10 @@ fn skip_ipv6_ext_headers(ctx: &TcContext, start_offset: usize) -> Result<(u8, us
         let Some(extension) = Ipv6Extension::from_next_header(next_hdr) else {
             break;
         };
-        let prefix = ctx.load::<[u8; 4]>(offset).map_err(|_| ())?;
+        let prefix = ctx.load_header::<[u8; 4]>(offset)?;
         let length = extension.header_length(prefix).ok_or(())?;
         // Validate the full extension, not just the prefix used to decode it.
-        ctx.load::<u8>(offset + length - 1).map_err(|_| ())?;
+        ctx.load_header::<u8>(offset + length - 1)?;
         offset += length;
         next_hdr = prefix[0];
     }
@@ -68,12 +68,12 @@ fn skip_ipv6_ext_headers(ctx: &TcContext, start_offset: usize) -> Result<(u8, us
     Ok((next_hdr, offset))
 }
 
-pub(crate) fn process_packet(ctx: &TcContext) -> Result<i32, ()> {
+pub(crate) fn process_packet(ctx: &impl PacketContext) -> Result<(), ()> {
     // 1) Skip over IPv6 extension headers to find the real upper-layer protocol and offset
     let (final_proto, offset_after_ext) = skip_ipv6_ext_headers(ctx, EthHdr::LEN)?;
 
     // 2) Build packet_info for IPv6
-    let ipv6hdr = ctx.load::<Ipv6Hdr>(EthHdr::LEN).map_err(|_| ())?;
+    let ipv6hdr = ctx.load_header::<Ipv6Hdr>(EthHdr::LEN)?;
     let network_header_length = offset_after_ext - EthHdr::LEN;
     let packet_info = PacketInfo::new(&ipv6hdr, final_proto, network_header_length)?;
 
@@ -88,12 +88,12 @@ pub(crate) fn process_packet(ctx: &TcContext) -> Result<i32, ()> {
         Some(IpProto::Ipv6Icmp) => {
             process_transport_packet::<Icmpv6Hdr>(ctx, &packet_info, offset_after_ext)
         }
-        _ => Ok(TC_ACT_PIPE),
+        _ => Ok(()),
     }
 }
 
 #[inline(always)]
-fn submit_ipv6_event(ctx: &TcContext, event: EbpfEventIpv6, queue_index: u32) {
+fn submit_ipv6_event(ctx: &impl PacketContext, event: EbpfEventIpv6, queue_index: u32) {
     let reserved = match queue_index {
         0 => reserve_ipv6_event(&EVENTS_IPV6_0, event),
         1 => reserve_ipv6_event(&EVENTS_IPV6_1, event),
@@ -194,18 +194,18 @@ fn finish_hash32(mut value: u32) -> u32 {
     value ^ (value >> 16)
 }
 
-fn process_transport_packet<T: NetworkHeader>(
-    ctx: &TcContext,
+fn process_transport_packet<T: NetworkHeader + WireHeader>(
+    ctx: &impl PacketContext,
     packet_info: &PacketInfo,
     transport_offset: usize,
-) -> Result<i32, ()> {
-    let hdr = ctx.load::<T>(transport_offset).map_err(|_| ())?;
+) -> Result<(), ()> {
+    let hdr = ctx.load_header::<T>(transport_offset)?;
     let packet_log = packet_info.to_packet_log(&hdr);
     let queue_index = queue_index_ipv6(packet_info, &hdr);
 
     submit_ipv6_event(ctx, packet_log, queue_index);
 
-    Ok(TC_ACT_PIPE)
+    Ok(())
 }
 
 struct PacketInfo {
