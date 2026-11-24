@@ -6,6 +6,9 @@ The [Parquet candidate profile](nuccore-parquet/README.md) repeats those workloa
 adds a fresh run of the archived CSV binary, and measures the time spent
 finishing regular-file exports.
 
+[Experiment 7](overnight-single-tc-classifier.md) compares two ingress classifiers
+with a single dual-stack classifier using the same netlink veth harness.
+
 ## Reproduce on nuccore
 
 Run from the repository root. Keep timings on CPUs 0–5, which are the six P-cores on this host. Use the same Rust toolchains, packet counts, flow counts, worker counts, and output destination for before/after comparisons. The scripts are Bash and take an output directory and a pcap path.

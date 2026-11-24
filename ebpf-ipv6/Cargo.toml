@@ -3,6 +3,9 @@ name = "ebpf-ipv6"
 version = "0.1.0"
 edition = "2021"
 
+[features]
+dual-stack = []
+
 [dependencies]
 aya-ebpf = "0.3.0"
 aya-log-ebpf = "0.3.0"
@@ -13,6 +16,11 @@ num-traits = { version = "0.2.19", default-features = false }
 [[bin]]
 name = "rustiflow-ebpf-ipv6"
 path = "src/main.rs"
+
+[[bin]]
+name = "rustiflow-ebpf-dual-stack"
+path = "src/dual_stack.rs"
+required-features = ["dual-stack"]
 
 [profile.dev]
 opt-level = 3
