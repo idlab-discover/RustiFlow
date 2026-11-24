@@ -4,6 +4,22 @@ This file keeps short-lived design choices and execution notes that would make
 `AGENTS.md` too long. Newest entries come first. Older entries are condensed to
 the decisions and results that still describe the current code.
 
+## 2026-11-24. zerocopy wire headers in both ingestion modes
+
+`common::wire` defines the Ethernet, SLL, VLAN, IPv4, IPv6, TCP, UDP and ICMP
+headers once, with network-order field types, for the pcap parser and the eBPF
+programs. They replace pnet_packet offline and network-types in eBPF, and
+zerocopy's `FromBytes` bound replaces the hand-audited `unsafe trait
+WireHeader`. Ring records decode through `ref_from_bytes`, which rejects
+records of the wrong size, and replay uses the same decoder. Event addresses
+are wire-order byte arrays.
+
+A differential run of 2M generated and mutated frames, plus every fixture
+export, matched the pnet decoder exactly. Decode cost is unchanged (~55
+ns/frame). BPF instruction counts moved by less than 1%. One pre-existing
+difference remains: offline ICMP counts 4 header bytes and realtime counts 8,
+so `data_length` differs by 4 between the modes.
+
 ## 2026-11-24. UNSW-NB15 exporter
 
 RustiFlow derives the 47 unlabeled columns from the feature dictionary and
