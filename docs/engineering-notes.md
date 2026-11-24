@@ -4,6 +4,73 @@ This file keeps short-lived design choices and execution notes that would make
 `AGENTS.md` too long. Newest entries come first. Older entries are condensed to
 the decisions and results that still describe the current code.
 
+## 2026-11-24. Default-path CPU and cache profile on rgbcore
+
+Compared `2c877ef` and `2cd5df8` on the Ryzen 9 5950X with generic
+x86-64 release builds and Rust 1.99.0. Both builds used default Cargo
+features and Parquet to `/dev/null`. The table shows median Mpps over six
+alternating pairs after warmup on CPUs 0–5, six physical cores sharing an L3
+cache. Offline used five workers and the same 2-million-frame pcap as
+nuccore. Replay used six workers and the CLI's default 10 million events,
+100,000 flows, and eight sources. Offline times span the whole process.
+Replay times start after event generation and end at writer close.
+
+| Features | Offline pcap | IPv4 replay | IPv6 replay |
+| --- | ---: | ---: | ---: |
+| Basic | 7.35 to 8.52 (+16%) | 39.71 to 41.60 (+5%) | 38.27 to 39.50 (+3%) |
+| CIC | 7.54 to 8.66 (+15%) | 12.01 to 15.57 (+30%) | 11.41 to 15.18 (+33%) |
+| NFStream | 7.62 to 8.60 (+13%) | 10.57 to 20.10 (+90%) | 10.33 to 18.85 (+82%) |
+| RustiFlow | 7.31 to 8.61 (+18%) | 9.98 to 10.06 (+1%) | 9.49 to 9.57 (+1%) |
+
+With unrestricted affinity and 12 replay workers, the IPv4 and IPv6
+NFStream medians rose 127% and 122%. CIC rose 38% and 34%. RustiFlow
+replay medians moved by 1–5% depending on affinity and IP family, within
+the run-to-run spread. The offline gain was consistent across the four
+feature sets on CPUs 0–5.
+
+Three paired `perf stat` runs on CPUs 0–5 measured the whole CLI, including
+event generation for replay. The AMD cache-miss counts below use the
+kernel's generic `cache-misses` event on this host.
+
+| Case | User cycles per input | User cache misses per input | Peak RSS (MiB) |
+| --- | ---: | ---: | ---: |
+| Offline CIC | 1,135 to 923 | 23.98 to 19.48 | 49 to 44 |
+| IPv4 CIC replay | 2,302 to 1,821 | 23.21 to 19.09 | 847 to 769 |
+| IPv4 NFStream replay | 2,720 to 1,462 | 27.22 to 12.50 | 870 to 628 |
+
+Calendar date construction took 3.9% of baseline CIC offline user-cycle
+samples. The current classic pcap reader skips that conversion for its
+unsigned 32-bit seconds field. NFStream's removed header and payload
+updates took 13.0% of baseline IPv4 replay samples by themselves. With
+fewer measurements per flow, NFStream also spent less overall CPU time
+and memory on the same packet stream. Flow-table lookup was the largest
+remaining hotspot, at 47.2% of current NFStream replay samples.
+
+The baseline already includes the Basic replay defaults. An eight-round
+comparison in the current binary used four workers on CPUs 0–5 and
+rotated the order of four settings. With AVX2 flow keys and shard batch
+recycling both off, Basic replay reached 27.69 Mpps for IPv4 and 27.50
+Mpps for IPv6. The defaults reached 32.94 and 30.27 Mpps respectively.
+IPv4 improved in all eight rounds. IPv6 improved in seven.
+The AVX2 path checks CPU capability at runtime on x86-64.
+
+Live CIC capture used two workers, split TC ingress, and a temporary veth.
+The sender fell short of 650 kpps in the initial probe. The measured
+comparison used 300,000 frames per run and a paced 100 kpps. Across six
+alternating pairs, capture-process user cycles per frame fell from 5,974
+(5,896–6,231) to 5,821 (5,637–5,872). User instructions per frame fell
+2.3%. Every measured run submitted all frames with zero eBPF drops and
+zero sender failures or retries. The counters cover the sender command and
+exclude final export.
+
+Decoded Parquet schemas and rows matched in all 12 comparisons across
+offline pcap and both replay families. Replay timestamps were aligned to a
+common clock origin. The NFStream millisecond fields matched within one
+millisecond after alignment.
+
+Raw timings, perf data, profiles, sender logs, and the scripts are in
+`target/amd-default/` on rgbcore.
+
 ## 2026-11-24 — Default-path CPU and cache profile on nuccore
 
 Against `2c877ef`, CIC now keeps each direction's header byte total, minimum
