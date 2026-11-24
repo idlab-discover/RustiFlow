@@ -1702,6 +1702,7 @@ dependencies = [
  "confy",
  "env_logger",
  "foldhash",
+ "hashbrown",
  "libc",
  "log",
  "num_cpus",
