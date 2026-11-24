@@ -4,6 +4,22 @@ This file keeps short-lived design choices and execution notes that would make
 `AGENTS.md` too long. Newest entries come first. Older entries are condensed to
 the decisions and results that still describe the current code.
 
+## 2026-11-24 — Overnight performance experiments on nuccore
+
+- [TCP sequence tracking](profiling/overnight-retransmission-fast-path.md)
+  keeps the highest sequence range inline. Median full-feature TCP/UDP
+  replay throughput improved 15.2–15.6% in the branch benchmarks.
+- [Shard batch buffer recycling](profiling/overnight-batch-buffer-reuse.md)
+  is opt-in for capture and replay. It used 3.4–3.6% fewer cycles per frame
+  in paced live capture. Full-feature replay throughput stayed within 1.4%
+  of baseline.
+- The [AVX2 flow-key prototype](profiling/overnight-simd-flow-keys.md) stays
+  on its experiment branch after increasing live CPU cost and slowing Basic
+  replay with SIMD disabled.
+- [Parquet Float64 statistics](profiling/overnight-simd-parquet-projection.md)
+  gained Snappy round-trip regression coverage. The AVX2 implementation is
+  available as a local dependency patch for reproducing the measurements.
+
 ## 2026-11-24 — Parallel Parquet export on nuccore
 
 Flow-table shards project completed flows directly into native column buffers.

@@ -578,6 +578,11 @@ Replay: packets=50000000 threads=12 wall_s=3.251 mpps=15.378 cpu_s=43.531 cpu_ns
   as for `realtime`. Events take 40 (IPv4) or 72 (IPv6) bytes of memory
   each.
 
+Set `RUSTIFLOW_EXPERIMENT_RECYCLE_SHARD_BATCHES=1` to try reusing batch buffers
+in `replay-bench` or `realtime`. Each shard can retain up to 32 empty buffers.
+The [profiling report](docs/profiling/overnight-batch-buffer-reuse.md) records
+the CPU savings and memory cost measured on nuccore.
+
 ## Logging in both development or using the binary
 
 ### Development
