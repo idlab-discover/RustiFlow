@@ -1,3 +1,4 @@
+mod connection_order;
 mod parquet;
 
 use crate::{
@@ -9,6 +10,7 @@ use crate::{
     },
 };
 use anyhow::{Context, Result};
+use connection_order::Message;
 use log::error;
 use std::{
     fs::File,
@@ -27,6 +29,7 @@ const ENCODED_CHUNK_BYTES: usize = 64 * 1024;
 const ENCODED_CHUNK_QUEUE_CAPACITY: usize = 64;
 
 pub enum FlowExporter<T> {
+    Shared(mpsc::Sender<Message<T>>),
     Parquet(parquet::Exporter<T>),
     Csv {
         clean: bool,
@@ -37,6 +40,10 @@ pub enum FlowExporter<T> {
 /// One flow table's output. Parquet projects directly from the owned flow
 /// while it is still hot in the table worker's cache.
 pub enum ShardOutput<T> {
+    Shared {
+        messages: mpsc::Sender<Message<T>>,
+        offline_shard: Option<usize>,
+    },
     Channel(mpsc::Sender<T>),
     Parquet(parquet::Shard<T>),
 }
@@ -56,6 +63,26 @@ impl<T: Flow> ShardOutput<T> {
                 }
             }
             Self::Parquet(shard) => shard.export(&flow).await,
+            Self::Shared { messages, .. } => {
+                if messages.send(Message::Flow(flow)).await.is_err() {
+                    error!("Failed to send flow: export channel is closed");
+                }
+            }
+        }
+    }
+
+    pub async fn publish_watermark(&self, timestamp_us: i64) {
+        if let Self::Shared {
+            messages,
+            offline_shard: Some(shard),
+        } = self
+        {
+            let _ = messages
+                .send(Message::Watermark {
+                    shard: *shard,
+                    timestamp_us,
+                })
+                .await;
         }
     }
 
@@ -70,6 +97,10 @@ impl<T: Flow> ShardOutput<T> {
 pub trait FlowSink<T>: Send + 'static {
     /// Creates the output used by one shard for its lifetime.
     fn shard_output(&self) -> ShardOutput<T>;
+
+    fn pcap_shard_output(&self, _shard: usize) -> ShardOutput<T> {
+        self.shard_output()
+    }
 }
 
 /// All shards share the channel; used by tests that inspect exported flows.
@@ -82,6 +113,12 @@ impl<T: Flow> FlowSink<T> for mpsc::Sender<T> {
 impl<T: Flow> FlowSink<T> for FlowExporter<T> {
     fn shard_output(&self) -> ShardOutput<T> {
         let (clean, chunk_sender) = match self {
+            Self::Shared(messages) => {
+                return ShardOutput::Shared {
+                    messages: messages.clone(),
+                    offline_shard: None,
+                }
+            }
             Self::Parquet(exporter) => return ShardOutput::Parquet(exporter.shard()),
             Self::Csv { clean, chunks } => (*clean, chunks.clone()),
         };
@@ -123,6 +160,16 @@ impl<T: Flow> FlowSink<T> for FlowExporter<T> {
 
         flow_sender.into()
     }
+
+    fn pcap_shard_output(&self, shard: usize) -> ShardOutput<T> {
+        match self {
+            Self::Shared(messages) => ShardOutput::Shared {
+                messages: messages.clone(),
+                offline_shard: Some(shard),
+            },
+            _ => self.shard_output(),
+        }
+    }
 }
 
 fn project<T: Flow>(flow: &T, clean: bool, row: &mut impl Record) {
@@ -134,6 +181,30 @@ fn project<T: Flow>(flow: &T, clean: bool, row: &mut impl Record) {
 }
 
 pub fn spawn_output_writer<T: Flow>(
+    output: OutputConfig,
+    offline_shards: Option<u8>,
+) -> Result<(FlowExporter<T>, JoinHandle<Result<()>>)> {
+    let (exporter, writer) = spawn_writer::<T>(output)?;
+    if !T::USES_CONNECTION_HISTORY {
+        return Ok((exporter, writer));
+    }
+
+    // A single ordered input stream gives the window and all output formats
+    // the same connection order, even when several flow tables are active.
+    let (sender, receiver) = mpsc::channel(SHARD_FLOW_QUEUE_CAPACITY);
+    let task = tokio::spawn(async move {
+        let mut output = exporter.shard_output();
+        drop(exporter);
+        let result = connection_order::export(receiver, &mut output, offline_shards).await;
+        output.flush().await;
+        drop(output);
+        writer.await??;
+        result
+    });
+    Ok((FlowExporter::Shared(sender), task))
+}
+
+fn spawn_writer<T: Flow>(
     output: OutputConfig,
 ) -> Result<(FlowExporter<T>, JoinHandle<Result<()>>)> {
     let clean = output.drop_contaminant_features;

@@ -80,7 +80,7 @@ where
             next_check_time_us = Some(timestamp_us.saturating_add(check_interval_us));
         }
 
-        if let Some(features) = decode_frame(packet.data, timestamp_us) {
+        if let Some(features) = decode_frame(packet.data, timestamp_us, T::CAPTURE_TCP_PAYLOAD) {
             dispatcher.dispatch(features).await;
         }
     }
@@ -559,7 +559,11 @@ impl ShardDispatcher {
 
 /// Locate the network header once, then decode Ethernet and Linux cooked
 /// frames through the same IP parser, including single-tag VLAN captures.
-fn decode_frame(data: &[u8], timestamp_us: i64) -> Option<PacketFeatures> {
+fn decode_frame(
+    data: &[u8],
+    timestamp_us: i64,
+    capture_tcp_payload: bool,
+) -> Option<PacketFeatures> {
     let Some(ethernet) = EthernetPacket::new(data) else {
         error!("Error parsing packet...");
         return None;
@@ -588,12 +592,16 @@ fn decode_frame(data: &[u8], timestamp_us: i64) -> Option<PacketFeatures> {
         payload = inner;
     }
     match ethertype {
-        EtherTypes::Ipv4 => {
-            PacketFeatures::from_ipv4_packet(&Ipv4Packet::new(payload)?, timestamp_us)
-        }
-        EtherTypes::Ipv6 => {
-            PacketFeatures::from_ipv6_packet(&Ipv6Packet::new(payload)?, timestamp_us)
-        }
+        EtherTypes::Ipv4 => PacketFeatures::from_ipv4_packet(
+            &Ipv4Packet::new(payload)?,
+            timestamp_us,
+            capture_tcp_payload,
+        ),
+        EtherTypes::Ipv6 => PacketFeatures::from_ipv6_packet(
+            &Ipv6Packet::new(payload)?,
+            timestamp_us,
+            capture_tcp_payload,
+        ),
         _ => {
             debug!("Unsupported EtherType: {ethertype:?}");
             None
@@ -615,13 +623,13 @@ where
 {
     debug!("Creating {} sharded FlowTables...", num_shards);
     let mut shard_senders = Vec::with_capacity(num_shards as usize);
-    for _ in 0..num_shards {
+    for shard in 0..num_shards {
         let (tx, mut rx) = mpsc::channel::<ShardMessage>(SHARD_QUEUE_CAPACITY);
         let mut flow_table = FlowTable::new(
             active_timeout,
             idle_timeout,
             early_export,
-            exporter.shard_output(),
+            exporter.pcap_shard_output(usize::from(shard)),
             expiration_check_interval,
         );
 
@@ -637,6 +645,9 @@ where
                     }
                     ShardMessage::Expire(timestamp_us) => {
                         flow_table.export_expired_flows(timestamp_us).await;
+                        if T::USES_CONNECTION_HISTORY {
+                            flow_table.publish_offline_watermark(timestamp_us).await;
+                        }
                     }
                     ShardMessage::Finish(timestamp_us) => {
                         flow_table.export_all_flows(timestamp_us).await;

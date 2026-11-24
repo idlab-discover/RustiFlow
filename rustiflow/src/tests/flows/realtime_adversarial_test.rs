@@ -96,6 +96,7 @@ mod tests {
                     segment.sequence_number_ack,
                     0,
                     0,
+                    64,
                 );
                 PacketFeatures::from_ebpf_event_ipv4(&event, REALTIME_OFFSET_US)
             }
@@ -122,6 +123,7 @@ mod tests {
                     segment.sequence_number_ack,
                     0,
                     0,
+                    64,
                 );
                 PacketFeatures::from_ebpf_event_ipv6(&event, REALTIME_OFFSET_US)
             }

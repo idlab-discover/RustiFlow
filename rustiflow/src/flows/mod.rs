@@ -7,4 +7,5 @@ pub mod flow;
 pub mod nf_flow;
 pub mod row;
 pub mod rusti_flow;
+pub(crate) mod unsw_nb15_flow;
 pub mod util;

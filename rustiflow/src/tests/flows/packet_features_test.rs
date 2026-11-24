@@ -126,7 +126,7 @@ mod tests {
 
         let bytes = build_ipv6_packet(IpNextHeaderProtocols::Hopopt.0, &payload);
         let packet = Ipv6Packet::new(&bytes).unwrap();
-        let features = PacketFeatures::from_ipv6_packet(&packet, 42).unwrap();
+        let features = PacketFeatures::from_ipv6_packet(&packet, 42, false).unwrap();
 
         assert_eq!(features.protocol, IpNextHeaderProtocols::Tcp.0);
         assert_eq!(features.source_port, 12345);
@@ -143,7 +143,7 @@ mod tests {
 
         let bytes = build_ipv6_packet(IpNextHeaderProtocols::Ipv6Frag.0, &payload);
         let packet = Ipv6Packet::new(&bytes).unwrap();
-        let features = PacketFeatures::from_ipv6_packet(&packet, 99).unwrap();
+        let features = PacketFeatures::from_ipv6_packet(&packet, 99, false).unwrap();
 
         assert_eq!(features.protocol, IpNextHeaderProtocols::Udp.0);
         assert_eq!(features.source_port, 5353);
@@ -162,7 +162,7 @@ mod tests {
         let bytes = build_ipv6_packet(IpNextHeaderProtocols::Ipv6Frag.0, &payload);
         let packet = Ipv6Packet::new(&bytes).unwrap();
 
-        assert!(PacketFeatures::from_ipv6_packet(&packet, 100).is_none());
+        assert!(PacketFeatures::from_ipv6_packet(&packet, 100, false).is_none());
     }
 
     #[test]
@@ -173,7 +173,7 @@ mod tests {
         );
         let packet = Ipv6Packet::new(&bytes).unwrap();
 
-        assert!(PacketFeatures::from_ipv6_packet(&packet, 7).is_none());
+        assert!(PacketFeatures::from_ipv6_packet(&packet, 7, false).is_none());
     }
 
     #[test]
@@ -188,7 +188,7 @@ mod tests {
 
         let bytes = build_ipv6_packet(IpNextHeaderProtocols::Ah.0, &payload);
         let packet = Ipv6Packet::new(&bytes).unwrap();
-        let features = PacketFeatures::from_ipv6_packet(&packet, 123).unwrap();
+        let features = PacketFeatures::from_ipv6_packet(&packet, 123, false).unwrap();
 
         assert_eq!(features.protocol, IpNextHeaderProtocols::Tcp.0);
         assert_eq!(features.source_port, 42424);
@@ -200,7 +200,7 @@ mod tests {
         let bytes = build_ipv6_packet(IpNextHeaderProtocols::Esp.0, &[0_u8; 16]);
         let packet = Ipv6Packet::new(&bytes).unwrap();
 
-        assert!(PacketFeatures::from_ipv6_packet(&packet, 55).is_none());
+        assert!(PacketFeatures::from_ipv6_packet(&packet, 55, false).is_none());
     }
 
     #[test]
@@ -208,7 +208,7 @@ mod tests {
         let bytes = build_ipv4_packet(IpNextHeaderProtocols::Udp.0, 1, &[0_u8; 8]);
         let packet = Ipv4Packet::new(&bytes).unwrap();
 
-        assert!(PacketFeatures::from_ipv4_packet(&packet, 88).is_none());
+        assert!(PacketFeatures::from_ipv4_packet(&packet, 88, false).is_none());
     }
 
     #[test]
@@ -220,7 +220,7 @@ mod tests {
 
         let bytes = build_ipv4_packet(IpNextHeaderProtocols::Udp.0, 0, &payload);
         let packet = Ipv4Packet::new(&bytes).unwrap();
-        let features = PacketFeatures::from_ipv4_packet(&packet, 89).unwrap();
+        let features = PacketFeatures::from_ipv4_packet(&packet, 89, false).unwrap();
 
         assert_eq!(features.protocol, IpNextHeaderProtocols::Udp.0);
         assert_eq!(features.source_port, 5353);
@@ -243,7 +243,7 @@ mod tests {
 
         let bytes = build_ipv4_packet(IpNextHeaderProtocols::Tcp.0, 0, &tcp);
         let packet = Ipv4Packet::new(&bytes).unwrap();
-        let parsed_packet = PacketFeatures::from_ipv4_packet(&packet, 1_234_567).unwrap();
+        let parsed_packet = PacketFeatures::from_ipv4_packet(&packet, 1_234_567, false).unwrap();
 
         let realtime_offset_us = 1_000_000;
         let event = EbpfEventIpv4::new(
@@ -262,6 +262,7 @@ mod tests {
             0x0506_0708,
             0,
             0,
+            64,
         );
         let realtime_packet = PacketFeatures::from_ebpf_event_ipv4(&event, realtime_offset_us);
 
@@ -276,7 +277,8 @@ mod tests {
             let mut event = event;
             for delta in [0, 1, 2, 5] {
                 let timestamp_us = 1_234_567 + delta;
-                let parsed = PacketFeatures::from_ipv4_packet(&packet, timestamp_us).unwrap();
+                let parsed =
+                    PacketFeatures::from_ipv4_packet(&packet, timestamp_us, false).unwrap();
                 event.timestamp_ns = (timestamp_us - realtime_offset_us) as u64 * 1_000;
                 let live = PacketFeatures::from_ebpf_event_ipv4(&event, realtime_offset_us);
                 offline.update(&parsed, forward, timestamp_us);
@@ -300,7 +302,7 @@ mod tests {
 
         let bytes = build_ipv6_packet(IpNextHeaderProtocols::Udp.0, &udp);
         let packet = Ipv6Packet::new(&bytes).unwrap();
-        let parsed_packet = PacketFeatures::from_ipv6_packet(&packet, 2_345_678).unwrap();
+        let parsed_packet = PacketFeatures::from_ipv6_packet(&packet, 2_345_678, false).unwrap();
 
         let realtime_offset_us = 2_000_000;
         let event = EbpfEventIpv6::new(
@@ -319,6 +321,7 @@ mod tests {
             0,
             0,
             0,
+            64,
         );
         let realtime_packet = PacketFeatures::from_ebpf_event_ipv6(&event, realtime_offset_us);
 
@@ -333,7 +336,8 @@ mod tests {
             let mut event = event;
             for delta in [0, 1, 2, 5] {
                 let timestamp_us = 2_345_678 + delta;
-                let parsed = PacketFeatures::from_ipv6_packet(&packet, timestamp_us).unwrap();
+                let parsed =
+                    PacketFeatures::from_ipv6_packet(&packet, timestamp_us, false).unwrap();
                 event.timestamp_ns = (timestamp_us - realtime_offset_us) as u64 * 1_000;
                 let live = PacketFeatures::from_ebpf_event_ipv6(&event, realtime_offset_us);
                 offline.update(&parsed, forward, timestamp_us);

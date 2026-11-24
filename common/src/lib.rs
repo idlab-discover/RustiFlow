@@ -33,7 +33,7 @@ pub struct EbpfEventIpv4 {
     pub sequence_number_ack: u32,
     pub icmp_type: u8,
     pub icmp_code: u8,
-    pub _padding: [u8; 1],
+    pub ttl: u8,
 }
 
 impl EbpfEventIpv4 {
@@ -54,6 +54,7 @@ impl EbpfEventIpv4 {
         sequence_number_ack: u32,
         icmp_type: u8,
         icmp_code: u8,
+        ttl: u8,
     ) -> Self {
         EbpfEventIpv4 {
             timestamp_ns,
@@ -71,7 +72,7 @@ impl EbpfEventIpv4 {
             sequence_number_ack,
             icmp_type,
             icmp_code,
-            _padding: [0; 1],
+            ttl,
         }
     }
 }
@@ -101,7 +102,8 @@ pub struct EbpfEventIpv6 {
     pub sequence_number_ack: u32,
     pub icmp_type: u8,
     pub icmp_code: u8,
-    pub _padding: [u8; 9],
+    pub ttl: u8,
+    pub _padding: [u8; 8],
 }
 
 impl EbpfEventIpv6 {
@@ -122,6 +124,7 @@ impl EbpfEventIpv6 {
         sequence_number_ack: u32,
         icmp_type: u8,
         icmp_code: u8,
+        ttl: u8,
     ) -> Self {
         EbpfEventIpv6 {
             timestamp_ns,
@@ -139,7 +142,8 @@ impl EbpfEventIpv6 {
             sequence_number_ack,
             icmp_type,
             icmp_code,
-            _padding: [0; 9],
+            ttl,
+            _padding: [0; 8],
         }
     }
 }

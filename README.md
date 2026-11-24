@@ -35,11 +35,24 @@ for the individual features.
 | `cic` | 100 | CICFlowMeter-style |
 | `cidds` | 10 | CIDDS-style |
 | `nfstream` | 71 | NFStream-inspired |
+| `unsw-nb15` | 47 | [UNSW-NB15-inspired](docs/unsw-nb15.md) |
 | `rustiflow` | 203 | Everything, including TCP quality signals (duplicate ACKs, zero windows, close style), retransmissions, and IP version, scope, and path locality |
 | `custom` | — | Your own; start from [`custom_flow.rs`](rustiflow/src/flows/custom_flow.rs) |
 
 `--drop-contaminant-features` removes raw identifiers such as exact IPs and
 ports, so a model cannot learn shortcuts from them.
+
+### UNSW-NB15
+
+```bash
+rustiflow -f unsw-nb15 -o csv --header --export-path unsw.csv pcap trace.pcap
+```
+
+Use `features = "UnswNb15"` in TOML. The profile exports the 47 feature
+columns from the full dataset schema. The clean projection has 39 columns.
+Offline capture provides HTTP and FTP metadata for supported plaintext
+sessions. Live capture provides connection history and header-derived fields.
+See the [feature definitions and compatibility notes](docs/unsw-nb15.md).
 
 ## Output
 

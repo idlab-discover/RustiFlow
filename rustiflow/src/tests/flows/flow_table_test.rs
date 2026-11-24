@@ -65,6 +65,7 @@ mod tests {
             spec.sequence_number_ack,
             0,
             0,
+            64,
         );
         PacketFeatures::from_ebpf_event_ipv4(&event, realtime_offset_us)
     }
@@ -101,6 +102,7 @@ mod tests {
             spec.sequence_number_ack,
             0,
             0,
+            64,
         );
         PacketFeatures::from_ebpf_event_ipv6(&event, realtime_offset_us)
     }

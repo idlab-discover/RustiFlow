@@ -1,5 +1,7 @@
 pub mod active_idle_stats;
+pub(crate) mod application;
 pub mod bulk_stats;
+pub(crate) mod connection_history;
 pub mod header_stats;
 pub mod iat_stats;
 pub mod icmp_stats;
@@ -9,6 +11,7 @@ pub mod retransmission_stats;
 pub mod subflow_stats;
 pub mod tcp_flag_stats;
 pub mod tcp_quality_stats;
+pub(crate) mod tcp_setup;
 pub mod timing_stats;
 pub mod util;
 pub mod window_size_stats;

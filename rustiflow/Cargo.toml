@@ -34,6 +34,7 @@ confy = "2.0.0"
 ratatui = { version = "0.30", default-features = false, features = ["crossterm", "layout-cache"] }
 parquet = { version = "60.2", default-features = false, features = ["arrow", "snap"] }
 arrow-schema = "60.2"
+httparse = "1.10"
 
 [target.'cfg(target_os = "linux")'.dependencies]
 aya = "0.16.0"

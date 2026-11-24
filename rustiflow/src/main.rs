@@ -31,7 +31,7 @@ use args::{
 use clap::Parser;
 use flows::{
     basic_flow::BasicFlow, cidds_flow::CiddsFlow, custom_flow::CustomFlow, flow::Flow,
-    nf_flow::NfFlow,
+    nf_flow::NfFlow, unsw_nb15_flow::UnswNb15Flow,
 };
 use log::{debug, error, info};
 use output::spawn_output_writer;
@@ -134,7 +134,7 @@ async fn run_replay_bench(
 
     macro_rules! execute_replay {
         ($flow_ty:ty) => {{
-            let (exporter, output_task) = spawn_output_writer::<$flow_ty>(output)?;
+            let (exporter, output_task) = spawn_output_writer::<$flow_ty>(output, None)?;
             replay_bench::<$flow_ty>(
                 &replay_args,
                 &config,
@@ -151,6 +151,7 @@ async fn run_replay_bench(
         FlowType::CIC => execute_replay!(CicFlow),
         FlowType::CIDDS => execute_replay!(CiddsFlow),
         FlowType::Nfstream => execute_replay!(NfFlow),
+        FlowType::UnswNb15 => execute_replay!(UnswNb15Flow),
         FlowType::Rustiflow => execute_replay!(RustiFlow),
         FlowType::Custom => execute_replay!(CustomFlow),
     }
@@ -170,7 +171,8 @@ async fn run_with_config(config: Config) -> anyhow::Result<()> {
             macro_rules! execute_realtime {
                 ($flow_ty:ty) => {{
                     let packet_graph_mode = packet_graph_mode(&config.output);
-                    let (exporter, output_task) = spawn_output_writer::<$flow_ty>(config.output)?;
+                    let (exporter, output_task) =
+                        spawn_output_writer::<$flow_ty>(config.output, None)?;
 
                     debug!("Starting realtime processing...");
                     let start = Instant::now();
@@ -231,6 +233,7 @@ async fn run_with_config(config: Config) -> anyhow::Result<()> {
                 FlowType::CIC => execute_realtime!(CicFlow),
                 FlowType::CIDDS => execute_realtime!(CiddsFlow),
                 FlowType::Nfstream => execute_realtime!(NfFlow),
+                FlowType::UnswNb15 => execute_realtime!(UnswNb15Flow),
                 FlowType::Rustiflow => execute_realtime!(RustiFlow),
                 FlowType::Custom => execute_realtime!(CustomFlow),
             }
@@ -238,7 +241,9 @@ async fn run_with_config(config: Config) -> anyhow::Result<()> {
         Commands::Pcap { path } => {
             macro_rules! execute_offline {
                 ($flow_ty:ty) => {{
-                    let (exporter, output_task) = spawn_output_writer::<$flow_ty>(config.output)?;
+                    let threads = resolve_offline_threads(config.config.threads);
+                    let (exporter, output_task) =
+                        spawn_output_writer::<$flow_ty>(config.output, Some(threads))?;
 
                     let start = Instant::now();
                     let profiling_session = match ProfilingSession::start_from_env("offline") {
@@ -252,7 +257,7 @@ async fn run_with_config(config: Config) -> anyhow::Result<()> {
                     if let Err(err) = read_pcap_file::<$flow_ty>(
                         &path,
                         exporter,
-                        resolve_offline_threads(config.config.threads),
+                        threads,
                         config.config.active_timeout,
                         config.config.idle_timeout,
                         config.config.early_export,
@@ -287,6 +292,7 @@ async fn run_with_config(config: Config) -> anyhow::Result<()> {
                 FlowType::CIC => execute_offline!(CicFlow),
                 FlowType::CIDDS => execute_offline!(CiddsFlow),
                 FlowType::Nfstream => execute_offline!(NfFlow),
+                FlowType::UnswNb15 => execute_offline!(UnswNb15Flow),
                 FlowType::Rustiflow => execute_offline!(RustiFlow),
                 FlowType::Custom => execute_offline!(CustomFlow),
             }

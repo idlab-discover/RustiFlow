@@ -366,6 +366,7 @@ fn encode_ipv4(
         packet.sequence_number_ack,
         0,
         0,
+        64,
     )
 }
 
@@ -397,6 +398,7 @@ fn encode_ipv6(
         packet.sequence_number_ack,
         0,
         0,
+        64,
     )
 }
 

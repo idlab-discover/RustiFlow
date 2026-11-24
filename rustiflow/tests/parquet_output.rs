@@ -71,7 +71,15 @@ fn csv_field(column: &dyn Array, row: usize) -> String {
 
 #[test]
 fn default_parquet_matches_csv_for_every_feature_set_and_projection() {
-    for feature in ["basic", "cic", "cidds", "nfstream", "rustiflow", "custom"] {
+    for feature in [
+        "basic",
+        "cic",
+        "cidds",
+        "nfstream",
+        "unsw-nb15",
+        "rustiflow",
+        "custom",
+    ] {
         for clean in [false, true] {
             let dir = tempfile::tempdir().unwrap();
             let mut args = vec!["-f", feature];

@@ -243,6 +243,10 @@ pub enum FlowType {
     /// Represents a nfstream inspired flow, giving 71 features.
     Nfstream,
 
+    /// UNSW-NB15-inspired features.
+    #[value(name = "unsw-nb15")]
+    UnswNb15,
+
     /// Represents the Rusti Flow, giving 203 features.
     Rustiflow,
 
@@ -252,11 +256,12 @@ pub enum FlowType {
 
 impl FlowType {
     /// Every flow type, in the order the config TUI lists them.
-    pub const ALL: [FlowType; 6] = [
+    pub const ALL: [FlowType; 7] = [
         FlowType::Basic,
         FlowType::CIC,
         FlowType::CIDDS,
         FlowType::Nfstream,
+        FlowType::UnswNb15,
         FlowType::Rustiflow,
         FlowType::Custom,
     ];
@@ -268,6 +273,7 @@ impl FlowType {
             FlowType::CIC => "cic",
             FlowType::CIDDS => "cidds",
             FlowType::Nfstream => "nfstream",
+            FlowType::UnswNb15 => "unsw-nb15",
             FlowType::Rustiflow => "rustiflow",
             FlowType::Custom => "custom",
         }

@@ -214,6 +214,7 @@ struct PacketInfo {
     total_length: u16,
     network_header_length: u16,
     protocol: u8,
+    ttl: u8,
 }
 
 impl PacketInfo {
@@ -223,6 +224,7 @@ impl PacketInfo {
             ipv6_destination: u128::from_ne_bytes(ipv6hdr.dst_addr),
             total_length: Ipv6Hdr::LEN as u16 + ipv6hdr.payload_len(),
             network_header_length: network_header_length as u16,
+            ttl: ipv6hdr.hop_limit,
             protocol,
         })
     }
@@ -250,6 +252,7 @@ impl PacketInfo {
             header.sequence_number_ack(),
             header.icmp_type(),
             header.icmp_code(),
+            self.ttl,
         )
     }
 }

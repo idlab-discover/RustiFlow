@@ -4,6 +4,19 @@ This file keeps short-lived design choices and execution notes that would make
 `AGENTS.md` too long. Newest entries come first. Older entries are condensed to
 the decisions and results that still describe the current code.
 
+## 2026-11-24. UNSW-NB15 exporter
+
+RustiFlow derives the 47 unlabeled columns from the feature dictionary and
+the thesis algorithms. Offline uses a shared time-ordered connection window
+with 99 subsequent completed flows. Live capture uses the preceding 99
+completed exports. Only the UNSW-NB15 pcap path copies selected application
+payloads. The eBPF events use an existing padding byte for TTL and hop limit.
+
+The CLI fixture checks cross-shard ordering, window boundaries, HTTP and FTP
+metadata, TCP setup time, and retransmissions. CSV and Parquet projections
+agree. An isolated Linux loopback capture verified both IP families through
+the rebuilt TC classifiers. [Feature definitions](unsw-nb15.md)
+
 ## 2026-11-24. Default-path CPU and cache profile on rgbcore
 
 Compared `2c877ef` and `2cd5df8` on the Ryzen 9 5950X with generic

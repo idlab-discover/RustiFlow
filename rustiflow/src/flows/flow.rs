@@ -2,7 +2,10 @@ use std::net::IpAddr;
 
 use crate::packet_features::PacketFeatures;
 
-use super::util::FlowExpireCause;
+use super::{
+    features::connection_history::{Connection, ConnectionCounts},
+    util::FlowExpireCause,
+};
 
 /// `Flow` defines the behavior of a network flow.
 ///
@@ -10,6 +13,15 @@ use super::util::FlowExpireCause;
 /// a network flow, providing mechanisms to update the flow state
 /// and to export its current state as typed fields.
 pub trait Flow: Send + Sync + 'static + Clone {
+    const CAPTURE_TCP_PAYLOAD: bool = false;
+    const USES_CONNECTION_HISTORY: bool = false;
+
+    fn connection(&self) -> Option<Connection> {
+        None
+    }
+
+    fn set_connection_counts(&mut self, _counts: ConnectionCounts) {}
+
     /// Constructs a new `Flow`.
     ///
     /// Initializes a `Flow` instance with the provided parameters, setting up

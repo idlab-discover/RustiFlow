@@ -405,6 +405,15 @@ where
         }
     }
 
+    pub async fn publish_offline_watermark(&self, timestamp_us: i64) {
+        // Expiration works in whole seconds with a strict greater-than test.
+        let delay = self.active_timeout.min(self.idle_timeout).saturating_add(1);
+        let delay_us = i64::try_from(delay.saturating_mul(1_000_000)).unwrap_or(i64::MAX);
+        self.output
+            .publish_watermark(timestamp_us.saturating_sub(delay_us))
+            .await;
+    }
+
     fn remove_flow(&mut self, key: &FlowKey) -> Option<T> {
         let entry = self.remove(key)?;
         #[cfg(feature = "experiment-deadline-index")]
