@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Run from the repository root with sudo. See overnight-xdp-capture-prototype.md.
+# Run from the repository root with sudo. See docs/profiling/experiments.md.
 set -euo pipefail
 
 mode=${1:?usage: xdp_capture.sh MODE ARM OUTPUT_DIRECTORY PCAP}

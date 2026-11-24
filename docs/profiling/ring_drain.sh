@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Run from the repository root with sudo -n. See overnight-ring-wakeup-coalescing.md.
+# Run from the repository root with sudo -n. See docs/profiling/experiments.md.
 set -euo pipefail
 mode=${1:?usage: ring_drain.sh MODE OUTPUT_DIRECTORY PCAP [PPS|top] [TAIL_PCAP]}
 out=${2:?specify an output directory}

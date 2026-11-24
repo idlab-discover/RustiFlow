@@ -1,4 +1,0 @@
-[2026-11-23T22:36:47Z INFO  rustiflow::profiling] Profile summary for replay: user_cpu_ms=7494.378 sys_cpu_ms=251.349 max_rss_kb=823280 voluntary_ctx_switches=36786 involuntary_ctx_switches=193
-[2026-11-23T22:36:47Z INFO  rustiflow::export_profile] Export breakdown for replay: clone_count=0 clone_ms=0.000 serialized_flows=100000 serialized_bytes=42702389 dump_ms=99.695 write_ms=262.399
-[2026-11-23T22:36:45Z INFO  rustiflow::export_profile] Export breakdown for offline: clone_count=0 clone_ms=0.000 serialized_flows=10000 serialized_bytes=696953 dump_ms=9.576 write_ms=22.420
-[2026-11-23T22:36:45Z INFO  rustiflow::profiling] Profile summary for offline: user_cpu_ms=780.280 sys_cpu_ms=106.057 max_rss_kb=63536 voluntary_ctx_switches=21872 involuntary_ctx_switches=15

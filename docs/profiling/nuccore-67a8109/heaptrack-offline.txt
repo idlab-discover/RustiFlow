@@ -1,6 +1,0 @@
-total runtime: 6.18s.
-calls to allocation functions: 66586 (10776/s)
-temporary memory allocations: 42589 (6892/s)
-peak heap memory consumption: 41.01M
-peak RSS (including heaptrack overhead): 45.60M
-total memory leaked: 27.02K

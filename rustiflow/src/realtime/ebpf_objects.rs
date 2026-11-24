@@ -45,7 +45,7 @@ pub fn ebpf_object_path(program_name: &str) -> Result<PathBuf, anyhow::Error> {
     if program_name == "rustiflow-ebpf-dual-stack" {
         bail!(
             "eBPF object {program_name} not found. Searched:\n{searched}\n\
-             Build the experimental object using docs/profiling/overnight-single-tc-classifier.md \
+             Build the experimental object using docs/profiling/experiments.md \
              and set {EBPF_DIR_ENV} to its directory."
         );
     }

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Run from the repository root with sudo. See overnight-single-tc-classifier.md.
+# Run from the repository root with sudo. See docs/profiling/experiments.md.
 set -euo pipefail
 mode=${1:?usage: validate_single_tc.sh MODE OBJECTS OUTPUT_DIRECTORY RUN_DIRECTORY}
 kind=${2:?specify base, split, or candidate objects}
