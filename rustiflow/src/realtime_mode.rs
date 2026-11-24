@@ -68,47 +68,26 @@ mod tests {
     }
 
     #[test]
-    fn packet_graph_mode_only_enables_for_explicit_csv_packet_graph() {
-        let output = output_config(ExportMethodType::Csv, Some("/tmp/out.csv"), true);
-
-        assert_eq!(
-            packet_graph_mode_with_debug(&output, false),
-            PacketGraphMode::Enabled
-        );
-    }
-
-    #[test]
-    fn packet_graph_mode_stays_disabled_without_packet_graph() {
-        let output = output_config(ExportMethodType::Csv, Some("/tmp/out.csv"), false);
-
-        assert_eq!(
-            packet_graph_mode_with_debug(&output, false),
-            PacketGraphMode::Disabled
-        );
-    }
-
-    #[test]
-    fn packet_graph_mode_stays_disabled_for_debug_logging() {
-        let output = output_config(ExportMethodType::Csv, Some("/tmp/out.csv"), false);
-
-        assert_eq!(
-            packet_graph_mode_with_debug(&output, true),
-            PacketGraphMode::Disabled
-        );
-    }
-
-    #[test]
-    fn packet_graph_mode_stays_disabled_without_csv_export_path() {
-        let csv_without_path = output_config(ExportMethodType::Csv, None, false);
-        let print_output = output_config(ExportMethodType::Print, None, false);
-
-        assert_eq!(
-            packet_graph_mode_with_debug(&csv_without_path, false),
-            PacketGraphMode::Disabled
-        );
-        assert_eq!(
-            packet_graph_mode_with_debug(&print_output, false),
-            PacketGraphMode::Disabled
-        );
+    fn packet_graph_mode_requires_a_file_export_an_explicit_flag_and_no_debug_logging() {
+        use ExportMethodType::{Csv, Parquet, Print};
+        use PacketGraphMode::{Disabled, Enabled};
+        let cases = [
+            (Csv, Some("/tmp/out.csv"), true, false, Enabled),
+            (Parquet, Some("/tmp/out.parquet"), true, false, Enabled),
+            (Parquet, None, true, false, Enabled),
+            (Csv, Some("/tmp/out.csv"), false, false, Disabled),
+            (Csv, Some("/tmp/out.csv"), true, true, Disabled),
+            (Csv, None, true, false, Disabled),
+            (Print, None, true, false, Disabled),
+        ];
+        let actual: Vec<_> = cases
+            .iter()
+            .map(|(output, path, graph, debug, _)| {
+                let config = output_config(output.clone(), *path, *graph);
+                packet_graph_mode_with_debug(&config, *debug)
+            })
+            .collect();
+        let expected: Vec<_> = cases.iter().map(|case| case.4).collect();
+        assert_eq!(actual, expected);
     }
 }

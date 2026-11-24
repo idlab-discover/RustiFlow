@@ -245,6 +245,10 @@ mod tests {
         output
     }
 
+    // Covers, among others: in-order delivery; the ingress ring delivering
+    // the SYN-ACK before the egress ring delivers its SYN; the server's ACK and
+    // FIN arriving before the client FIN they answer; and server ISN u32::MAX
+    // with the client FIN just before the sequence wrap.
     #[tokio::test]
     async fn all_direction_preserving_interleavings_close_cleanly() {
         for family in FAMILIES {
@@ -311,64 +315,6 @@ mod tests {
             expected.packets += 1;
             expected.fwd_packets += 1;
             assert_eq!(summaries(&run(family, &arrivals).await), vec![expected]);
-        }
-    }
-
-    #[tokio::test]
-    async fn baseline_in_order_connection_closes_cleanly() {
-        for family in FAMILIES {
-            let flows = run(family, &clean_connection(1000, 5000)).await;
-            assert_eq!(
-                summaries(&flows),
-                vec![expected_clean_close(family)],
-                "{family:?}"
-            );
-        }
-    }
-
-    #[tokio::test]
-    async fn syn_ack_drained_before_syn_keeps_client_as_forward() {
-        // The ingress ring delivers the SYN-ACK before the egress ring
-        // delivers the SYN it answers.
-        for family in FAMILIES {
-            let mut arrivals = clean_connection(1000, 5000);
-            arrivals.swap(0, 1);
-            let flows = run(family, &arrivals).await;
-            assert_eq!(
-                summaries(&flows),
-                vec![expected_clean_close(family)],
-                "{family:?}"
-            );
-        }
-    }
-
-    #[tokio::test]
-    async fn peer_fin_drained_before_own_fin_still_terminates() {
-        // The server's ACK and FIN reach the shard before the client FIN they
-        // answer.
-        for family in FAMILIES {
-            let mut arrivals = clean_connection(1000, 5000);
-            arrivals[5..8].rotate_left(1);
-            let flows = run(family, &arrivals).await;
-            assert_eq!(
-                summaries(&flows),
-                vec![expected_clean_close(family)],
-                "{family:?}"
-            );
-        }
-    }
-
-    #[tokio::test]
-    async fn sequence_numbers_crossing_the_wrap_close_cleanly() {
-        // Server ISN u32::MAX: the SYN-ACK's expected ACK is 0. Client ISN
-        // chosen so its FIN sits right before the wrap.
-        for family in FAMILIES {
-            let flows = run(family, &clean_connection(u32::MAX - 100, u32::MAX)).await;
-            assert_eq!(
-                summaries(&flows),
-                vec![expected_clean_close(family)],
-                "{family:?}"
-            );
         }
     }
 

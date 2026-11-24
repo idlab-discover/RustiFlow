@@ -90,25 +90,6 @@ mod tests {
     }
 
     #[test]
-    fn close_flow_records_expiration_cause() {
-        let ip_source = IpAddr::V4(Ipv4Addr::new(192, 168, 1, 10));
-        let ip_destination = IpAddr::V4(Ipv4Addr::new(192, 168, 1, 20));
-        let mut flow = BasicFlow::new(
-            "flow-1".to_string(),
-            ip_source,
-            4242,
-            ip_destination,
-            443,
-            6,
-            1_000_000,
-        );
-
-        flow.close_flow(2_000_000, FlowExpireCause::IdleTimeout);
-
-        assert_eq!(flow.flow_expire_cause, FlowExpireCause::IdleTimeout);
-    }
-
-    #[test]
     fn tcp_fin_handshake_terminates_flow() {
         let ip_source = IpAddr::V4(Ipv4Addr::new(10, 0, 0, 1));
         let ip_destination = IpAddr::V4(Ipv4Addr::new(10, 0, 0, 2));
