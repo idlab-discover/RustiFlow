@@ -61,6 +61,18 @@ history: `git show 2cd5df81:docs/profiling/overnight-<name>.md`.
     These results cover one software receive queue. NIC RSS, offloads, and
     physical-rate validation remain open.
 
+## Event ring memory on constrained hosts
+
+The November 25 pass tested `RUSTIFLOW_EXPERIMENT_RING_BYTES`, an opt-in
+load-time setting for IPv4 and IPv6 event maps. With 8 MiB per ring
+(128 MiB total on ingress), all four high-cardinality runs completed under
+a 1.5 GiB cgroup limit. With the default 64 MiB per ring, all four ran out of
+memory. Under unrestricted memory the smaller plan lost IPv4 events in two of
+four high-load veth runs at about 6 Mpps delivered. The default rings retained
+every packet in that comparison. Size for the peak rate and reader stall on
+the busiest ring in each family. The [configuration example](../../README.md#tuning-and-experiments)
+shows how to check the total budget for one or both capture directions.
+
 ## Building the experimental eBPF objects
 
 Experiments 7 and 10 load separate objects. Point `RUSTIFLOW_EBPF_DIR` at the

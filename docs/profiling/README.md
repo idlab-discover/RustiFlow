@@ -5,6 +5,22 @@ capture costs. [Experiments](experiments.md) summarizes the ten 2026-11
 optimization experiments and their opt-in switches. Dated results are in the
 [engineering notes](../engineering-notes.md).
 
+## Hardware inventory and capture accounting
+
+Run `python3 docs/profiling/nic_inventory.py INTERFACE` in the capture
+namespace to record the NIC, negotiated link, RX queues and RSS fields.
+The [capture accounting report](overnight-capture-accounting.md#reproduction-and-diagnostic-use)
+includes the commands to compare NIC, TC, userspace and Parquet counters
+over one interval. Use an independent sequence-checked frame source when
+testing packet completeness. GRO can combine multiple wire packets into a
+single event before TC sees them.
+
+For a 200 GbE physical trial, generate the per-direction worksheet with
+`python3 docs/profiling/physical_matrix.py > target/physical-200gbe.csv`
+after creating `target/`. Record actual offered and delivered rates, sequence
+gaps, drops and packet totals in the closed file. Each full-duplex pair of
+rows represents a single simultaneous trial. Repetition zero is the warmup.
+
 ## Baseline workflow
 
 Run from the repository root. Pin timings to one set of physical cores (on nuccore, CPUs 0–5 are its six P-cores). Use the same Rust toolchains, packet counts, flow counts, worker counts, and output destination for before/after comparisons. The scripts are Bash and take an output directory and a pcap path.
