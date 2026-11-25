@@ -214,17 +214,8 @@ async fn run_with_config(config: Config) -> anyhow::Result<()> {
                         end.duration_since(start).as_secs_f64()
                     );
 
-                    // Now process the result and print the dropped packets
-                    match result {
-                        Ok(dropped_packets) => {
-                            // If successful, log dropped packets count after writer is flushed
-                            info!("Total dropped packets: {}", dropped_packets);
-                        }
-                        Err(err) => {
-                            // Handle errors and log them
-                            error!("Error during realtime processing: {:?}", err);
-                        }
-                    }
+                    let dropped_packets = result?;
+                    info!("Total dropped packets: {dropped_packets}");
                 }};
             }
 

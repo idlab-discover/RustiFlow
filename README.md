@@ -162,6 +162,9 @@ Realtime capture is Linux-only and needs root or `CAP_BPF`, `CAP_NET_ADMIN` and
 
 ![RustiFlow Architecture Realtime](figures/realtime.png)
 
+Ctrl-C detaches the capture hooks, drains queued events, and finalizes the
+export. A busy capture can take time to finish writing. RustiFlow reports an
+error if the decoded event count differs from the kernel submission count.
 When updating a manual installation, update the executable before replacing
 the eBPF objects.
 

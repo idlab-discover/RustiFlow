@@ -34,6 +34,29 @@ The userspace script runs one warmup and five measured repetitions per case. It 
 
 Keep profiles, build objects, generated pcaps, and heap traces under `target/`. Record conclusions in the engineering notes, and commit only the compact CSVs those notes cite. For each prospective optimization, establish the expected metric and run the baseline and candidate under the same host conditions. Check exact output on a deterministic fixture and report throughput, CPU cost, capture loss, and run-to-run spread where applicable.
 
+## Realtime shutdown with queued events
+
+The `shutdown` mode of `ring_drain.sh` pauses capture, sends a mixed IPv4/IPv6
+fixture, then queues Ctrl-C before resuming the process. Compare that export
+with one from an uninterrupted run. Both must contain two flows with 125,000
+packets each. The capture log also records the eBPF submission and drop counts.
+Use a fresh directory under `target/` and build the release eBPF objects and
+profiling binary first.
+
+```bash
+run="$PWD/target/profile-shutdown"
+mkdir -p "$run"
+python docs/profiling/generate_pcap.py "$run/mixed.pcap" --packets 250000 --flows 2
+sudo bash docs/profiling/ring_drain.sh low "$run/control" "$run/mixed.pcap"
+sudo bash docs/profiling/ring_drain.sh shutdown "$run/backlog" "$run/mixed.pcap"
+
+deps="$PWD/target/profiling/deps"
+parquet=$(find "$deps" -maxdepth 1 -name 'libparquet-*.rlib')
+rustc --edition=2021 -L "dependency=$deps" --extern "parquet=$parquet" \
+    docs/profiling/check_ring_parquet.rs -o "$run/check_ring_parquet"
+"$run/check_ring_parquet" shutdown "$run/control" "$run/backlog"
+```
+
 ## Additional profiles and compact records
 
 For a live userspace stack sample, run the realtime script with a separate output directory and append `--sample-only`. To reproduce classifier hardware counts with BTF, stage separate objects:

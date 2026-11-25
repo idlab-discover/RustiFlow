@@ -88,6 +88,7 @@ fn main() {
             "pressure" => &[838_860, 1_398_101],
             "ordered" => &[2053, 2053],
             "fair" => &[1, 250_000],
+            "shutdown" => &[125_000, 125_000],
             _ => panic!("unknown case {case}"),
         };
         assert_eq!(packet_counts, expected);

@@ -6,7 +6,7 @@ use aya::{
     programs::{
         tc,
         tc::{NlOptions, TcAttach},
-        SchedClassifier, TcAttachType, Xdp, XdpMode,
+        Program, SchedClassifier, TcAttachType, Xdp, XdpMode,
     },
     Ebpf,
 };
@@ -137,11 +137,38 @@ impl Capture {
         )
     }
 
-    pub(super) fn log_totals(&self) -> u64 {
-        self.counters
-            .iter()
-            .map(RealtimeEbpfCounters::log_totals)
-            .sum()
+    /// Stops the producers while the rings and counter maps remain open.
+    pub(super) fn detach(&mut self) -> anyhow::Result<()> {
+        let mut failure = None;
+        for bpf in &mut self.programs {
+            for (name, program) in bpf.programs_mut() {
+                // The ingress experiment object contains both TC and XDP.
+                if program.fd().is_err() {
+                    continue;
+                }
+                let result = match program {
+                    Program::SchedClassifier(program) => program.unload(),
+                    Program::Xdp(program) => program.unload(),
+                    _ => continue,
+                };
+                if let Err(error) = result.with_context(|| format!("detaching {name}")) {
+                    if failure.is_some() {
+                        error!("{error:#}");
+                    } else {
+                        failure = Some(error);
+                    }
+                }
+            }
+        }
+        failure.map_or(Ok(()), Err)
+    }
+
+    pub(super) fn log_totals(&self) -> anyhow::Result<CaptureTotals> {
+        let mut totals = CaptureTotals::default();
+        for counters in &self.counters {
+            counters.log_totals(&mut totals)?;
+        }
+        Ok(totals)
     }
 }
 
@@ -179,6 +206,12 @@ struct RealtimeEbpfCounters {
     submitted_events: PerCpuArray<MapData, u64>,
 }
 
+#[derive(Default)]
+pub(super) struct CaptureTotals {
+    pub(super) submitted: u64,
+    pub(super) dropped: u64,
+}
+
 impl RealtimeEbpfCounters {
     fn take(bpf: &mut Ebpf, labels: &[&'static str]) -> anyhow::Result<Self> {
         let mut take_counter = |name| {
@@ -195,18 +228,19 @@ impl RealtimeEbpfCounters {
         })
     }
 
-    fn log_totals(&self) -> u64 {
-        let mut total_dropped = 0;
+    fn log_totals(&self, totals: &mut CaptureTotals) -> anyhow::Result<()> {
         for (index, &label) in (0..).zip(&self.labels) {
-            let dropped = read_per_cpu_counter(&self.dropped_packets, index, label, "dropped");
-            let submitted = read_per_cpu_counter(&self.submitted_events, index, label, "submitted");
-            total_dropped += dropped;
+            let dropped = read_per_cpu_counter(&self.dropped_packets, index, label, "dropped")?;
+            let submitted =
+                read_per_cpu_counter(&self.submitted_events, index, label, "submitted")?;
+            totals.submitted += submitted;
+            totals.dropped += dropped;
             let matched = submitted + dropped;
             info!(
                 "eBPF counters {label}: matched_packets={matched}, submitted_events={submitted}, dropped_packets={dropped}"
             );
         }
-        total_dropped
+        Ok(())
     }
 }
 
@@ -215,17 +249,11 @@ fn read_per_cpu_counter(
     index: u32,
     label: &str,
     counter_name: &str,
-) -> u64 {
-    match counter_array.get(&index, 0) {
-        Ok(values) => values.iter().sum(),
-        Err(e) => {
-            error!(
-                "Failed to read {} counter for {}: {:?}",
-                counter_name, label, e
-            );
-            0
-        }
-    }
+) -> anyhow::Result<u64> {
+    let values = counter_array
+        .get(&index, 0)
+        .with_context(|| format!("reading {counter_name} counter for {label}"))?;
+    Ok(values.iter().sum())
 }
 
 fn take_sources(bpf: &mut Ebpf, base_name: &str, label: &str) -> anyhow::Result<Sources> {

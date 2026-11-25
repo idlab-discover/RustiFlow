@@ -6,8 +6,11 @@ use log::info;
 use tokio::{io::unix::AsyncFd, task::yield_now};
 
 use super::{
-    read_clock_us, DecodeEvent, PacketGraphState, SourceBatcher, PACKET_GRAPH_RECORD_BATCH,
+    read_clock_us,
+    source_reactors::{Shutdown, SourceControl},
+    DecodeEvent, PacketGraphState, SourceBatcher, PACKET_GRAPH_RECORD_BATCH,
 };
+use anyhow::Context;
 
 const RECORD_BUDGET: u64 = 256;
 const CLOCK_CHECK_RECORDS: u64 = 32;
@@ -34,12 +37,15 @@ impl DrainPolicy {
         graph: Option<PacketGraphState>,
         decode: DecodeEvent,
         realtime_offset_us: i64,
-    ) {
+        control: SourceControl,
+    ) -> anyhow::Result<()> {
         match self {
             Self::UntilEmpty => {
-                drain::<false>(ring, batcher, graph, decode, realtime_offset_us).await
+                drain::<false>(ring, batcher, graph, decode, realtime_offset_us, control).await
             }
-            Self::Budgeted => drain::<true>(ring, batcher, graph, decode, realtime_offset_us).await,
+            Self::Budgeted => {
+                drain::<true>(ring, batcher, graph, decode, realtime_offset_us, control).await
+            }
         }
     }
 }
@@ -53,48 +59,89 @@ enum DrainEnd {
 
 async fn drain<const BUDGETED: bool>(
     mut ring: AsyncFd<RingBuf<MapData>>,
-    mut batcher: SourceBatcher,
+    batcher: SourceBatcher,
     graph: Option<PacketGraphState>,
     decode: DecodeEvent,
     realtime_offset_us: i64,
-) {
-    let mut warned_invalid_size = false;
+    mut control: SourceControl,
+) -> anyhow::Result<()> {
+    let mut drain = RingDrain {
+        batcher,
+        graph,
+        decode,
+        realtime_offset_us,
+        warned_invalid_size: false,
+        decoded_packets: 0,
+    };
     loop {
-        let mut guard = ring.readable_mut().await.unwrap();
-        if let Some(stats) = batcher.stats.as_ref().and_then(|stats| stats.ring.as_ref()) {
-            stats.ready.fetch_add(1, Relaxed);
+        tokio::select! {
+            biased;
+            _ = control.stop.changed() => break,
+            result = ring.readable_mut() => {
+                let mut guard = result.context("waiting for event ring")?;
+                if let Some(stats) = drain.batcher.stats.as_ref().and_then(|stats| stats.ring.as_ref()) {
+                    stats.ready.fetch_add(1, Relaxed);
+                }
+                drain.until_empty::<BUDGETED>(guard.get_inner_mut()).await;
+                guard.clear_ready();
+            }
         }
+    }
+    if *control.stop.borrow() == Shutdown::Drain {
+        // The producer has been detached. Check the ring directly even
+        // if its final records did not trigger another readiness event.
+        drain.until_empty::<BUDGETED>(ring.get_mut()).await;
+        control
+            .decoded_packets
+            .fetch_add(drain.decoded_packets, Relaxed);
+    }
+    Ok(())
+}
 
+struct RingDrain {
+    batcher: SourceBatcher,
+    graph: Option<PacketGraphState>,
+    decode: DecodeEvent,
+    realtime_offset_us: i64,
+    warned_invalid_size: bool,
+    decoded_packets: u64,
+}
+
+impl RingDrain {
+    async fn until_empty<const BUDGETED: bool>(&mut self, ring: &mut RingBuf<MapData>) {
         loop {
             let deadline = BUDGETED.then(|| Instant::now() + TIME_BUDGET);
-            let ring = guard.get_inner_mut();
             let mut records = 0;
             let mut packets = 0;
             let end = loop {
                 let Some(event) = ring.next() else {
                     break DrainEnd::Empty;
                 };
-                // Drop the ring item before a possible yield. push_event
-                // decodes synchronously before awaiting the queue.
-                if let Some(stats) = &batcher.stats {
+                if let Some(stats) = &self.batcher.stats {
                     stats.sample_ring_age(&event);
                 }
-                if batcher
-                    .push_event(|| decode(&event, realtime_offset_us))
+                let size = event.len();
+                if self
+                    .batcher
+                    .push_event(|| {
+                        let packet = (self.decode)(&event, self.realtime_offset_us);
+                        // Release the slot before an enqueue can block.
+                        drop(event);
+                        packet
+                    })
                     .await
                 {
                     packets += 1;
                     if packets % PACKET_GRAPH_RECORD_BATCH == 0 {
-                        if let Some(graph) = &graph {
+                        if let Some(graph) = &self.graph {
                             graph.record_packets(PACKET_GRAPH_RECORD_BATCH);
                         }
                     }
-                } else if !warned_invalid_size {
+                } else if !self.warned_invalid_size {
                     log::warn!(
-                        "Skipping incorrectly sized realtime ring records (first size: {} bytes)",
-                        event.len()
+                        "Skipping incorrectly sized realtime ring records (first size: {size} bytes)"
                     );
-                    warned_invalid_size = true;
+                    self.warned_invalid_size = true;
                 }
                 records += 1;
                 if BUDGETED {
@@ -109,17 +156,22 @@ async fn drain<const BUDGETED: bool>(
                 }
             };
 
-            if let Some(graph) = &graph {
+            if let Some(graph) = &self.graph {
                 graph.record_packets(packets % PACKET_GRAPH_RECORD_BATCH);
             }
-            batcher.flush().await;
-            if let Some(stats) = batcher.stats.as_ref().and_then(|stats| stats.ring.as_ref()) {
+            self.decoded_packets += packets;
+            self.batcher.flush().await;
+            if let Some(stats) = self
+                .batcher
+                .stats
+                .as_ref()
+                .and_then(|stats| stats.ring.as_ref())
+            {
                 stats.record_drain(end, records);
             }
 
             if let DrainEnd::Empty = end {
-                guard.clear_ready();
-                break;
+                return;
             }
 
             // Budget exhaustion says nothing about the ring's readiness.

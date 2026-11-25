@@ -35,7 +35,9 @@ use common::{EbpfEventIpv4, EbpfEventIpv6};
 use log::{error, info};
 use promiscuous::PromiscuousMembership;
 use ring_drain::{DrainPolicy, RingStats};
-use source_reactors::{ReactorCount, RingSource, RingSourcePipeline};
+use source_reactors::{
+    unexpected_source_exit, ReactorCount, RingSource, RingSourcePipeline, Shutdown,
+};
 use tokio::sync::watch;
 use tokio::{
     signal,
@@ -286,7 +288,7 @@ struct PendingShardBatch {
 impl SourceBatcher {
     /// Creates the batcher and spawns its dispatcher into `handle_set`.
     fn new(
-        handle_set: &mut JoinSet<()>,
+        handle_set: &mut JoinSet<anyhow::Result<()>>,
         shard_senders: &[ShardBatchSender],
         shard_selector: &ShardSelector,
         settings: &PipelineSettings,
@@ -408,13 +410,14 @@ where
 
     let enable_source_stats = std::env::var_os("RUSTIFLOW_REALTIME_STATS").is_some();
     let mut handle_set = JoinSet::new();
+    let mut graph_tasks = JoinSet::new();
     let (packet_graph, packet_rx) = match packet_graph_mode {
         PacketGraphMode::Enabled => {
             let (packet_tx, packet_rx) = watch::channel(Vec::new());
             let packet_graph = PacketGraphState {
                 packets_since_tick: Arc::new(AtomicU64::new(0)),
             };
-            handle_set.spawn(packet_graph.clone().publish_intervals(packet_tx));
+            graph_tasks.spawn(packet_graph.clone().publish_intervals(packet_tx));
             (Some(packet_graph), Some(packet_rx))
         }
         PacketGraphMode::Disabled => (None, None),
@@ -480,44 +483,37 @@ where
     let capture_result = tokio::select! {
         signal = signal::ctrl_c() => signal.context("waiting for Ctrl-C"),
         error = reactors.unexpected_exit() => Err(error),
+        result = handle_set.join_next(), if !handle_set.is_empty() => {
+            Err(unexpected_source_exit(result))
+        }
     };
+    graph_tasks.shutdown().await;
 
-    // Fetch dropped packets counter from eBPF program before terminating
-    info!("Fetching dropped packet counters before exiting...");
-    let total_dropped = capture.log_totals();
-
-    info!("Total dropped packets before exit: {}", total_dropped);
+    // Detach first so the source tasks can finish draining finite rings.
+    let detach_result = capture.detach();
+    let shutdown = if detach_result.is_ok() {
+        Shutdown::Drain
+    } else {
+        Shutdown::Abort
+    };
+    let drain_result = reactors.shutdown(shutdown, &mut handle_set).await;
     for (label, stats) in &source_stats {
         if let Some(stats) = stats.as_ref() {
             log_source_stats(label, stats);
         }
     }
 
-    // Cancel the tasks reading ebpf events
-    handle_set.abort_all();
-    let reactor_result = reactors.shutdown().await;
-
-    // Wait for all tasks to finish
-    while let Some(res) = handle_set.join_next().await {
-        match res {
-            Ok(_) => {
-                // Task should never finish by itself
-                error!("Event source task finished unexpectedly");
-            }
-            Err(e) if e.is_cancelled() => {
-                // Task was successfully cancelled
-                debug!("Task was cancelled as part of graceful shutdown");
-            }
-            Err(e) => {
-                // Log other types of errors
-                error!("Task failed: {:?}", e);
-            }
-        }
-    }
-
     capture_result?;
-    reactor_result?;
-    Ok(total_dropped)
+    detach_result?;
+    let decoded = drain_result?;
+    let totals = capture.log_totals()?;
+    info!("Total dropped packets before exit: {}", totals.dropped);
+    anyhow::ensure!(
+        decoded == totals.submitted,
+        "realtime capture submitted {} events but decoded {decoded}",
+        totals.submitted,
+    );
+    Ok(totals.dropped)
 }
 
 struct ShardDispatchBatch {
@@ -526,7 +522,7 @@ struct ShardDispatchBatch {
 }
 
 fn spawn_source_dispatcher(
-    handle_set: &mut JoinSet<()>,
+    handle_set: &mut JoinSet<anyhow::Result<()>>,
     shard_senders: Vec<Sender<Vec<PacketFeatures>>>,
     source_dispatch_queue_capacity: usize,
     stats: Option<Arc<RealtimeSourceStats>>,
@@ -535,7 +531,7 @@ fn spawn_source_dispatcher(
         mpsc::channel::<ShardDispatchBatch>(source_dispatch_queue_capacity);
 
     handle_set.spawn(async move {
-        run_source_dispatcher(&shard_senders, &mut dispatch_receiver, stats.as_ref()).await;
+        run_source_dispatcher(&shard_senders, &mut dispatch_receiver, stats.as_ref()).await
     });
 
     dispatch_sender
@@ -545,21 +541,18 @@ async fn run_source_dispatcher(
     shard_senders: &[Sender<Vec<PacketFeatures>>],
     dispatch_receiver: &mut Receiver<ShardDispatchBatch>,
     stats: Option<&Arc<RealtimeSourceStats>>,
-) {
+) -> anyhow::Result<()> {
     while let Some(ShardDispatchBatch { shard_index, batch }) = dispatch_receiver.recv().await {
         let handoff = stats
             .and_then(|stats| stats.ring.as_ref())
             .zip(batch.first())
             .map(|(ring, first)| (ring, batch.len(), first.timestamp_us));
         let send_start = stats.as_ref().map(|_| Instant::now());
-        if let Err(e) = shard_senders[shard_index].send(batch).await {
+        if shard_senders[shard_index].send(batch).await.is_err() {
             if let Some(stats) = stats {
                 stats.increment_send_errors();
             }
-            error!(
-                "Failed to send packet batch to shard {}: {}",
-                shard_index, e
-            );
+            anyhow::bail!("packet queue for shard {shard_index} closed during dispatch");
         } else if let Some((ring, records, first_timestamp_us)) = handoff {
             ring.record_handoff(records, first_timestamp_us);
         }
@@ -567,6 +560,7 @@ async fn run_source_dispatcher(
             stats.add_shard_send_wait_ns(elapsed_ns(send_start));
         }
     }
+    Ok(())
 }
 
 async fn enqueue_shard_batch(

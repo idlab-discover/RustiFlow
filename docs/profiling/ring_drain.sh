@@ -19,7 +19,7 @@ output=/dev/null
 case $mode in
     stat|kernel) ;;
     notify) export RUSTIFLOW_REALTIME_STATS=1 ;;
-    low|backlog|pressure|fair)
+    low|backlog|pressure|fair|shutdown)
         export RUSTIFLOW_REALTIME_STATS=1
         limit=()
         output="$out/flows.parquet"
@@ -110,7 +110,7 @@ case $mode in
     low)
         "${sender[@]}" >"$out/sender.log" 2>&1
         ;;
-    backlog|pressure|fair)
+    backlog|pressure|fair|shutdown)
         kill -STOP "$pid"
         paused=1
         for _ in {1..100}; do
@@ -119,6 +119,10 @@ case $mode in
         done
         rg -q $'^State:\tT' "/proc/$pid/status"
         "${sender[@]}" >"$out/sender.log" 2>&1
+        if [[ $mode == shutdown ]]; then
+            # Queue Ctrl-C while every capture thread is still stopped.
+            kill -INT "$pid"
+        fi
         if [[ $mode == fair ]]; then
             python - "$pid" >"$out/resume.us" <<'PYRESUME'
 import os
@@ -149,9 +153,10 @@ ip -n "$cap" -s -j link show dev cap0 >"$out/link-after.json"
 case $mode in
     pressure) sleep 4 ;;
     fair) sleep 0.8 ;;
+    shutdown) ;;
     *) sleep 0.3 ;;
 esac
-kill -INT "$pid"
+if [[ $mode != shutdown ]]; then kill -INT "$pid"; fi
 wait "$pid"
 pid=
 ip netns exec "$cap" tc filter show dev cap0 ingress >"$out/detached.tc"

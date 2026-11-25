@@ -94,7 +94,7 @@ pub async fn replay_bench<T: Flow>(
 
     let mut handle_set = JoinSet::new();
     let mut source_stats = Vec::new();
-    let mut new_batcher = |handle_set: &mut JoinSet<()>, label: String| {
+    let mut new_batcher = |handle_set: &mut JoinSet<anyhow::Result<()>>, label: String| {
         let stats = enable_source_stats.then(|| Arc::new(RealtimeSourceStats::default()));
         source_stats.push((label, stats.clone()));
         SourceBatcher::new(
@@ -136,7 +136,10 @@ pub async fn replay_bench<T: Flow>(
     drop(shard_senders);
 
     while let Some(result) = handle_set.join_next().await {
-        if let Err(err) = result {
+        if let Err(err) = result
+            .context("joining replay task")
+            .and_then(|inner| inner)
+        {
             error!("Replay task failed: {:?}", err);
         }
     }
@@ -182,7 +185,7 @@ async fn replay_source<E: IntoBytes + Immutable + Send + Sync + 'static>(
     drain_burst: NonZeroUsize,
     decode: DecodeEvent,
     realtime_offset_us: i64,
-) {
+) -> anyhow::Result<()> {
     for burst in events.chunks(drain_burst.get()) {
         for event in burst {
             let decoded = batcher
@@ -194,6 +197,7 @@ async fn replay_source<E: IntoBytes + Immutable + Send + Sync + 'static>(
         // A live source waits for ring readiness between drains.
         tokio::task::yield_now().await;
     }
+    Ok(())
 }
 
 /// Pre-generated events, one list per source. All events of a flow go to the
