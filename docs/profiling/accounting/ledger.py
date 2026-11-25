@@ -83,6 +83,11 @@ def explain(interval, evidence, tc, shapes=None, epoch_ok=True):
             raise ValueError("expected nonnegative integer count or null")
 
     rx = d.get("link.rx.packets")
+    rx_bounds = interval.get("link_rx_delta_bounds")
+    matches = [v["matched"] for v in tc.values()]
+    tc_in_bracket = None
+    if rx_bounds and scope == "isolated" and other is not None and None not in matches and epoch_ok:
+        tc_in_bracket = rx_bounds[0] <= sum(matches) + other <= rx_bounds[1]
     if scope == "mixed":
         notes.append("other traffic in observation window")
     elif scope != "isolated" or other is None or any(truth.get(f) is None for f in tc):
@@ -94,27 +99,26 @@ def explain(interval, evidence, tc, shapes=None, epoch_ok=True):
     elif rx < other:
         notes.append("excluded link units exceed observed RX")
     else:
-        scoped_rx = rx - other
+        lo, hi = (v - other for v in (rx_bounds or [rx, rx]))
         total = sum(truth.values())
         aggregate = any(v["gso_skbs"] for v in shapes or [])
         inline_tag = any(v["ethertype"] == "802.1Q" for v in shapes or [])
-        if scoped_rx < total:
+        if hi < total:
             findings.append("fewer units by capture link RX than independent frames")
             if aggregate:
                 findings.append("multi-segment skbs confirmed at TC")
-        elif scoped_rx > total:
+        elif lo > total:
             findings.append("additional link units beyond the known offer")
-        matches = [v["matched"] for v in tc.values()]
         if None in matches:
             notes.append("parsed TC match interval unavailable")
-        elif sum(matches) < scoped_rx:
+        elif sum(matches) < lo:
             if inline_tag:
                 findings.append("inline VLAN at TC EtherType check")
             elif aggregate:
                 findings.append("aggregation observed between link RX accounting and TC")
             else:
                 findings.append("fewer parsed TC matches than scoped link RX units")
-        elif sum(matches) > scoped_rx:
+        elif sum(matches) > hi:
             findings.append("TC matches exceed scoped link RX units")
         elif sum(matches) == total and any(tc[f]["matched"] != truth[f] for f in tc):
             findings.append("family counts diverge by TC match")
@@ -143,7 +147,8 @@ def explain(interval, evidence, tc, shapes=None, epoch_ok=True):
         notes.append("terminal decode and export comparison unavailable")
     first = next(iter(findings), notes[0] if notes else "observed counts reconcile")
     return dict(first_observation=first, observations=findings, limits=notes,
-                device_pressure=pressure, reported_queue_packet_sum=queue_total)
+                device_pressure=pressure, reported_queue_packet_sum=queue_total,
+                tc_plus_other_within_link_bracket=tc_in_bracket)
 
 
 def assess(directory):

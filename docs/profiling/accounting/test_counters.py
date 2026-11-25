@@ -48,6 +48,16 @@ class CounterDeltaTest(unittest.TestCase):
         self.assertIsNone(d["tc.ipv4.ring_drop"])
         self.assertIsNone(d["softnet.dropped"])
 
+    def test_interleaved_reads_bound_rx_delta_and_reject_intra_sample_reset(self):
+        self.a["rx_end"] = 18
+        self.b["counts"]["link.rx.packets"] = 32
+        self.b["rx_end"] = 37
+        self.assertEqual(difference(self.a, self.b)["link_rx_delta_bounds"], [14, 25])
+        self.b["rx_end"] = 2
+        result = difference(self.a, self.b)
+        self.assertIsNone(result["link_rx_delta_bounds"])
+        self.assertIsNone(result["deltas"]["link.rx.packets"])
+
     def test_incomparable_snapshots(self):
         self.b["start_ns"] = 20
         with self.assertRaises(ValueError):

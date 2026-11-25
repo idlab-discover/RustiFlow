@@ -24,6 +24,13 @@ class BoundaryTest(unittest.TestCase):
         self.evidence["scope"] = "isolated"
         self.assertIn("fewer units", explain(self.interval, self.evidence, self.kernel)["first_observation"])
 
+    def test_bracket_covers_apparent_steady_state_gap(self):
+        self.interval["deltas"]["link.rx.packets"] = 31
+        self.interval["link_rx_delta_bounds"] = [28, 32]
+        result = explain(self.interval, self.evidence, self.kernel)
+        self.assertEqual(result["observations"], [])
+        self.assertTrue(result["tc_plus_other_within_link_bracket"])
+
     def test_positive_reserve_failure_without_ground_truth(self):
         self.kernel["6"].update(submitted=6, ring_drop=1)
         result = explain(self.interval, {}, self.kernel)

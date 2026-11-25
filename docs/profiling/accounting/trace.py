@@ -36,6 +36,18 @@ def slice_trace(source, outfile, count):
     return truth
 
 
+def export_totals(parquet):
+    packets = {"4": 0, "6": 0}
+    sizes = dict(packets)
+    rows = run([BUILD / "accounting/read_export", parquet]).splitlines()
+    for line in rows:
+        row = {k: json.loads(v) for k, v in (s.split("=", 1) for s in line.split("\t"))}
+        family = str(row["ip_version"])
+        packets[family] += row["packet_count"]
+        sizes[family] += int(row["packet_len_total"])
+    return dict(rows=len(rows), packets=packets, ip_bytes=sizes)
+
+
 def trial(directory, setting, pcap, truth):
     directory.mkdir()
     run(local(SEND, "ethtool", "-K", "send0", "gso", setting, "tx-udp-segmentation", setting))
@@ -59,18 +71,11 @@ def trial(directory, setting, pcap, truth):
     delta = interval["deltas"]
     assert delta["link.rx.packets"] == sum(v["packets"] for v in truth.values())
     tc, decoded = outcomes(log.read_text()), source_events(log.read_text())
-    packets = {"4": 0, "6": 0}
-    sizes = dict(packets)
-    rows = run([BUILD / "accounting/read_export", parquet]).splitlines()
-    for line in rows:
-        row = {k: json.loads(v) for k, v in (s.split("=", 1) for s in line.split("\t"))}
-        family = str(row["ip_version"])
-        packets[family] += row["packet_count"]
-        sizes[family] += int(row["packet_len_total"])
-    write(directory / "export.json", dict(rows=len(rows), packets=packets, ip_bytes=sizes))
+    exported = export_totals(parquet)
+    write(directory / "export.json", exported)
     for f, v in truth.items():
-        assert v["packets"] == delta[f"tc.ipv{f}.matched"] == tc[f]["submitted"] == decoded[f] == packets[f]
-        assert tc[f]["ring_drop"] == 0 and sizes[f] == v["ip_bytes"]
+        assert v["packets"] == delta[f"tc.ipv{f}.matched"] == tc[f]["submitted"] == decoded[f] == exported["packets"][f]
+        assert tc[f]["ring_drop"] == 0 and exported["ip_bytes"][f] == v["ip_bytes"]
 
 
 if __name__ == "__main__":

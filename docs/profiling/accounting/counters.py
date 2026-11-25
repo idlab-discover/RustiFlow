@@ -45,7 +45,7 @@ def tc_counters(dev):
     return counts, epochs
 
 
-def snapshot(dev, split_tc):
+def snapshot(dev, split_tc, bracket_rx=False):
     begin = time.monotonic_ns()
     link, = json.loads(command("ip", "-j", "-s", "-s", "link", "show", "dev", dev))
     ident = [Path("/proc/sys/kernel/random/boot_id").read_text().strip(),
@@ -55,11 +55,14 @@ def snapshot(dev, split_tc):
     epochs = {}
     # A queue may expose drops without a packet counter. Preserve this distinction.
     netdev = Path("/sys/class/net") / dev
-    if (netdev / "ifindex").is_file() and (netdev / "ifindex").read_text().strip() == str(link["ifindex"]):
-        for queue in (netdev / "queues").glob("rx-[0-9]*"):
-            index = int(queue.name.split("-")[1])
-            for suffix in ("packets", "bytes", "drops", "alloc_failed"):
-                counts[f"driver.rx_queue_{index}_{suffix}"] = None
+    try:
+        if (netdev / "ifindex").read_text().strip() == str(link["ifindex"]):
+            for queue in (netdev / "queues").glob("rx-[0-9]*"):
+                index = int(queue.name.split("-")[1])
+                for suffix in ("packets", "bytes", "drops", "alloc_failed"):
+                    counts[f"driver.rx_queue_{index}_{suffix}"] = None
+    except OSError as exc:
+        issues.append(f"queue inventory unavailable: {exc}")
     try:
         for line in command("ethtool", "-S", dev).splitlines():
             match = re.fullmatch(r"\s*(rx_(?:missed_errors|no_buffer_count|queue_\d+_(?:packets|bytes|drops|alloc_failed))):\s*(\d+)\s*", line)
@@ -84,10 +87,16 @@ def snapshot(dev, split_tc):
             counts.update(tc)
         except (OSError, ValueError, KeyError, subprocess.TimeoutExpired) as exc:
             issues.append(str(exc))
+    rx_end = None
+    if bracket_rx:
+        last, = json.loads(command("ip", "-j", "-s", "link", "show", "dev", dev))
+        if (last["ifindex"], last.get("address")) != (link["ifindex"], link.get("address")):
+            raise ValueError("link changed during RX bracket")
+        rx_end = last.get("stats64", {}).get("rx", {}).get("packets")
     if socket.if_nametoindex(dev) != link["ifindex"]:
         raise ValueError("interface changed during observation")
     return dict(identity=ident, start_ns=begin, end_ns=time.monotonic_ns(),
-                counts=counts, tc_epochs=epochs, issues=issues)
+                counts=counts, tc_epochs=epochs, issues=issues, rx_end=rx_end)
 
 
 def difference(before, after):
@@ -108,6 +117,12 @@ def difference(before, after):
         if group == "softnet" and isinstance(a, dict) and isinstance(b, dict):
             if a.keys() != b.keys() or any(b[c] < v for c, v in a.items()):
                 reset[group] = f"{key} CPU set or epoch changed"
+    packet_key = "link.rx.packets"
+    x, y = first.get(packet_key), last.get(packet_key)
+    xe, ye = before.get("rx_end"), after.get("rx_end")
+    if any(a is not None and b is not None and b < a for a, b in ((x, xe), (xe, y), (y, ye))):
+        reset["link"] = "link RX decreased across bracket; rebaseline link counters"
+    bounds = [y - xe, ye - x] if None not in (x, xe, y, ye) and "link" not in reset else None
     for key in sorted(fields):
         a, b = first.get(key), last.get(key)
         if a is None or b is None:
@@ -137,7 +152,7 @@ def difference(before, after):
         deltas[prefix + "matched"] = None if None in (sub, drop) else sub + drop
     return dict(identity=before["identity"], elapsed_bounds_ns=[
         after["start_ns"] - before["end_ns"], after["end_ns"] - before["start_ns"]],
-        deltas=deltas, issues=issues)
+        deltas=deltas, link_rx_delta_bounds=bounds, issues=issues)
 
 
 if __name__ == "__main__":
@@ -146,10 +161,11 @@ if __name__ == "__main__":
     take = commands.add_parser("snapshot")
     take.add_argument("dev")
     take.add_argument("--split-tc", action="store_true")
+    take.add_argument("--bracket-rx", action="store_true", help="bound link RX units during sequential reads")
     diff = commands.add_parser("delta")
     diff.add_argument("before", type=Path)
     diff.add_argument("after", type=Path)
     args = parser.parse_args()
-    result = (snapshot(args.dev, args.split_tc) if args.cmd == "snapshot" else
+    result = (snapshot(args.dev, args.split_tc, args.bracket_rx) if args.cmd == "snapshot" else
               difference(json.loads(args.before.read_text()), json.loads(args.after.read_text())))
     print(json.dumps(result, indent=2, sort_keys=True))
