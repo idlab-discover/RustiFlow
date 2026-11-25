@@ -168,6 +168,15 @@ error if the decoded event count differs from the kernel submission count.
 When updating a manual installation, update the executable before replacing
 the eBPF objects.
 
+For a read-only Linux interface inventory, run
+`python3 docs/profiling/nic_inventory.py INTERFACE` in the capture network
+namespace (Python 3.9+, iproute2 and ethtool with JSON support). The standalone
+probe prints JSON with each query's source. Nulls and omitted driver attributes
+mean unknown. `reported_speed_bps` converts the ethtool or sysfs speed from
+Mb/s to bit/s. A veth speed is a software device readback. Ethernet lane count
+and PCIe link width appear separately. The probe preserves GET errors alongside
+available data and can read sysfs when either optional utility is missing.
+
 ### Promiscuous capture
 
 A physical NIC drops unicast frames addressed to other MAC addresses. On a tap,
