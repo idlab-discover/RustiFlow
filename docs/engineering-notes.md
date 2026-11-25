@@ -4,6 +4,29 @@ This file keeps short-lived design choices and execution notes that would make
 `AGENTS.md` too long. Newest entries come first. Older entries are condensed to
 the decisions and results that still describe the current code.
 
+## 2026-11-25. CAIDA-shaped 100 Gbit/s packet-rate profile on nuccore
+
+At `659288cd`, the April 2026 CAIDA Los Angeles–Dallas sample gives
+13.29 Mpps for direction A, 18.24 Mpps for B, and 15.58 Mpps per 100 Gbit/s
+aggregate at the observed direction ratio. These use CAIDA's byte convention.
+We synthesized IPv4/IPv6 TCP, UDP and ICMP from A's joint length/protocol
+histogram and varied flow cardinality and churn separately.
+
+With 16 workers, 20 million events and 203-column Parquet files, median
+userspace replay was 27.28 Mpps at 30,000 stable flows, 17.09 at 60,000 and
+13.01 at 100,000. Increasing the shard batch capacity from 128 to 512 raised
+the 100,000-flow median to 15.35 Mpps (14.56–15.65). The 60,000-key TCP-reset
+workload produced 477,496 rows per run at 15.10 Mpps with the larger batch.
+Flow-table lookup and packet updates accounted for 54–59% of sampled
+userspace cycles at 100,000 stable flows. The staged lookup experiment's
+throughput ranges overlapped the matching baseline on both workloads.
+
+The passive veth harness delivered a median 6.05 Mpps over 24 million frames
+with eight senders (6.00–6.06 Mpps, three runs). Every packet reconciled from
+send through TC and Parquet, with zero ring drops. The run including drain
+and writer close was 4.28 Mpps median. Raw results and the temporary replay
+driver are under `target/caida-100g.lCElEa/` on nuccore.
+
 ## 2026-11-24. zerocopy wire headers in both ingestion modes
 
 `common::wire` defines the Ethernet, SLL, VLAN, IPv4, IPv6, TCP, UDP and ICMP
