@@ -31,9 +31,9 @@ mod staged_lookup;
 #[cfg(feature = "experiment-deadline-index")]
 use deadline_index::{DeadlineBucket, DeadlineIndex};
 
-enum FlowUpdate<T> {
+enum FlowUpdate {
     Active,
-    EarlyExport(T),
+    EarlyExport,
     Terminated,
 }
 
@@ -231,7 +231,8 @@ where
                 let is_forward = entry.forward_orientation == orientation;
                 match Self::apply_packet_to_flow(entry, packet, is_forward, self.early_export_us) {
                     FlowUpdate::Active => {}
-                    FlowUpdate::EarlyExport(snapshot) => {
+                    FlowUpdate::EarlyExport => {
+                        let snapshot = Self::snapshot(&entry.flow, packet.timestamp_us);
                         self.output.export(snapshot).await;
                     }
                     FlowUpdate::Terminated => {
@@ -297,7 +298,7 @@ where
             self.early_export_us,
         ) {
             FlowUpdate::Active => None,
-            FlowUpdate::EarlyExport(snapshot) => Some(snapshot),
+            FlowUpdate::EarlyExport => Some(Self::snapshot(&entry.flow, packet.timestamp_us)),
             FlowUpdate::Terminated => {
                 self.output.export(entry.flow).await;
                 return;
@@ -335,7 +336,7 @@ where
         packet: &PacketFeatures,
         is_forward: bool,
         early_export_us: Option<i64>,
-    ) -> FlowUpdate<T> {
+    ) -> FlowUpdate {
         if entry.flow.update_flow(packet, is_forward) {
             return FlowUpdate::Terminated;
         }
@@ -352,11 +353,16 @@ where
         let elapsed_intervals = (packet.timestamp_us - first_timestamp_us) / interval_us;
         entry.next_early_export_us = first_timestamp_us + (elapsed_intervals + 1) * interval_us;
 
+        FlowUpdate::EarlyExport
+    }
+
+    #[cold]
+    fn snapshot(flow: &T, timestamp_us: i64) -> T {
         let clone_start = Instant::now();
-        let mut snapshot = entry.flow.clone();
+        let mut snapshot = flow.clone();
         export_profile::record_clone(clone_start.elapsed());
-        snapshot.close_flow(packet.timestamp_us, FlowExpireCause::None);
-        FlowUpdate::EarlyExport(snapshot)
+        snapshot.close_flow(timestamp_us, FlowExpireCause::None);
+        snapshot
     }
 
     /// Export all flows in the flow map in order of first packet arrival.
