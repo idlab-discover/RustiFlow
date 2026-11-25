@@ -292,18 +292,36 @@ async fn run_with_config(config: Config) -> anyhow::Result<()> {
     Ok(())
 }
 
+fn capped_shards(requested: u8, logical_cpus: usize) -> u8 {
+    requested.min(u8::try_from(logical_cpus).unwrap_or(u8::MAX))
+}
+
 fn resolve_realtime_threads(config_threads: Option<u8>) -> u8 {
-    let logical_cpus = num_cpus::get() as u8;
-    std::cmp::min(
+    capped_shards(
         config_threads.unwrap_or(DEFAULT_REALTIME_THREADS),
-        logical_cpus,
+        num_cpus::get(),
     )
 }
 
 fn resolve_offline_threads(config_threads: Option<u8>) -> u8 {
-    let logical_cpus = num_cpus::get() as u8;
-    std::cmp::min(
+    capped_shards(
         config_threads.unwrap_or(DEFAULT_OFFLINE_THREADS),
-        logical_cpus,
+        num_cpus::get(),
     )
+}
+
+#[cfg(test)]
+mod shard_count_tests {
+    use super::*;
+
+    #[test]
+    fn logical_cpu_cap_preserves_defaults_and_overrides_on_wide_hosts() {
+        for cpus in [255, 256, 257, 512, 1024] {
+            for requested in [DEFAULT_OFFLINE_THREADS, DEFAULT_REALTIME_THREADS, 200, 255] {
+                assert_eq!(capped_shards(requested, cpus), requested);
+            }
+        }
+        assert_eq!(capped_shards(12, 3), 3);
+        assert_eq!(capped_shards(0, 256), 0); // rejected by the ingestion path
+    }
 }
