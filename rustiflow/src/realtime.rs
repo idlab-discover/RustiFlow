@@ -141,7 +141,7 @@ fn log_source_stats(label: &str, stats: &RealtimeSourceStats) {
     }
 }
 
-const DEFAULT_SHARD_BATCH_SIZE: usize = 128;
+const DEFAULT_SHARD_BATCH_SIZE: usize = 512;
 const DEFAULT_SHARD_QUEUE_CAPACITY: usize = 512;
 const DEFAULT_SOURCE_DISPATCH_QUEUE_CAPACITY: usize = 1024;
 

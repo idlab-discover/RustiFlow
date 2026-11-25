@@ -177,7 +177,8 @@ flag, so pass it on the command line or in `RUSTIFLOW_REALTIME_ARGS`.
 | Variable | Effect |
 | --- | --- |
 | `RUSTIFLOW_EBPF_DIR` | Directory holding the eBPF objects |
-| `RUSTIFLOW_REALTIME_SHARD_BATCH_SIZE`, `RUSTIFLOW_REALTIME_SHARD_QUEUE_CAPACITY`, `RUSTIFLOW_REALTIME_SOURCE_DISPATCH_QUEUE_CAPACITY` | Pipeline batch and queue sizes |
+| `RUSTIFLOW_REALTIME_SHARD_BATCH_SIZE` | Shard batch capacity in packets for realtime capture and replay (default: 512) |
+| `RUSTIFLOW_REALTIME_SHARD_QUEUE_CAPACITY`, `RUSTIFLOW_REALTIME_SOURCE_DISPATCH_QUEUE_CAPACITY` | Pipeline queue capacities |
 | `RUSTIFLOW_REALTIME_STATS=1` | Per-source drain and dispatch timing |
 | `RUSTIFLOW_EXPERIMENT_*` | Opt-in experiments (XDP ingress, single tc classifier, staged lookup, and others) and switches for on-by-default optimizations |
 

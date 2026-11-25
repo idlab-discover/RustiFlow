@@ -34,8 +34,9 @@ history: `git show 2cd5df81:docs/profiling/overnight-<name>.md`.
    spread. Only the Snappy round-trip regression test was kept. The patch is
    in Git history at `78ff4b46`.
 4. **Batch buffer recycling.** Each shard keeps up to 32 empty batch vectors
-   (at most 320 KiB at default sizes). Paced live capture used 3.4–3.6% fewer
-   cycles per frame. Full-feature replay stayed within 1.4%.
+   (at most 320 KiB with the 128-packet batches used in the experiment).
+   Paced live capture used 3.4–3.6% fewer cycles per frame. Full-feature replay
+   stayed within 1.4%.
 5. **Staged lookup.** Groups of eight packets are hashed and probed and their
    flows are prefetched before being applied in order. At 262,144 flows it
    saved 20.5% of cycles in the isolated hit loop and raised replay 4.8–5.2%.
