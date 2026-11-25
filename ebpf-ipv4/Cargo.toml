@@ -5,7 +5,6 @@ edition = "2021"
 
 [dependencies]
 aya-ebpf = "0.3.0"
-aya-log-ebpf = "0.3.0"
 common = { path = "../common" }
 zerocopy = { version = "0.8.63", default-features = false }
 

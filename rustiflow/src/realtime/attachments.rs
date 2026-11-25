@@ -176,7 +176,6 @@ fn attach_xdp(bpf: &mut Ebpf, interface: &CStr, mode: XdpMode) -> anyhow::Result
 struct RealtimeEbpfCounters {
     labels: Vec<&'static str>,
     dropped_packets: PerCpuArray<MapData, u64>,
-    matched_packets: PerCpuArray<MapData, u64>,
     submitted_events: PerCpuArray<MapData, u64>,
 }
 
@@ -192,7 +191,6 @@ impl RealtimeEbpfCounters {
         Ok(Self {
             labels: labels.to_vec(),
             dropped_packets: take_counter("DROPPED_PACKETS")?,
-            matched_packets: take_counter("MATCHED_PACKETS")?,
             submitted_events: take_counter("SUBMITTED_EVENTS")?,
         })
     }
@@ -201,9 +199,9 @@ impl RealtimeEbpfCounters {
         let mut total_dropped = 0;
         for (index, &label) in (0..).zip(&self.labels) {
             let dropped = read_per_cpu_counter(&self.dropped_packets, index, label, "dropped");
-            let matched = read_per_cpu_counter(&self.matched_packets, index, label, "matched");
             let submitted = read_per_cpu_counter(&self.submitted_events, index, label, "submitted");
             total_dropped += dropped;
+            let matched = submitted + dropped;
             info!(
                 "eBPF counters {label}: matched_packets={matched}, submitted_events={submitted}, dropped_packets={dropped}"
             );

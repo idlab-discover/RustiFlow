@@ -7,10 +7,6 @@ pub(crate) static DROPPED_PACKETS: PerCpuArray<u64> =
     PerCpuArray::with_max_entries(COUNTER_SLOTS, 0);
 
 #[map]
-pub(crate) static MATCHED_PACKETS: PerCpuArray<u64> =
-    PerCpuArray::with_max_entries(COUNTER_SLOTS, 0);
-
-#[map]
 pub(crate) static SUBMITTED_EVENTS: PerCpuArray<u64> =
     PerCpuArray::with_max_entries(COUNTER_SLOTS, 0);
 

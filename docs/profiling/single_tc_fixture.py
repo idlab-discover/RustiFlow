@@ -66,12 +66,13 @@ def fixture():
             transport_sum = checksum(pseudo + header + body)
             header = header[:sum_offset] + struct.pack("!H", transport_sum) + header[sum_offset + 2:]
             skip = packet_index == 10
+            ttl = 64
             if family == 4:
                 ethertype = 0x0800
                 options = bytes.fromhex("01010000") if packet_index == 0 else b""
                 total_len = 20 + len(options) + transport_len
                 ip_header = struct.pack("!BBHHHBBH", 0x45 + len(options) // 4, 0,
-                                        total_len, 1, int(skip), 64, proto, 0)
+                                        total_len, 1, int(skip), ttl, proto, 0)
                 ip_header += src + dst + options
                 ip_header = ip_header[:10] + struct.pack("!H", checksum(ip_header)) + ip_header[12:]
             else:
@@ -83,15 +84,16 @@ def fixture():
                     next_header, extension = 44, struct.pack("!BBHI", proto, 0, 8, 1)
                 payload_len = len(extension) + transport_len
                 total_len = 40 + payload_len
-                ip_header = struct.pack("!IHBB", 6 << 28, payload_len, next_header, 64)
+                ip_header = struct.pack("!IHBB", 6 << 28, payload_len, next_header, ttl)
                 ip_header += src + dst + extension
 
             wire = macs + struct.pack("!H", ethertype) + ip_header + header + body
             record = dst + src + struct.pack(
-                "<5H3B2I2B", dest_port, source_port, len(body), total_len, window,
-                flags, proto, length, seq, ack, icmp_type, icmp_code,
+                "<5H3B2I3B", dest_port, source_port, len(body), total_len, window,
+                flags, proto, length, seq, ack, icmp_type, icmp_code, ttl,
             )
-            record += bytes(1 if family == 4 else 9)
+            if family == 6:
+                record += bytes(8)
             yield wire, None if skip else record
     yield macs + bytes.fromhex("88b5") + bytes(46), None
 

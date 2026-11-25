@@ -1,5 +1,4 @@
 use aya_ebpf::{helpers::bpf_ktime_get_ns, macros::map, maps::RingBuf};
-use aya_log_ebpf::debug;
 
 use common::{
     ip_protocol,
@@ -9,7 +8,7 @@ use common::{
 use core::mem::size_of;
 use zerocopy::{FromBytes, IntoBytes};
 
-use crate::counters::{increment_counter, DROPPED_PACKETS, MATCHED_PACKETS, SUBMITTED_EVENTS};
+use crate::counters::{increment_counter, DROPPED_PACKETS, SUBMITTED_EVENTS};
 use crate::{packet::PacketContext, IPV4_COUNTER_INDEX};
 
 #[map]
@@ -56,7 +55,7 @@ pub(crate) fn process_packet(ctx: &impl PacketContext) -> Result<(), ()> {
 }
 
 #[inline(always)]
-fn submit_ipv4_event(ctx: &impl PacketContext, event: EbpfEventIpv4, queue_index: u32) {
+fn submit_ipv4_event(event: EbpfEventIpv4, queue_index: u32) {
     let reserved = match queue_index {
         0 => reserve_ipv4_event(&EVENTS_IPV4_0, event),
         1 => reserve_ipv4_event(&EVENTS_IPV4_1, event),
@@ -68,10 +67,12 @@ fn submit_ipv4_event(ctx: &impl PacketContext, event: EbpfEventIpv4, queue_index
         _ => reserve_ipv4_event(&EVENTS_IPV4_7, event),
     };
 
-    if !reserved {
-        increment_counter(&DROPPED_PACKETS, IPV4_COUNTER_INDEX);
-        debug!(ctx, "Failed to reserve entry in ring buffer.");
-    }
+    let counter = if reserved {
+        &SUBMITTED_EVENTS
+    } else {
+        &DROPPED_PACKETS
+    };
+    increment_counter(counter, IPV4_COUNTER_INDEX);
 }
 
 #[inline(always)]
@@ -79,11 +80,8 @@ fn reserve_ipv4_event(queue: &RingBuf, event: EbpfEventIpv4) -> bool {
     if let Some(mut entry) = queue.reserve::<EbpfEventIpv4>(0) {
         *entry = core::mem::MaybeUninit::new(event);
         entry.submit(0);
-        increment_counter(&MATCHED_PACKETS, IPV4_COUNTER_INDEX);
-        increment_counter(&SUBMITTED_EVENTS, IPV4_COUNTER_INDEX);
         true
     } else {
-        increment_counter(&MATCHED_PACKETS, IPV4_COUNTER_INDEX);
         false
     }
 }
@@ -158,7 +156,7 @@ fn process_transport_packet<T: NetworkHeader + FromBytes + IntoBytes + Copy>(
     let packet_log = packet_info.to_packet_log(&hdr);
     let queue_index = queue_index_ipv4(packet_info, &hdr);
 
-    submit_ipv4_event(ctx, packet_log, queue_index);
+    submit_ipv4_event(packet_log, queue_index);
 
     Ok(())
 }

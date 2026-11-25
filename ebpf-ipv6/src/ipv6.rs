@@ -1,5 +1,4 @@
 use aya_ebpf::{helpers::bpf_ktime_get_ns, macros::map, maps::RingBuf};
-use aya_log_ebpf::debug;
 
 use common::{
     ip_protocol,
@@ -10,7 +9,7 @@ use common::{
 use core::mem::size_of;
 use zerocopy::{FromBytes, IntoBytes};
 
-use crate::counters::{increment_counter, DROPPED_PACKETS, MATCHED_PACKETS, SUBMITTED_EVENTS};
+use crate::counters::{increment_counter, DROPPED_PACKETS, SUBMITTED_EVENTS};
 use crate::{packet::PacketContext, IPV6_COUNTER_INDEX};
 
 #[map]
@@ -39,14 +38,11 @@ static EVENTS_IPV6_7: RingBuf = RingBuf::with_byte_size(REALTIME_EVENT_RINGBUF_B
 
 const MAX_EXT_HEADERS: usize = 8;
 
-fn skip_ipv6_ext_headers(ctx: &impl PacketContext, start_offset: usize) -> Result<(u8, usize), ()> {
-    // Load the base IPv6 header
-    let ipv6hdr = ctx.load_header::<Ipv6Header>(start_offset)?;
-
-    // Current offset: skip the fixed 40-byte IPv6 header
-    let mut offset = start_offset + size_of::<Ipv6Header>();
-    let mut next_hdr = ipv6hdr.next_header;
-
+fn skip_ipv6_ext_headers(
+    ctx: &impl PacketContext,
+    mut next_hdr: u8,
+    mut offset: usize,
+) -> Result<(u8, usize), ()> {
     // Unrolled loop using a fixed number of iterations
     for _ in 0..MAX_EXT_HEADERS {
         let Some(extension) = Ipv6Extension::from_next_header(next_hdr) else {
@@ -64,15 +60,15 @@ fn skip_ipv6_ext_headers(ctx: &impl PacketContext, start_offset: usize) -> Resul
 }
 
 pub(crate) fn process_packet(ctx: &impl PacketContext) -> Result<(), ()> {
-    // 1) Skip over IPv6 extension headers to find the real upper-layer protocol and offset
-    let (final_proto, offset_after_ext) = skip_ipv6_ext_headers(ctx, size_of::<EthernetHeader>())?;
+    let network_offset = size_of::<EthernetHeader>();
+    let ipv6hdr = ctx.load_header::<Ipv6Header>(network_offset)?;
+    let (final_proto, offset_after_ext) = skip_ipv6_ext_headers(
+        ctx,
+        ipv6hdr.next_header,
+        network_offset + size_of::<Ipv6Header>(),
+    )?;
+    let packet_info = PacketInfo::new(&ipv6hdr, final_proto, offset_after_ext - network_offset)?;
 
-    // 2) Build packet_info for IPv6
-    let ipv6hdr = ctx.load_header::<Ipv6Header>(size_of::<EthernetHeader>())?;
-    let network_header_length = offset_after_ext - size_of::<EthernetHeader>();
-    let packet_info = PacketInfo::new(&ipv6hdr, final_proto, network_header_length)?;
-
-    // 3) Dispatch on the final protocol
     match final_proto {
         ip_protocol::TCP => {
             process_transport_packet::<TcpHeader>(ctx, &packet_info, offset_after_ext)
@@ -88,7 +84,7 @@ pub(crate) fn process_packet(ctx: &impl PacketContext) -> Result<(), ()> {
 }
 
 #[inline(always)]
-fn submit_ipv6_event(ctx: &impl PacketContext, event: EbpfEventIpv6, queue_index: u32) {
+fn submit_ipv6_event(event: EbpfEventIpv6, queue_index: u32) {
     let reserved = match queue_index {
         0 => reserve_ipv6_event(&EVENTS_IPV6_0, event),
         1 => reserve_ipv6_event(&EVENTS_IPV6_1, event),
@@ -100,10 +96,12 @@ fn submit_ipv6_event(ctx: &impl PacketContext, event: EbpfEventIpv6, queue_index
         _ => reserve_ipv6_event(&EVENTS_IPV6_7, event),
     };
 
-    if !reserved {
-        increment_counter(&DROPPED_PACKETS, IPV6_COUNTER_INDEX);
-        debug!(ctx, "Failed to reserve entry in ring buffer.");
-    }
+    let counter = if reserved {
+        &SUBMITTED_EVENTS
+    } else {
+        &DROPPED_PACKETS
+    };
+    increment_counter(counter, IPV6_COUNTER_INDEX);
 }
 
 #[inline(always)]
@@ -111,11 +109,8 @@ fn reserve_ipv6_event(queue: &RingBuf, event: EbpfEventIpv6) -> bool {
     if let Some(mut entry) = queue.reserve::<EbpfEventIpv6>(0) {
         *entry = core::mem::MaybeUninit::new(event);
         entry.submit(0);
-        increment_counter(&MATCHED_PACKETS, IPV6_COUNTER_INDEX);
-        increment_counter(&SUBMITTED_EVENTS, IPV6_COUNTER_INDEX);
         true
     } else {
-        increment_counter(&MATCHED_PACKETS, IPV6_COUNTER_INDEX);
         false
     }
 }
@@ -198,7 +193,7 @@ fn process_transport_packet<T: NetworkHeader + FromBytes + IntoBytes + Copy>(
     let packet_log = packet_info.to_packet_log(&hdr);
     let queue_index = queue_index_ipv6(packet_info, &hdr);
 
-    submit_ipv6_event(ctx, packet_log, queue_index);
+    submit_ipv6_event(packet_log, queue_index);
 
     Ok(())
 }

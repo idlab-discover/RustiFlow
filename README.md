@@ -162,6 +162,9 @@ Realtime capture is Linux-only and needs root or `CAP_BPF`, `CAP_NET_ADMIN` and
 
 ![RustiFlow Architecture Realtime](figures/realtime.png)
 
+When updating a manual installation, update the executable before replacing
+the eBPF objects.
+
 ### Promiscuous capture
 
 A physical NIC drops unicast frames addressed to other MAC addresses. On a tap,
