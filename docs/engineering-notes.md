@@ -4,6 +4,64 @@ This file keeps short-lived design choices and execution notes that would make
 `AGENTS.md` too long. Newest entries come first. Older entries are condensed to
 the decisions and results that still describe the current code.
 
+## 2026-11-25. Realtime shutdown and classifier cost on nuccore
+
+A paused capture had 250,000 mixed IPv4/IPv6 UDP events queued when it
+received Ctrl-C. At `cbabf204`, TC submitted all 250,000 and reported zero
+ring drops, yet the export contained zero packets. Shutdown now detaches
+the producers, drains the rings and dispatch queues, and finalizes the
+writer. Capture compares the decoded count with the kernel submission count
+and returns an error on mismatch. The same fixture now exports both 125,000
+packet flows. Their stable Parquet fields match the uninterrupted control.
+This also passed with single TC, both XDP modes, budgeted draining, dedicated
+reactors, and dispatch and shard queues constrained to one batch each.
+[Reproduction](profiling/README.md#realtime-shutdown-with-queued-events)
+
+Both classifiers now update one per-CPU outcome counter per matched
+packet. Userspace derives the matched count from submissions and ring
+drops. Full rings increment the drop counter directly. IPv6 also reuses
+its base header after extension parsing. The new executable supports older
+eBPF objects. With the same userspace binary, six alternating pairs at
+200 kpps measured a median combined split-TC runtime of 306.5 ns/frame
+(303.3–316.7) with the old objects and 302.4 ns/frame (297.7–315.2) with
+the new objects. These are instrumented BPF runtimes over 250,000 mixed
+frames per repetition. Combined JIT code fell from 44,630 to 11,466 bytes.
+
+The flow table now builds early-export snapshots on the early-export path.
+Six alternating pairs of 20-million-event replay runs used 16 workers,
+eight sources, full RustiFlow features, and Parquet files. The table shows
+median Mpps, with observed ranges.
+
+| Replay | Baseline | Current |
+| --- | ---: | ---: |
+| IPv4, 100,000 flows | 13.44 (13.32–14.61) | 13.80 (13.36–14.15) |
+| IPv6, 100,000 flows | 13.10 (12.80–13.37) | 13.50 (12.35–13.93) |
+| IPv4, 300,000 flows | 9.67 (9.47–10.29) | 9.72 (9.36–10.14) |
+
+The ranges overlap for all three cases. A packed flow-key hashing trial
+also had overlapping ranges and was removed. In a 30-million-event IPv4
+profile at 100,000 flows, lookup and per-packet updates accounted for 52–65%
+of sampled baseline userspace cycles across the three core types.
+
+Three alternating veth pairs used eight sender cores and eight capture
+cores, with 24 million CAIDA-shaped frames per run and a regular Parquet
+file. Median delivery was 6.07 Mpps (6.00–6.17) at baseline and 6.12 Mpps
+(5.97–6.21) with the current code. Every run reconciled from veth receive
+through the 203-column Parquet export with zero ring drops. In three
+additional runs, Ctrl-C interrupted the current capture during traffic.
+All 11.75–11.98 million events accepted by TC per run reached Parquet.
+
+A longer run used four 100-million-frame segments on the same veth,
+crossing the default 60-second expiration sweep. The 400 million frames
+arrived in 67.2 s, with 67.8 s elapsed through writer close. Sender,
+interface, TC and Parquet packet counts agreed, with zero ring drops.
+The 3.3 GiB file held 8.81 million rows. Process RSS sampled after each
+segment rose from 4.43 to 5.27 GiB during the run. These runs measure
+the local software path. The host's Ethernet link negotiated at 1 Gbit/s.
+
+Raw runs, profiles, fixture exports, and harness scripts are under
+`target/perf-100g-next/`.
+
 ## 2026-11-25. CAIDA-shaped 100 Gbit/s packet-rate profile on nuccore
 
 At `659288cd`, the April 2026 CAIDA Los Angeles–Dallas sample gives
