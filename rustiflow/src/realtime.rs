@@ -4,6 +4,7 @@ mod ebpf_objects;
 mod promiscuous;
 mod replay;
 mod ring_drain;
+mod ring_sizes;
 mod source_reactors;
 
 pub use replay::replay_bench;

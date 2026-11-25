@@ -186,10 +186,31 @@ flag, so pass it on the command line or in `RUSTIFLOW_REALTIME_ARGS`.
 | `RUSTIFLOW_REALTIME_SHARD_BATCH_SIZE` | Shard batch capacity in packets for realtime capture and replay (default: 512) |
 | `RUSTIFLOW_REALTIME_SHARD_QUEUE_CAPACITY`, `RUSTIFLOW_REALTIME_SOURCE_DISPATCH_QUEUE_CAPACITY` | Pipeline queue capacities |
 | `RUSTIFLOW_REALTIME_STATS=1` | Per-source drain and dispatch timing |
+| `RUSTIFLOW_EXPERIMENT_RING_BYTES` | Realtime event-map data bytes, in decimal as `IPv4_per_map,IPv6_per_map,total_cap`. Unset uses the sizes in the selected eBPF object. |
 | `RUSTIFLOW_EXPERIMENT_*` | Opt-in experiments (XDP ingress, single tc classifier, staged lookup, and others) and switches for on-by-default optimizations |
 
 [docs/profiling/experiments.md](docs/profiling/experiments.md) lists every
 experiment switch, its default, and its measured effect.
+
+On Linux, each family has eight event rings per capture direction. Explicit
+sizes must be powers of two of at least one host page. RustiFlow checks the
+total against the supplied cap before loading a classifier. The cap covers
+event-ring data only. Map metadata, flow tables and export need additional
+memory. Smaller rings can drop packets during reader stalls.
+
+For example, the following command calculates a setting on the capture host
+for a 120 ms stall. Supply peak packets/s in the busiest **software ring of
+each family**. For two-hook capture, use the higher peak across the two hooks
+for each family and omit `--ingress-only`.
+
+```bash
+python3 docs/profiling/size_event_rings.py --ingress-only --cap-mib 65 \
+    --stall-ms 120 --ipv4-hot-pps 1350000 --ipv6-hot-pps 10000
+# 8388608,131072,68157440
+```
+
+Set `RUSTIFLOW_EXPERIMENT_RING_BYTES` to the printed value for the capture.
+The calculator reports an error if the requested burst exceeds the budget.
 
 ## Configuration file and TUI
 

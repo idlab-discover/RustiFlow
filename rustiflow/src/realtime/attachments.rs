@@ -8,7 +8,7 @@ use aya::{
         tc::{NlOptions, TcAttach},
         Program, SchedClassifier, TcAttachType, Xdp, XdpMode,
     },
-    Ebpf,
+    Ebpf, EbpfLoader,
 };
 use aya_log::EbpfLogger;
 use common::REALTIME_EVENT_QUEUE_COUNT;
@@ -70,20 +70,22 @@ impl Capture {
         let ingress = Ingress::select(ingress_only)?;
         let interface_name = CString::new(interface)
             .with_context(|| format!("interface name {interface:?} contains a NUL byte"))?;
+        let overrides = super::ring_sizes::map_overrides(ingress_only)?;
         let mut capture = Self::default();
         match ingress {
             Ingress::SplitTc => {
-                capture.add_split_tc(&interface_name, TcAttachType::Ingress)?;
+                capture.add_split_tc(&interface_name, TcAttachType::Ingress, &overrides)?;
                 if !ingress_only {
-                    capture.add_split_tc(&interface_name, TcAttachType::Egress)?;
+                    capture.add_split_tc(&interface_name, TcAttachType::Egress, &overrides)?;
                 }
             }
             Ingress::Experiment(hook) => {
-                let mut bpf = load_object(if matches!(hook, ExperimentHook::LegacySingleTc) {
+                let object = if matches!(hook, ExperimentHook::LegacySingleTc) {
                     "rustiflow-ebpf-dual-stack"
                 } else {
                     INGRESS_EXPERIMENT_OBJECT
-                })?;
+                };
+                let mut bpf = load_object(object, &overrides)?;
                 match hook {
                     ExperimentHook::LegacySingleTc | ExperimentHook::SingleTc => attach_tc(
                         &mut bpf,
@@ -108,14 +110,19 @@ impl Capture {
         Ok(capture)
     }
 
-    fn add_split_tc(&mut self, interface: &CStr, attach_type: TcAttachType) -> anyhow::Result<()> {
+    fn add_split_tc(
+        &mut self,
+        interface: &CStr,
+        attach_type: TcAttachType,
+        overrides: &[(String, u32)],
+    ) -> anyhow::Result<()> {
         let (label4, label6) = match attach_type {
             TcAttachType::Ingress => ("ingress-ipv4", "ingress-ipv6"),
             TcAttachType::Egress => ("egress-ipv4", "egress-ipv6"),
         };
-        let mut ipv4 = load_object("rustiflow-ebpf-ipv4")?;
+        let mut ipv4 = load_object("rustiflow-ebpf-ipv4", overrides)?;
         attach_tc(&mut ipv4, interface, "IPv4", attach_type)?;
-        let mut ipv6 = load_object("rustiflow-ebpf-ipv6")?;
+        let mut ipv6 = load_object("rustiflow-ebpf-ipv6", overrides)?;
         attach_tc(&mut ipv6, interface, "IPv6", attach_type)?;
         // Preserve the order in which the original pipeline starts its source tasks.
         self.ipv4
@@ -172,10 +179,15 @@ impl Capture {
     }
 }
 
-fn load_object(object: &str) -> anyhow::Result<Ebpf> {
+fn load_object(object: &str, overrides: &[(String, u32)]) -> anyhow::Result<Ebpf> {
     let binary_path = ebpf_object_path(object)?;
     info!("Loading eBPF binary {}", binary_path.display());
-    Ebpf::load_file(&binary_path)
+    let mut loader = EbpfLoader::new();
+    for (name, bytes) in overrides {
+        loader.map_max_entries(name, *bytes);
+    }
+    loader
+        .load_file(&binary_path)
         .with_context(|| format!("Failed to load eBPF binary from {}", binary_path.display()))
 }
 
