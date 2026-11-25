@@ -1,8 +1,8 @@
-"""Join a quiescent two-family fixture interval to its independent reference and closed export.
+"""Locate the first observed count difference in a capture interval.
 
-On a shared physical link, use counters.py alone until an independent source and
-a comparable packet cohort are available. A driver counter and a softnet drop
-may refer to other traffic. A readable empty Parquet file has zero rows.
+Pass a counters.py delta JSON file and optional independent evidence, or a
+completed fixture directory. Unknown and mixed cohorts preclude attributing
+link discrepancies. Only a drained interval can reconcile terminal exports.
 """
 
 import argparse
@@ -58,6 +58,94 @@ def file_counts(directory):
     return rows, all_counts, target
 
 
+def explain(interval, evidence, tc, shapes=None, epoch_ok=True):
+    d = interval["deltas"]
+    pressure = {k: v for k, v in d.items() if v and (
+        k == "link.rx.missed_errors" or k.startswith("driver.") and
+        k.endswith(("missed_errors", "no_buffer_count", "_drops", "_alloc_failed")))}
+    queues = {m[1] for k in d if (m := re.match(r"driver\.rx_queue_(\d+)_", k))}
+    queue_packets = [d.get(f"driver.rx_queue_{q}_packets") for q in queues]
+    queue_total = sum(queue_packets) if queue_packets and None not in queue_packets else None
+    findings = ["device reports receive pressure"] if pressure else []
+    notes = []
+    scope = evidence.get("scope", "unknown")
+    if scope not in ("isolated", "mixed", "unknown"):
+        raise ValueError("expected isolated, mixed or unknown scope")
+    truth = evidence.get("reference_frames", {})
+    decoded = evidence.get("decoded", {})
+    exported = evidence.get("exported", {})
+    other = evidence.get("other_link_units")
+    for counts in (truth, decoded, exported):
+        if not isinstance(counts, dict) or counts.keys() - {"4", "6"}:
+            raise ValueError("expected per-family count object")
+    for v in (other, *truth.values(), *decoded.values(), *exported.values()):
+        if v is not None and (type(v) is not int or v < 0):
+            raise ValueError("expected nonnegative integer count or null")
+
+    rx = d.get("link.rx.packets")
+    if scope == "mixed":
+        notes.append("other traffic in observation window")
+    elif scope != "isolated" or other is None or any(truth.get(f) is None for f in tc):
+        notes.append("independent comparable frame cohort unavailable")
+    elif not epoch_ok:
+        notes.append("TC interval cannot be joined to capture epoch")
+    elif rx is None:
+        notes.append("link interval unavailable")
+    elif rx < other:
+        notes.append("excluded link units exceed observed RX")
+    else:
+        scoped_rx = rx - other
+        total = sum(truth.values())
+        aggregate = any(v["gso_skbs"] for v in shapes or [])
+        inline_tag = any(v["ethertype"] == "802.1Q" for v in shapes or [])
+        if scoped_rx < total:
+            findings.append("fewer units by capture link RX than independent frames")
+            if aggregate:
+                findings.append("multi-segment skbs confirmed at TC")
+        elif scoped_rx > total:
+            findings.append("additional link units beyond the known offer")
+        matches = [v["matched"] for v in tc.values()]
+        if None in matches:
+            notes.append("parsed TC match interval unavailable")
+        elif sum(matches) < scoped_rx:
+            if inline_tag:
+                findings.append("inline VLAN at TC EtherType check")
+            elif aggregate:
+                findings.append("aggregation observed between link RX accounting and TC")
+            else:
+                findings.append("fewer parsed TC matches than scoped link RX units")
+        elif sum(matches) > scoped_rx:
+            findings.append("TC matches exceed scoped link RX units")
+        elif sum(matches) == total and any(tc[f]["matched"] != truth[f] for f in tc):
+            findings.append("family counts diverge by TC match")
+
+    if epoch_ok and any(v["ring_drop"] for v in tc.values()):
+        findings.append("TC ring reservation loss")
+    drained = evidence.get("drained", False)
+    if type(drained) is not bool:
+        raise ValueError("expected boolean drained flag")
+    if drained and epoch_ok:
+        for f, kernel in tc.items():
+            submitted = kernel["submitted"]
+            if submitted is not None and decoded.get(f) is not None and decoded[f] != submitted:
+                findings.append(f"IPv{f} submitted versus decoded mismatch")
+        for f, kernel in tc.items():
+            if exported.get(f) is None:
+                continue
+            if decoded.get(f) is not None:
+                if exported[f] != decoded[f]:
+                    findings.append(f"IPv{f} decoded versus exported mismatch")
+            elif kernel["submitted"] is not None and exported[f] != kernel["submitted"]:
+                findings.append(f"IPv{f} post-submission export mismatch")
+        if any(decoded.get(f) is None or exported.get(f) is None for f in tc):
+            notes.append("per-family decode or file totals unavailable")
+    else:
+        notes.append("terminal decode and export comparison unavailable")
+    first = next(iter(findings), notes[0] if notes else "observed counts reconcile")
+    return dict(first_observation=first, observations=findings, limits=notes,
+                device_pressure=pressure, reported_queue_packet_sum=queue_total)
+
+
 def assess(directory):
     sender = read(directory, "sender.json")
     reference = json.loads((directory / "reference.log").read_text().splitlines()[-1])
@@ -71,61 +159,23 @@ def assess(directory):
     other = sender["other_frames"] if interval["identity"][3] == "cap0" else 0
     shape_file = directory / "shapes.json"
     shapes = json.loads(shape_file.read_text()) if shape_file.exists() else None
-    aggregate = any(v["gso_skbs"] for v in shapes or [])
-    inline_tag = any(v["ethertype"] == "802.1Q" for v in shapes or [])
-    findings = []
     reference_complete = (reference["frames"] == {"4": offered, "6": offered}
                           and reference["socket_drops"] == 0)
-    hardware = {k: v for k, v in counters.items() if k.startswith("driver.") and v
-                and k.endswith(("missed_errors", "no_buffer_count", "_drops", "_alloc_failed"))}
-    # A nonzero device-wide counter is an observation. Family attribution needs a matched cohort.
-    if hardware:
-        findings.append("driver reports receive pressure")
-    rx = counters.get("link.rx.packets")
-    scoped_rx = rx - other if rx is not None else None
-    matched = sum(v["matched"] for v in tc.values())
-    mixed_export = any(target[f]["packet_count"] != exported[f] for f in tc)
-    map_disagreement = any(counters[key] != v for f in tc for outcome, v in tc[f].items()
-                           if (key := f"tc.ipv{f}.{outcome}") in counters and counters[key] is not None)
-    incomplete_maps = bool(read(directory, "before.json")["tc_epochs"]) and any(
-        counters.get(f"tc.ipv{f}.{outcome}") is None for f in tc for outcome in tc[f])
-    if not reference_complete:
-        findings.append("independent frame truth incomplete")
-    elif mixed_export or reference["socket_packets"] != sum(reference["frames"].values()):
-        findings.append("other IP traffic in observation window")
-    elif map_disagreement or incomplete_maps:
-        findings.append("TC interval cannot be joined to capture epoch")
-    elif scoped_rx is None:
-        findings.append("link interval unavailable")
-    else:
-        if scoped_rx < 2 * offered:
-            findings.append("coarser count by capture link RX")
-            if aggregate:
-                findings.append("multi-segment skbs confirmed at TC")
-        elif scoped_rx > 2 * offered:
-            findings.append("additional link units beyond the known offer")
-        if matched < scoped_rx:
-            if inline_tag:
-                findings.append("inline VLAN at TC EtherType check")
-            elif aggregate:
-                findings.append("aggregation between link RX accounting and TC")
-            else:
-                findings.append("fewer parsed TC matches than scoped link RX units")
-        elif matched > scoped_rx:
-            findings.append("TC matches exceed scoped link RX units")
-        elif matched == 2 * offered and any(v["matched"] != offered for v in tc.values()):
-            findings.append("family counts diverge by TC match")
-    if any(v["ring_drop"] for v in tc.values()):
-        findings.append("TC ring reservation loss")
-    if any(decoded[f] is not None and decoded[f] != tc[f]["submitted"] for f in tc):
-        findings.append("submitted versus decoded mismatch")
-    if any(exported[f] != tc[f]["submitted"] for f in tc):
-        findings.append("post-submission export mismatch")
+    scope = "isolated" if reference_complete else "unknown"
+    if any(target[f]["packet_count"] != exported[f] for f in tc) or (
+            reference["socket_packets"] != sum(reference["frames"].values())):
+        scope = "mixed"
+    with_maps = bool(read(directory, "before.json")["tc_epochs"])
+    epoch_ok = not with_maps or all(counters.get(f"tc.ipv{f}.{k}") == v
+                                    for f in tc for k, v in tc[f].items())
+    evidence = dict(scope=scope, reference_frames=reference["frames"], other_link_units=other,
+                    drained=True, decoded=decoded, exported=exported)
+    result = explain(interval, evidence, tc, shapes, epoch_ok)
     for f in tc:
         tc[f]["decoded"] = decoded[f]
         tc[f]["all_exported"] = exported[f]
         tc[f]["fixture_exported"] = target[f]
-    return dict(first_observation=next(iter(findings), "counts reconcile"), observations=findings,
+    return dict(**result,
                 families=tc, sent_per_family=offered, other_frames_at_hook=other,
                 reference_complete=reference_complete, reference=reference,
                 parquet_rows=rows, tc_shapes=shapes, interval=interval)
@@ -133,6 +183,17 @@ def assess(directory):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("directory", type=Path)
+    parser.add_argument("input", type=Path, help="delta JSON or completed fixture directory")
+    parser.add_argument("--evidence", type=Path, help="optional cohort and terminal counts for a delta")
     args = parser.parse_args()
-    print(json.dumps(assess(args.directory), indent=2))
+    if args.input.is_dir():
+        if args.evidence:
+            parser.error("fixture directories already supply the evidence")
+        result = assess(args.input)
+    else:
+        interval = json.loads(args.input.read_text())
+        evidence = json.loads(args.evidence.read_text()) if args.evidence else {}
+        tc = {f: {k: interval["deltas"].get(f"tc.ipv{f}.{k}") for k in ("matched", "submitted", "ring_drop")}
+              for f in ("4", "6")}
+        result = dict(**explain(interval, evidence, tc), families=tc, interval=interval, evidence=evidence)
+    print(json.dumps(result, indent=2))
