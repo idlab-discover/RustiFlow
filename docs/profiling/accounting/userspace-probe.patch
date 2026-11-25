@@ -1,0 +1,177 @@
+diff --git a/rustiflow/src/output.rs b/rustiflow/src/output.rs
+--- a/rustiflow/src/output.rs
++++ b/rustiflow/src/output.rs
+@@ -1,5 +1,7 @@
+ mod connection_order;
+ mod parquet;
++
++pub(crate) use parquet::{accounting_requested, appended_counts};
+
+ use crate::{
+     args::{ExportMethodType, OutputConfig},
+diff --git a/rustiflow/src/output/parquet.rs b/rustiflow/src/output/parquet.rs
+--- a/rustiflow/src/output/parquet.rs
++++ b/rustiflow/src/output/parquet.rs
+@@ -4,7 +4,7 @@
+     net::Ipv4Addr,
+     sync::{
+         atomic::{AtomicBool, Ordering},
+-        Arc,
++        Arc, Mutex,
+     },
+     time::Instant,
+ };
+@@ -39,7 +39,19 @@
+ const FIRST_GROUP_ROWS: usize = 512;
+ const MAX_GROUP_ROWS: usize = 4096;
+
++// Profiling build: one file per CLI. Publish only successfully appended groups.
++static APPENDED: Mutex<Option<[u64; 3]>> = Mutex::new(None);
++
++pub(crate) fn accounting_requested() -> bool {
++    std::env::var_os("RUSTIFLOW_PROBE_COUNTS").as_deref() == Some(std::ffi::OsStr::new("1"))
++}
++
++pub(crate) fn appended_counts() -> Option<[u64; 3]> {
++    *APPENDED.lock().expect("accounting lock")
++}
++
+ struct EncodedGroup {
++    counts: Option<[u64; 3]>,
+     bytes: Bytes,
+     columns: Vec<ColumnCloseResult>,
+ }
+@@ -124,7 +136,30 @@
+     }
+ }
+
++fn group_counts(columns: &[Column], positions: Option<(usize, usize)>) -> Option<[u64; 3]> {
++    let (version, packets) = positions?;
++    let (Column::Integer(versions), Column::Integer(counts)) =
++        (columns.get(version)?, columns.get(packets)?)
++    else {
++        return None;
++    };
++    if versions.len() != counts.len() {
++        return None;
++    }
++    let mut totals = [versions.len() as u64, 0, 0];
++    for (&family, &count) in versions.iter().zip(counts) {
++        let index = match family {
++            4 => 1,
++            6 => 2,
++            _ => return None,
++        };
++        totals[index] = totals[index].checked_add(u64::try_from(count).ok()?)?;
++    }
++    Some(totals)
++}
++
+ struct Encoder {
++    accounting_columns: Option<(usize, usize)>,
+     descriptors: Vec<ColumnDescPtr>,
+     properties: Arc<WriterProperties>,
+     interrupted: AtomicBool,
+@@ -139,6 +174,7 @@
+     }
+
+     fn encode(&self, columns: Vec<Column>) -> Result<EncodedGroup> {
++        let counts = group_counts(&columns, self.accounting_columns);
+         let mut bytes = TrackedWrite::new(Vec::new());
+         let mut chunks = Vec::with_capacity(columns.len());
+         for (column, descriptor) in columns.into_iter().zip(&self.descriptors) {
+@@ -159,6 +195,7 @@
+             chunks.push(writer.close()?);
+         }
+         Ok(EncodedGroup {
++            counts,
+             bytes: bytes.into_inner()?.into(),
+             columns: chunks,
+         })
+@@ -258,6 +295,16 @@
+             group.append_column(&encoded.bytes, column)?;
+         }
+         group.close()?;
++        if encoder.accounting_columns.is_some() {
++            let mut totals = APPENDED.lock().expect("accounting lock");
++            *totals = totals.zip(encoded.counts).and_then(|(a, b)| {
++                Some([
++                    a[0].checked_add(b[0])?,
++                    a[1].checked_add(b[1])?,
++                    a[2].checked_add(b[2])?,
++                ])
++            });
++        }
+         export_profile::record_write(start.elapsed());
+     }
+     let start = Instant::now();
+@@ -266,6 +313,9 @@
+         "Parquet shard stopped before its final flush"
+     );
+     file.finish()?;
++    if encoder.accounting_columns.is_some() {
++        log::info!("Accounting footer appended={:?}", appended_counts());
++    }
+     export_profile::record_write(start.elapsed());
+     export_profile::record_file_bytes(file.bytes_written());
+     Ok(())
+@@ -316,7 +366,17 @@
+     let properties = Arc::new(properties);
+     let physical = ArrowSchemaConverter::new().convert(&schema)?;
+     let file = SerializedFileWriter::new(file, physical.root_schema_ptr(), properties.clone())?;
++    let accounting_columns = if accounting_requested() {
++        schema
++            .index_of("ip_version")
++            .ok()
++            .zip(schema.index_of("packet_count").ok())
++    } else {
++        None
++    };
++    *APPENDED.lock().expect("accounting lock") = accounting_columns.map(|_| [0; 3]);
+     let encoder = Arc::new(Encoder {
++        accounting_columns,
+         descriptors: physical.columns().to_vec(),
+         properties,
+         interrupted: AtomicBool::new(false),
+diff --git a/rustiflow/src/realtime.rs b/rustiflow/src/realtime.rs
+--- a/rustiflow/src/realtime.rs
++++ b/rustiflow/src/realtime.rs
+@@ -474,6 +474,38 @@
+     .start(reactor_count, &mut handle_set, sources)
+     .await?;
+
++    if crate::output::accounting_requested() && enable_source_stats && ingress_only {
++        let families = ["ingress-ipv4-q", "ingress-ipv6-q"].map(|prefix| {
++            source_stats
++                .iter()
++                .filter(|(label, _)| label.starts_with(prefix))
++                .filter_map(|(_, stats)| stats.clone())
++                .collect::<Vec<_>>()
++        });
++        if families
++            .iter()
++            .all(|family| family.len() == common::REALTIME_EVENT_QUEUE_COUNT)
++        {
++            match signal::unix::signal(signal::unix::SignalKind::user_defined1()) {
++                Ok(mut requests) => {
++                    graph_tasks.spawn(async move {
++                        while requests.recv().await.is_some() {
++                            let decoded = families.each_ref().map(|family| {
++                                family
++                                    .iter()
++                                    .map(|stats| stats.events.load(Ordering::Relaxed))
++                                    .sum::<u64>()
++                            });
++                            let appended = crate::output::appended_counts();
++                            info!("Accounting sample decoded={decoded:?} appended={appended:?}");
++                        }
++                    });
++                    info!("Accounting probe listening for SIGUSR1");
++                }
++                Err(error) => log::warn!("Accounting signal unavailable: {error}"),
++            }
++        }
++    }
+     info!("Waiting for Ctrl-C...");
+
+     if let Some(packet_rx) = packet_rx {

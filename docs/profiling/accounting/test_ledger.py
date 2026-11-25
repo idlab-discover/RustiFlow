@@ -44,6 +44,13 @@ class BoundaryTest(unittest.TestCase):
         self.evidence["drained"] = False
         self.assertEqual(explain(self.interval, self.evidence, self.kernel)["observations"], [])
 
+    def test_inflight_export_can_catch_up_from_an_earlier_interval(self):
+        self.evidence.update(drained=False, appended_packets={"4": 30, "6": 0})
+        result = explain(self.interval, self.evidence, self.kernel)
+        self.assertEqual(result["observations"], [])
+        self.assertEqual(result["interval_balances"]["4"],
+                         {"submitted_minus_decoded": 0, "decoded_minus_appended": -10})
+
     def test_localize_remaining_stages_when_submission_missing(self):
         kernel = deepcopy(self.kernel)
         kernel["6"].update(submitted=None, matched=None)

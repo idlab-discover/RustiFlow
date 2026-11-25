@@ -74,11 +74,12 @@ def explain(interval, evidence, tc, shapes=None, epoch_ok=True):
     truth = evidence.get("reference_frames", {})
     decoded = evidence.get("decoded", {})
     exported = evidence.get("exported", {})
+    appended = evidence.get("appended_packets", {})
     other = evidence.get("other_link_units")
-    for counts in (truth, decoded, exported):
+    for counts in (truth, decoded, exported, appended):
         if not isinstance(counts, dict) or counts.keys() - {"4", "6"}:
             raise ValueError("expected per-family count object")
-    for v in (other, *truth.values(), *decoded.values(), *exported.values()):
+    for v in (other, *truth.values(), *decoded.values(), *exported.values(), *appended.values()):
         if v is not None and (type(v) is not int or v < 0):
             raise ValueError("expected nonnegative integer count or null")
 
@@ -146,7 +147,14 @@ def explain(interval, evidence, tc, shapes=None, epoch_ok=True):
     else:
         notes.append("terminal decode and export comparison unavailable")
     first = next(iter(findings), notes[0] if notes else "observed counts reconcile")
-    return dict(first_observation=first, observations=findings, limits=notes,
+    balances = {}
+    for f, kernel in tc.items():
+        n = decoded.get(f)
+        sub = kernel["submitted"] if epoch_ok else None
+        groups = appended.get(f)
+        balances[f] = dict(submitted_minus_decoded=None if None in (sub, n) else sub - n,
+                           decoded_minus_appended=None if None in (n, groups) else n - groups)
+    return dict(first_observation=first, observations=findings, limits=notes, interval_balances=balances,
                 device_pressure=pressure, reported_queue_packet_sum=queue_total,
                 tc_plus_other_within_link_bracket=tc_in_bracket)
 
