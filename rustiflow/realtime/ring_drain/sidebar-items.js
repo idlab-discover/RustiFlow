@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"constant":["CLOCK_CHECK_RECORDS","LATENCY_BUCKETS","RECORD_BUDGET","TIME_BUDGET"],"enum":["DrainEnd","DrainPolicy"],"fn":["drain"],"struct":["RingStats"]};
+window.SIDEBAR_ITEMS = {"constant":["CLOCK_CHECK_RECORDS","LATENCY_BUCKETS","RECORD_BUDGET","TIME_BUDGET"],"enum":["DrainEnd","DrainPolicy"],"fn":["drain"],"struct":["RingDrain","RingStats"]};

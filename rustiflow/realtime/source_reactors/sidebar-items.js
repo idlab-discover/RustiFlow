@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"struct":["ReactorCount","RingSource","RingSourcePipeline","SourceReactors"]};
+window.SIDEBAR_ITEMS = {"enum":["Shutdown"],"fn":["finish_sources","unexpected_source_exit"],"struct":["ReactorCount","RingSource","RingSourcePipeline","SourceControl","SourceReactors"]};
